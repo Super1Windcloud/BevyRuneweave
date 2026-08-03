@@ -1,0 +1,209 @@
+[workspace]
+dependencies_update = false
+publish_timeout = "30m"
+git_release_enable = false
+git_tag_enable = false
+git_release_body = """
+{{ changelog }}
+{% if remote.contributors %}
+### Contributors
+{% for contributor in remote.contributors | unique(attribute="username") %}
+* @{{ contributor.username }}
+{% endfor %}
+{% endif %}
+"""
+
+[changelog]
+commit_parsers = [
+    # dont include chore changes in changelog
+    { message = "^chore.*", skip = true },
+    { message = "^test.*", skip = true },
+    { message = "^docs.*", skip = true },
+    { message = "^.*SKIP_CHANGELOG.*$", skip = true },
+    { message = "^feat", group = "added" },
+    { message = "^changed", group = "changed" },
+    { message = "^deprecated", group = "deprecated" },
+    { message = "^refactor", group = "refactored" },
+    { message = "^fix", group = "fixed" },
+    { message = "^security", group = "security" },
+    { message = "^.*", group = "other" },
+]
+
+[[package]]
+name = "bevy_mod_scripting"
+publish_features = ["lua55"]
+version_group = "main"
+git_release_latest = true
+git_release_enable = true
+git_tag_enable = true
+git_tag_name = "v{{ version }}"
+git_release_name = "v{{ version }}"
+
+changelog_include = [
+    "bevy_mod_scripting_lua",
+    "bevy_mod_scripting_core",
+    "bevy_mod_scripting_derive",
+    "bevy_mod_scripting_quickjs",
+    "bevy_mod_scripting_functions",
+    "lua_language_server_lad_backend",
+    "ladfile",
+    "ladfile_builder",
+    "mdbook_lad_preprocessor",
+    "bevy_system_reflection",
+
+    ## bindings crates 
+
+    "bevy_a11y_bms_bindings",
+    "bevy_animation_bms_bindings",
+    "bevy_asset_bms_bindings",
+    "bevy_color_bms_bindings",
+    "bevy_core_pipeline_bms_bindings",
+    "bevy_ecs_bms_bindings",
+    "bevy_gizmos_bms_bindings",
+    "bevy_gltf_bms_bindings",
+    "bevy_image_bms_bindings",
+    "bevy_input_bms_bindings",
+    "bevy_input_focus_bms_bindings",
+    "bevy_math_bms_bindings",
+    "bevy_mesh_bms_bindings",
+    "bevy_pbr_bms_bindings",
+    "bevy_picking_bms_bindings",
+    "bevy_reflect_bms_bindings",
+    "bevy_render_bms_bindings",
+    "bevy_scene_bms_bindings",
+    "bevy_sprite_bms_bindings",
+    "bevy_text_bms_bindings",
+    "bevy_time_bms_bindings",
+    "bevy_transform_bms_bindings",
+]
+
+[[package]]
+name = "bevy_mod_scripting_lua"
+publish_features = ["lua55"]
+version_group = "main"
+
+[[package]]
+name = "bevy_mod_scripting_core"
+version_group = "main"
+
+[[package]]
+name = "bevy_mod_scripting_derive"
+version_group = "main"
+
+[[package]]
+name = "bevy_mod_scripting_quickjs"
+version_group = "main"
+
+[[package]]
+name = "bevy_mod_scripting_functions"
+version_group = "main"
+
+[[package]]
+name = "lua_language_server_lad_backend"
+version_group = "main"
+
+[[package]]
+name = "ladfile"
+version_group = "main"
+
+[[package]]
+name = "ladfile_builder"
+version_group = "main"
+
+[[package]]
+name = "mdbook_lad_preprocessor"
+version_group = "main"
+
+[[package]]
+name = "bevy_system_reflection"
+version_group = "main"
+
+# bindings crates
+
+[[package]]
+name = "bevy_a11y_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_animation_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_asset_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_color_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_core_pipeline_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_ecs_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_gizmos_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_gltf_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_image_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_input_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_input_focus_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_math_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_mesh_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_pbr_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_picking_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_reflect_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_render_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_scene_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_sprite_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_text_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_time_bms_bindings"
+version_group = "main"
+
+[[package]]
+name = "bevy_transform_bms_bindings"
+version_group = "main"

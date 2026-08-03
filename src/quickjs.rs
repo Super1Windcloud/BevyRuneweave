@@ -1,8 +1,9 @@
 use bevy_mod_scripting::{
-    bindings::InteropError, core::ConfigureScriptPlugin, script::ScriptAttachment,
+    bindings::InteropError,
+    core::ConfigureScriptPlugin,
+    quickjs::{QuickJsContext, QuickJsScriptingPlugin, rquickjs::function::Func},
+    script::ScriptAttachment,
 };
-use bevy_mod_scripting_quickjs::{QuickJsContext, QuickJsScriptingPlugin};
-use rquickjs::function::Func;
 
 use crate::{ScriptCommand, queue_command};
 
@@ -65,7 +66,7 @@ pub(crate) fn game_quickjs_plugin() -> QuickJsScriptingPlugin {
 
 #[cfg(test)]
 mod tests {
-    use rquickjs::{Context, Function, Runtime};
+    use bevy_mod_scripting::quickjs::rquickjs::{Context, Function, Runtime};
 
     use super::*;
 

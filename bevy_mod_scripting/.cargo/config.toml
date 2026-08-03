@@ -1,0 +1,5 @@
+[env]
+TARGET_DIR = { value = "target", relative = true }
+
+[alias]
+xtask = "run --manifest-path xtask/Cargo.toml --package xtask --"

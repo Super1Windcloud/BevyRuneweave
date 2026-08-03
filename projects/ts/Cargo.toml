@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy-script-runtime = { path = "../..", default-features = false, features = ["js"] }
+bevy-script-runtime = { path = "../..", default-features = false, features = ["typescript"] }

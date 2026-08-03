@@ -1,0 +1,56 @@
+name: Deploy mdBook to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+    paths:
+      - 'docs/**'
+      - 'crates/xtask/**'
+      - '.github/workflows/mdbook.yml'
+      - 'crates/bevy_mod_scripting_functions/**'
+  pull_request:
+    branches:
+      - "**"
+    paths:
+      - 'docs/**'
+      - 'crates/xtask/**'
+      - '.github/workflows/mdbook.yml'
+      - 'crates/bevy_mod_scripting_functions/**'
+
+jobs:
+
+  build:
+    name: Build Book - mdbook
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2.7.3
+
+    - name: Setup xtask & GPU drivers
+      run: |
+        cargo xtask init --dont-update-ide
+        sudo add-apt-repository ppa:kisak/turtle -y
+        sudo apt-get install --no-install-recommends libxkbcommon-x11-0 xvfb libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
+
+    - name: Build the book
+      run: xvfb-run cargo xtask docs --no-rust-docs
+
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: docs/book

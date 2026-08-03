@@ -1,18 +1,28 @@
 #[cfg(any(feature = "lua", feature = "luau"))]
 mod lua;
-#[cfg(feature = "js")]
+#[cfg(any(feature = "js", feature = "typescript"))]
 mod quickjs;
-#[cfg(not(any(feature = "js", feature = "lua", feature = "luau")))]
-compile_error!("enable exactly one scripting feature: js, lua, or luau");
+#[cfg(not(any(
+    feature = "js",
+    feature = "typescript",
+    feature = "lua",
+    feature = "luau"
+)))]
+compile_error!("enable exactly one scripting feature: js, typescript, lua, or luau");
 #[cfg(any(
-    all(feature = "js", any(feature = "lua", feature = "luau")),
+    all(
+        feature = "js",
+        any(feature = "typescript", feature = "lua", feature = "luau")
+    ),
+    all(feature = "typescript", any(feature = "lua", feature = "luau")),
     all(feature = "lua", feature = "luau")
 ))]
-compile_error!("the js, lua, and luau features are mutually exclusive");
+compile_error!("the js, typescript, lua, and luau features are mutually exclusive");
 
 use std::{
     collections::HashMap,
     ffi::{CStr, c_char, c_int},
+    fs,
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex, OnceLock,
@@ -27,14 +37,17 @@ use bevy::{
     window::{PresentMode, WindowResolution},
 };
 use bevy_mod_scripting::prelude::{
-    BMSPlugin, ScriptAsset, ScriptCallbackEvent, ScriptComponent, ScriptValue, callback_labels,
-    event_handler,
+    BMSPlugin, CoreScriptGlobalsPlugin, ScriptAsset, ScriptCallbackEvent, ScriptComponent,
+    ScriptValue, callback_labels, event_handler,
 };
 
-#[cfg(all(not(feature = "js"), any(feature = "lua", feature = "luau")))]
+#[cfg(all(
+    not(any(feature = "js", feature = "typescript")),
+    any(feature = "lua", feature = "luau")
+))]
 use bevy_mod_scripting::lua::LuaScriptingPlugin as ActiveScriptingPlugin;
-#[cfg(feature = "js")]
-use bevy_mod_scripting_quickjs::QuickJsScriptingPlugin as ActiveScriptingPlugin;
+#[cfg(any(feature = "js", feature = "typescript"))]
+use bevy_mod_scripting::quickjs::QuickJsScriptingPlugin as ActiveScriptingPlugin;
 
 static RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
 static COMMAND_QUEUE: OnceLock<CommandQueue> = OnceLock::new();
@@ -84,7 +97,11 @@ pub(crate) fn queue_command(command: ScriptCommand) {
 }
 
 #[derive(Resource)]
-struct LoadedScriptPath(PathBuf);
+struct LoadedScriptPath {
+    asset_path: PathBuf,
+    source_path: PathBuf,
+    modified: Option<std::time::SystemTime>,
+}
 
 #[derive(Resource, Default)]
 struct ScriptEntities(HashMap<String, Entity>);
@@ -117,13 +134,33 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>, path: Res<Loade
         HudText,
     ));
     commands.spawn(ScriptComponent::new(vec![
-        asset_server.load::<ScriptAsset>(path.0.clone()),
+        asset_server.load::<ScriptAsset>(path.asset_path.clone()),
     ]));
 }
 
-fn request_asset_reload(asset_server: Res<AssetServer>, path: Res<LoadedScriptPath>) {
-    if RELOAD_REQUESTED.swap(false, Ordering::AcqRel) {
-        asset_server.reload(path.0.clone());
+fn source_has_changed(
+    previous: Option<std::time::SystemTime>,
+    current: Option<std::time::SystemTime>,
+) -> bool {
+    current.is_some() && current != previous
+}
+
+fn request_asset_reload(asset_server: Res<AssetServer>, mut path: ResMut<LoadedScriptPath>) {
+    let modified = fs::metadata(&path.source_path)
+        .and_then(|metadata| metadata.modified())
+        .ok();
+    let source_changed = source_has_changed(path.modified, modified);
+    let reload_requested = RELOAD_REQUESTED.swap(false, Ordering::AcqRel);
+
+    if source_changed {
+        path.modified = modified;
+    }
+    if source_changed || reload_requested {
+        info!(
+            "Reloading script after source change: {}",
+            path.source_path.display()
+        );
+        asset_server.reload(path.asset_path.clone());
     }
 }
 
@@ -243,12 +280,15 @@ fn normalize_script_path(asset_root: &Path, path: &Path) -> Result<PathBuf, Stri
     Ok(relative.to_path_buf())
 }
 
-#[cfg(feature = "js")]
+#[cfg(any(feature = "js", feature = "typescript"))]
 fn add_language(app: &mut App) {
     app.add_plugins(quickjs::game_quickjs_plugin());
 }
 
-#[cfg(all(not(feature = "js"), any(feature = "lua", feature = "luau")))]
+#[cfg(all(
+    not(any(feature = "js", feature = "typescript")),
+    any(feature = "lua", feature = "luau")
+))]
 fn add_language(app: &mut App) {
     app.add_plugins(lua::game_lua_plugin());
 }
@@ -270,11 +310,23 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         .clear();
 
     let mut app = App::new();
+    let scripting_plugins = BMSPlugin.set(CoreScriptGlobalsPlugin {
+        filter: |_| false,
+        register_static_references: false,
+    });
+    #[cfg(any(
+        feature = "js",
+        feature = "typescript",
+        feature = "lua",
+        feature = "luau"
+    ))]
+    let scripting_plugins = scripting_plugins.disable::<ActiveScriptingPlugin>();
+
     app.add_plugins(
         DefaultPlugins
             .set(AssetPlugin {
                 file_path: asset_root.to_string_lossy().into_owned(),
-                watch_for_changes_override: Some(true),
+                watch_for_changes_override: Some(false),
                 ..default()
             })
             .set(WindowPlugin {
@@ -288,9 +340,15 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
                 ..default()
             }),
     )
-    .add_plugins(BMSPlugin)
+    .add_plugins(scripting_plugins)
     .insert_resource(queue)
-    .insert_resource(LoadedScriptPath(asset_path))
+    .insert_resource(LoadedScriptPath {
+        source_path: asset_root.join(&asset_path),
+        modified: fs::metadata(asset_root.join(&asset_path))
+            .and_then(|metadata| metadata.modified())
+            .ok(),
+        asset_path,
+    })
     .init_resource::<ScriptEntities>()
     .add_systems(Startup, setup)
     .add_systems(
@@ -337,20 +395,30 @@ pub fn run_with_assets(asset_root: PathBuf, script_path: PathBuf) {
 
 /// Returns the script path matching the selected language feature.
 pub const fn default_script_path() -> &'static str {
-    #[cfg(feature = "js")]
+    #[cfg(any(feature = "js", feature = "typescript"))]
     return "assets/shooter.js";
-    #[cfg(all(not(feature = "js"), feature = "lua"))]
+    #[cfg(all(not(any(feature = "js", feature = "typescript")), feature = "lua"))]
     return "assets/shooter.lua";
-    #[cfg(all(not(feature = "js"), not(feature = "lua"), feature = "luau"))]
+    #[cfg(all(
+        not(any(feature = "js", feature = "typescript")),
+        not(feature = "lua"),
+        feature = "luau"
+    ))]
     return "assets/shooter.luau";
 }
 
 const fn active_language() -> &'static str {
     #[cfg(feature = "js")]
     return "QuickJS";
-    #[cfg(all(not(feature = "js"), feature = "lua"))]
+    #[cfg(all(not(feature = "js"), feature = "typescript"))]
+    return "TypeScript / QuickJS";
+    #[cfg(all(not(any(feature = "js", feature = "typescript")), feature = "lua"))]
     return "Lua 5.5";
-    #[cfg(all(not(feature = "js"), not(feature = "lua"), feature = "luau"))]
+    #[cfg(all(
+        not(any(feature = "js", feature = "typescript")),
+        not(feature = "lua"),
+        feature = "luau"
+    ))]
     return "Luau";
 }
 
@@ -397,5 +465,16 @@ mod tests {
     fn rejects_scripts_outside_asset_root() {
         assert!(normalize_script_path(Path::new("assets"), Path::new("../shooter.js")).is_err());
         assert!(normalize_script_path(Path::new("assets"), Path::new("/tmp/shooter.js")).is_err());
+    }
+
+    #[test]
+    fn detects_source_timestamp_changes() {
+        let first = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1);
+        let second = first + std::time::Duration::from_secs(1);
+
+        assert!(!source_has_changed(Some(first), Some(first)));
+        assert!(source_has_changed(Some(first), Some(second)));
+        assert!(source_has_changed(None, Some(first)));
+        assert!(!source_has_changed(Some(first), None));
     }
 }

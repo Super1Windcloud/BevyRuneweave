@@ -1,0 +1,28 @@
+[package]
+name = "bevy_mod_scripting_world"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+description = "ECS World access abstractions for the BMS framework"
+
+[dependencies]
+bevy_ecs = { workspace = true }
+bevy_platform = { workspace = true }
+bevy_reflect = { workspace = true }
+# bevy_mod_scripting_script = { workspace = true }
+# bevy_mod_scripting_display = { workspace = true }
+profiling = { workspace = true, features = [
+    "procmacros",
+] }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+[lints]
+workspace = true

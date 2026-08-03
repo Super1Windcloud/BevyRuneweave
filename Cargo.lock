@@ -336,8 +336,6 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_mod_scripting",
- "bevy_mod_scripting_quickjs",
- "rquickjs",
 ]
 
 [[package]]
@@ -1096,8 +1094,8 @@ dependencies = [
  "bevy_mod_scripting_core",
  "bevy_mod_scripting_derive",
  "bevy_mod_scripting_display",
- "bevy_mod_scripting_functions",
  "bevy_mod_scripting_lua",
+ "bevy_mod_scripting_quickjs",
  "bevy_mod_scripting_script",
 ]
 
@@ -1131,12 +1129,9 @@ dependencies = [
  "bevy_platform",
  "bevy_reflect",
  "bevy_system_reflection",
- "itertools 0.14.0",
  "nonmax",
  "parking_lot",
  "profiling",
- "serde",
- "smallvec",
  "variadics_please",
 ]
 
@@ -1155,12 +1150,10 @@ version = "0.21.0"
 dependencies = [
  "bevy_app",
  "bevy_asset",
- "bevy_diagnostic",
  "bevy_ecs",
  "bevy_log",
  "bevy_mod_scripting_asset",
  "bevy_mod_scripting_bindings",
- "bevy_mod_scripting_derive",
  "bevy_mod_scripting_display",
  "bevy_mod_scripting_script",
  "bevy_mod_scripting_world",
@@ -1168,14 +1161,8 @@ dependencies = [
  "bevy_reflect",
  "bevy_system_reflection",
  "bevy_utils",
- "fixedbitset",
- "itertools 0.14.0",
  "parking_lot",
  "profiling",
- "serde",
- "smallvec",
- "uuid",
- "variadics_please",
 ]
 
 [[package]]
@@ -1198,28 +1185,6 @@ dependencies = [
  "bevy_reflect",
  "bevy_utils",
  "parking_lot",
-]
-
-[[package]]
-name = "bevy_mod_scripting_functions"
-version = "0.21.0"
-dependencies = [
- "bevy_app",
- "bevy_asset",
- "bevy_ecs",
- "bevy_log",
- "bevy_mod_scripting_asset",
- "bevy_mod_scripting_bindings",
- "bevy_mod_scripting_core",
- "bevy_mod_scripting_derive",
- "bevy_mod_scripting_display",
- "bevy_mod_scripting_lua",
- "bevy_mod_scripting_script",
- "bevy_mod_scripting_world",
- "bevy_platform",
- "bevy_reflect",
- "bevy_system_reflection",
- "profiling",
 ]
 
 [[package]]
@@ -1273,13 +1238,10 @@ name = "bevy_mod_scripting_world"
 version = "0.21.0"
 dependencies = [
  "bevy_ecs",
- "bevy_log",
  "bevy_platform",
  "bevy_reflect",
- "fixedbitset",
  "parking_lot",
  "profiling",
- "smallvec",
 ]
 
 [[package]]

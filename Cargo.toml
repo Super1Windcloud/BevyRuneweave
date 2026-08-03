@@ -11,7 +11,7 @@ members = [
     "projects/luau",
     "projects/ts",
 ]
-exclude = ["vendor/bevy_mod_scripting"]
+exclude = ["bevy_mod_scripting"]
 resolver = "2"
 
 [lib]
@@ -20,18 +20,14 @@ crate-type = ["rlib", "cdylib", "staticlib"]
 
 [features]
 default = ["js"]
-js = ["dep:bevy_mod_scripting_quickjs", "dep:rquickjs"]
+js = ["bevy_mod_scripting/quickjs"]
+typescript = ["bevy_mod_scripting/typescript"]
 lua = ["bevy_mod_scripting/lua55"]
 luau = ["bevy_mod_scripting/luau"]
 
 [dependencies]
 bevy = { version = "0.19.0", default-features = false, features = ["2d", "file_watcher"] }
-bevy_mod_scripting = { path = "vendor/bevy_mod_scripting", default-features = false }
-bevy_mod_scripting_quickjs = { path = "vendor/bevy_mod_scripting/crates/languages/bevy_mod_scripting_quickjs", optional = true }
-rquickjs = { version = "0.12.2", features = ["parallel"], optional = true }
-
-[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
-rquickjs = { version = "0.12.2", features = ["parallel", "bindgen"], optional = true }
+bevy_mod_scripting = { path = "bevy_mod_scripting", default-features = false }
 
 [profile.dev]
 opt-level = 1

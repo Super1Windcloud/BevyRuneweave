@@ -1,0 +1,2 @@
+crates/bindings/**/* linguist-generated
+crates/bindings/**/* -diff -merge

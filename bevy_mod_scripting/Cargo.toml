@@ -1,0 +1,215 @@
+[package]
+name = "bevy_mod_scripting"
+description = "Multi language scripting in Bevy"
+include = ["readme.md", "/src", "/examples", "/assets", "LICENSE", "/badges"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[workspace.package]
+version = "0.21.0"
+edition = "2024"
+authors = ["Maksymilian Mozolewski <makspl17@gmail.com>"]
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/makspll/bevy_mod_scripting"
+repository = "https://github.com/makspll/bevy_mod_scripting"
+keywords = ["bevy", "gamedev", "scripting", "lua"]
+categories = ["game-development"]
+readme = "readme.md"
+
+[lib]
+name = "bevy_mod_scripting"
+path = "src/lib.rs"
+bench = false
+
+[package.metadata."docs.rs"]
+features = ["lua55", "quickjs"]
+
+[features]
+default = []
+
+
+# lua
+lua = ["bevy_mod_scripting_lua"]
+lua55 = ["bevy_mod_scripting_lua/lua55", "lua"]
+luau = ["bevy_mod_scripting_lua/luau", "lua"]
+# optional
+unsafe_lua_modules = ["bevy_mod_scripting_lua?/unsafe_lua_modules"]
+mlua_serialize = ["bevy_mod_scripting_lua?/mlua_serialize"]
+mlua_macros = ["bevy_mod_scripting_lua?/mlua_macros"]
+mlua_async = ["bevy_mod_scripting_lua?/mlua_async"]
+
+
+## quickjs
+quickjs = ["bevy_mod_scripting_quickjs"]
+typescript = ["quickjs"]
+
+[dependencies]
+bevy_app = { workspace = true }
+bevy_mod_scripting_core = { workspace = true }
+bevy_mod_scripting_lua = { workspace = true, optional = true }
+bevy_mod_scripting_quickjs = { workspace = true, optional = true }
+bevy_mod_scripting_derive = { workspace = true }
+bevy_mod_scripting_asset = { workspace = true }
+bevy_mod_scripting_bindings = { workspace = true }
+bevy_mod_scripting_bindings_domain = { workspace = true }
+bevy_mod_scripting_display = { workspace = true }
+bevy_mod_scripting_script = { workspace = true }
+
+[workspace.dependencies]
+# local crates
+test_utils = { path = "crates/testing_crates/test_utils" }
+
+bevy_mod_scripting_derive = { path = "crates/bevy_mod_scripting_derive", version = "0.21.0" }
+bevy_system_reflection = { path = "crates/bevy_system_reflection", version = "0.21.0", default-features = false }
+bevy_mod_scripting_lua = { path = "crates/languages/bevy_mod_scripting_lua", version = "0.21.0", default-features = false }
+bevy_mod_scripting_quickjs = { path = "crates/languages/bevy_mod_scripting_quickjs", version = "0.21.0", default-features = false }
+bevy_mod_scripting_asset = { path = "crates/bevy_mod_scripting_asset", version = "0.21.0", default-features = false }
+bevy_mod_scripting_bindings = { path = "crates/bevy_mod_scripting_bindings", version = "0.21.0", default-features = false }
+bevy_mod_scripting_bindings_domain = { path = "crates/bevy_mod_scripting_bindings_domain", version = "0.21.0", default-features = false }
+bevy_mod_scripting_display = { path = "crates/bevy_mod_scripting_display", version = "0.21.0", default-features = false }
+bevy_mod_scripting_script = { path = "crates/bevy_mod_scripting_script", version = "0.21.0", default-features = false }
+bevy_mod_scripting_core = { path = "crates/bevy_mod_scripting_core", version = "0.21.0" }
+bevy_mod_scripting_world = { path = "crates/bevy_mod_scripting_world", version = "0.21.0", default-features = true}
+# bevy
+
+
+bevy = { version = "0.19", default-features = false }
+bevy_reflect = { version = "0.19", default-features = false }
+bevy_ecs = { version = "0.19", default-features = false }
+bevy_asset = { version = "0.19", default-features = false }
+bevy_app = { version = "0.19", default-features = false }
+bevy_log = { version = "0.19", default-features = false }
+bevy_diagnostic = { version = "0.19", default-features = false }
+bevy_platform = { version = "0.19", default-features = false }
+bevy_time = { version = "0.19", default-features = false }
+bevy_utils = { version = "0.19", default-features = false, features = ["std"] }
+
+uuid = { version = "1.13", default-features = false }
+nonmax = { version = "0.5", default-features = false, features = ["std"] }
+
+# other
+profiling = { version = "1.0", default-features = false, features = [
+    "procmacros",
+] }
+regex = { version = "1.11", default-features = false }
+serde = { version = "1.0", default-features = false }
+dot-writer = { version = "0.1.4", default-features = false }
+parking_lot = { version = "0.12.1", default-features = false }
+mlua = { version = "0.11", default-features = false }
+rquickjs = { version = "0.12.2", default-features = false, features = ["std"] }
+clap = { version = "4", default-features = false, features = ["std"] }
+quote = { version = "1.0", default-features = false }
+syn = { version = "2.0", default-features = false }
+proc-macro2 = { version = "1.0", default-features = false }
+variadics_please = { version = "1.1.0", default-features = false }
+
+# development and testing
+
+pretty_assertions = { version = "1.4", default-features = false, features = [
+    "std",
+] }
+manifest-dir-macros = { version = "0.1.18", default-features = false }
+bevy_console = { git="https://github.com/makspll/bevy-console", default-features = false }
+rand = { version = "0.9", default-features = false }
+
+[dev-dependencies]
+bevy = { workspace = true, features = [
+    "bevy_render",
+    "bevy_window",
+    "bevy_asset",
+    "bevy_log",
+    "bevy_core_pipeline",
+    "bevy_sprite",
+    "bevy_sprite_render",
+    "bevy_state",
+    "x11",
+    "bevy_ui",
+    "default_font",
+    "custom_cursor",
+] }
+clap = { workspace = true, features = ["derive"] }
+rand = { workspace = true, features = ["thread_rng"] }
+bevy_console = { workspace = true }
+
+
+[workspace]
+members = [
+    "crates/bevy_mod_scripting_core",
+    "crates/languages/bevy_mod_scripting_lua",
+    "crates/languages/bevy_mod_scripting_quickjs",
+    "crates/testing_crates/test_utils",
+    "crates/bevy_mod_scripting_derive",
+    "crates/bevy_system_reflection",
+    "crates/bevy_mod_scripting_asset",
+    "crates/bevy_mod_scripting_bindings",
+    "crates/bevy_mod_scripting_display",
+    "crates/bevy_mod_scripting_script",
+    "crates/bevy_mod_scripting_bindings_domain",
+    "crates/bevy_mod_scripting_world",
+]
+resolver = "2"
+#exclude = ["codegen", "crates/macro_tests", "xtask"]
+
+[profile.dev]
+debug = 1
+opt-level = 1
+
+[profile.dev-debug]
+inherits = "dev"
+debug = true
+opt-level = 0
+
+[profile.dev.package."*"]
+debug = 0
+opt-level = 3
+
+[profile.ephemeral-build]
+inherits = "dev"
+opt-level = 2
+codegen-units = 8
+incremental = false
+debug = false
+
+# [profile.ephemeral-coverage]
+# inherits = "ephemeral-build"
+# debug = true
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+
+[[example]]
+name = "game_of_life"
+path = "examples/game_of_life.rs"
+required-features = ["lua55"]
+
+[[example]]
+name = "runscript"
+path = "examples/run_script.rs"
+
+[[example]]
+name = "script_loading"
+path = "examples/script_loading.rs"
+required-features = ["lua55"]
+
+
+[[example]]
+name = "custom_conversions"
+path = "examples/custom_conversions.rs"
+required-features = ["lua55"]
+
+[workspace.lints.clippy]
+panic = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+todo = "deny"
+
+[workspace.lints.rust]
+missing_docs = "deny"
