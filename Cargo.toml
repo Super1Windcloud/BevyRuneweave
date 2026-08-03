@@ -1,6 +1,41 @@
 [package]
-name = "demo"
+name = "bevy-script-runtime"
 version = "0.1.0"
 edition = "2024"
+autobins = false
+
+[workspace]
+members = [
+    "projects/js",
+    "projects/lua",
+    "projects/luau",
+    "projects/ts",
+]
+exclude = ["vendor/bevy_mod_scripting"]
+resolver = "2"
+
+[lib]
+name = "bevy_script_runtime"
+crate-type = ["rlib", "cdylib", "staticlib"]
+
+[features]
+default = ["js"]
+js = ["dep:bevy_mod_scripting_quickjs", "dep:rquickjs"]
+lua = ["bevy_mod_scripting/lua55"]
+luau = ["bevy_mod_scripting/luau"]
 
 [dependencies]
+bevy = { version = "0.19.0", default-features = false, features = ["2d", "file_watcher"] }
+bevy_mod_scripting = { path = "vendor/bevy_mod_scripting", default-features = false }
+bevy_mod_scripting_quickjs = { path = "vendor/bevy_mod_scripting/crates/languages/bevy_mod_scripting_quickjs", optional = true }
+rquickjs = { version = "0.12.2", features = ["parallel"], optional = true }
+
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+rquickjs = { version = "0.12.2", features = ["parallel", "bindgen"], optional = true }
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
