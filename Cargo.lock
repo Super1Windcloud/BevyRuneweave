@@ -331,14 +331,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy-script-runtime"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_mod_scripting",
-]
-
-[[package]]
 name = "bevy_a11y"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4185,34 +4177,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
-name = "plane-war-js"
-version = "0.1.0"
-dependencies = [
- "bevy-script-runtime",
-]
-
-[[package]]
-name = "plane-war-lua"
-version = "0.1.0"
-dependencies = [
- "bevy-script-runtime",
-]
-
-[[package]]
-name = "plane-war-luau"
-version = "0.1.0"
-dependencies = [
- "bevy-script-runtime",
-]
-
-[[package]]
-name = "plane-war-typescript"
-version = "0.1.0"
-dependencies = [
- "bevy-script-runtime",
-]
-
-[[package]]
 name = "png"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4674,6 +4638,42 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+
+[[package]]
+name = "script-squadron-js"
+version = "0.1.0"
+dependencies = [
+ "script-squadron-runtime",
+]
+
+[[package]]
+name = "script-squadron-lua"
+version = "0.1.0"
+dependencies = [
+ "script-squadron-runtime",
+]
+
+[[package]]
+name = "script-squadron-luau"
+version = "0.1.0"
+dependencies = [
+ "script-squadron-runtime",
+]
+
+[[package]]
+name = "script-squadron-runtime"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_mod_scripting",
+]
+
+[[package]]
+name = "script-squadron-typescript"
+version = "0.1.0"
+dependencies = [
+ "script-squadron-runtime",
+]
 
 [[package]]
 name = "sctk-adwaita"

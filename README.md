@@ -1,6 +1,13 @@
-# Lua、Luau、JavaScript 和 TypeScript 飞机大战
+# Script Squadron
 
-这是一个 Bevy 0.19 脚本游戏示例。Rust 共享宿主只负责窗口、键盘输入、
+一个分别由 Lua 5.5、Luau、JavaScript 和 TypeScript 驱动的 Bevy 飞机大战。
+
+Script Squadron 使用统一且独立的包命名空间：共享运行时为
+`script-squadron-runtime`，四个可执行项目分别为 `script-squadron-lua`、
+`script-squadron-luau`、`script-squadron-js` 和
+`script-squadron-typescript`。
+
+Rust 共享宿主只负责窗口、键盘输入、
 精灵渲染和脚本 API；移动、射击、敌机生成、碰撞、计分、生命值和重新开始
 均分别由 Lua、Luau、JavaScript 和 TypeScript 实现。
 
@@ -17,7 +24,7 @@ projects/
 └── ts/                  # TypeScript 7.0.2 + QuickJS 可执行项目
     ├── src/shooter.ts   # TypeScript 游戏源码
     └── assets/          # 编译后 shooter.js + 独立 sprites
-src/                     # 四个项目共用的 Bevy 宿主库
+src/                     # script-squadron-runtime 共享 Bevy 宿主库
 bevy_mod_scripting/      # Lua 5.5、Luau、QuickJS/TypeScript 脚本运行时
 include/                 # 可选的原生宿主 C ABI
 ```

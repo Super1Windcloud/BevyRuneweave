@@ -1,6 +1,6 @@
 set shell := ["zsh", "-cu"]
 
-rust_packages := "-p bevy-script-runtime -p plane-war-lua -p plane-war-luau -p plane-war-js -p plane-war-typescript"
+rust_packages := "-p script-squadron-runtime -p script-squadron-lua -p script-squadron-luau -p script-squadron-js -p script-squadron-typescript"
 ts_dir := "projects/ts"
 
 # List all available recipes.
@@ -21,15 +21,15 @@ ts-check:
 
 # Run the Lua 5.5 game.
 run-lua:
-    cargo run -p plane-war-lua
+    cargo run -p script-squadron-lua
 
 # Run the Luau game.
 run-luau:
-    cargo run -p plane-war-luau
+    cargo run -p script-squadron-luau
 
 # Run the JavaScript game with QuickJS.
 run-js:
-    cargo run -p plane-war-js
+    cargo run -p script-squadron-js
 
 # Watch, compile, and run the TypeScript game with QuickJS.
 run-ts:
@@ -38,42 +38,42 @@ run-ts:
     npm --prefix {{ts_dir}} run watch &
     watcher_pid=$!
     trap 'kill $watcher_pid 2>/dev/null || true' EXIT INT TERM
-    cargo run -p plane-war-typescript
+    cargo run -p script-squadron-typescript
 
 # Check the Lua 5.5 executable project.
 check-lua:
-    cargo check -p plane-war-lua
+    cargo check -p script-squadron-lua
 
 # Check the Luau executable project.
 check-luau:
-    cargo check -p plane-war-luau
+    cargo check -p script-squadron-luau
 
 # Check the JavaScript executable project.
 check-js:
-    cargo check -p plane-war-js
+    cargo check -p script-squadron-js
 
 # Check the TypeScript executable project.
 check-ts: ts-check
-    cargo check -p plane-war-typescript
+    cargo check -p script-squadron-typescript
 
 # Check all four isolated executable projects.
 check: check-lua check-luau check-js check-ts
 
 # Execute 600 gameplay frames with the Lua 5.5 VM.
 test-lua:
-    cargo test -p bevy-script-runtime --no-default-features --features lua --lib
+    cargo test -p script-squadron-runtime --no-default-features --features lua --lib
 
 # Execute 600 gameplay frames with the Luau VM.
 test-luau:
-    cargo test -p bevy-script-runtime --no-default-features --features luau --lib
+    cargo test -p script-squadron-runtime --no-default-features --features luau --lib
 
 # Execute JavaScript gameplay frames with QuickJS.
 test-js:
-    cargo test -p bevy-script-runtime --no-default-features --features js --lib
+    cargo test -p script-squadron-runtime --no-default-features --features js --lib
 
 # Compile TypeScript, then execute it through its dedicated BMS feature.
 test-ts: ts-build
-    cargo test -p bevy-script-runtime --no-default-features --features typescript --lib
+    cargo test -p script-squadron-runtime --no-default-features --features typescript --lib
 
 # Run all script-engine gameplay tests.
 test: test-lua test-luau test-js test-ts
@@ -88,19 +88,19 @@ fmt-check:
 
 # Build the Lua 5.5 game in release mode.
 build-lua:
-    cargo build --release -p plane-war-lua
+    cargo build --release -p script-squadron-lua
 
 # Build the Luau game in release mode.
 build-luau:
-    cargo build --release -p plane-war-luau
+    cargo build --release -p script-squadron-luau
 
 # Build the JavaScript game in release mode.
 build-js:
-    cargo build --release -p plane-war-js
+    cargo build --release -p script-squadron-js
 
 # Compile TypeScript and build its game in release mode.
 build-ts: ts-build
-    cargo build --release -p plane-war-typescript
+    cargo build --release -p script-squadron-typescript
 
 # Build all four games in release mode.
 build: build-lua build-luau build-js build-ts

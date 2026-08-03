@@ -1,7 +1,7 @@
 [package]
-name = "plane-war-js"
+name = "script-squadron-js"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy-script-runtime = { path = "../..", default-features = false, features = ["js"] }
+script-squadron-runtime = { path = "../..", default-features = false, features = ["js"] }

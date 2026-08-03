@@ -1,5 +1,5 @@
 [package]
-name = "bevy-script-runtime"
+name = "script-squadron-runtime"
 version = "0.1.0"
 edition = "2024"
 autobins = false
@@ -15,7 +15,7 @@ exclude = ["bevy_mod_scripting"]
 resolver = "2"
 
 [lib]
-name = "bevy_script_runtime"
+name = "script_squadron_runtime"
 crate-type = ["rlib", "cdylib", "staticlib"]
 
 [features]
