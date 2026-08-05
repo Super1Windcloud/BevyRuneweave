@@ -1,6 +1,7 @@
 {
   "name": "script-squadron-typescript-scripts",
   "version": "0.1.0",
+  "author": "superwindcloud",
   "private": true,
   "scripts": {
     "build": "tsc --project tsconfig.json",

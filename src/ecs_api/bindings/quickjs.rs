@@ -5,13 +5,13 @@ use bevy_mod_scripting::{
     script::ScriptAttachment,
 };
 
-use crate::{ScriptCommand, queue_command};
+use super::super::command::{EcsCommand, queue_command};
 
 fn interop_error(error: impl std::fmt::Display) -> InteropError {
     InteropError::external(std::io::Error::other(error.to_string()))
 }
 
-fn install_game_api(
+fn install_ecs_api(
     _attachment: &ScriptAttachment,
     context: &mut QuickJsContext,
 ) -> Result<(), InteropError> {
@@ -19,37 +19,43 @@ fn install_game_api(
         let globals = ctx.globals();
         globals
             .set(
-                "clear_game",
-                Func::from(|| queue_command(ScriptCommand::Clear)),
+                "ecs_clear_world",
+                Func::from(|| queue_command(EcsCommand::ClearWorld)),
             )
             .map_err(interop_error)?;
         globals
             .set(
-                "spawn_sprite",
-                Func::from(|kind: String, id: String, x: f32, y: f32| {
-                    queue_command(ScriptCommand::Spawn { kind, id, x, y });
+                "ecs_spawn_entity",
+                Func::from(|id: String| queue_command(EcsCommand::SpawnEntity { id })),
+            )
+            .map_err(interop_error)?;
+        globals
+            .set(
+                "ecs_insert_sprite",
+                Func::from(|id: String, kind: String| {
+                    queue_command(EcsCommand::InsertSprite { id, kind });
                 }),
             )
             .map_err(interop_error)?;
         globals
             .set(
-                "set_position",
+                "ecs_set_transform",
                 Func::from(|id: String, x: f32, y: f32| {
-                    queue_command(ScriptCommand::SetPosition { id, x, y });
+                    queue_command(EcsCommand::SetTransform { id, x, y });
                 }),
             )
             .map_err(interop_error)?;
         globals
             .set(
-                "despawn_sprite",
-                Func::from(|id: String| queue_command(ScriptCommand::Despawn { id })),
+                "ecs_despawn_entity",
+                Func::from(|id: String| queue_command(EcsCommand::DespawnEntity { id })),
             )
             .map_err(interop_error)?;
         globals
             .set(
-                "set_hud",
+                "ecs_set_game_state",
                 Func::from(|score: i32, lives: i32, message: String| {
-                    queue_command(ScriptCommand::SetHud {
+                    queue_command(EcsCommand::SetGameState {
                         score,
                         lives,
                         message,
@@ -60,8 +66,8 @@ fn install_game_api(
     })
 }
 
-pub(crate) fn game_quickjs_plugin() -> QuickJsScriptingPlugin {
-    QuickJsScriptingPlugin::default().add_context_initializer(install_game_api)
+pub(super) fn ecs_quickjs_plugin() -> QuickJsScriptingPlugin {
+    QuickJsScriptingPlugin::default().add_context_initializer(install_ecs_api)
 }
 
 #[cfg(test)]
@@ -75,21 +81,27 @@ mod tests {
         let context = Context::full(&runtime).unwrap();
         context.with(|ctx| {
             let globals = ctx.globals();
-            globals.set("clear_game", Func::from(|| {})).unwrap();
+            globals.set("ecs_clear_world", Func::from(|| {})).unwrap();
+            globals
+                .set("ecs_spawn_entity", Func::from(|_: String| {}))
+                .unwrap();
+            globals
+                .set("ecs_insert_sprite", Func::from(|_: String, _: String| {}))
+                .unwrap();
             globals
                 .set(
-                    "spawn_sprite",
-                    Func::from(|_: String, _: String, _: f32, _: f32| {}),
+                    "ecs_set_transform",
+                    Func::from(|_: String, _: f32, _: f32| {}),
                 )
                 .unwrap();
             globals
-                .set("set_position", Func::from(|_: String, _: f32, _: f32| {}))
+                .set("ecs_despawn_entity", Func::from(|_: String| {}))
                 .unwrap();
             globals
-                .set("despawn_sprite", Func::from(|_: String| {}))
-                .unwrap();
-            globals
-                .set("set_hud", Func::from(|_: i32, _: i32, _: String| {}))
+                .set(
+                    "ecs_set_game_state",
+                    Func::from(|_: i32, _: i32, _: String| {}),
+                )
                 .unwrap();
             ctx.eval::<(), _>(source).unwrap();
             let loaded: Function = globals.get("on_script_loaded").unwrap();
@@ -105,11 +117,11 @@ mod tests {
 
     #[test]
     fn javascript_shooter_runs_gameplay_frames() {
-        assert_shooter_runs(include_str!("../projects/js/assets/shooter.js"));
+        assert_shooter_runs(include_str!("../../../projects/js/assets/shooter.js"));
     }
 
     #[test]
     fn compiled_typescript_shooter_runs_gameplay_frames() {
-        assert_shooter_runs(include_str!("../projects/ts/assets/shooter.js"));
+        assert_shooter_runs(include_str!("../../../projects/ts/assets/shooter.js"));
     }
 }

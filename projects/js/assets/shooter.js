@@ -16,13 +16,19 @@ let seed = 73129;
 let gameOver = false;
 let wasFiring = false;
 
+function spawnEntity(kind, id, x, y) {
+  ecs_spawn_entity(id);
+  ecs_insert_sprite(id, kind);
+  ecs_set_transform(id, x, y);
+}
+
 function random01() {
   seed = (seed * 48271) % 2147483647;
   return seed / 2147483647;
 }
 
 function resetGame() {
-  clear_game();
+  ecs_clear_world();
   player = { x: 0, y: -300 };
   bullets = [];
   enemies = [];
@@ -33,8 +39,8 @@ function resetGame() {
   spawnTimer = 0.35;
   seed = 73129;
   gameOver = false;
-  spawn_sprite("player", "player", player.x, player.y);
-  set_hud(score, lives, "ARROWS/WASD + HOLD SPACE");
+  spawnEntity("player", "player", player.x, player.y);
+  ecs_set_game_state(score, lives, "ARROWS/WASD + HOLD SPACE");
 }
 
 function spawnEnemy() {
@@ -45,7 +51,7 @@ function spawnEnemy() {
     alive: true,
   };
   enemies.push(enemy);
-  spawn_sprite("enemy", enemy.id, enemy.x, enemy.y);
+  spawnEntity("enemy", enemy.id, enemy.x, enemy.y);
 }
 
 function shoot() {
@@ -56,7 +62,7 @@ function shoot() {
     alive: true,
   };
   bullets.push(bullet);
-  spawn_sprite("bullet", bullet.id, bullet.x, bullet.y);
+  spawnEntity("bullet", bullet.id, bullet.x, bullet.y);
 }
 
 function hit(a, b, halfWidth, halfHeight) {
@@ -75,7 +81,7 @@ globalThis.on_update = function (dt, inputX, inputY, firing) {
 
   player.x = Math.max(-260, Math.min(260, player.x + inputX * PLAYER_SPEED * dt));
   player.y = Math.max(-335, Math.min(300, player.y + inputY * PLAYER_SPEED * dt));
-  set_position("player", player.x, player.y);
+  ecs_set_transform("player", player.x, player.y);
 
   fireTimer -= dt;
   if (firing && fireTimer <= 0) {
@@ -93,9 +99,9 @@ globalThis.on_update = function (dt, inputX, inputY, firing) {
     bullet.y += BULLET_SPEED * dt;
     if (bullet.y > 420) {
       bullet.alive = false;
-      despawn_sprite(bullet.id);
+      ecs_despawn_entity(bullet.id);
     } else {
-      set_position(bullet.id, bullet.x, bullet.y);
+      ecs_set_transform(bullet.id, bullet.x, bullet.y);
     }
   }
 
@@ -104,9 +110,9 @@ globalThis.on_update = function (dt, inputX, inputY, firing) {
     if (enemy.y < -420) {
       enemy.alive = false;
       lives -= 1;
-      despawn_sprite(enemy.id);
+      ecs_despawn_entity(enemy.id);
     } else {
-      set_position(enemy.id, enemy.x, enemy.y);
+      ecs_set_transform(enemy.id, enemy.x, enemy.y);
     }
   }
 
@@ -117,8 +123,8 @@ globalThis.on_update = function (dt, inputX, inputY, firing) {
         bullet.alive = false;
         enemy.alive = false;
         score += 100;
-        despawn_sprite(bullet.id);
-        despawn_sprite(enemy.id);
+        ecs_despawn_entity(bullet.id);
+        ecs_despawn_entity(enemy.id);
         break;
       }
     }
@@ -128,7 +134,7 @@ globalThis.on_update = function (dt, inputX, inputY, firing) {
     if (enemy.alive && hit(player, enemy, 55, 65)) {
       enemy.alive = false;
       lives -= 1;
-      despawn_sprite(enemy.id);
+      ecs_despawn_entity(enemy.id);
     }
   }
 
@@ -137,9 +143,9 @@ globalThis.on_update = function (dt, inputX, inputY, firing) {
   if (lives <= 0) {
     lives = 0;
     gameOver = true;
-    set_hud(score, lives, "GAME OVER - TAP SPACE TO RESTART");
+    ecs_set_game_state(score, lives, "GAME OVER - TAP SPACE TO RESTART");
   } else {
-    set_hud(score, lives, "");
+    ecs_set_game_state(score, lives, "");
   }
   wasFiring = firing;
 };

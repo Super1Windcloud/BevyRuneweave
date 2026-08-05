@@ -2,6 +2,7 @@
 name = "script-squadron-runtime"
 version = "0.1.0"
 edition = "2024"
+authors.workspace = true
 autobins = false
 
 [workspace]
@@ -29,7 +30,7 @@ resolver = "2"
 [workspace.package]
 version = "0.21.0"
 edition = "2024"
-authors = ["Maksymilian Mozolewski <makspl17@gmail.com>"]
+authors = ["superwindcloud"]
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/makspll/bevy_mod_scripting"
 repository = "https://github.com/makspll/bevy_mod_scripting"

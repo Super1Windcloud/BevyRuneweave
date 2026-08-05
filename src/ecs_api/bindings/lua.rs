@@ -5,23 +5,23 @@ use bevy_mod_scripting::{
     script::ScriptAttachment,
 };
 
-use crate::{ScriptCommand, queue_command};
+use super::super::command::{EcsCommand, queue_command};
 
 fn interop_error(error: impl std::fmt::Display) -> InteropError {
     InteropError::external(std::io::Error::other(error.to_string()))
 }
 
-fn install_game_api(
+fn install_ecs_api(
     _attachment: &ScriptAttachment,
     context: &mut LuaContext,
 ) -> Result<(), InteropError> {
     let globals = context.globals();
     globals
         .set(
-            "clear_game",
+            "ecs_clear_world",
             context
                 .create_function(|_, ()| {
-                    queue_command(ScriptCommand::Clear);
+                    queue_command(EcsCommand::ClearWorld);
                     Ok(())
                 })
                 .map_err(interop_error)?,
@@ -29,32 +29,10 @@ fn install_game_api(
         .map_err(interop_error)?;
     globals
         .set(
-            "spawn_sprite",
-            context
-                .create_function(|_, (kind, id, x, y): (String, String, f32, f32)| {
-                    queue_command(ScriptCommand::Spawn { kind, id, x, y });
-                    Ok(())
-                })
-                .map_err(interop_error)?,
-        )
-        .map_err(interop_error)?;
-    globals
-        .set(
-            "set_position",
-            context
-                .create_function(|_, (id, x, y): (String, f32, f32)| {
-                    queue_command(ScriptCommand::SetPosition { id, x, y });
-                    Ok(())
-                })
-                .map_err(interop_error)?,
-        )
-        .map_err(interop_error)?;
-    globals
-        .set(
-            "despawn_sprite",
+            "ecs_spawn_entity",
             context
                 .create_function(|_, id: String| {
-                    queue_command(ScriptCommand::Despawn { id });
+                    queue_command(EcsCommand::SpawnEntity { id });
                     Ok(())
                 })
                 .map_err(interop_error)?,
@@ -62,10 +40,43 @@ fn install_game_api(
         .map_err(interop_error)?;
     globals
         .set(
-            "set_hud",
+            "ecs_insert_sprite",
+            context
+                .create_function(|_, (id, kind): (String, String)| {
+                    queue_command(EcsCommand::InsertSprite { id, kind });
+                    Ok(())
+                })
+                .map_err(interop_error)?,
+        )
+        .map_err(interop_error)?;
+    globals
+        .set(
+            "ecs_set_transform",
+            context
+                .create_function(|_, (id, x, y): (String, f32, f32)| {
+                    queue_command(EcsCommand::SetTransform { id, x, y });
+                    Ok(())
+                })
+                .map_err(interop_error)?,
+        )
+        .map_err(interop_error)?;
+    globals
+        .set(
+            "ecs_despawn_entity",
+            context
+                .create_function(|_, id: String| {
+                    queue_command(EcsCommand::DespawnEntity { id });
+                    Ok(())
+                })
+                .map_err(interop_error)?,
+        )
+        .map_err(interop_error)?;
+    globals
+        .set(
+            "ecs_set_game_state",
             context
                 .create_function(|_, (score, lives, message): (i32, i32, String)| {
-                    queue_command(ScriptCommand::SetHud {
+                    queue_command(EcsCommand::SetGameState {
                         score,
                         lives,
                         message,
@@ -77,8 +88,8 @@ fn install_game_api(
         .map_err(interop_error)
 }
 
-pub(crate) fn game_lua_plugin() -> LuaScriptingPlugin {
-    LuaScriptingPlugin::default().add_context_initializer(install_game_api)
+pub(super) fn ecs_lua_plugin() -> LuaScriptingPlugin {
+    LuaScriptingPlugin::default().add_context_initializer(install_ecs_api)
 }
 
 #[cfg(test)]
@@ -91,21 +102,27 @@ mod tests {
         let globals = context.globals();
         globals
             .set(
-                "clear_game",
+                "ecs_clear_world",
                 context.create_function(|_, ()| Ok(())).unwrap(),
             )
             .unwrap();
         globals
             .set(
-                "spawn_sprite",
+                "ecs_spawn_entity",
+                context.create_function(|_, _: String| Ok(())).unwrap(),
+            )
+            .unwrap();
+        globals
+            .set(
+                "ecs_insert_sprite",
                 context
-                    .create_function(|_, _: (String, String, f32, f32)| Ok(()))
+                    .create_function(|_, _: (String, String)| Ok(()))
                     .unwrap(),
             )
             .unwrap();
         globals
             .set(
-                "set_position",
+                "ecs_set_transform",
                 context
                     .create_function(|_, _: (String, f32, f32)| Ok(()))
                     .unwrap(),
@@ -113,22 +130,22 @@ mod tests {
             .unwrap();
         globals
             .set(
-                "despawn_sprite",
+                "ecs_despawn_entity",
                 context.create_function(|_, _: String| Ok(())).unwrap(),
             )
             .unwrap();
         globals
             .set(
-                "set_hud",
+                "ecs_set_game_state",
                 context
                     .create_function(|_, _: (i32, i32, String)| Ok(()))
                     .unwrap(),
             )
             .unwrap();
         #[cfg(feature = "lua")]
-        let source = include_str!("../projects/lua/assets/shooter.lua");
+        let source = include_str!("../../../projects/lua/assets/shooter.lua");
         #[cfg(feature = "luau")]
-        let source = include_str!("../projects/luau/assets/shooter.luau");
+        let source = include_str!("../../../projects/luau/assets/shooter.luau");
 
         context.load(source).exec().unwrap();
         let loaded: bevy_mod_scripting::lua::mlua::Function =

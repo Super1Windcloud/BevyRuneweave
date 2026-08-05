@@ -16,13 +16,19 @@ local seed = 73129
 local game_over = false
 local was_firing = false
 
+local function spawn_entity(kind, id, x, y)
+    ecs_spawn_entity(id)
+    ecs_insert_sprite(id, kind)
+    ecs_set_transform(id, x, y)
+end
+
 local function random01()
     seed = (seed * 48271) % 2147483647
     return seed / 2147483647
 end
 
 local function reset_game()
-    clear_game()
+    ecs_clear_world()
     player = { x = 0, y = -300 }
     bullets = {}
     enemies = {}
@@ -33,8 +39,8 @@ local function reset_game()
     spawn_timer = 0.35
     seed = 73129
     game_over = false
-    spawn_sprite("player", "player", player.x, player.y)
-    set_hud(score, lives, "ARROWS/WASD + HOLD SPACE")
+    spawn_entity("player", "player", player.x, player.y)
+    ecs_set_game_state(score, lives, "ARROWS/WASD + HOLD SPACE")
 end
 
 local function spawn_enemy()
@@ -46,7 +52,7 @@ local function spawn_enemy()
     }
     next_id = next_id + 1
     table.insert(enemies, enemy)
-    spawn_sprite("enemy", enemy.id, enemy.x, enemy.y)
+    spawn_entity("enemy", enemy.id, enemy.x, enemy.y)
 end
 
 local function shoot()
@@ -58,7 +64,7 @@ local function shoot()
     }
     next_id = next_id + 1
     table.insert(bullets, bullet)
-    spawn_sprite("bullet", bullet.id, bullet.x, bullet.y)
+    spawn_entity("bullet", bullet.id, bullet.x, bullet.y)
 end
 
 local function hit(a, b, half_width, half_height)
@@ -82,7 +88,7 @@ function on_update(dt, input_x, input_y, firing)
 
     player.x = math.max(-260, math.min(260, player.x + input_x * PLAYER_SPEED * dt))
     player.y = math.max(-335, math.min(300, player.y + input_y * PLAYER_SPEED * dt))
-    set_position("player", player.x, player.y)
+    ecs_set_transform("player", player.x, player.y)
 
     fire_timer = fire_timer - dt
     if firing and fire_timer <= 0 then
@@ -100,9 +106,9 @@ function on_update(dt, input_x, input_y, firing)
         bullet.y = bullet.y + BULLET_SPEED * dt
         if bullet.y > 420 then
             bullet.alive = false
-            despawn_sprite(bullet.id)
+            ecs_despawn_entity(bullet.id)
         else
-            set_position(bullet.id, bullet.x, bullet.y)
+            ecs_set_transform(bullet.id, bullet.x, bullet.y)
         end
     end
 
@@ -111,9 +117,9 @@ function on_update(dt, input_x, input_y, firing)
         if enemy.y < -420 then
             enemy.alive = false
             lives = lives - 1
-            despawn_sprite(enemy.id)
+            ecs_despawn_entity(enemy.id)
         else
-            set_position(enemy.id, enemy.x, enemy.y)
+            ecs_set_transform(enemy.id, enemy.x, enemy.y)
         end
     end
 
@@ -124,8 +130,8 @@ function on_update(dt, input_x, input_y, firing)
                     bullet.alive = false
                     enemy.alive = false
                     score = score + 100
-                    despawn_sprite(bullet.id)
-                    despawn_sprite(enemy.id)
+                    ecs_despawn_entity(bullet.id)
+                    ecs_despawn_entity(enemy.id)
                     break
                 end
             end
@@ -136,7 +142,7 @@ function on_update(dt, input_x, input_y, firing)
         if enemy.alive and hit(player, enemy, 55, 65) then
             enemy.alive = false
             lives = lives - 1
-            despawn_sprite(enemy.id)
+            ecs_despawn_entity(enemy.id)
         end
     end
 
@@ -150,9 +156,9 @@ function on_update(dt, input_x, input_y, firing)
     if lives <= 0 then
         lives = 0
         game_over = true
-        set_hud(score, lives, "GAME OVER - TAP SPACE TO RESTART")
+        ecs_set_game_state(score, lives, "GAME OVER - TAP SPACE TO RESTART")
     else
-        set_hud(score, lives, "")
+        ecs_set_game_state(score, lives, "")
     end
     was_firing = firing
 end

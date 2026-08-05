@@ -1,8 +1,9 @@
-declare function clear_game(): void;
-declare function spawn_sprite(kind: string, id: string, x: number, y: number): void;
-declare function set_position(id: string, x: number, y: number): void;
-declare function despawn_sprite(id: string): void;
-declare function set_hud(score: number, lives: number, message: string): void;
+declare function ecs_clear_world(): void;
+declare function ecs_spawn_entity(id: string): void;
+declare function ecs_insert_sprite(id: string, kind: string): void;
+declare function ecs_set_transform(id: string, x: number, y: number): void;
+declare function ecs_despawn_entity(id: string): void;
+declare function ecs_set_game_state(score: number, lives: number, message: string): void;
 
 interface Point {
   x: number;
@@ -32,13 +33,19 @@ let seed = 73129;
 let gameOver = false;
 let wasFiring = false;
 
+function spawnEntity(kind: string, id: string, x: number, y: number): void {
+  ecs_spawn_entity(id);
+  ecs_insert_sprite(id, kind);
+  ecs_set_transform(id, x, y);
+}
+
 function random01(): number {
   seed = (seed * 48271) % 2147483647;
   return seed / 2147483647;
 }
 
 function resetGame(): void {
-  clear_game();
+  ecs_clear_world();
   player = { x: 0, y: -300 };
   bullets = [];
   enemies = [];
@@ -49,8 +56,8 @@ function resetGame(): void {
   spawnTimer = 0.35;
   seed = 73129;
   gameOver = false;
-  spawn_sprite("player", "player", player.x, player.y);
-  set_hud(score, lives, "ARROWS/WASD + HOLD SPACE");
+  spawnEntity("player", "player", player.x, player.y);
+  ecs_set_game_state(score, lives, "ARROWS/WASD + HOLD SPACE");
 }
 
 function spawnEnemy(): void {
@@ -61,7 +68,7 @@ function spawnEnemy(): void {
     alive: true,
   };
   enemies.push(enemy);
-  spawn_sprite("enemy", enemy.id, enemy.x, enemy.y);
+  spawnEntity("enemy", enemy.id, enemy.x, enemy.y);
 }
 
 function shoot(): void {
@@ -72,7 +79,7 @@ function shoot(): void {
     alive: true,
   };
   bullets.push(bullet);
-  spawn_sprite("bullet", bullet.id, bullet.x, bullet.y);
+  spawnEntity("bullet", bullet.id, bullet.x, bullet.y);
 }
 
 function hit(a: Point, b: Point, halfWidth: number, halfHeight: number): boolean {
@@ -96,7 +103,7 @@ function on_update(dt: number, inputX: number, inputY: number, firing: boolean):
 
   player.x = Math.max(-260, Math.min(260, player.x + inputX * PLAYER_SPEED * dt));
   player.y = Math.max(-335, Math.min(300, player.y + inputY * PLAYER_SPEED * dt));
-  set_position("player", player.x, player.y);
+  ecs_set_transform("player", player.x, player.y);
 
   fireTimer -= dt;
   if (firing && fireTimer <= 0) {
@@ -114,9 +121,9 @@ function on_update(dt: number, inputX: number, inputY: number, firing: boolean):
     bullet.y += BULLET_SPEED * dt;
     if (bullet.y > 420) {
       bullet.alive = false;
-      despawn_sprite(bullet.id);
+      ecs_despawn_entity(bullet.id);
     } else {
-      set_position(bullet.id, bullet.x, bullet.y);
+      ecs_set_transform(bullet.id, bullet.x, bullet.y);
     }
   }
 
@@ -125,9 +132,9 @@ function on_update(dt: number, inputX: number, inputY: number, firing: boolean):
     if (enemy.y < -420) {
       enemy.alive = false;
       lives -= 1;
-      despawn_sprite(enemy.id);
+      ecs_despawn_entity(enemy.id);
     } else {
-      set_position(enemy.id, enemy.x, enemy.y);
+      ecs_set_transform(enemy.id, enemy.x, enemy.y);
     }
   }
 
@@ -138,8 +145,8 @@ function on_update(dt: number, inputX: number, inputY: number, firing: boolean):
         bullet.alive = false;
         enemy.alive = false;
         score += 100;
-        despawn_sprite(bullet.id);
-        despawn_sprite(enemy.id);
+        ecs_despawn_entity(bullet.id);
+        ecs_despawn_entity(enemy.id);
         break;
       }
     }
@@ -149,7 +156,7 @@ function on_update(dt: number, inputX: number, inputY: number, firing: boolean):
     if (enemy.alive && hit(player, enemy, 55, 65)) {
       enemy.alive = false;
       lives -= 1;
-      despawn_sprite(enemy.id);
+      ecs_despawn_entity(enemy.id);
     }
   }
 
@@ -158,9 +165,9 @@ function on_update(dt: number, inputX: number, inputY: number, firing: boolean):
   if (lives <= 0) {
     lives = 0;
     gameOver = true;
-    set_hud(score, lives, "GAME OVER - TAP SPACE TO RESTART");
+    ecs_set_game_state(score, lives, "GAME OVER - TAP SPACE TO RESTART");
   } else {
-    set_hud(score, lives, "");
+    ecs_set_game_state(score, lives, "");
   }
   wasFiring = firing;
 }
