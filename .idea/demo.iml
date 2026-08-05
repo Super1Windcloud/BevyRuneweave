@@ -8,6 +8,19 @@
       <sourceFolder url="file://$MODULE_DIR$/projects/rhai/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/projects/ts/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/crates/bevy_mod_scripting_asset/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/crates/bevy_mod_scripting_bindings/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/crates/bevy_mod_scripting_bindings_domain/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/crates/bevy_mod_scripting_core/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/crates/bevy_mod_scripting_derive/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/crates/bevy_mod_scripting_display/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/crates/bevy_mod_scripting_script/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/crates/bevy_mod_scripting_world/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/crates/bevy_system_reflection/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/crates/languages/bevy_mod_scripting_lua/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/crates/languages/bevy_mod_scripting_quickjs/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/crates/testing_crates/test_utils/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/bevy_mod_scripting/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
