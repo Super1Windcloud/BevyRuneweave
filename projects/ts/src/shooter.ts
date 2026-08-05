@@ -43,6 +43,7 @@ interface GameResources {
   seed: number;
   gameOver: boolean;
   restartWasPressed: boolean;
+  started: boolean;
 }
 
 interface FrameContext {
@@ -84,7 +85,8 @@ function createResources(): GameResources {
     damageTimer: 0,
     seed: 73129,
     gameOver: false,
-    restartWasPressed: false,
+  restartWasPressed: false,
+  started: false,
   };
 }
 
@@ -292,6 +294,16 @@ function on_script_reloaded(): void {
 }
 
 function on_update(dt: number, inputX: number, inputY: number, restartPressed: boolean): void {
+  if (!resources.started) {
+    if (restartPressed && !resources.restartWasPressed) {
+      resources.started = true;
+      ecs_set_game_state(resources.score, resources.lives, "ARROWS/WASD - AUTO FIRE");
+    } else {
+      resources.restartWasPressed = restartPressed;
+      ecs_set_game_state(resources.score, resources.lives, "PRESS SPACE TO START");
+      return;
+    }
+  }
   if (resources.gameOver) {
     if (restartPressed && !resources.restartWasPressed) resetGame();
     resources.restartWasPressed = restartPressed;

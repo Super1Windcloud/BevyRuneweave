@@ -1,4 +1,7 @@
 set shell := ["zsh", "-cu"]
+# Use PowerShell for recipes on Windows; the recipes below use POSIX-style
+# command syntax that the default `cmd` shell cannot interpret.
+set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
 
 ts_dir := "projects/ts"
 bms_base_packages := "-p bevy_mod_scripting -p bevy_mod_scripting_asset -p bevy_mod_scripting_bindings -p bevy_mod_scripting_bindings_domain -p bevy_mod_scripting_core -p bevy_mod_scripting_derive -p bevy_mod_scripting_display -p bevy_mod_scripting_script -p bevy_mod_scripting_world -p bevy_system_reflection -p test_utils"
@@ -40,6 +43,14 @@ run-ts:
     watcher_pid=$!
     trap 'kill $watcher_pid 2>/dev/null || true' EXIT INT TERM
     cargo run -p script-squadron-typescript
+
+# Windows/PowerShell variant of run-ts. The zsh recipe above remains the
+# default for Unix hosts because its process and signal handling are shell
+# specific.
+run-ts-windows:
+    #!powershell.exe -NoLogo -NoProfile -Command
+    $watcher = Start-Process npm -ArgumentList '--prefix', '{{ts_dir}}', 'run', 'watch' -PassThru
+    try { cargo run -p script-squadron-typescript } finally { Stop-Process -Id $watcher.Id -Force -ErrorAction SilentlyContinue }
 
 # Check the Lua 5.5 executable project.
 check-lua:
