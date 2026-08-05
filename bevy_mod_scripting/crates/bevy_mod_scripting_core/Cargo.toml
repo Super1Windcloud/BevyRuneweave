@@ -41,7 +41,6 @@ profiling = { workspace = true }
 bevy_diagnostic = { workspace = true, default-features = false, features = [] }
 bevy_mod_scripting_derive = { workspace = true }
 test_utils = { workspace = true }
-pretty_assertions = { workspace = true, features = ["alloc"] }
 uuid = { workspace = true }
 
 [lints]

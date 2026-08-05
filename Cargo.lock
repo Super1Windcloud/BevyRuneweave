@@ -434,7 +434,7 @@ dependencies = [
  "downcast-rs 2.0.2",
  "log",
  "thiserror 2.0.19",
- "variadics_please",
+ "variadics_please 1.1.0",
  "wasm-bindgen",
  "web-sys",
 ]
@@ -667,7 +667,7 @@ dependencies = [
  "slotmap",
  "smallvec",
  "thiserror 2.0.19",
- "variadics_please",
+ "variadics_please 1.1.0",
 ]
 
 [[package]]
@@ -1006,7 +1006,7 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.19",
  "tracing",
- "variadics_please",
+ "variadics_please 1.1.0",
  "wgpu-types",
 ]
 
@@ -1038,7 +1038,7 @@ dependencies = [
  "rand_distr",
  "serde",
  "thiserror 2.0.19",
- "variadics_please",
+ "variadics_please 1.1.0",
 ]
 
 [[package]]
@@ -1123,7 +1123,7 @@ dependencies = [
  "pretty_assertions",
  "profiling",
  "test_utils",
- "variadics_please",
+ "variadics_please 2.0.0",
 ]
 
 [[package]]
@@ -1155,7 +1155,6 @@ dependencies = [
  "bevy_system_reflection",
  "bevy_utils",
  "parking_lot",
- "pretty_assertions",
  "profiling",
  "test_utils",
  "uuid",
@@ -1167,7 +1166,7 @@ version = "0.21.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -1381,7 +1380,7 @@ dependencies = [
  "smol_str",
  "thiserror 2.0.19",
  "uuid",
- "variadics_please",
+ "variadics_please 1.1.0",
  "wgpu-types",
 ]
 
@@ -1445,7 +1444,7 @@ dependencies = [
  "send_wrapper",
  "smallvec",
  "thiserror 2.0.19",
- "variadics_please",
+ "variadics_please 1.1.0",
  "wasm-bindgen",
  "weak-table",
  "web-sys",
@@ -1483,7 +1482,7 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.19",
  "tracing",
- "variadics_please",
+ "variadics_please 1.1.0",
 ]
 
 [[package]]
@@ -1590,7 +1589,7 @@ dependencies = [
  "bevy_state_macros",
  "bevy_utils",
  "log",
- "variadics_please",
+ "variadics_please 1.1.0",
 ]
 
 [[package]]
@@ -3416,18 +3415,18 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
 name = "lua-src"
-version = "550.0.0"
+version = "550.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e836dc8ae16806c9bdcf42003a88da27d163433e3f9684c52f0301258004a4fb"
+checksum = "75c110c2fa33f34e0de05448e1f3eb2e0631e7a69e2d8ae1586cffc9fc9f9949"
 dependencies = [
  "cc",
 ]
 
 [[package]]
 name = "luajit-src"
-version = "210.6.6+707c12b"
+version = "210.7.2+b925b3e"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a86cc925d4053d0526ae7f5bc765dbd0d7a5d1a63d43974f4966cb349ca63295"
+checksum = "920cf654b23d217c550ceea57c32cd2a413ea27b6d47ed77b5ee0cf655adefa6"
 dependencies = [
  "cc",
  "which",
@@ -3435,9 +3434,9 @@ dependencies = [
 
 [[package]]
 name = "luau0-src"
-version = "0.18.3+luau709"
+version = "0.20.7+luau728"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e73f7d752fe2ef0a41f132b83d0be154c6ae0ed84967b4df80a16901866be075"
+checksum = "6aa644236297645ba62215330b2a2d60cf7ee6263c33578baf8e54662868ed59"
 dependencies = [
  "cc",
 ]
@@ -3506,9 +3505,9 @@ dependencies = [
 
 [[package]]
 name = "mlua"
-version = "0.11.6"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccd36acfa49ce6ee56d1307a061dd302c564eee757e6e4cd67eb4f7204846fab"
+checksum = "ad72ffa037cf5970c9860674f32f703fda25d86cf217475fe7a79c5f9961bcaa"
 dependencies = [
  "bstr",
  "either",
@@ -3517,14 +3516,13 @@ dependencies = [
  "num-traits",
  "parking_lot",
  "rustc-hash 2.1.3",
- "rustversion",
 ]
 
 [[package]]
 name = "mlua-sys"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f1c3a7fc7580227ece249fd90aa2fa3b39eb2b49d3aec5e103b3e85f2c3dfc8"
+checksum = "92136787b906d4e55cfe96cd6c62e010bb1a56889d0d6cf83eb016dbad07576b"
 dependencies = [
  "cc",
  "cfg-if",
@@ -3544,6 +3542,12 @@ dependencies = [
  "num-traits",
  "pxfm",
 ]
+
+[[package]]
+name = "mutants"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc0287524726960e07b119cebd01678f852f147742ae0d925e6a520dca956126"
 
 [[package]]
 name = "naga"
@@ -5250,6 +5254,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
+name = "unsynn"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "501a7adf1a4bd9951501e5c66621e972ef8874d787628b7f90e64f936ef7ec0a"
+dependencies = [
+ "mutants",
+ "proc-macro2",
+ "rustc-hash 2.1.3",
+]
+
+[[package]]
 name = "utf8_iter"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5282,6 +5297,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "variadics_please"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b53d0f7f2d0182759a549f1f313ce16b07d8f9ba93098157b5fa10ee3e61117f"
+dependencies = [
+ "quote",
+ "unsynn",
 ]
 
 [[package]]
