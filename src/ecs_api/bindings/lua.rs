@@ -75,7 +75,7 @@ fn install_ecs_api(
         .set(
             "ecs_set_game_state",
             context
-                .create_function(|_, (score, lives, message): (i32, i32, String)| {
+                .create_function(|_, (score, lives, message): (f64, i32, String)| {
                     queue_command(EcsCommand::SetGameState {
                         score,
                         lives,
@@ -94,12 +94,19 @@ pub(super) fn ecs_lua_plugin() -> LuaScriptingPlugin {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicI32, AtomicUsize, Ordering},
+    };
+
     use bevy_mod_scripting::lua::mlua::Lua;
 
     #[test]
     fn shooter_script_runs_gameplay_frames() {
         let context = Lua::new();
         let globals = context.globals();
+        let bullet_count = Arc::new(AtomicUsize::new(0));
+        let remaining_lives = Arc::new(AtomicI32::new(3));
         globals
             .set(
                 "ecs_clear_world",
@@ -116,7 +123,15 @@ mod tests {
             .set(
                 "ecs_insert_sprite",
                 context
-                    .create_function(|_, _: (String, String)| Ok(()))
+                    .create_function({
+                        let bullet_count = Arc::clone(&bullet_count);
+                        move |_, (_, kind): (String, String)| {
+                            if kind == "bullet" {
+                                bullet_count.fetch_add(1, Ordering::Relaxed);
+                            }
+                            Ok(())
+                        }
+                    })
                     .unwrap(),
             )
             .unwrap();
@@ -138,7 +153,13 @@ mod tests {
             .set(
                 "ecs_set_game_state",
                 context
-                    .create_function(|_, _: (i32, i32, String)| Ok(()))
+                    .create_function({
+                        let remaining_lives = Arc::clone(&remaining_lives);
+                        move |_, (_, lives, _): (f64, i32, String)| {
+                            remaining_lives.store(lives, Ordering::Relaxed);
+                            Ok(())
+                        }
+                    })
                     .unwrap(),
             )
             .unwrap();
@@ -152,10 +173,12 @@ mod tests {
             globals.get("on_script_loaded").unwrap();
         loaded.call::<()>(()).unwrap();
         let update: bevy_mod_scripting::lua::mlua::Function = globals.get("on_update").unwrap();
-        for frame in 0..600 {
+        for _ in 0..600 {
             update
-                .call::<()>((0.016_f64, 0.25_f64, 0.0_f64, frame % 3 != 0))
+                .call::<()>((0.016_f64, 0.25_f64, 0.0_f64, false))
                 .unwrap();
         }
+        assert!(bullet_count.load(Ordering::Relaxed) > 0);
+        assert!(remaining_lives.load(Ordering::Relaxed) > 0);
     }
 }

@@ -84,13 +84,14 @@ fn emit_update(
         + axis(&keyboard, KeyCode::KeyA, KeyCode::KeyD);
     let vertical = axis(&keyboard, KeyCode::ArrowDown, KeyCode::ArrowUp)
         + axis(&keyboard, KeyCode::KeyS, KeyCode::KeyW);
+    let restart_pressed = keyboard.pressed(KeyCode::Space);
     callbacks.write(ScriptCallbackEvent::new_for_all_scripts(
         OnUpdate,
         vec![
             ScriptValue::Float(time.delta_secs_f64().min(0.05)),
             ScriptValue::Float(horizontal.clamp(-1.0, 1.0)),
             ScriptValue::Float(vertical.clamp(-1.0, 1.0)),
-            ScriptValue::Bool(keyboard.pressed(KeyCode::Space)),
+            ScriptValue::Bool(restart_pressed),
         ],
     ));
 }

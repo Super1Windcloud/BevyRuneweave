@@ -1,8 +1,12 @@
 [package]
-name = "script-squadron-runtime"
+name = "bevy-runeweave"
 version = "0.1.0"
 edition = "2024"
 authors.workspace = true
+description = "A Bevy-based ECS game framework for Lua, Luau, JavaScript, and TypeScript"
+license = "MIT OR Apache-2.0"
+keywords = ["bevy", "ecs", "gamedev", "scripting"]
+categories = ["game-development", "game-engines"]
 autobins = false
 
 [workspace]
@@ -88,7 +92,7 @@ todo = "deny"
 missing_docs = "deny"
 
 [lib]
-name = "script_squadron_runtime"
+name = "bevy_runeweave"
 crate-type = ["rlib", "cdylib", "staticlib"]
 
 [features]

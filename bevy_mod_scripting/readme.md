@@ -1,6 +1,6 @@
-# Script Squadron BMS Runtime
+# Bevy Runeweave BMS Runtime
 
-This is the focused `bevy_mod_scripting` runtime used by Script Squadron. It
+This is the focused `bevy_mod_scripting` runtime used by Bevy Runeweave. It
 keeps the upstream script asset, lifecycle, callback, and hot-reload pipeline,
 while limiting language support to:
 

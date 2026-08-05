@@ -27,11 +27,12 @@ type GameResources = {
     next_id: number,
     fire_timer: number,
     spawn_timer: number,
+    damage_timer: number,
     seed: number,
     game_over: boolean,
-    was_firing: boolean,
+    restart_was_pressed: boolean,
 }
-type FrameContext = { dt: number, input_x: number, input_y: number, firing: boolean }
+type FrameContext = { dt: number, input_x: number, input_y: number }
 type GameSystem = (FrameContext) -> ()
 
 local PLAYER_SPEED: number = 330
@@ -39,6 +40,7 @@ local BULLET_SPEED: number = 570
 local ENEMY_SPEED: number = 145
 local FIRE_DELAY: number = 0.18
 local SPAWN_DELAY: number = 0.72
+local DAMAGE_DELAY: number = 1.0
 
 local function create_world(): World
     return {
@@ -61,9 +63,10 @@ local function create_resources(): GameResources
         next_id = 1,
         fire_timer = 0,
         spawn_timer = 0.35,
+        damage_timer = 0,
         seed = 73129,
         game_over = false,
-        was_firing = false,
+        restart_was_pressed = false,
     }
 end
 
@@ -158,7 +161,7 @@ end
 
 local function weapon_system(frame: FrameContext)
     resources.fire_timer -= frame.dt
-    if not frame.firing or resources.fire_timer > 0 then return end
+    if resources.fire_timer > 0 then return end
     for id in world.players do
         local transform = world.transforms[id]
         if transform and is_active(id) then spawn_bullet(transform) end
@@ -191,10 +194,7 @@ local function bounds_system(_frame: FrameContext)
     end
     for id in world.enemies do
         local transform = world.transforms[id]
-        if transform and transform.y < -420 and is_active(id) then
-            resources.lives -= 1
-            queue_despawn(id)
-        end
+        if transform and transform.y < -420 then queue_despawn(id) end
     end
 end
 
@@ -210,7 +210,7 @@ local function entities_overlap(left: EntityId, right: EntityId): boolean
         and math.abs(left_transform.y - right_transform.y) < left_collider.y + right_collider.y
 end
 
-local function collision_system(_frame: FrameContext)
+local function collision_system(frame: FrameContext)
     for bullet in world.bullets do
         if not is_active(bullet) then continue end
         for enemy in world.enemies do
@@ -222,12 +222,16 @@ local function collision_system(_frame: FrameContext)
             end
         end
     end
+    resources.damage_timer = math.max(0, resources.damage_timer - frame.dt)
+    if resources.damage_timer > 0 then return end
     for player in world.players do
         if not is_active(player) then continue end
         for enemy in world.enemies do
             if is_active(enemy) and entities_overlap(player, enemy) then
                 queue_despawn(enemy)
                 resources.lives -= 1
+                resources.damage_timer = DAMAGE_DELAY
+                return
             end
         end
     end
@@ -263,7 +267,7 @@ local function reset_game()
     world = create_world()
     resources = create_resources()
     spawn_player()
-    ecs_set_game_state(resources.score, resources.lives, "ARROWS/WASD + HOLD SPACE")
+    ecs_set_game_state(resources.score, resources.lives, "ARROWS/WASD - AUTO FIRE")
 end
 
 function on_script_loaded()
@@ -274,17 +278,17 @@ function on_script_reloaded()
     reset_game()
 end
 
-function on_update(dt: number, input_x: number, input_y: number, firing: boolean)
+function on_update(dt: number, input_x: number, input_y: number, restart_pressed: boolean)
     if resources.game_over then
-        if firing and not resources.was_firing then reset_game() end
-        resources.was_firing = firing
+        if restart_pressed and not resources.restart_was_pressed then reset_game() end
+        resources.restart_was_pressed = restart_pressed
         return
     end
 
-    local frame: FrameContext = { dt = dt, input_x = input_x, input_y = input_y, firing = firing }
+    local frame: FrameContext = { dt = dt, input_x = input_x, input_y = input_y }
     for _, system in update_schedule do system(frame) end
     flush_entity_commands()
     game_state_system()
     render_sync_system()
-    resources.was_firing = firing
+    resources.restart_was_pressed = restart_pressed
 end

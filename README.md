@@ -1,14 +1,15 @@
-# Script Squadron
+# Bevy Runeweave
 
-**Script Squadron 是一个基于 Bevy 封装、支持使用多种脚本语言开发游戏的框架。**
+**Bevy Runeweave 是一个将多种脚本语言编织进 Bevy ECS 世界的游戏框架。**
 
-框架以 Bevy 作为底层游戏引擎，统一提供窗口、输入、渲染、资源管理、脚本热重载
-和 Rust 宿主能力，并允许使用 Lua 5.5、Luau、JavaScript 或 TypeScript 编写玩法
-逻辑。开发者可以复用同一套 Bevy 运行时与脚本 API，按项目选择合适的脚本语言，
-而不必为每种语言重复搭建完整的游戏基础设施。
+`Rune` 代表赋予世界行为的脚本符文，`Weave` 表达脚本、组件与系统在 ECS 中的
+组合。框架在 Bevy 之上封装窗口、输入、渲染、资源管理、ECS 脚本 API、热重载和
+Rust 宿主能力，并允许使用 Lua 5.5、Luau、JavaScript 或 TypeScript 编写玩法逻辑。
+开发者可以直接复用统一的框架运行时与数据驱动模型，按项目选择合适的脚本语言。
 
-仓库内的飞机大战是框架的完整示例：同一套游戏分别由四种脚本语言实现，用于
-展示多语言接入、独立项目组织、资源隔离、热重载以及 Rust 与脚本之间的协作方式。
+仓库内的飞机大战示例名为 **Script Squadron**。同一套游戏分别由四种脚本语言
+实现，用于展示多语言接入、独立项目组织、资源隔离、热重载以及 Rust 与脚本之间
+的协作方式。
 
 ## 框架能力
 
@@ -22,8 +23,9 @@
   语言实现之间产生隐式依赖。
 - **开发期热重载**：脚本作为 Bevy 资源加载，修改后可自动重新载入，缩短玩法迭代周期。
 
-Script Squadron 使用统一且独立的包命名空间：共享运行时为
-`script-squadron-runtime`，四个可执行项目分别为 `script-squadron-lua`、
+Bevy Runeweave 的框架主包为 `bevy-runeweave`，Rust crate 为
+`bevy_runeweave`，TypeScript 包为 `@superwindcloud/bevy-runeweave`。
+Script Squadron 的四个可执行示例分别为 `script-squadron-lua`、
 `script-squadron-luau`、`script-squadron-js` 和
 `script-squadron-typescript`。
 
@@ -43,7 +45,7 @@ projects/
 └── ts/                  # TypeScript 7.0.2 + QuickJS 可执行项目
     ├── src/shooter.ts   # TypeScript 游戏源码
     └── assets/          # 编译后 shooter.js + 独立 sprites
-src/                     # script-squadron-runtime 共享 Bevy 宿主库
+src/                     # bevy-runeweave 框架核心与共享 Bevy 宿主
 ├── ecs_api/             # 面向脚本的 ECS 数据写入边界
 │   ├── bindings/        # Lua/Luau 与 QuickJS/TypeScript 语言适配
 │   ├── command.rs       # 跨脚本运行时的 ECS 写入队列
@@ -74,8 +76,9 @@ just run-js
 just run-ts
 ```
 
-操作方式：方向键或 `WASD` 移动，按住空格连续射击；生命值归零后松开并
-再次按下空格重新开始。四个版本使用相同参数和随机种子，便于对比语言实现。
+操作方式：方向键或 `WASD` 移动，子弹会按固定冷却自动连续发射，不需要射击按键；
+生命值归零后松开并再次按下空格重新开始。击毁敌机获得的积分会持续累加，没有玩法
+上限。四个版本使用相同参数和随机种子，便于对比语言实现。
 
 ## ECS 数据驱动设计
 
@@ -96,7 +99,9 @@ Bullet、Enemy 对象数组：
 
 - `World` 使用以 Entity ID 为 key 的稀疏组件存储，分别保存 Transform、Velocity、
   Collider、Sprite，并用 Player、Bullet、Enemy 标签组件表达查询条件。
-- `Resources` 保存分数、生命值、随机种子、生成冷却和射击冷却等全局状态。
+- `Resources` 保存持续累加且不封顶的分数、生命值、随机种子、生成冷却、自动射击
+  冷却和受击冷却等全局状态。敌机飞出边界只会被销毁，不会自动扣除生命；玩家碰撞
+  才会受伤，并有短暂无敌间隔防止连续扣血。
 - Movement、Weapon、EnemySpawn、Bounds、Collision 等 System 按固定 schedule 查询并
   更新组件，不把行为方法挂载到 Entity 上。
 - System 只标记待销毁 Entity，遍历结束后统一 flush 结构变更，避免在查询期间修改
@@ -112,7 +117,7 @@ ecs_insert_sprite(entity_id, sprite_kind)
 ecs_set_transform(entity_id, x, y)
 ecs_despawn_entity(entity_id)
 ecs_set_game_state(score, lives, message)
-on_update(delta_seconds, input_x, input_y, firing)
+on_update(delta_seconds, input_x, input_y, restart_pressed)
 ```
 
 例如，一个可渲染实体不是由 `spawn_sprite` 一次性创建的对象，而是由三条数据写入

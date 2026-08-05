@@ -4,6 +4,7 @@ const BULLET_SPEED = 570;
 const ENEMY_SPEED = 145;
 const FIRE_DELAY = 0.18;
 const SPAWN_DELAY = 0.72;
+const DAMAGE_DELAY = 1.0;
 function createWorld() {
     return {
         entities: new Set(),
@@ -24,9 +25,10 @@ function createResources() {
         nextId: 1,
         fireTimer: 0,
         spawnTimer: 0.35,
+        damageTimer: 0,
         seed: 73129,
         gameOver: false,
-        wasFiring: false,
+        restartWasPressed: false,
     };
 }
 let world = createWorld();
@@ -110,7 +112,7 @@ function playerMovementSystem(frame) {
 }
 function weaponSystem(frame) {
     resources.fireTimer -= frame.dt;
-    if (!frame.firing || resources.fireTimer > 0)
+    if (resources.fireTimer > 0)
         return;
     for (const id of world.players) {
         const transform = world.transforms.get(id);
@@ -143,10 +145,8 @@ function boundsSystem() {
     }
     for (const id of world.enemies) {
         const transform = world.transforms.get(id);
-        if (transform && transform.y < -420 && isActive(id)) {
-            resources.lives -= 1;
+        if (transform && transform.y < -420)
             queueDespawn(id);
-        }
     }
 }
 function entitiesOverlap(left, right) {
@@ -159,7 +159,7 @@ function entitiesOverlap(left, right) {
     return (Math.abs(leftTransform.x - rightTransform.x) < leftCollider.x + rightCollider.x &&
         Math.abs(leftTransform.y - rightTransform.y) < leftCollider.y + rightCollider.y);
 }
-function collisionSystem() {
+function collisionSystem(frame) {
     for (const bullet of world.bullets) {
         if (!isActive(bullet))
             continue;
@@ -172,6 +172,9 @@ function collisionSystem() {
             }
         }
     }
+    resources.damageTimer = Math.max(0, resources.damageTimer - frame.dt);
+    if (resources.damageTimer > 0)
+        return;
     for (const player of world.players) {
         if (!isActive(player))
             continue;
@@ -179,6 +182,8 @@ function collisionSystem() {
             if (isActive(enemy) && entitiesOverlap(player, enemy)) {
                 queueDespawn(enemy);
                 resources.lives -= 1;
+                resources.damageTimer = DAMAGE_DELAY;
+                return;
             }
         }
     }
@@ -212,7 +217,7 @@ function resetGame() {
     world = createWorld();
     resources = createResources();
     spawnPlayer();
-    ecs_set_game_state(resources.score, resources.lives, "ARROWS/WASD + HOLD SPACE");
+    ecs_set_game_state(resources.score, resources.lives, "ARROWS/WASD - AUTO FIRE");
 }
 function on_script_loaded() {
     resetGame();
@@ -220,18 +225,18 @@ function on_script_loaded() {
 function on_script_reloaded() {
     resetGame();
 }
-function on_update(dt, inputX, inputY, firing) {
+function on_update(dt, inputX, inputY, restartPressed) {
     if (resources.gameOver) {
-        if (firing && !resources.wasFiring)
+        if (restartPressed && !resources.restartWasPressed)
             resetGame();
-        resources.wasFiring = firing;
+        resources.restartWasPressed = restartPressed;
         return;
     }
-    const frame = { dt, inputX, inputY, firing };
+    const frame = { dt, inputX, inputY };
     for (const system of updateSchedule)
         system(frame);
     flushEntityCommands();
     gameStateSystem();
     renderSyncSystem();
-    resources.wasFiring = firing;
+    resources.restartWasPressed = restartPressed;
 }

@@ -54,7 +54,7 @@ fn install_ecs_api(
         globals
             .set(
                 "ecs_set_game_state",
-                Func::from(|score: i32, lives: i32, message: String| {
+                Func::from(|score: f64, lives: i32, message: String| {
                     queue_command(EcsCommand::SetGameState {
                         score,
                         lives,
@@ -72,6 +72,11 @@ pub(super) fn ecs_quickjs_plugin() -> QuickJsScriptingPlugin {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicI32, AtomicUsize, Ordering},
+    };
+
     use bevy_mod_scripting::quickjs::rquickjs::{Context, Function, Runtime};
 
     use super::*;
@@ -79,6 +84,8 @@ mod tests {
     fn assert_shooter_runs(source: &str) {
         let runtime = Runtime::new().unwrap();
         let context = Context::full(&runtime).unwrap();
+        let bullet_count = Arc::new(AtomicUsize::new(0));
+        let remaining_lives = Arc::new(AtomicI32::new(3));
         context.with(|ctx| {
             let globals = ctx.globals();
             globals.set("ecs_clear_world", Func::from(|| {})).unwrap();
@@ -86,7 +93,17 @@ mod tests {
                 .set("ecs_spawn_entity", Func::from(|_: String| {}))
                 .unwrap();
             globals
-                .set("ecs_insert_sprite", Func::from(|_: String, _: String| {}))
+                .set(
+                    "ecs_insert_sprite",
+                    Func::from({
+                        let bullet_count = Arc::clone(&bullet_count);
+                        move |_: String, kind: String| {
+                            if kind == "bullet" {
+                                bullet_count.fetch_add(1, Ordering::Relaxed);
+                            }
+                        }
+                    }),
+                )
                 .unwrap();
             globals
                 .set(
@@ -100,19 +117,26 @@ mod tests {
             globals
                 .set(
                     "ecs_set_game_state",
-                    Func::from(|_: i32, _: i32, _: String| {}),
+                    Func::from({
+                        let remaining_lives = Arc::clone(&remaining_lives);
+                        move |_: f64, lives: i32, _: String| {
+                            remaining_lives.store(lives, Ordering::Relaxed);
+                        }
+                    }),
                 )
                 .unwrap();
             ctx.eval::<(), _>(source).unwrap();
             let loaded: Function = globals.get("on_script_loaded").unwrap();
             loaded.call::<_, ()>(()).unwrap();
             let update: Function = globals.get("on_update").unwrap();
-            for frame in 0..600 {
+            for _ in 0..600 {
                 update
-                    .call::<_, ()>((0.016_f64, 0.25_f64, 0.0_f64, frame % 3 != 0))
+                    .call::<_, ()>((0.016_f64, 0.25_f64, 0.0_f64, false))
                     .unwrap();
             }
         });
+        assert!(bullet_count.load(Ordering::Relaxed) > 0);
+        assert!(remaining_lives.load(Ordering::Relaxed) > 0);
     }
 
     #[test]

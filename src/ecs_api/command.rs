@@ -21,7 +21,7 @@ pub(super) enum EcsCommand {
         id: String,
     },
     SetGameState {
-        score: i32,
+        score: f64,
         lives: i32,
         message: String,
     },

@@ -9,7 +9,7 @@ pub(super) struct ScriptEntityRegistry(HashMap<String, Entity>);
 
 #[derive(Resource, Default)]
 pub(super) struct GameState {
-    score: i32,
+    score: f64,
     lives: i32,
     message: String,
 }
@@ -165,12 +165,12 @@ pub(super) fn sync_game_state(
     if let Ok(mut text) = text.single_mut() {
         text.0 = if game_state.message.is_empty() {
             format!(
-                "SCORE {:05}    LIVES {}",
+                "SCORE {:05.0}    LIVES {}",
                 game_state.score, game_state.lives
             )
         } else {
             format!(
-                "SCORE {:05}    LIVES {}\n{}",
+                "SCORE {:05.0}    LIVES {}\n{}",
                 game_state.score, game_state.lives, game_state.message
             )
         };
@@ -212,7 +212,7 @@ mod tests {
             y: -34.0,
         });
         queue_command(EcsCommand::SetGameState {
-            score: 200,
+            score: 200.0,
             lives: 2,
             message: "READY".to_owned(),
         });
@@ -225,7 +225,7 @@ mod tests {
         assert_eq!(components.1.0, "player");
         assert_eq!((components.2.x, components.2.y), (12.0, -34.0));
         let state = world.resource::<GameState>();
-        assert_eq!((state.score, state.lives), (200, 2));
+        assert_eq!((state.score, state.lives), (200.0, 2));
         assert_eq!(state.message, "READY");
 
         queue_command(EcsCommand::ClearWorld);

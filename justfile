@@ -88,19 +88,19 @@ bms-check: bms-check-base bms-check-lua bms-check-luau bms-check-js bms-check-ts
 
 # Execute 600 gameplay frames with the Lua 5.5 VM.
 test-lua:
-    cargo test -p script-squadron-runtime --no-default-features --features lua --lib
+    cargo test -p bevy-runeweave --no-default-features --features lua --lib
 
 # Execute 600 gameplay frames with the Luau VM.
 test-luau:
-    cargo test -p script-squadron-runtime --no-default-features --features luau --lib
+    cargo test -p bevy-runeweave --no-default-features --features luau --lib
 
 # Execute JavaScript gameplay frames with QuickJS.
 test-js:
-    cargo test -p script-squadron-runtime --no-default-features --features js --lib
+    cargo test -p bevy-runeweave --no-default-features --features js --lib
 
 # Compile TypeScript, then execute it through its dedicated BMS feature.
 test-ts: ts-build
-    cargo test -p script-squadron-runtime --no-default-features --features typescript --lib
+    cargo test -p bevy-runeweave --no-default-features --features typescript --lib
 
 # Run all script-engine gameplay tests.
 test: test-lua test-luau test-js test-ts

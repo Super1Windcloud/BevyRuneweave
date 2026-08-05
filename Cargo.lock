@@ -331,6 +331,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy-runeweave"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_mod_scripting",
+]
+
+[[package]]
 name = "bevy_a11y"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4640,36 +4648,28 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 name = "script-squadron-js"
 version = "0.1.0"
 dependencies = [
- "script-squadron-runtime",
+ "bevy-runeweave",
 ]
 
 [[package]]
 name = "script-squadron-lua"
 version = "0.1.0"
 dependencies = [
- "script-squadron-runtime",
+ "bevy-runeweave",
 ]
 
 [[package]]
 name = "script-squadron-luau"
 version = "0.1.0"
 dependencies = [
- "script-squadron-runtime",
-]
-
-[[package]]
-name = "script-squadron-runtime"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_mod_scripting",
+ "bevy-runeweave",
 ]
 
 [[package]]
 name = "script-squadron-typescript"
 version = "0.1.0"
 dependencies = [
- "script-squadron-runtime",
+ "bevy-runeweave",
 ]
 
 [[package]]
