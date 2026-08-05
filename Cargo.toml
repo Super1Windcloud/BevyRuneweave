@@ -6,13 +6,85 @@ autobins = false
 
 [workspace]
 members = [
+    "bevy_mod_scripting",
+    "bevy_mod_scripting/crates/bevy_mod_scripting_asset",
+    "bevy_mod_scripting/crates/bevy_mod_scripting_bindings",
+    "bevy_mod_scripting/crates/bevy_mod_scripting_bindings_domain",
+    "bevy_mod_scripting/crates/bevy_mod_scripting_core",
+    "bevy_mod_scripting/crates/bevy_mod_scripting_derive",
+    "bevy_mod_scripting/crates/bevy_mod_scripting_display",
+    "bevy_mod_scripting/crates/bevy_mod_scripting_script",
+    "bevy_mod_scripting/crates/bevy_mod_scripting_world",
+    "bevy_mod_scripting/crates/bevy_system_reflection",
+    "bevy_mod_scripting/crates/languages/bevy_mod_scripting_lua",
+    "bevy_mod_scripting/crates/languages/bevy_mod_scripting_quickjs",
+    "bevy_mod_scripting/crates/testing_crates/test_utils",
     "projects/js",
     "projects/lua",
     "projects/luau",
     "projects/ts",
 ]
-exclude = ["bevy_mod_scripting"]
 resolver = "2"
+
+[workspace.package]
+version = "0.21.0"
+edition = "2024"
+authors = ["Maksymilian Mozolewski <makspl17@gmail.com>"]
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/makspll/bevy_mod_scripting"
+repository = "https://github.com/makspll/bevy_mod_scripting"
+keywords = ["bevy", "gamedev", "scripting", "lua"]
+categories = ["game-development"]
+readme = "bevy_mod_scripting/readme.md"
+
+[workspace.dependencies]
+test_utils = { path = "bevy_mod_scripting/crates/testing_crates/test_utils" }
+
+bevy_mod_scripting_derive = { path = "bevy_mod_scripting/crates/bevy_mod_scripting_derive", version = "0.21.0" }
+bevy_system_reflection = { path = "bevy_mod_scripting/crates/bevy_system_reflection", version = "0.21.0", default-features = false }
+bevy_mod_scripting_lua = { path = "bevy_mod_scripting/crates/languages/bevy_mod_scripting_lua", version = "0.21.0", default-features = false }
+bevy_mod_scripting_quickjs = { path = "bevy_mod_scripting/crates/languages/bevy_mod_scripting_quickjs", version = "0.21.0", default-features = false }
+bevy_mod_scripting_asset = { path = "bevy_mod_scripting/crates/bevy_mod_scripting_asset", version = "0.21.0", default-features = false }
+bevy_mod_scripting_bindings = { path = "bevy_mod_scripting/crates/bevy_mod_scripting_bindings", version = "0.21.0", default-features = false }
+bevy_mod_scripting_bindings_domain = { path = "bevy_mod_scripting/crates/bevy_mod_scripting_bindings_domain", version = "0.21.0", default-features = false }
+bevy_mod_scripting_display = { path = "bevy_mod_scripting/crates/bevy_mod_scripting_display", version = "0.21.0", default-features = false }
+bevy_mod_scripting_script = { path = "bevy_mod_scripting/crates/bevy_mod_scripting_script", version = "0.21.0", default-features = false }
+bevy_mod_scripting_core = { path = "bevy_mod_scripting/crates/bevy_mod_scripting_core", version = "0.21.0" }
+bevy_mod_scripting_world = { path = "bevy_mod_scripting/crates/bevy_mod_scripting_world", version = "0.21.0", default-features = true }
+
+bevy_reflect = { version = "0.19", default-features = false }
+bevy_ecs = { version = "0.19", default-features = false }
+bevy_asset = { version = "0.19", default-features = false }
+bevy_app = { version = "0.19", default-features = false }
+bevy_log = { version = "0.19", default-features = false }
+bevy_diagnostic = { version = "0.19", default-features = false }
+bevy_platform = { version = "0.19", default-features = false }
+bevy_time = { version = "0.19", default-features = false }
+bevy_utils = { version = "0.19", default-features = false, features = ["std"] }
+
+uuid = { version = "1.13", default-features = false }
+nonmax = { version = "0.5", default-features = false, features = ["std"] }
+profiling = { version = "1.0", default-features = false, features = ["procmacros"] }
+serde = { version = "1.0", default-features = false }
+dot-writer = { version = "0.1.4", default-features = false }
+parking_lot = { version = "0.12.1", default-features = false }
+mlua = { version = "0.11", default-features = false }
+rquickjs = { version = "0.12.2", default-features = false, features = ["std"] }
+quote = { version = "1.0", default-features = false }
+syn = { version = "2.0", default-features = false }
+proc-macro2 = { version = "1.0", default-features = false }
+variadics_please = { version = "1.1.0", default-features = false }
+pretty_assertions = { version = "1.4", default-features = false, features = ["std"] }
+manifest-dir-macros = { version = "0.1.18", default-features = false }
+
+[workspace.lints.clippy]
+panic = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+todo = "deny"
+
+[workspace.lints.rust]
+missing_docs = "deny"
 
 [lib]
 name = "script_squadron_runtime"

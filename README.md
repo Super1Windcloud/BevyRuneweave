@@ -72,8 +72,9 @@ on_update(delta_seconds, input_x, input_y, firing)
 
 ## 构建验证
 
-Lua、Luau、JavaScript 和 TypeScript 后端 feature 互斥，需要分别检查，不要使用
-`cargo check --workspace`：
+所有应用和 `bevy_mod_scripting` crate 都属于同一个 Cargo workspace，共享根
+`Cargo.lock`、依赖版本和格式化配置。Lua 与 Luau 后端 feature 互斥，因此检查时
+仍需分别选择后端，不要使用会统一成员 feature 的 `cargo check --workspace`：
 
 运行 `just check` 分别检查四个项目，运行 `just test` 使用对应脚本引擎执行
 玩法测试；`just verify` 会执行格式检查、项目检查和全部玩法测试。

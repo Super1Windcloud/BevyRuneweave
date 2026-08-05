@@ -15,8 +15,6 @@ description = "ECS World access abstractions for the BMS framework"
 bevy_ecs = { workspace = true }
 bevy_platform = { workspace = true }
 bevy_reflect = { workspace = true }
-# bevy_mod_scripting_script = { workspace = true }
-# bevy_mod_scripting_display = { workspace = true }
 profiling = { workspace = true, features = [
     "procmacros",
 ] }

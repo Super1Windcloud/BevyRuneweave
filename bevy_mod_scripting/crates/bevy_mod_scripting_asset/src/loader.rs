@@ -77,20 +77,6 @@ impl AssetLoader for ScriptAssetLoader {
                     Language::Unknown
                 })
         });
-        // if language == Language::Lua && cfg!(not(feature = "mlua")) {
-        //     warn_once!(
-        //         "Script {:?} is a Lua script but the {:?} feature is not enabled; the script will not be evaluated.",
-        //         load_context.path().display(),
-        //         "mlua"
-        //     );
-        // }
-        // if language == Language::Rhai && cfg!(not(feature = "rhai")) {
-        //     warn_once!(
-        //         "Script {:?} is a Rhai script but the {:?} feature is not enabled; the script will not be evaluated.",
-        //         load_context.path().display(),
-        //         "rhai"
-        //     );
-        // }
         let asset = ScriptAsset {
             content: content.into_boxed_slice(),
             language,
