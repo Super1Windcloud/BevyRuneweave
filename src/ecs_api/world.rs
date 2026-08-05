@@ -34,6 +34,7 @@ pub(super) struct ScriptTransform {
 #[derive(Component)]
 pub(super) struct GameStateText;
 
+
 pub(super) fn setup_scene(
     mut commands: Commands,
     asset_server: Res<AssetServer>,

@@ -30,6 +30,7 @@ function createResources() {
     seed: 73129,
     gameOver: false,
     restartWasPressed: false,
+    started: false,
   };
 }
 
@@ -230,6 +231,16 @@ function resetGame() {
 globalThis.on_script_loaded = resetGame;
 globalThis.on_script_reloaded = resetGame;
 globalThis.on_update = function (dt, inputX, inputY, restartPressed) {
+  if (!resources.started) {
+    if (restartPressed && !resources.restartWasPressed) {
+      resources.started = true;
+      ecs_set_game_state(resources.score, resources.lives, "ARROWS/WASD - AUTO FIRE");
+    } else {
+      resources.restartWasPressed = restartPressed;
+      ecs_set_game_state(resources.score, resources.lives, "PRESS SPACE TO START");
+      return;
+    }
+  }
   if (resources.gameOver) {
     if (restartPressed && !resources.restartWasPressed) resetGame();
     resources.restartWasPressed = restartPressed;

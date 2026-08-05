@@ -44,6 +44,14 @@ run-ts:
     trap 'kill $watcher_pid 2>/dev/null || true' EXIT INT TERM
     cargo run -p script-squadron-typescript
 
+# Windows/PowerShell variant of run-ts. The zsh recipe above remains the
+# default for Unix hosts because its process and signal handling are shell
+# specific.
+run-ts-windows:
+    #!powershell.exe -NoLogo -NoProfile -Command
+    $watcher = Start-Process npm -ArgumentList '--prefix', '{{ts_dir}}', 'run', 'watch' -PassThru
+    try { cargo run -p script-squadron-typescript } finally { Stop-Process -Id $watcher.Id -Force -ErrorAction SilentlyContinue }
+
 # Check the Lua 5.5 executable project.
 check-lua:
     cargo check -p script-squadron-lua

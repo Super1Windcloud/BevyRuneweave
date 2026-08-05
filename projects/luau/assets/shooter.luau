@@ -67,6 +67,7 @@ local function create_resources(): GameResources
         seed = 73129,
         game_over = false,
         restart_was_pressed = false,
+        started = false,
     }
 end
 
@@ -279,6 +280,16 @@ function on_script_reloaded()
 end
 
 function on_update(dt: number, input_x: number, input_y: number, restart_pressed: boolean)
+    if not resources.started then
+        if restart_pressed and not resources.restart_was_pressed then
+            resources.started = true
+            ecs_set_game_state(resources.score, resources.lives, "ARROWS/WASD - AUTO FIRE")
+        else
+            resources.restart_was_pressed = restart_pressed
+            ecs_set_game_state(resources.score, resources.lives, "PRESS SPACE TO START")
+            return
+        end
+    end
     if resources.game_over then
         if restart_pressed and not resources.restart_was_pressed then reset_game() end
         resources.restart_was_pressed = restart_pressed
