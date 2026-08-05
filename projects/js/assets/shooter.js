@@ -1,5 +1,5 @@
-const PLAYER_SPEED = 330;
-const BULLET_SPEED = 570;
+const PLAYER_SPEED = 530;
+const BULLET_SPEED = 1770;
 const ENEMY_SPEED = 145;
 const FIRE_DELAY = 0.18;
 const SPAWN_DELAY = 0.72;

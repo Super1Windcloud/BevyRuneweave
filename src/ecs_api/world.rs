@@ -71,10 +71,19 @@ pub(super) fn apply_ecs_writes(
     for command in pending.read() {
         match command {
             EcsCommand::ClearWorld => {
-                for entity in &script_entities {
+                let registered = entities
+                    .0
+                    .drain()
+                    .map(|(_, entity)| entity)
+                    .collect::<Vec<_>>();
+                for &entity in &registered {
                     commands.entity(entity).despawn();
                 }
-                entities.0.clear();
+                for entity in &script_entities {
+                    if !registered.contains(&entity) {
+                        commands.entity(entity).despawn();
+                    }
+                }
             }
             EcsCommand::SpawnEntity { id } => {
                 if let Some(old) = entities.0.remove(id) {
@@ -227,6 +236,24 @@ mod tests {
         let state = world.resource::<GameState>();
         assert_eq!((state.score, state.lives), (200.0, 2));
         assert_eq!(state.message, "READY");
+
+        queue_command(EcsCommand::ClearWorld);
+        queue_command(EcsCommand::SpawnEntity {
+            id: "intermediate-player".to_owned(),
+        });
+        queue_command(EcsCommand::ClearWorld);
+        queue_command(EcsCommand::SpawnEntity {
+            id: "final-player".to_owned(),
+        });
+        app.update();
+
+        let world = app.world_mut();
+        let mut query = world.query_filtered::<&ScriptEntityId, With<ScriptOwned>>();
+        let ids = query
+            .iter(world)
+            .map(|id| id._key.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, ["final-player"]);
 
         queue_command(EcsCommand::ClearWorld);
         app.update();
