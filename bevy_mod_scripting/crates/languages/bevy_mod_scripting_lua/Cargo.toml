@@ -18,14 +18,8 @@ features = ["lua55"]
 enable-features = ["lua55"]
 
 [features]
-# enables loading possibly unsafe lua modules by lua scripts
-unsafe_lua_modules = []
-
-lua55 = ["mlua/lua55"]
-luau = ["mlua/luau"]
-mlua_serialize = ["mlua/serialize"]
-mlua_macros = ["mlua/macros"]
-mlua_async = ["mlua/async"]
+lua55 = ["dep:mlua", "mlua/lua55"]
+luau = ["dep:mlua", "mlua/luau"]
 
 [lib]
 name = "bevy_mod_scripting_lua"
@@ -34,18 +28,19 @@ path = "src/lib.rs"
 [dependencies]
 bevy_app = { workspace = true, default-features = false, features = [] }
 bevy_ecs = { workspace = true, default-features = false, features = [] }
-bevy_asset = { workspace = true, default-features = false, features = [] }
 bevy_log = { workspace = true, default-features = false, features = [] }
 bevy_platform = { workspace = true, default-features = false, features = [] }
 bevy_mod_scripting_core = { workspace = true }
-bevy_mod_scripting_display = { workspace = true }
 bevy_mod_scripting_bindings = { workspace = true }
-bevy_mod_scripting_bindings_domain = { workspace = true }
 bevy_mod_scripting_asset = { workspace = true }
 bevy_mod_scripting_script = { workspace = true }
-bevy_mod_scripting_world = { workspace = true }
-mlua = { workspace = true, features = ["vendored", "send", "macros"] }
-profiling = { workspace = true }
+mlua = { workspace = true, optional = true, features = ["vendored", "send"] }
+
+[dev-dependencies]
+bevy_asset = { workspace = true, default-features = false }
 
 [lints]
 workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["bevy_platform"]

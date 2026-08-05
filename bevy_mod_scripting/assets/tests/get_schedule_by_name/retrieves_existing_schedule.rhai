@@ -1,2 +1,0 @@
-assert(type_of(world.get_schedule_by_name.call("Update")) != "()", "Schedule not found under short identifier");
-assert(type_of(world.get_schedule_by_name.call("bevy_app::main_schedule::Update")) != "()", "Schedule not found under long identifier");

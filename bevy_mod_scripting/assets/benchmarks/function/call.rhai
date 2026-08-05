@@ -1,3 +1,0 @@
-fn bench(){
-    noop.call();
-}

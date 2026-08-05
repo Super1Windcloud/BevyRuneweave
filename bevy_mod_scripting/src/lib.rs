@@ -1,12 +1,7 @@
 #![doc=include_str!("../readme.md")]
 
-pub mod display {
-    pub use bevy_mod_scripting_display::*;
-}
-
 pub mod bindings {
     pub use bevy_mod_scripting_bindings::*;
-    pub use bevy_mod_scripting_bindings_domain::*;
 }
 
 pub mod core {
@@ -43,13 +38,10 @@ pub mod typescript {
 }
 
 use bevy_app::plugin_group;
-pub use bevy_mod_scripting_bindings::CoreScriptGlobalsPlugin;
 use bevy_mod_scripting_core::BMSScriptingInfrastructurePlugin;
-pub use bevy_mod_scripting_derive::*;
 
 plugin_group! {
     pub struct BMSPlugin {
-        :CoreScriptGlobalsPlugin,
         :BMSScriptingInfrastructurePlugin,
         #[custom(cfg(feature = "lua"))]
         bevy_mod_scripting_lua:::LuaScriptingPlugin,

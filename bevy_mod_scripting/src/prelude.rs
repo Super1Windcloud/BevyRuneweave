@@ -6,7 +6,6 @@ pub use bevy_mod_scripting_core::{
 };
 
 pub use bevy_mod_scripting_bindings::{
-    CoreScriptGlobalsPlugin,
     function::namespace::{GlobalNamespace, NamespaceBuilder},
     script_value::ScriptValue,
 };
@@ -25,5 +24,3 @@ pub use bevy_mod_scripting_lua::LuaScriptingPlugin;
 pub use bevy_mod_scripting_quickjs::{QuickJsContext, QuickJsScriptingPlugin};
 
 pub use crate::BMSPlugin;
-
-pub use bevy_mod_scripting_derive::*;

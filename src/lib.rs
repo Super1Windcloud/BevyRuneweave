@@ -37,8 +37,8 @@ use bevy::{
     window::{PresentMode, WindowResolution},
 };
 use bevy_mod_scripting::prelude::{
-    BMSPlugin, CoreScriptGlobalsPlugin, ScriptAsset, ScriptCallbackEvent, ScriptComponent,
-    ScriptValue, callback_labels, event_handler,
+    BMSPlugin, ScriptAsset, ScriptCallbackEvent, ScriptComponent, ScriptValue, callback_labels,
+    event_handler,
 };
 
 #[cfg(all(
@@ -310,10 +310,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         .clear();
 
     let mut app = App::new();
-    let scripting_plugins = BMSPlugin.set(CoreScriptGlobalsPlugin {
-        filter: |_| false,
-        register_static_references: false,
-    });
+    let scripting_plugins = BMSPlugin.build();
     #[cfg(any(
         feature = "js",
         feature = "typescript",

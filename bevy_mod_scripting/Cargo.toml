@@ -1,7 +1,7 @@
 [package]
 name = "bevy_mod_scripting"
 description = "Multi language scripting in Bevy"
-include = ["readme.md", "/src", "/examples", "/assets", "LICENSE", "/badges"]
+include = ["readme.md", "/src", "LICENSE-MIT"]
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -40,12 +40,6 @@ lua = ["bevy_mod_scripting_lua"]
 lua55 = ["bevy_mod_scripting_lua/lua55", "lua"]
 luau = ["bevy_mod_scripting_lua/luau", "lua"]
 # optional
-unsafe_lua_modules = ["bevy_mod_scripting_lua?/unsafe_lua_modules"]
-mlua_serialize = ["bevy_mod_scripting_lua?/mlua_serialize"]
-mlua_macros = ["bevy_mod_scripting_lua?/mlua_macros"]
-mlua_async = ["bevy_mod_scripting_lua?/mlua_async"]
-
-
 ## quickjs
 quickjs = ["bevy_mod_scripting_quickjs"]
 typescript = ["quickjs"]
@@ -55,11 +49,8 @@ bevy_app = { workspace = true }
 bevy_mod_scripting_core = { workspace = true }
 bevy_mod_scripting_lua = { workspace = true, optional = true }
 bevy_mod_scripting_quickjs = { workspace = true, optional = true }
-bevy_mod_scripting_derive = { workspace = true }
 bevy_mod_scripting_asset = { workspace = true }
 bevy_mod_scripting_bindings = { workspace = true }
-bevy_mod_scripting_bindings_domain = { workspace = true }
-bevy_mod_scripting_display = { workspace = true }
 bevy_mod_scripting_script = { workspace = true }
 
 [workspace.dependencies]
@@ -98,13 +89,11 @@ nonmax = { version = "0.5", default-features = false, features = ["std"] }
 profiling = { version = "1.0", default-features = false, features = [
     "procmacros",
 ] }
-regex = { version = "1.11", default-features = false }
 serde = { version = "1.0", default-features = false }
 dot-writer = { version = "0.1.4", default-features = false }
 parking_lot = { version = "0.12.1", default-features = false }
 mlua = { version = "0.11", default-features = false }
 rquickjs = { version = "0.12.2", default-features = false, features = ["std"] }
-clap = { version = "4", default-features = false, features = ["std"] }
 quote = { version = "1.0", default-features = false }
 syn = { version = "2.0", default-features = false }
 proc-macro2 = { version = "1.0", default-features = false }
@@ -116,27 +105,6 @@ pretty_assertions = { version = "1.4", default-features = false, features = [
     "std",
 ] }
 manifest-dir-macros = { version = "0.1.18", default-features = false }
-bevy_console = { git="https://github.com/makspll/bevy-console", default-features = false }
-rand = { version = "0.9", default-features = false }
-
-[dev-dependencies]
-bevy = { workspace = true, features = [
-    "bevy_render",
-    "bevy_window",
-    "bevy_asset",
-    "bevy_log",
-    "bevy_core_pipeline",
-    "bevy_sprite",
-    "bevy_sprite_render",
-    "bevy_state",
-    "x11",
-    "bevy_ui",
-    "default_font",
-    "custom_cursor",
-] }
-clap = { workspace = true, features = ["derive"] }
-rand = { workspace = true, features = ["thread_rng"] }
-bevy_console = { workspace = true }
 
 
 [workspace]
@@ -184,26 +152,6 @@ debug = false
 [profile.release-with-debug]
 inherits = "release"
 debug = true
-
-[[example]]
-name = "game_of_life"
-path = "examples/game_of_life.rs"
-required-features = ["lua55"]
-
-[[example]]
-name = "runscript"
-path = "examples/run_script.rs"
-
-[[example]]
-name = "script_loading"
-path = "examples/script_loading.rs"
-required-features = ["lua55"]
-
-
-[[example]]
-name = "custom_conversions"
-path = "examples/custom_conversions.rs"
-required-features = ["lua55"]
 
 [workspace.lints.clippy]
 panic = "deny"

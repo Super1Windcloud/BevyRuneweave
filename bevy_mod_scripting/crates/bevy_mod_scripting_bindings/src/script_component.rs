@@ -1,16 +1,16 @@
 //! Everything necessary to support scripts registering their own components
 
 use super::{ScriptComponentRegistration, ScriptValue};
-use bevy_ecs::resource::Resource;
-use bevy_platform::collections::HashMap;
-use bevy_reflect::std_traits::ReflectDefault;
-use parking_lot::RwLock;
-use std::sync::Arc;
 use ::{
     bevy_app::{App, Plugin},
     bevy_ecs::component::{Component, Mutable, StorageType},
     bevy_reflect::Reflect,
 };
+use bevy_ecs::resource::Resource;
+use bevy_platform::collections::HashMap;
+use bevy_reflect::std_traits::ReflectDefault;
+use parking_lot::RwLock;
+use std::sync::Arc;
 /// A dynamic script component
 #[derive(Reflect, Clone, Default)]
 #[reflect(Default)]

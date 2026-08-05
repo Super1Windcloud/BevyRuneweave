@@ -1,42 +1,26 @@
 //! Lua integration for the bevy_mod_scripting system.
-use std::{
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
+#![cfg(any(feature = "lua55", feature = "luau"))]
 
-use ::{
-    bevy_app::Plugin,
-    bevy_asset::Handle,
-    bevy_ecs::{entity::Entity, world::World},
-};
-use bevy_app::App;
-use bevy_asset::AssetPath;
-use bevy_ecs::world::{Mut, WorldId};
+#[cfg(all(feature = "lua55", feature = "luau"))]
+compile_error!("the lua55 and luau features are mutually exclusive");
+
+use std::ops::{Deref, DerefMut};
+
+use bevy_app::{App, Plugin};
+use bevy_ecs::world::WorldId;
 use bevy_log::trace;
-use bevy_mod_scripting_asset::{Language, ScriptAsset};
-use bevy_mod_scripting_bindings::{
-    InteropError, PartialReflectExt, WorldExtensions, function::namespace::Namespace,
-    globals::AppScriptGlobalsRegistry, script_value::ScriptValue,
-};
+use bevy_mod_scripting_asset::Language;
+use bevy_mod_scripting_bindings::{InteropError, ScriptValue};
 use bevy_mod_scripting_core::{
     IntoScriptPluginParams, ScriptingPlugin,
-    callbacks::ScriptCallbacks,
     config::{GetPluginThreadConfig, ScriptingPluginConfiguration},
     event::CallbackLabel,
     make_plugin_config_static,
     script::ContextPolicy,
 };
 use bevy_mod_scripting_script::ScriptAttachment;
-use bevy_mod_scripting_world::ThreadWorldContainer;
-use bindings::{
-    reference::{LuaReflectReference, LuaStaticReflectReference},
-    script_value::LuaScriptValue,
-};
 pub use mlua;
-use mlua::{Function, IntoLua, Lua, MultiValue, Variadic};
-
-/// Bindings for lua.
-pub mod bindings;
+use mlua::{Function, Lua, MultiValue, Value};
 
 make_plugin_config_static!(LuaScriptingPlugin);
 
@@ -91,153 +75,14 @@ pub struct LuaScriptingPlugin {
     pub scripting_plugin: ScriptingPlugin<Self>,
 }
 
-fn register_plugin_globals(lua: &mut Lua) -> Result<(), mlua::Error> {
-    lua.globals().set(
-        "register_callback",
-        lua.create_function(|_lua: &Lua, (callback, func): (String, Function)| {
-            let thread_ctxt = ThreadWorldContainer
-                .try_get_context()
-                .map_err(IntoMluaError::to_lua_error)?;
-            let world = thread_ctxt.world;
-            let attachment = world.current_attachment().0.ok_or_else(|| {
-                mlua::Error::external(
-                    "Cannot register callback, missing script attachment context.",
-                )
-            })?;
-
-            world
-                .with_resource_mut(|res: Mut<ScriptCallbacks<LuaScriptingPlugin>>| {
-                    let mut callbacks = res.callbacks.write();
-                    callbacks.insert(
-                        (attachment.clone(), callback),
-                        Arc::new(
-                            move |args: Vec<ScriptValue>,
-                                  lua: &mut LuaContext,
-                                  world_id: WorldId| {
-                                let pre_handling_callbacks =
-                                    LuaScriptingPlugin::readonly_configuration(world_id)
-                                        .pre_handling_callbacks;
-
-                                pre_handling_callbacks
-                                    .iter()
-                                    .try_for_each(|init| init(&attachment, lua))?;
-
-                                let args = args
-                                    .into_iter()
-                                    .map(LuaScriptValue)
-                                    .collect::<Variadic<_>>();
-
-                                func.call::<LuaScriptValue>(args)
-                                    .map_err(IntoInteropError::to_bms_error)
-                                    .map(ScriptValue::from)
-                            },
-                        ),
-                    )
-                })
-                .map_err(mlua::Error::external)?;
-            Ok(())
-        })?,
-    )?;
-    Ok(())
-}
-
 impl Default for LuaScriptingPlugin {
     fn default() -> Self {
         LuaScriptingPlugin {
             scripting_plugin: ScriptingPlugin {
                 runtime_initializers: Vec::default(),
                 supported_extensions: vec!["lua", "luau"],
-                context_initializers: vec![
-                    |_script_id, context| {
-                        // set the world global
-                        let globals = context.globals();
-
-                        globals
-                            .set(
-                                "world",
-                                LuaStaticReflectReference(std::any::TypeId::of::<World>()),
-                            )
-                            .map_err(IntoInteropError::to_bms_error)?;
-
-                        register_plugin_globals(context).map_err(IntoInteropError::to_bms_error)?;
-
-                        Ok(())
-                    },
-                    |_script_id, context| {
-                        // set static globals
-                        let world = ThreadWorldContainer.try_get_context()?.world;
-                        let globals_registry =
-                            world.with_resource(|r: &AppScriptGlobalsRegistry| r.clone())?;
-                        let globals_registry = globals_registry.read();
-
-                        for (key, global) in globals_registry.iter() {
-                            match &global.maker {
-                                Some(maker) => {
-                                    // non-static global
-                                    let global = (maker)(world.clone())?;
-                                    context
-                                        .globals()
-                                        .set(key.to_string(), LuaScriptValue::from(global))
-                                        .map_err(IntoInteropError::to_bms_error)?
-                                }
-                                None => {
-                                    let ref_ = LuaStaticReflectReference(global.type_id);
-                                    context
-                                        .globals()
-                                        .set(key.to_string(), ref_)
-                                        .map_err(IntoInteropError::to_bms_error)?
-                                }
-                            }
-                        }
-
-                        // go through functions in the global namespace and add them to the lua context
-                        let script_function_registry = world.script_function_registry();
-                        let script_function_registry = script_function_registry.read();
-
-                        for (key, function) in script_function_registry
-                            .iter_all()
-                            .filter(|(k, _)| k.namespace == Namespace::Global)
-                        {
-                            context
-                                .globals()
-                                .set(
-                                    key.name.to_string(),
-                                    LuaScriptValue::from(ScriptValue::Function(function.clone())),
-                                )
-                                .map_err(IntoInteropError::to_bms_error)?;
-                        }
-
-                        Ok(())
-                    },
-                ],
-                context_pre_handling_initializers: vec![|context_key, context| {
-                    // TODO: convert these to functions
-                    let world = ThreadWorldContainer.try_get_context()?.world;
-                    if let Some(entity) = context_key.entity() {
-                        context
-                            .globals()
-                            .set(
-                                "entity",
-                                LuaReflectReference(<Entity>::allocate(
-                                    Box::new(entity),
-                                    world.clone(),
-                                )),
-                            )
-                            .map_err(IntoInteropError::to_bms_error)?;
-                    }
-                    context
-                        .globals()
-                        .set(
-                            "script_asset",
-                            LuaReflectReference(<Handle<ScriptAsset>>::allocate(
-                                Box::new(context_key.script()),
-                                world,
-                            )),
-                        )
-                        .map_err(IntoInteropError::to_bms_error)?;
-
-                    Ok(())
-                }],
+                context_initializers: Vec::new(),
+                context_pre_handling_initializers: Vec::new(),
                 language: Language::Lua,
                 context_policy: ContextPolicy::default(),
                 emit_responses: false,
@@ -282,34 +127,18 @@ fn load_lua_content_into_context(
     Ok(())
 }
 
-/// App data which can be retrieved via [`mlua::Lua::app_data_ref`], containing some metadata about scripts present
-#[derive(Default, Debug)]
-pub struct LuaContextAppData {
-    /// the asset path of the script loaded last if this is a shared context, or the only script if it's not.
-    pub last_loaded_script_name: Option<AssetPath<'static>>,
-}
-
-#[profiling::function]
 /// Load a lua context from a script
 pub fn lua_context_load(
     context_key: &ScriptAttachment,
     content: &[u8],
     world_id: WorldId,
 ) -> Result<LuaContext, InteropError> {
-    #[cfg(feature = "unsafe_lua_modules")]
-    let mut context = LuaContext(unsafe { Lua::unsafe_new() });
-    #[cfg(not(feature = "unsafe_lua_modules"))]
     let mut context = LuaContext(Lua::new());
-
-    context.set_app_data(LuaContextAppData {
-        last_loaded_script_name: context_key.script().path().cloned(),
-    });
 
     load_lua_content_into_context(&mut context, context_key, content, world_id)?;
     Ok(context)
 }
 
-#[profiling::function]
 /// Reload a lua context from a script
 pub fn lua_context_reload(
     context_key: &ScriptAttachment,
@@ -322,7 +151,6 @@ pub fn lua_context_reload(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[profiling::function]
 /// The lua handler for events
 pub fn lua_handler(
     args: Vec<ScriptValue>,
@@ -353,16 +181,49 @@ pub fn lua_handler(
 
     let input = MultiValue::from_vec(
         args.into_iter()
-            .map(|arg| LuaScriptValue::from(arg).into_lua(context))
-            .collect::<Result<_, _>>()
-            .map_err(IntoInteropError::to_bms_error)?,
+            .map(|arg| into_lua_value(context, arg))
+            .collect::<Result<_, _>>()?,
     );
 
     let out = handler
-        .call::<LuaScriptValue>(input)
+        .call::<Value>(input)
         .map_err(IntoInteropError::to_bms_error)?;
 
-    Ok(out.into())
+    from_lua_value(out)
+}
+
+fn unsupported_value(kind: &str, type_name: impl std::fmt::Display) -> InteropError {
+    InteropError::external(std::io::Error::other(format!(
+        "unsupported Lua {kind}: {type_name}"
+    )))
+}
+
+fn into_lua_value(lua: &Lua, value: ScriptValue) -> Result<Value, InteropError> {
+    match value {
+        ScriptValue::Unit => Ok(Value::Nil),
+        ScriptValue::Bool(value) => Ok(Value::Boolean(value)),
+        ScriptValue::Integer(value) => Ok(Value::Integer(value)),
+        ScriptValue::Float(value) => Ok(Value::Number(value)),
+        ScriptValue::String(value) => lua
+            .create_string(value.as_ref())
+            .map(Value::String)
+            .map_err(IntoInteropError::to_bms_error),
+        other => Err(unsupported_value("argument", other.type_name())),
+    }
+}
+
+fn from_lua_value(value: Value) -> Result<ScriptValue, InteropError> {
+    match value {
+        Value::Nil => Ok(ScriptValue::Unit),
+        Value::Boolean(value) => Ok(ScriptValue::Bool(value)),
+        Value::Integer(value) => Ok(ScriptValue::Integer(value)),
+        Value::Number(value) => Ok(ScriptValue::Float(value)),
+        Value::String(value) => value
+            .to_str()
+            .map(|value| ScriptValue::from(value.to_owned()))
+            .map_err(IntoInteropError::to_bms_error),
+        other => Err(unsupported_value("return type", other.type_name())),
+    }
 }
 
 /// A trait to convert between mlua::Error and InteropError
@@ -407,6 +268,7 @@ impl<T: Into<InteropError>> IntoMluaError for T {
 #[cfg(test)]
 mod test {
     use ::bevy_asset::Handle;
+    use bevy_ecs::entity::Entity;
     use bevy_mod_scripting_asset::LanguageExtensions;
     use mlua::Value;
 

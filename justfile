@@ -2,6 +2,7 @@ set shell := ["zsh", "-cu"]
 
 rust_packages := "-p script-squadron-runtime -p script-squadron-lua -p script-squadron-luau -p script-squadron-js -p script-squadron-typescript"
 ts_dir := "projects/ts"
+bms_manifest := "bevy_mod_scripting/Cargo.toml"
 
 # List all available recipes.
 default:
@@ -59,6 +60,32 @@ check-ts: ts-check
 # Check all four isolated executable projects.
 check: check-lua check-luau check-js check-ts
 
+# Check all language-neutral BMS workspace targets.
+bms-check-base:
+    cargo check --manifest-path {{bms_manifest}} --workspace --all-targets
+
+# Check the BMS root and language crate with Lua 5.5.
+bms-check-lua:
+    cargo check --manifest-path {{bms_manifest}} -p bevy_mod_scripting --no-default-features --features lua55 --all-targets
+    cargo check --manifest-path {{bms_manifest}} -p bevy_mod_scripting_lua --no-default-features --features lua55 --all-targets
+
+# Check the BMS root and language crate with Luau.
+bms-check-luau:
+    cargo check --manifest-path {{bms_manifest}} -p bevy_mod_scripting --no-default-features --features luau --all-targets
+    cargo check --manifest-path {{bms_manifest}} -p bevy_mod_scripting_lua --no-default-features --features luau --all-targets
+
+# Check the BMS root and language crate with QuickJS.
+bms-check-js:
+    cargo check --manifest-path {{bms_manifest}} -p bevy_mod_scripting --no-default-features --features quickjs --all-targets
+    cargo check --manifest-path {{bms_manifest}} -p bevy_mod_scripting_quickjs --all-targets
+
+# Check the TypeScript alias over the QuickJS runtime.
+bms-check-ts:
+    cargo check --manifest-path {{bms_manifest}} -p bevy_mod_scripting --no-default-features --features typescript --all-targets
+
+# Check every supported BMS runtime configuration.
+bms-check: bms-check-base bms-check-lua bms-check-luau bms-check-js bms-check-ts
+
 # Execute 600 gameplay frames with the Lua 5.5 VM.
 test-lua:
     cargo test -p script-squadron-runtime --no-default-features --features lua --lib
@@ -78,6 +105,21 @@ test-ts: ts-build
 # Run all script-engine gameplay tests.
 test: test-lua test-luau test-js test-ts
 
+# Test the BMS Lua 5.5 adapter.
+bms-test-lua:
+    cargo test --manifest-path {{bms_manifest}} -p bevy_mod_scripting_lua --no-default-features --features lua55
+
+# Test the BMS Luau adapter.
+bms-test-luau:
+    cargo test --manifest-path {{bms_manifest}} -p bevy_mod_scripting_lua --no-default-features --features luau
+
+# Test the BMS QuickJS adapter.
+bms-test-js:
+    cargo test --manifest-path {{bms_manifest}} -p bevy_mod_scripting_quickjs
+
+# Test every retained BMS language adapter.
+bms-test: bms-test-lua bms-test-luau bms-test-js
+
 # Format all first-party Rust packages.
 fmt:
     cargo fmt {{rust_packages}}
@@ -85,6 +127,18 @@ fmt:
 # Verify first-party Rust formatting without changing files.
 fmt-check:
     cargo fmt {{rust_packages}} -- --check
+
+# Format the focused BMS workspace.
+bms-fmt:
+    cargo fmt --manifest-path {{bms_manifest}} --all
+
+# Verify BMS formatting without changing files.
+bms-fmt-check:
+    cargo fmt --manifest-path {{bms_manifest}} --all -- --check
+
+# Remove generated BMS build artifacts.
+clean-bms:
+    cargo clean --manifest-path {{bms_manifest}}
 
 # Build the Lua 5.5 game in release mode.
 build-lua:
@@ -106,4 +160,4 @@ build-ts: ts-build
 build: build-lua build-luau build-js build-ts
 
 # Run formatting, project checks, and gameplay tests.
-verify: fmt-check check test
+verify: fmt-check bms-fmt-check bms-check check bms-test test
