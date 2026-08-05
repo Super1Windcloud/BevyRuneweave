@@ -84,9 +84,12 @@ local function spawn_entity(id: EntityId, bundle: SpawnBundle)
     if bundle.role == "bullet" then world.bullets[id] = true end
     if bundle.role == "enemy" then world.enemies[id] = true end
 
-    ecs_spawn_entity(id)
-    ecs_insert_sprite(id, bundle.sprite)
-    ecs_set_transform(id, bundle.transform.x, bundle.transform.y)
+    ecs_entity_spawn(id)
+    ecs_component_insert(id, "sprite", { kind = bundle.sprite })
+    ecs_component_insert(id, "transform", {
+        x = bundle.transform.x,
+        y = bundle.transform.y,
+    })
 end
 
 local function queue_despawn(id: EntityId)
@@ -107,7 +110,7 @@ local function flush_entity_commands()
         world.players[id] = nil
         world.bullets[id] = nil
         world.enemies[id] = nil
-        ecs_despawn_entity(id)
+        ecs_entity_despawn(id)
     end
     world.pending_despawn = {}
 end
@@ -240,7 +243,7 @@ end
 
 local function render_sync_system()
     for id, transform in world.transforms do
-        if is_active(id) then ecs_set_transform(id, transform.x, transform.y) end
+        if is_active(id) then ecs_component_insert(id, "transform", transform) end
     end
 end
 
@@ -248,9 +251,17 @@ local function game_state_system()
     if resources.lives <= 0 then
         resources.lives = 0
         resources.game_over = true
-        ecs_set_game_state(resources.score, resources.lives, "GAME OVER - TAP SPACE TO RESTART")
+        ecs_resource_set("game_state", {
+            score = resources.score,
+            lives = resources.lives,
+            message = "GAME OVER - TAP SPACE TO RESTART",
+        })
     else
-        ecs_set_game_state(resources.score, resources.lives, "")
+        ecs_resource_set("game_state", {
+            score = resources.score,
+            lives = resources.lives,
+            message = "",
+        })
     end
 end
 
@@ -264,11 +275,15 @@ local update_schedule: { GameSystem } = {
 }
 
 local function reset_game()
-    ecs_clear_world()
+    ecs_world_clear()
     world = create_world()
     resources = create_resources()
     spawn_player()
-    ecs_set_game_state(resources.score, resources.lives, "ARROWS/WASD - AUTO FIRE")
+    ecs_resource_set("game_state", {
+        score = resources.score,
+        lives = resources.lives,
+        message = "ARROWS/WASD - AUTO FIRE",
+    })
 end
 
 function on_script_loaded()
@@ -283,10 +298,18 @@ function on_update(dt: number, input_x: number, input_y: number, restart_pressed
     if not resources.started then
         if restart_pressed and not resources.restart_was_pressed then
             resources.started = true
-            ecs_set_game_state(resources.score, resources.lives, "ARROWS/WASD - AUTO FIRE")
+            ecs_resource_set("game_state", {
+                score = resources.score,
+                lives = resources.lives,
+                message = "ARROWS/WASD - AUTO FIRE",
+            })
         else
             resources.restart_was_pressed = restart_pressed
-            ecs_set_game_state(resources.score, resources.lives, "PRESS SPACE TO START")
+            ecs_resource_set("game_state", {
+                score = resources.score,
+                lives = resources.lives,
+                message = "PRESS SPACE TO START",
+            })
             return
         end
     end

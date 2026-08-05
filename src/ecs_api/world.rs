@@ -1,75 +1,68 @@
 use std::collections::HashMap;
 
-use bevy::{prelude::*, sprite::Anchor};
+use bevy::prelude::*;
 
-use super::{EcsApiConfig, command::EcsCommand};
+use super::{
+    command::{ComponentMap, EcsCommand, ResourceMap, take_commands},
+    value::EcsValue,
+};
 
 #[derive(Resource, Default)]
 pub(super) struct ScriptEntityRegistry(HashMap<String, Entity>);
 
-#[derive(Resource, Default)]
-pub(super) struct GameState {
-    score: f64,
-    lives: i32,
-    message: String,
+/// All script-defined components attached to one Bevy entity.
+#[derive(Component, Clone, Debug, Default)]
+pub struct ScriptComponents(ComponentMap);
+
+impl ScriptComponents {
+    /// Returns a named component value.
+    pub fn get(&self, name: &str) -> Option<&EcsValue> {
+        self.0.get(name)
+    }
+
+    /// Iterates over all named component values.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &EcsValue)> {
+        self.0.iter().map(|(name, value)| (name.as_str(), value))
+    }
 }
 
-#[derive(Component)]
-pub(super) struct ScriptOwned;
+/// Script-defined ECS resources shared by all script-owned entities.
+#[derive(Resource, Clone, Debug, Default)]
+pub struct ScriptResources(ResourceMap);
 
-#[derive(Component)]
-pub(super) struct ScriptEntityId {
-    _key: String,
+impl ScriptResources {
+    /// Returns a named resource value.
+    pub fn get(&self, name: &str) -> Option<&EcsValue> {
+        self.0.get(name)
+    }
+
+    /// Iterates over all named resource values.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &EcsValue)> {
+        self.0.iter().map(|(name, value)| (name.as_str(), value))
+    }
 }
 
+/// Marks entities whose lifecycle is owned by a script.
 #[derive(Component)]
-pub(super) struct SpriteKind(String);
+pub struct ScriptOwned;
 
+/// Stable script-facing identity for a Bevy entity.
 #[derive(Component)]
-pub(super) struct ScriptTransform {
-    x: f32,
-    y: f32,
-}
+pub struct ScriptEntityId(String);
 
-#[derive(Component)]
-pub(super) struct GameStateText;
-
-
-pub(super) fn setup_scene(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    config: Res<EcsApiConfig>,
-) {
-    commands.spawn(Camera2d);
-    commands.spawn((
-        Sprite {
-            image: asset_server.load("sprites/background.png"),
-            custom_size: Some(Vec2::new(config.width, config.height)),
-            ..default()
-        },
-        Transform::from_xyz(0.0, 0.0, -10.0),
-    ));
-    commands.spawn((
-        Text2d::new("SCORE 00000    LIVES 0"),
-        TextFont {
-            font_size: FontSize::Px(25.0),
-            ..default()
-        },
-        TextColor(Color::srgb(0.82, 0.94, 1.0)),
-        Anchor::TOP_CENTER,
-        Transform::from_xyz(0.0, config.height / 2.0 - 18.0, 20.0),
-        GameStateText,
-    ));
+impl ScriptEntityId {
+    /// Returns the stable script-facing identifier.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 pub(super) fn apply_ecs_writes(
     mut commands: Commands,
-    mut pending: MessageReader<EcsCommand>,
     mut entities: ResMut<ScriptEntityRegistry>,
-    mut game_state: ResMut<GameState>,
     script_entities: Query<Entity, With<ScriptOwned>>,
 ) {
-    for command in pending.read() {
+    for command in take_commands() {
         match command {
             EcsCommand::ClearWorld => {
                 let registered = entities
@@ -87,179 +80,129 @@ pub(super) fn apply_ecs_writes(
                 }
             }
             EcsCommand::SpawnEntity { id } => {
-                if let Some(old) = entities.0.remove(id) {
+                if let Some(old) = entities.0.remove(&id) {
                     commands.entity(old).despawn();
                 }
                 let entity = commands
                     .spawn((
                         ScriptOwned,
-                        ScriptEntityId { _key: id.clone() },
-                        Transform::default(),
+                        ScriptEntityId(id.clone()),
+                        ScriptComponents::default(),
                     ))
                     .id();
-                entities.0.insert(id.clone(), entity);
+                entities.0.insert(id, entity);
             }
-            EcsCommand::InsertSprite { id, kind } => {
-                if let Some(entity) = entities.0.get(id) {
-                    commands.entity(*entity).insert(SpriteKind(kind.clone()));
-                }
-            }
-            EcsCommand::SetTransform { id, x, y } => {
-                if let Some(entity) = entities.0.get(id) {
+            EcsCommand::SyncComponents { id, components } => {
+                if let Some(entity) = entities.0.get(&id) {
                     commands
                         .entity(*entity)
-                        .insert(ScriptTransform { x: *x, y: *y });
+                        .insert(ScriptComponents(components));
                 }
             }
             EcsCommand::DespawnEntity { id } => {
-                if let Some(entity) = entities.0.remove(id) {
+                if let Some(entity) = entities.0.remove(&id) {
                     commands.entity(entity).despawn();
                 }
             }
-            EcsCommand::SetGameState {
-                score,
-                lives,
-                message,
-            } => {
-                game_state.score = *score;
-                game_state.lives = *lives;
-                message.clone_into(&mut game_state.message);
+            EcsCommand::SyncResources(resources) => {
+                commands.insert_resource(ScriptResources(resources));
             }
         }
     }
 }
 
-fn sprite_spec(kind: &str) -> (&'static str, Vec2, f32) {
-    match kind {
-        "player" => ("sprites/player.png", Vec2::new(72.0, 88.0), 3.0),
-        "enemy" => ("sprites/enemy.png", Vec2::new(66.0, 70.0), 2.0),
-        "bullet" => ("sprites/bullet.png", Vec2::new(14.0, 34.0), 1.0),
-        _ => ("sprites/bullet.png", Vec2::splat(24.0), 1.0),
-    }
-}
-
-pub(super) fn sync_sprite_components(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    sprites: Query<(Entity, &SpriteKind), Changed<SpriteKind>>,
-) {
-    for (entity, kind) in &sprites {
-        let (path, size, _) = sprite_spec(&kind.0);
-        commands.entity(entity).insert(Sprite {
-            image: asset_server.load(path),
-            custom_size: Some(size),
-            ..default()
-        });
-    }
-}
-
-pub(super) fn sync_transform_components(
-    mut transforms: Query<
-        (&ScriptTransform, &SpriteKind, &mut Transform),
-        Changed<ScriptTransform>,
-    >,
-) {
-    for (script_transform, kind, mut transform) in &mut transforms {
-        let (_, _, z) = sprite_spec(&kind.0);
-        transform.translation = Vec3::new(script_transform.x, script_transform.y, z);
-    }
-}
-
-pub(super) fn sync_game_state(
-    game_state: Res<GameState>,
-    mut text: Query<&mut Text2d, With<GameStateText>>,
-) {
-    if !game_state.is_changed() {
-        return;
-    }
-    if let Ok(mut text) = text.single_mut() {
-        text.0 = if game_state.message.is_empty() {
-            format!(
-                "SCORE {:05.0}    LIVES {}",
-                game_state.score, game_state.lives
-            )
-        } else {
-            format!(
-                "SCORE {:05.0}    LIVES {}\n{}",
-                game_state.score, game_state.lives, game_state.message
-            )
-        };
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::*;
-    use crate::ecs_api::command::{queue_command, reset_command_queue};
+    use crate::ecs_api::command::{
+        clear_world, entity_exists, get_component, get_resource, insert_component, query_entities,
+        remove_component, reset_bridge, set_resource, spawn_entity,
+    };
+
+    fn object(fields: impl IntoIterator<Item = (&'static str, EcsValue)>) -> EcsValue {
+        EcsValue::Object(
+            fields
+                .into_iter()
+                .map(|(name, value)| (name.to_owned(), value))
+                .collect::<BTreeMap<_, _>>(),
+        )
+    }
 
     #[test]
-    fn ecs_writes_compose_components_and_resources() {
-        reset_command_queue();
+    fn structured_components_resources_and_queries_sync_to_bevy() {
+        reset_bridge();
         let mut app = App::new();
         app.init_resource::<ScriptEntityRegistry>()
-            .init_resource::<GameState>()
-            .add_message::<EcsCommand>()
-            .add_systems(
-                Update,
-                (
-                    super::super::command::dispatch_commands,
-                    apply_ecs_writes,
-                    ApplyDeferred,
-                )
-                    .chain(),
-            );
+            .init_resource::<ScriptResources>()
+            .add_systems(Update, (apply_ecs_writes, ApplyDeferred).chain());
 
-        queue_command(EcsCommand::SpawnEntity {
-            id: "player".to_owned(),
-        });
-        queue_command(EcsCommand::InsertSprite {
-            id: "player".to_owned(),
-            kind: "player".to_owned(),
-        });
-        queue_command(EcsCommand::SetTransform {
-            id: "player".to_owned(),
-            x: 12.0,
-            y: -34.0,
-        });
-        queue_command(EcsCommand::SetGameState {
-            score: 200.0,
-            lives: 2,
-            message: "READY".to_owned(),
-        });
+        spawn_entity("player".to_owned());
+        assert!(entity_exists("player"));
+        assert!(insert_component(
+            "player",
+            "transform".to_owned(),
+            object([
+                ("x", EcsValue::Number(12.0)),
+                ("y", EcsValue::Number(-34.0)),
+            ]),
+        ));
+        assert!(insert_component(
+            "player",
+            "sprite".to_owned(),
+            object([("kind", EcsValue::String("player".to_owned()))]),
+        ));
+        set_resource(
+            "game_state".to_owned(),
+            object([
+                ("score", EcsValue::Number(200.0)),
+                ("lives", EcsValue::Number(2.0)),
+            ]),
+        );
+
+        assert_eq!(
+            query_entities(&["sprite".to_owned(), "transform".to_owned()]),
+            ["player"]
+        );
+        assert_eq!(
+            get_component("player", "transform")
+                .and_then(|value| value.field("x").and_then(EcsValue::as_number)),
+            Some(12.0)
+        );
+        assert_eq!(
+            get_resource("game_state")
+                .and_then(|value| value.field("lives").and_then(EcsValue::as_number)),
+            Some(2.0)
+        );
+
         app.update();
-
         let world = app.world_mut();
-        let mut query = world.query::<(&ScriptEntityId, &SpriteKind, &ScriptTransform)>();
-        let components = query.single(world).expect("one composed script entity");
-        assert_eq!(components.0._key, "player");
-        assert_eq!(components.1.0, "player");
-        assert_eq!((components.2.x, components.2.y), (12.0, -34.0));
-        let state = world.resource::<GameState>();
-        assert_eq!((state.score, state.lives), (200.0, 2));
-        assert_eq!(state.message, "READY");
+        let mut query = world.query::<(&ScriptEntityId, &ScriptComponents)>();
+        let (id, components) = query.single(world).expect("one script entity");
+        assert_eq!(id.as_str(), "player");
+        assert!(components.get("sprite").is_some());
+        assert_eq!(
+            world
+                .resource::<ScriptResources>()
+                .get("game_state")
+                .and_then(|value| value.field("score"))
+                .and_then(EcsValue::as_number),
+            Some(200.0)
+        );
 
-        queue_command(EcsCommand::ClearWorld);
-        queue_command(EcsCommand::SpawnEntity {
-            id: "intermediate-player".to_owned(),
-        });
-        queue_command(EcsCommand::ClearWorld);
-        queue_command(EcsCommand::SpawnEntity {
-            id: "final-player".to_owned(),
-        });
+        assert!(remove_component("player", "sprite"));
+        assert!(query_entities(&["sprite".to_owned()]).is_empty());
+        clear_world();
+        spawn_entity("final-player".to_owned());
         app.update();
 
         let world = app.world_mut();
         let mut query = world.query_filtered::<&ScriptEntityId, With<ScriptOwned>>();
         let ids = query
             .iter(world)
-            .map(|id| id._key.as_str())
+            .map(ScriptEntityId::as_str)
             .collect::<Vec<_>>();
         assert_eq!(ids, ["final-player"]);
-
-        queue_command(EcsCommand::ClearWorld);
-        app.update();
-        let world = app.world_mut();
-        let mut query = world.query_filtered::<Entity, With<ScriptOwned>>();
-        assert_eq!(query.iter(world).count(), 0);
     }
 }

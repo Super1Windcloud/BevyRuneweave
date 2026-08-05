@@ -1,58 +1,34 @@
+//! Language-neutral ECS operations exposed consistently to every script runtime.
+
 mod bindings;
 mod command;
+mod value;
 mod world;
 
 use bevy::prelude::*;
 
-pub(crate) use bindings::add_language;
-use command::{dispatch_commands, reset_command_queue};
+use command::reset_bridge;
+pub use value::EcsValue;
+pub use world::{ScriptComponents, ScriptEntityId, ScriptOwned, ScriptResources};
 
-#[derive(Resource)]
-struct EcsApiConfig {
-    width: f32,
-    height: f32,
-}
-
+/// Applies script ECS mutations to the Bevy world.
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct ApplyEcsCommands;
+pub struct ApplyEcsCommands;
 
-pub(crate) struct EcsApiPlugin {
-    width: f32,
-    height: f32,
-}
+/// Adds the common script-facing ECS state and synchronization systems.
+pub struct RuneweaveEcsPlugin;
 
-impl EcsApiPlugin {
-    pub(crate) const fn new(width: u32, height: u32) -> Self {
-        Self {
-            width: width as f32,
-            height: height as f32,
-        }
-    }
-}
-
-impl Plugin for EcsApiPlugin {
+impl Plugin for RuneweaveEcsPlugin {
     fn build(&self, app: &mut App) {
-        reset_command_queue();
-        app.insert_resource(EcsApiConfig {
-            width: self.width,
-            height: self.height,
-        })
-        .init_resource::<world::ScriptEntityRegistry>()
-        .init_resource::<world::GameState>()
-        .add_message::<command::EcsCommand>()
-        .add_systems(Startup, world::setup_scene)
-        .add_systems(
-            Update,
-            (
-                dispatch_commands,
-                world::apply_ecs_writes,
-                ApplyDeferred,
-                world::sync_sprite_components,
-                world::sync_transform_components,
-                world::sync_game_state,
-            )
-                .chain()
-                .in_set(ApplyEcsCommands),
-        );
+        reset_bridge();
+        bindings::add_language(app);
+        app.init_resource::<world::ScriptEntityRegistry>()
+            .init_resource::<ScriptResources>()
+            .add_systems(
+                Update,
+                (world::apply_ecs_writes, ApplyDeferred)
+                    .chain()
+                    .in_set(ApplyEcsCommands),
+            );
     }
 }

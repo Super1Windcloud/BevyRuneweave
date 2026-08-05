@@ -15,7 +15,8 @@ compile_error!("enable exactly one scripting feature: js, typescript, lua, or lu
 ))]
 compile_error!("the js, typescript, lua, and luau features are mutually exclusive");
 
-mod ecs_api;
+pub mod ecs_api;
+mod example_host;
 mod runtime;
 
 pub use runtime::{

@@ -47,9 +47,12 @@ function spawnEntity(id, bundle) {
         world.bullets.add(id);
     if (bundle.role === "enemy")
         world.enemies.add(id);
-    ecs_spawn_entity(id);
-    ecs_insert_sprite(id, bundle.sprite);
-    ecs_set_transform(id, bundle.transform.x, bundle.transform.y);
+    ecs_entity_spawn(id);
+    ecs_component_insert(id, "sprite", { kind: bundle.sprite });
+    ecs_component_insert(id, "transform", {
+        x: bundle.transform.x,
+        y: bundle.transform.y,
+    });
 }
 function queueDespawn(id) {
     if (world.entities.has(id))
@@ -68,7 +71,7 @@ function flushEntityCommands() {
         world.players.delete(id);
         world.bullets.delete(id);
         world.enemies.delete(id);
-        ecs_despawn_entity(id);
+        ecs_entity_despawn(id);
     }
     world.pendingDespawn.clear();
 }
@@ -192,17 +195,25 @@ function collisionSystem(frame) {
 function renderSyncSystem() {
     for (const [id, transform] of world.transforms) {
         if (isActive(id))
-            ecs_set_transform(id, transform.x, transform.y);
+            ecs_component_insert(id, "transform", transform);
     }
 }
 function gameStateSystem() {
     if (resources.lives <= 0) {
         resources.lives = 0;
         resources.gameOver = true;
-        ecs_set_game_state(resources.score, resources.lives, "GAME OVER - TAP SPACE TO RESTART");
+        ecs_resource_set("game_state", {
+            score: resources.score,
+            lives: resources.lives,
+            message: "GAME OVER - TAP SPACE TO RESTART",
+        });
     }
     else {
-        ecs_set_game_state(resources.score, resources.lives, "");
+        ecs_resource_set("game_state", {
+            score: resources.score,
+            lives: resources.lives,
+            message: "",
+        });
     }
 }
 const updateSchedule = [
@@ -214,11 +225,15 @@ const updateSchedule = [
     collisionSystem,
 ];
 function resetGame() {
-    ecs_clear_world();
+    ecs_world_clear();
     world = createWorld();
     resources = createResources();
     spawnPlayer();
-    ecs_set_game_state(resources.score, resources.lives, "ARROWS/WASD - AUTO FIRE");
+    ecs_resource_set("game_state", {
+        score: resources.score,
+        lives: resources.lives,
+        message: "ARROWS/WASD - AUTO FIRE",
+    });
 }
 function on_script_loaded() {
     resetGame();
@@ -230,11 +245,19 @@ function on_update(dt, inputX, inputY, restartPressed) {
     if (!resources.started) {
         if (restartPressed && !resources.restartWasPressed) {
             resources.started = true;
-            ecs_set_game_state(resources.score, resources.lives, "ARROWS/WASD - AUTO FIRE");
+            ecs_resource_set("game_state", {
+                score: resources.score,
+                lives: resources.lives,
+                message: "ARROWS/WASD - AUTO FIRE",
+            });
         }
         else {
             resources.restartWasPressed = restartPressed;
-            ecs_set_game_state(resources.score, resources.lives, "PRESS SPACE TO START");
+            ecs_resource_set("game_state", {
+                score: resources.score,
+                lives: resources.lives,
+                message: "PRESS SPACE TO START",
+            });
             return;
         }
     }

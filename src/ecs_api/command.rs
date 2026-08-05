@@ -1,54 +1,159 @@
-use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::{
+    collections::BTreeMap,
+    sync::{Mutex, MutexGuard, OnceLock},
+};
 
-use bevy::prelude::*;
+use super::value::EcsValue;
 
-#[derive(Message, Debug)]
+pub(super) type ComponentMap = BTreeMap<String, EcsValue>;
+pub(super) type ResourceMap = BTreeMap<String, EcsValue>;
+
+#[derive(Debug)]
 pub(super) enum EcsCommand {
     ClearWorld,
     SpawnEntity {
         id: String,
     },
-    InsertSprite {
+    SyncComponents {
         id: String,
-        kind: String,
-    },
-    SetTransform {
-        id: String,
-        x: f32,
-        y: f32,
+        components: ComponentMap,
     },
     DespawnEntity {
         id: String,
     },
-    SetGameState {
-        score: f64,
-        lives: i32,
-        message: String,
-    },
+    SyncResources(ResourceMap),
 }
 
-static COMMAND_QUEUE: OnceLock<Mutex<Vec<EcsCommand>>> = OnceLock::new();
-
-fn command_queue() -> &'static Mutex<Vec<EcsCommand>> {
-    COMMAND_QUEUE.get_or_init(|| Mutex::new(Vec::new()))
+#[derive(Default)]
+struct EcsSnapshot {
+    entities: BTreeMap<String, ComponentMap>,
+    resources: ResourceMap,
 }
 
-fn lock_command_queue() -> MutexGuard<'static, Vec<EcsCommand>> {
-    command_queue()
+#[derive(Default)]
+struct BridgeState {
+    snapshot: EcsSnapshot,
+    commands: Vec<EcsCommand>,
+}
+
+static BRIDGE_STATE: OnceLock<Mutex<BridgeState>> = OnceLock::new();
+
+fn bridge_state() -> &'static Mutex<BridgeState> {
+    BRIDGE_STATE.get_or_init(|| Mutex::new(BridgeState::default()))
+}
+
+fn lock_bridge() -> MutexGuard<'static, BridgeState> {
+    bridge_state()
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-pub(super) fn queue_command(command: EcsCommand) {
-    lock_command_queue().push(command);
+pub(super) fn reset_bridge() {
+    *lock_bridge() = BridgeState::default();
 }
 
-pub(super) fn reset_command_queue() {
-    lock_command_queue().clear();
+pub(super) fn clear_world() {
+    let mut bridge = lock_bridge();
+    bridge.snapshot.entities.clear();
+    bridge.commands.push(EcsCommand::ClearWorld);
 }
 
-pub(super) fn dispatch_commands(mut commands: MessageWriter<EcsCommand>) {
-    for command in std::mem::take(&mut *lock_command_queue()) {
-        commands.write(command);
+pub(super) fn spawn_entity(id: String) {
+    let mut bridge = lock_bridge();
+    bridge
+        .snapshot
+        .entities
+        .insert(id.clone(), ComponentMap::new());
+    bridge.commands.push(EcsCommand::SpawnEntity { id });
+}
+
+pub(super) fn entity_exists(id: &str) -> bool {
+    lock_bridge().snapshot.entities.contains_key(id)
+}
+
+pub(super) fn despawn_entity(id: String) -> bool {
+    let mut bridge = lock_bridge();
+    if bridge.snapshot.entities.remove(&id).is_none() {
+        return false;
     }
+    bridge.commands.push(EcsCommand::DespawnEntity { id });
+    true
+}
+
+pub(super) fn insert_component(id: &str, name: String, value: EcsValue) -> bool {
+    let mut bridge = lock_bridge();
+    let Some(components) = bridge.snapshot.entities.get_mut(id) else {
+        return false;
+    };
+    components.insert(name, value);
+    let components = components.clone();
+    bridge.commands.push(EcsCommand::SyncComponents {
+        id: id.to_owned(),
+        components,
+    });
+    true
+}
+
+pub(super) fn remove_component(id: &str, name: &str) -> bool {
+    let mut bridge = lock_bridge();
+    let Some(components) = bridge.snapshot.entities.get_mut(id) else {
+        return false;
+    };
+    if components.remove(name).is_none() {
+        return false;
+    }
+    let components = components.clone();
+    bridge.commands.push(EcsCommand::SyncComponents {
+        id: id.to_owned(),
+        components,
+    });
+    true
+}
+
+pub(super) fn get_component(id: &str, name: &str) -> Option<EcsValue> {
+    lock_bridge()
+        .snapshot
+        .entities
+        .get(id)
+        .and_then(|components| components.get(name))
+        .cloned()
+}
+
+pub(super) fn has_component(id: &str, name: &str) -> bool {
+    get_component(id, name).is_some()
+}
+
+pub(super) fn query_entities(required: &[String]) -> Vec<String> {
+    lock_bridge()
+        .snapshot
+        .entities
+        .iter()
+        .filter(|(_, components)| required.iter().all(|name| components.contains_key(name)))
+        .map(|(id, _)| id.clone())
+        .collect()
+}
+
+pub(super) fn set_resource(name: String, value: EcsValue) {
+    let mut bridge = lock_bridge();
+    bridge.snapshot.resources.insert(name, value);
+    let resources = bridge.snapshot.resources.clone();
+    bridge.commands.push(EcsCommand::SyncResources(resources));
+}
+
+pub(super) fn get_resource(name: &str) -> Option<EcsValue> {
+    lock_bridge().snapshot.resources.get(name).cloned()
+}
+
+pub(super) fn remove_resource(name: &str) -> bool {
+    let mut bridge = lock_bridge();
+    if bridge.snapshot.resources.remove(name).is_none() {
+        return false;
+    }
+    let resources = bridge.snapshot.resources.clone();
+    bridge.commands.push(EcsCommand::SyncResources(resources));
+    true
+}
+
+pub(super) fn take_commands() -> Vec<EcsCommand> {
+    std::mem::take(&mut lock_bridge().commands)
 }

@@ -15,7 +15,10 @@ use bevy_mod_scripting::prelude::{
     event_handler,
 };
 
-use crate::ecs_api::{ApplyEcsCommands, EcsApiPlugin, add_language};
+use crate::{
+    ecs_api::{ApplyEcsCommands, RuneweaveEcsPlugin},
+    example_host::ScriptSquadronHostPlugin,
+};
 
 #[cfg(all(
     not(any(feature = "js", feature = "typescript")),
@@ -150,7 +153,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             }),
     )
     .add_plugins(scripting_plugins)
-    .add_plugins(EcsApiPlugin::new(WINDOW_WIDTH, WINDOW_HEIGHT))
+    .add_plugins((RuneweaveEcsPlugin, ScriptSquadronHostPlugin))
     .insert_resource(LoadedScriptPath {
         source_path: asset_root.join(&asset_path),
         modified: fs::metadata(asset_root.join(&asset_path))
@@ -169,7 +172,6 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             .chain()
             .before(ApplyEcsCommands),
     );
-    add_language(&mut app);
     Ok(app)
 }
 
@@ -237,6 +239,10 @@ pub extern "C" fn game_runtime_request_reload() {
 }
 
 /// C ABI entry point for desktop/mobile hosts. Returns non-zero for invalid input or startup panic.
+///
+/// # Safety
+///
+/// `script_path` must point to a valid, NUL-terminated UTF-8 string for the duration of this call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn game_runtime_run(script_path: *const c_char) -> c_int {
     if script_path.is_null() {

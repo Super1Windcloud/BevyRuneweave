@@ -29,8 +29,9 @@ Script Squadron 的四个可执行示例分别为 `script-squadron-lua`、
 `script-squadron-luau`、`script-squadron-js` 和
 `script-squadron-typescript`。
 
-飞机大战示例中的 Rust 共享宿主只负责窗口、键盘输入、精灵渲染和脚本 API；
-具体玩法均分别由 Lua、Luau、JavaScript 和 TypeScript 实现。
+Runeweave 核心提供四种语言一致的 Entity、Component、Resource 与 Query API；
+飞机大战宿主只负责窗口、键盘输入，以及将示例组件映射成精灵和 HUD。具体玩法均
+分别由 Lua、Luau、JavaScript 和 TypeScript 实现。
 
 ## 项目结构
 
@@ -43,15 +44,18 @@ projects/
 ├── js/                  # 独立 QuickJS 可执行项目
 │   └── assets/          # shooter.js + 独立 sprites
 └── ts/                  # TypeScript 7.0.2 + QuickJS 可执行项目
-    ├── src/shooter.ts   # TypeScript 游戏源码
+    ├── src/             # TypeScript 游戏源码 + Runeweave API 声明
     └── assets/          # 编译后 shooter.js + 独立 sprites
 src/                     # bevy-runeweave 框架核心与共享 Bevy 宿主
-├── ecs_api/             # 面向脚本的 ECS 数据写入边界
+├── ecs_api/             # 四语言统一的通用 ECS API
 │   ├── bindings/        # Lua/Luau 与 QuickJS/TypeScript 语言适配
-│   ├── command.rs       # 跨脚本运行时的 ECS 写入队列
-│   └── world.rs         # Component、Resource 与同步 System
+│   ├── command.rs       # 可同步读取的快照与 Bevy 写入队列
+│   ├── value.rs         # 跨语言结构化值模型
+│   └── world.rs         # 通用 Entity、Component、Resource 同步
+├── example_host.rs      # Script Squadron 贴图、Transform 与 HUD 映射
 ├── runtime/             # 应用装配、输入回调、热重载与宿主入口
 └── lib.rs               # feature 约束与公开 API 导出
+docs/ecs-api.md          # 通用 ECS API 契约与四语言示例
 bevy_mod_scripting/      # Lua 5.5、Luau、QuickJS/TypeScript 脚本运行时
 include/                 # 可选的原生宿主 C ABI
 ```
@@ -108,22 +112,20 @@ Bullet、Enemy 对象数组：
   组件集合；RenderSync System 最后把脚本组件数据提交给宿主 ECS。
 
 脚本侧使用稳定字符串作为跨语言 Entity key；它只用于定位 Bevy Entity，不代表带有
-行为和生命周期方法的对象。飞机大战示例使用以下 ECS 写入 API：
+行为和生命周期方法的对象。四种语言共享以下通用 API：
 
 ```text
-ecs_clear_world()
-ecs_spawn_entity(entity_id)
-ecs_insert_sprite(entity_id, sprite_kind)
-ecs_set_transform(entity_id, x, y)
-ecs_despawn_entity(entity_id)
-ecs_set_game_state(score, lives, message)
-on_update(delta_seconds, input_x, input_y, restart_pressed)
+ecs_world_clear()
+ecs_entity_spawn / ecs_entity_exists / ecs_entity_despawn
+ecs_component_insert / ecs_component_get / ecs_component_has / ecs_component_remove
+ecs_query
+ecs_resource_set / ecs_resource_get / ecs_resource_remove
 ```
 
-例如，一个可渲染实体不是由 `spawn_sprite` 一次性创建的对象，而是由三条数据写入
-组合而成：`ecs_spawn_entity` 创建 Entity，`ecs_insert_sprite` 插入精灵组件，
-`ecs_set_transform` 写入位置组件。新增能力时应优先增加 Component、Resource 和处理
-它们的 System，再为各脚本语言补充最小的数据写入绑定。
+例如，一个可渲染实体由 `ecs_entity_spawn` 创建，再分别插入 `sprite` 和 `transform`
+组件。Runeweave 不认识这些业务名称；Script Squadron 宿主 System 查询结构化组件并
+映射成 Bevy `Sprite` 和 `Transform`。新增能力时不再修改四份语言绑定，而是新增组件、
+资源和消费它们的 Bevy System。完整契约见 [`docs/ecs-api.md`](docs/ecs-api.md)。
 
 脚本文件支持 Bevy 资源热重载。修改当前项目 `assets` 下的脚本后，游戏状态
 会用新脚本重新初始化，并在终端打印 `Reloading script after source change`。

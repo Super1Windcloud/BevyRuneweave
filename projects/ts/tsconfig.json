@@ -9,5 +9,5 @@
     "removeComments": true,
     "skipLibCheck": true
   },
-  "include": ["src/shooter.ts"]
+  "include": ["src/**/*.ts"]
 }
