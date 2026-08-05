@@ -1,4 +1,7 @@
 set shell := ["zsh", "-cu"]
+# Use PowerShell for recipes on Windows; the recipes below use POSIX-style
+# command syntax that the default `cmd` shell cannot interpret.
+set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
 
 ts_dir := "projects/ts"
 bms_base_packages := "-p bevy_mod_scripting -p bevy_mod_scripting_asset -p bevy_mod_scripting_bindings -p bevy_mod_scripting_bindings_domain -p bevy_mod_scripting_core -p bevy_mod_scripting_derive -p bevy_mod_scripting_display -p bevy_mod_scripting_script -p bevy_mod_scripting_world -p bevy_system_reflection -p test_utils"
