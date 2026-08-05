@@ -337,7 +337,7 @@ static FORBIDDEN_KEYWORDS: [&str; 82] = [
     "true",
     "until",
     "while",
-    //  Rhai
+    // Additional reserved identifiers
     "true",
     "false",
     "let",
