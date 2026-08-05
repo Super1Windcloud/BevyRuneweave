@@ -16,8 +16,8 @@
   Bevy System 负责查询、处理与渲染。
 - **多脚本语言开发**：当前支持 Lua 5.5、Luau、JavaScript 和 TypeScript；JavaScript
   与编译后的 TypeScript 由 QuickJS 执行。
-- **玩法逻辑脚本化**：移动、射击、敌机生成、碰撞、计分、生命值和重新开始等玩法
-  可以由脚本实现，Rust 层专注于通用引擎能力。
+- **玩法逻辑脚本化**：脚本自身同样采用 ECS World、Component、Resource 和 System
+  组织移动、射击、敌机生成、碰撞、计分、生命值与重新开始等玩法。
 - **项目与资源隔离**：每种脚本语言拥有独立的可执行项目、脚本和资源目录，避免不同
   语言实现之间产生隐式依赖。
 - **开发期热重载**：脚本作为 Bevy 资源加载，修改后可自动重新载入，缩短玩法迭代周期。
@@ -90,6 +90,17 @@ Rust 宿主将这些写入提交到 Bevy World，独立 System 再根据组件�
 ```text
 脚本逻辑 -> ECS 写入队列 -> Component / Resource -> Bevy System -> 渲染与界面
 ```
+
+游戏脚本内部也遵循相同的数据驱动模型，而不是使用包含位置、速度和行为的 Player、
+Bullet、Enemy 对象数组：
+
+- `World` 使用以 Entity ID 为 key 的稀疏组件存储，分别保存 Transform、Velocity、
+  Collider、Sprite，并用 Player、Bullet、Enemy 标签组件表达查询条件。
+- `Resources` 保存分数、生命值、随机种子、生成冷却和射击冷却等全局状态。
+- Movement、Weapon、EnemySpawn、Bounds、Collision 等 System 按固定 schedule 查询并
+  更新组件，不把行为方法挂载到 Entity 上。
+- System 只标记待销毁 Entity，遍历结束后统一 flush 结构变更，避免在查询期间修改
+  组件集合；RenderSync System 最后把脚本组件数据提交给宿主 ECS。
 
 脚本侧使用稳定字符串作为跨语言 Entity key；它只用于定位 Bevy Entity，不代表带有
 行为和生命周期方法的对象。飞机大战示例使用以下 ECS 写入 API：
