@@ -3,6 +3,7 @@ name = "bevy-runeweave"
 version = "0.1.0"
 edition = "2024"
 authors.workspace = true
+homepage = "https://github.com/Super1windcloud/BevyRuneWeave"
 description = "A Bevy-based ECS game framework for Lua, Luau, JavaScript, and TypeScript"
 license = "MIT OR Apache-2.0"
 keywords = ["bevy", "ecs", "gamedev", "scripting"]
