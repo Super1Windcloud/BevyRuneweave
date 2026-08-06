@@ -25,9 +25,9 @@ members = [
     "bevy_mod_scripting/crates/languages/bevy_mod_scripting_lua",
     "bevy_mod_scripting/crates/languages/bevy_mod_scripting_quickjs",
     "bevy_mod_scripting/crates/testing_crates/test_utils",
-    "projects/js",
-    "projects/lua",
-    "projects/luau",
+#    "projects/js",
+#    "projects/lua",
+#    "projects/luau",
     "projects/ts",
 ]
 resolver = "2"
@@ -97,7 +97,9 @@ name = "bevy_runeweave"
 crate-type = ["rlib", "cdylib", "staticlib"]
 
 [features]
-default = ["js"]
+# Keep the root package feature-neutral so IDEs can select one runtime without
+# accidentally combining it with a default JavaScript backend.
+default = []
 js = ["bevy_mod_scripting/quickjs"]
 typescript = ["bevy_mod_scripting/typescript"]
 lua = ["bevy_mod_scripting/lua55"]

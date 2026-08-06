@@ -11,8 +11,8 @@ use mlua::{Lua, Table, Value};
 use super::super::{
     command::{
         clear_world, despawn_entity, entity_exists, get_component, get_resource, has_component,
-        insert_component, query_entities, remove_component, remove_resource, set_resource,
-        spawn_entity,
+        insert_component, query_entities, query_entities_filtered, remove_component,
+        remove_resource, set_resource, spawn_entity, spawn_entity_bundle,
     },
     value::EcsValue,
 };
@@ -130,6 +130,16 @@ fn install_ecs_api(
             })?,
         )?;
         globals.set(
+            "ecs_entity_spawn_bundle",
+            context.create_function(|_, (id, bundle): (String, Table)| {
+                let EcsValue::Object(components) = table_to_ecs(bundle, 0)? else {
+                    unreachable!();
+                };
+                spawn_entity_bundle(id, components);
+                Ok(())
+            })?,
+        )?;
+        globals.set(
             "ecs_entity_exists",
             context.create_function(|_, id: String| Ok(entity_exists(&id)))?,
         )?;
@@ -165,6 +175,17 @@ fn install_ecs_api(
             context.create_function(|lua, required: Vec<String>| {
                 let result = lua.create_table_with_capacity(required.len(), 0)?;
                 for (index, id) in query_entities(&required).into_iter().enumerate() {
+                    result.raw_set(index + 1, id)?;
+                }
+                Ok(result)
+            })?,
+        )?;
+        globals.set(
+            "ecs_query_filtered",
+            context.create_function(|lua, (required, excluded): (Vec<String>, Vec<String>)| {
+                let ids = query_entities_filtered(&required, &excluded);
+                let result = lua.create_table_with_capacity(ids.len(), 0)?;
+                for (index, id) in ids.into_iter().enumerate() {
                     result.raw_set(index + 1, id)?;
                 }
                 Ok(result)

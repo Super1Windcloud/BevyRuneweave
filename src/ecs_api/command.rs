@@ -11,9 +11,7 @@ pub(super) type ResourceMap = BTreeMap<String, EcsValue>;
 #[derive(Debug)]
 pub(super) enum EcsCommand {
     ClearWorld,
-    SpawnEntity {
-        id: String,
-    },
+    SpawnEntity { id: String, components: ComponentMap },
     SetComponent { id: String, name: String, value: EcsValue },
     RemoveComponent { id: String, name: String },
     DespawnEntity {
@@ -58,12 +56,13 @@ pub(super) fn clear_world() {
 }
 
 pub(super) fn spawn_entity(id: String) {
+    spawn_entity_bundle(id, ComponentMap::new());
+}
+
+pub(super) fn spawn_entity_bundle(id: String, components: ComponentMap) {
     let mut bridge = lock_bridge();
-    bridge
-        .snapshot
-        .entities
-        .insert(id.clone(), ComponentMap::new());
-    bridge.commands.push(EcsCommand::SpawnEntity { id });
+    bridge.snapshot.entities.insert(id.clone(), components.clone());
+    bridge.commands.push(EcsCommand::SpawnEntity { id, components });
 }
 
 pub(super) fn entity_exists(id: &str) -> bool {
@@ -115,11 +114,18 @@ pub(super) fn has_component(id: &str, name: &str) -> bool {
 }
 
 pub(super) fn query_entities(required: &[String]) -> Vec<String> {
+    query_entities_filtered(required, &[])
+}
+
+pub(super) fn query_entities_filtered(required: &[String], excluded: &[String]) -> Vec<String> {
     lock_bridge()
         .snapshot
         .entities
         .iter()
-        .filter(|(_, components)| required.iter().all(|name| components.contains_key(name)))
+        .filter(|(_, components)| {
+            required.iter().all(|name| components.contains_key(name))
+                && excluded.iter().all(|name| !components.contains_key(name))
+        })
         .map(|(id, _)| id.clone())
         .collect()
 }

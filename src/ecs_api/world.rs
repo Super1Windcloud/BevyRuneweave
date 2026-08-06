@@ -80,7 +80,7 @@ pub(super) fn apply_ecs_writes(
                     }
                 }
             }
-            EcsCommand::SpawnEntity { id } => {
+            EcsCommand::SpawnEntity { id, components } => {
                 if let Some(old) = entities.0.remove(&id) {
                     commands.entity(old).despawn();
                 }
@@ -88,7 +88,7 @@ pub(super) fn apply_ecs_writes(
                     .spawn((
                         ScriptOwned,
                         ScriptEntityId(id.clone()),
-                        ScriptComponents::default(),
+                        ScriptComponents(components),
                     ))
                     .id();
                 entities.0.insert(id, entity);
@@ -134,7 +134,8 @@ mod tests {
     use super::*;
     use crate::ecs_api::command::{
         clear_world, entity_exists, get_component, get_resource, insert_component, query_entities,
-        remove_component, reset_bridge, set_resource, spawn_entity,
+        query_entities_filtered, remove_component, reset_bridge, set_resource, spawn_entity,
+        spawn_entity_bundle,
     };
 
     fn object(fields: impl IntoIterator<Item = (&'static str, EcsValue)>) -> EcsValue {
@@ -181,6 +182,18 @@ mod tests {
             query_entities(&["sprite".to_owned(), "transform".to_owned()]),
             ["player"]
         );
+        assert!(query_entities_filtered(&["sprite".to_owned()], &["transform".to_owned()]).is_empty());
+
+        spawn_entity_bundle(
+            "pickup".to_owned(),
+            [("sprite".to_owned(), EcsValue::String("pickup".to_owned()))]
+                .into_iter()
+                .collect(),
+        );
+        assert_eq!(
+            query_entities_filtered(&["sprite".to_owned()], &["transform".to_owned()]),
+            ["pickup"]
+        );
         assert_eq!(
             get_component("player", "transform")
                 .and_then(|value| value.field("x").and_then(EcsValue::as_number)),
@@ -195,7 +208,10 @@ mod tests {
         app.update();
         let world = app.world_mut();
         let mut query = world.query::<(&ScriptEntityId, &ScriptComponents)>();
-        let (id, components) = query.single(world).expect("one script entity");
+        let (id, components) = query
+            .iter(world)
+            .find(|(id, _)| id.as_str() == "player")
+            .expect("player script entity");
         assert_eq!(id.as_str(), "player");
         assert!(components.get("sprite").is_some());
         assert_eq!(
@@ -208,7 +224,7 @@ mod tests {
         );
 
         assert!(remove_component("player", "sprite"));
-        assert!(query_entities(&["sprite".to_owned()]).is_empty());
+        assert_eq!(query_entities(&["sprite".to_owned()]), ["pickup"]);
         clear_world();
         spawn_entity("final-player".to_owned());
         app.update();

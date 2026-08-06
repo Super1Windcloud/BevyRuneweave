@@ -13,8 +13,8 @@ use bevy_mod_scripting::{
 use super::super::{
     command::{
         clear_world, despawn_entity, entity_exists, get_component, get_resource, has_component,
-        insert_component, query_entities, remove_component, remove_resource, set_resource,
-        spawn_entity,
+        insert_component, query_entities, query_entities_filtered, remove_component,
+        remove_resource, set_resource, spawn_entity, spawn_entity_bundle,
     },
     value::EcsValue,
 };
@@ -109,6 +109,18 @@ fn js_component_insert(id: String, name: String, value: Value<'_>) -> rquickjs::
     Ok(insert_component(&id, name, js_to_ecs(value, 0)?))
 }
 
+fn js_entity_spawn_bundle(id: String, bundle: Value<'_>) -> rquickjs::Result<()> {
+    let EcsValue::Object(components) = js_to_ecs(bundle, 0)? else {
+        return Err(rquickjs::Error::new_from_js_message(
+            "value",
+            "component bundle",
+            "expected an object",
+        ));
+    };
+    spawn_entity_bundle(id, components);
+    Ok(())
+}
+
 fn js_component_get<'js>(ctx: Ctx<'js>, id: String, name: String) -> rquickjs::Result<Value<'js>> {
     get_component(&id, &name).map_or_else(
         || Ok(Value::new_null(ctx.clone())),
@@ -119,6 +131,21 @@ fn js_component_get<'js>(ctx: Ctx<'js>, id: String, name: String) -> rquickjs::R
 fn js_query<'js>(ctx: Ctx<'js>, required: Vec<String>) -> rquickjs::Result<Array<'js>> {
     let result = Array::new(ctx)?;
     for (index, id) in query_entities(&required).into_iter().enumerate() {
+        result.set(index, id)?;
+    }
+    Ok(result)
+}
+
+fn js_query_filtered<'js>(
+    ctx: Ctx<'js>,
+    required: Vec<String>,
+    excluded: Vec<String>,
+) -> rquickjs::Result<Array<'js>> {
+    let result = Array::new(ctx)?;
+    for (index, id) in query_entities_filtered(&required, &excluded)
+        .into_iter()
+        .enumerate()
+    {
         result.set(index, id)?;
     }
     Ok(result)
@@ -146,6 +173,10 @@ fn install_ecs_api(
             globals.set("ecs_world_clear", Func::from(clear_world))?;
             globals.set("ecs_entity_spawn", Func::from(spawn_entity))?;
             globals.set(
+                "ecs_entity_spawn_bundle",
+                Func::from(js_entity_spawn_bundle),
+            )?;
+            globals.set(
                 "ecs_entity_exists",
                 Func::from(|id: String| entity_exists(&id)),
             )?;
@@ -161,6 +192,7 @@ fn install_ecs_api(
                 Func::from(|id: String, name: String| remove_component(&id, &name)),
             )?;
             globals.set("ecs_query", Func::from(js_query))?;
+            globals.set("ecs_query_filtered", Func::from(js_query_filtered))?;
             globals.set("ecs_resource_set", Func::from(js_resource_set))?;
             globals.set("ecs_resource_get", Func::from(js_resource_get))?;
             globals.set(

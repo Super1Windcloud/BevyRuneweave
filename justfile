@@ -37,6 +37,10 @@ run-js:
 
 # Watch, compile, and run the TypeScript game with QuickJS.
 run-ts:
+    {{ if os_family() == "windows" { "just run-ts-windows" } else { "just run-ts-unix" } }}
+
+# Unix implementation of the TypeScript watch workflow.
+run-ts-unix:
     #!/usr/bin/env zsh
     set -e
     npm --prefix {{ts_dir}} run watch &
@@ -48,9 +52,7 @@ run-ts:
 # default for Unix hosts because its process and signal handling are shell
 # specific.
 run-ts-windows:
-    #!powershell.exe -NoLogo -NoProfile -Command
-    $watcher = Start-Process npm -ArgumentList '--prefix', '{{ts_dir}}', 'run', 'watch' -PassThru
-    try { cargo run -p script-squadron-typescript } finally { Stop-Process -Id $watcher.Id -Force -ErrorAction SilentlyContinue }
+    powershell.exe -NoLogo -NoProfile -Command '$watcher = Start-Process npm -ArgumentList "--prefix","{{ts_dir}}","run","watch" -PassThru; try { cargo run -p script-squadron-typescript } finally { Stop-Process -Id $watcher.Id -Force -ErrorAction SilentlyContinue }'
 
 # Check the Lua 5.5 executable project.
 check-lua:
