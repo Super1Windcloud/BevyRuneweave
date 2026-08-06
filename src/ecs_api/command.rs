@@ -14,14 +14,13 @@ pub(super) enum EcsCommand {
     SpawnEntity {
         id: String,
     },
-    SyncComponents {
-        id: String,
-        components: ComponentMap,
-    },
+    SetComponent { id: String, name: String, value: EcsValue },
+    RemoveComponent { id: String, name: String },
     DespawnEntity {
         id: String,
     },
-    SyncResources(ResourceMap),
+    SetResource { name: String, value: EcsValue },
+    RemoveResource { name: String },
 }
 
 #[derive(Default)]
@@ -85,12 +84,8 @@ pub(super) fn insert_component(id: &str, name: String, value: EcsValue) -> bool 
     let Some(components) = bridge.snapshot.entities.get_mut(id) else {
         return false;
     };
-    components.insert(name, value);
-    let components = components.clone();
-    bridge.commands.push(EcsCommand::SyncComponents {
-        id: id.to_owned(),
-        components,
-    });
+    components.insert(name.clone(), value.clone());
+    bridge.commands.push(EcsCommand::SetComponent { id: id.to_owned(), name, value });
     true
 }
 
@@ -102,11 +97,7 @@ pub(super) fn remove_component(id: &str, name: &str) -> bool {
     if components.remove(name).is_none() {
         return false;
     }
-    let components = components.clone();
-    bridge.commands.push(EcsCommand::SyncComponents {
-        id: id.to_owned(),
-        components,
-    });
+    bridge.commands.push(EcsCommand::RemoveComponent { id: id.to_owned(), name: name.to_owned() });
     true
 }
 
@@ -135,9 +126,8 @@ pub(super) fn query_entities(required: &[String]) -> Vec<String> {
 
 pub(super) fn set_resource(name: String, value: EcsValue) {
     let mut bridge = lock_bridge();
-    bridge.snapshot.resources.insert(name, value);
-    let resources = bridge.snapshot.resources.clone();
-    bridge.commands.push(EcsCommand::SyncResources(resources));
+    bridge.snapshot.resources.insert(name.clone(), value.clone());
+    bridge.commands.push(EcsCommand::SetResource { name, value });
 }
 
 pub(super) fn get_resource(name: &str) -> Option<EcsValue> {
@@ -149,8 +139,7 @@ pub(super) fn remove_resource(name: &str) -> bool {
     if bridge.snapshot.resources.remove(name).is_none() {
         return false;
     }
-    let resources = bridge.snapshot.resources.clone();
-    bridge.commands.push(EcsCommand::SyncResources(resources));
+    bridge.commands.push(EcsCommand::RemoveResource { name: name.to_owned() });
     true
 }
 

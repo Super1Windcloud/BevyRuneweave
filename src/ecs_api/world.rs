@@ -60,7 +60,8 @@ impl ScriptEntityId {
 pub(super) fn apply_ecs_writes(
     mut commands: Commands,
     mut entities: ResMut<ScriptEntityRegistry>,
-    script_entities: Query<Entity, With<ScriptOwned>>,
+    mut resources: ResMut<ScriptResources>,
+    script_entities: Query<(Entity, Option<&ScriptComponents>), With<ScriptOwned>>,
 ) {
     for command in take_commands() {
         match command {
@@ -73,7 +74,7 @@ pub(super) fn apply_ecs_writes(
                 for &entity in &registered {
                     commands.entity(entity).despawn();
                 }
-                for entity in &script_entities {
+                for (entity, _) in &script_entities {
                     if !registered.contains(&entity) {
                         commands.entity(entity).despawn();
                     }
@@ -92,11 +93,23 @@ pub(super) fn apply_ecs_writes(
                     .id();
                 entities.0.insert(id, entity);
             }
-            EcsCommand::SyncComponents { id, components } => {
+            EcsCommand::SetComponent { id, name, value } => {
                 if let Some(entity) = entities.0.get(&id) {
-                    commands
-                        .entity(*entity)
-                        .insert(ScriptComponents(components));
+                    let mut components = ScriptComponents::default();
+                    if let Ok((_, Some(current))) = script_entities.get(*entity) {
+                        components = current.clone();
+                    }
+                    components.0.insert(name, value);
+                    commands.entity(*entity).insert(components);
+                }
+            }
+            EcsCommand::RemoveComponent { id, name } => {
+                if let Some(entity) = entities.0.get(&id) {
+                    if let Ok((_, Some(current))) = script_entities.get(*entity) {
+                        let mut components = current.clone();
+                        components.0.remove(&name);
+                        commands.entity(*entity).insert(components);
+                    }
                 }
             }
             EcsCommand::DespawnEntity { id } => {
@@ -104,8 +117,11 @@ pub(super) fn apply_ecs_writes(
                     commands.entity(entity).despawn();
                 }
             }
-            EcsCommand::SyncResources(resources) => {
-                commands.insert_resource(ScriptResources(resources));
+            EcsCommand::SetResource { name, value } => {
+                resources.0.insert(name, value);
+            }
+            EcsCommand::RemoveResource { name } => {
+                resources.0.remove(&name);
             }
         }
     }
