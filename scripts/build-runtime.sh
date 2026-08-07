@@ -162,7 +162,7 @@ build_desktop_target() {
     destination="$(fresh_package_dir "$platform" "$language" "$target")"
     (cd "$REPO_ROOT" && cargo "$cargo_subcommand" --release --lib -p "$DYNAMIC_PACKAGE" --no-default-features --features "$feature" --target "$target")
     case "$platform" in
-        windows) copy_matching_artifacts "$TARGET_DIR/$target/release" "$destination" '*.dll' '*.dll.a' '*.dll.lib' ;;
+        windows) copy_matching_artifacts "$TARGET_DIR/$target/release" "$destination" '*.dll' ;;
         macos)
             copy_matching_artifacts "$TARGET_DIR/$target/release" "$destination" '*.dylib'
             install_name_tool -id '@rpath/libbevy_runeweave.dylib' "$destination/lib/libbevy_runeweave.dylib"

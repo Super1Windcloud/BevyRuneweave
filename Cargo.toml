@@ -133,6 +133,10 @@ bevy_mod_scripting = { path = "bevy_mod_scripting", default-features = false }
 # Cross builds load Wayland at runtime instead of requiring a Linux pkg-config sysroot.
 wayland-backend = { version = "0.3.15", features = ["dlopen"] }
 
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+winit = { version = "0.30.13", default-features = false }
+
 [profile.dev]
 opt-level = 1
 

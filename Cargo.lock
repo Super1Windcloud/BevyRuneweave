@@ -336,7 +336,9 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_mod_scripting",
+ "image",
  "wayland-backend",
+ "winit",
 ]
 
 [[package]]

@@ -5,6 +5,10 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+use bevy::window::PrimaryWindow;
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+use bevy::winit::WINIT_WINDOWS;
 use bevy::{
     asset::AssetPlugin,
     prelude::*,
@@ -32,6 +36,8 @@ static RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 const WINDOW_WIDTH: u32 = 600;
 const WINDOW_HEIGHT: u32 = 800;
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+const DEFAULT_WINDOW_ICON: &[u8] = include_bytes!("../../assets/branding/bevy_icon.png");
 
 callback_labels!(OnUpdate => "on_update");
 
@@ -50,6 +56,33 @@ fn attach_script(
     commands.spawn(ScriptComponent::new(vec![
         asset_server.load::<ScriptAsset>(path.asset_path.clone()),
     ]));
+}
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+fn set_default_window_icon(primary_window: Single<Entity, With<PrimaryWindow>>) {
+    let image = match image::load_from_memory(DEFAULT_WINDOW_ICON) {
+        Ok(image) => image.into_rgba8(),
+        Err(error) => {
+            warn!("Failed to decode the embedded Bevy window icon: {error}");
+            return;
+        }
+    };
+    let (width, height) = image.dimensions();
+    let icon = match winit::window::Icon::from_rgba(image.into_raw(), width, height) {
+        Ok(icon) => icon,
+        Err(error) => {
+            warn!("Failed to create the Bevy window icon: {error}");
+            return;
+        }
+    };
+
+    WINIT_WINDOWS.with_borrow(|windows| {
+        if let Some(window) = windows.get_window(*primary_window) {
+            window.set_window_icon(Some(icon));
+        } else {
+            warn!("Failed to find the native primary window for its default icon");
+        }
+    });
 }
 
 fn source_has_changed(
@@ -161,7 +194,14 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             .ok(),
         asset_path,
     })
-    .add_systems(Startup, attach_script)
+    .add_systems(
+        Startup,
+        (
+            attach_script,
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            set_default_window_icon,
+        ),
+    )
     .add_systems(
         Update,
         (

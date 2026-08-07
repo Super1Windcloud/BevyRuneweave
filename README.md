@@ -190,3 +190,6 @@ IOS_SIMULATOR_TARGETS=aarch64-apple-ios-sim,x86_64-apple-ios just build-runtime-
 框架主库产出供 Rust 项目使用的 `rlib`；`crates/runtime-cdylib` 为 Windows、macOS、
 Linux 和 Android 各生成一个动态库，`crates/runtime-staticlib` 仅用于组成 iOS
 XCFramework。宿主使用的 C 头文件位于 `include/game_runtime.h`。
+
+Rust 宿主窗口默认嵌入 Bevy 官方图标。运行时窗口图标在 Windows 和 Linux/X11
+生效；macOS Dock 图标以及 Android/iOS 应用图标仍应由宿主应用包配置。
