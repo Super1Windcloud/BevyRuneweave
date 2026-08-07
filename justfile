@@ -170,7 +170,7 @@ build-runtime platform language="all":
 
 # Package Windows runtimes for one language or all languages.
 build-runtime-windows language="all":
-    bash scripts/build-runtime.sh windows "{{language}}"
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-runtime-windows.ps1 "{{language}}"
 
 # Package macOS runtimes for one language or all languages.
 build-runtime-macos language="all":
