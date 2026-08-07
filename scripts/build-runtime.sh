@@ -111,9 +111,8 @@ write_build_info() {
     local target="$4"
     local packages
     case "$platform" in
-        android) packages="$DYNAMIC_PACKAGE" ;;
         ios) packages="$STATIC_PACKAGE" ;;
-        *) packages="$DYNAMIC_PACKAGE,$STATIC_PACKAGE" ;;
+        *) packages="$DYNAMIC_PACKAGE" ;;
     esac
     {
         printf 'package=%s\n' "$packages"
@@ -169,11 +168,6 @@ build_desktop_target() {
             install_name_tool -id '@rpath/libbevy_runeweave.dylib' "$destination/lib/libbevy_runeweave.dylib"
             ;;
         linux) copy_matching_artifacts "$TARGET_DIR/$target/release" "$destination" '*.so' ;;
-    esac
-    (cd "$REPO_ROOT" && cargo "$cargo_subcommand" --release --lib -p "$STATIC_PACKAGE" --no-default-features --features "$feature" --target "$target")
-    case "$platform" in
-        windows) copy_matching_artifacts "$TARGET_DIR/$target/release" "$destination" '*.lib' '*.a' ;;
-        macos | linux) copy_matching_artifacts "$TARGET_DIR/$target/release" "$destination" '*.a' ;;
     esac
     write_build_info "$destination" "$platform" "$language" "$target"
 }

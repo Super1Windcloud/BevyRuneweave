@@ -187,6 +187,6 @@ ANDROID_ABIS=arm64-v8a just build-runtime-android luau
 IOS_SIMULATOR_TARGETS=aarch64-apple-ios-sim,x86_64-apple-ios just build-runtime-ios js
 ```
 
-框架主库产出供 Rust 项目使用的 `rlib`；`crates/runtime-cdylib` 为
-Windows、macOS、Linux 和 Android 生成动态库，`crates/runtime-staticlib` 为桌面端
-和 iOS 生成静态库。宿主使用的 C 头文件位于 `include/game_runtime.h`。
+框架主库产出供 Rust 项目使用的 `rlib`；`crates/runtime-cdylib` 为 Windows、macOS、
+Linux 和 Android 各生成一个动态库，`crates/runtime-staticlib` 仅用于组成 iOS
+XCFramework。宿主使用的 C 头文件位于 `include/game_runtime.h`。
