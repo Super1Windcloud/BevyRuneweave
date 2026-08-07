@@ -7,6 +7,8 @@ use std::{
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use bevy::window::PrimaryWindow;
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+use bevy::window::{MonitorSelection, WindowPosition};
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use bevy::winit::WINIT_WINDOWS;
 use bevy::{
@@ -18,6 +20,8 @@ use bevy_mod_scripting::prelude::{
     BMSPlugin, ScriptAsset, ScriptCallbackEvent, ScriptComponent, ScriptValue, callback_labels,
     event_handler,
 };
+#[cfg(target_os = "windows")]
+use winit::platform::windows::WindowExtWindows;
 
 use crate::{
     ecs_api::{ApplyEcsCommands, RuneweaveEcsPlugin},
@@ -78,6 +82,8 @@ fn set_default_window_icon(primary_window: Single<Entity, With<PrimaryWindow>>) 
 
     WINIT_WINDOWS.with_borrow(|windows| {
         if let Some(window) = windows.get_window(*primary_window) {
+            #[cfg(target_os = "windows")]
+            window.set_taskbar_icon(Some(icon.clone()));
             window.set_window_icon(Some(icon));
         } else {
             warn!("Failed to find the native primary window for its default icon");
@@ -178,6 +184,8 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
                 primary_window: Some(Window {
                     title: format!("Script Squadron - {}", active_language()),
                     resolution: WindowResolution::new(WINDOW_WIDTH, WINDOW_HEIGHT),
+                    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+                    position: WindowPosition::Centered(MonitorSelection::Primary),
                     present_mode: PresentMode::AutoVsync,
                     resizable: false,
                     ..default()

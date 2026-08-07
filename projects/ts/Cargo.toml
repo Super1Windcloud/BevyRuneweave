@@ -3,6 +3,10 @@ name = "script-squadron-typescript"
 version = "0.1.0"
 edition = "2024"
 authors.workspace = true
+build = "../../scripts/embed-windows-icon.rs"
 
 [dependencies]
 bevy-runeweave = { path = "../..", default-features = false, features = ["typescript"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1.12"
