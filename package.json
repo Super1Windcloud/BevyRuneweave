@@ -18,11 +18,13 @@
     "doc": "docs"
   },
   "scripts": {
+    "release:assets": "tsx --env-file=.env scripts/publish-release.ts",
     "typecheck:scripts": "tsc --project scripts/tsconfig.json",
     "test": "npm run typecheck:scripts"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
+    "tsx": "^4.20.6",
     "typescript": "7.0.2"
   }
 }

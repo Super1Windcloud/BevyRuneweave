@@ -92,7 +92,7 @@ function ios(language: Language) {
 }
 
 const platformArg = process.argv[2], languageArg = process.argv[3] ?? "all";
-if (["-h", "--help"].includes(platformArg)) { console.log("Usage: node --experimental-strip-types scripts/build-runtime.ts <windows|macos|linux|android|ios|all> [js|typescript|lua|luau|all]"); process.exit(0); }
+if (["-h", "--help"].includes(platformArg)) { console.log("Usage: npm exec -- tsx scripts/build-runtime.ts <windows|macos|linux|android|ios|all> [js|typescript|lua|luau|all]"); process.exit(0); }
 const selectedPlatforms = platformArg === "all" ? platforms : platforms.includes(platformArg as Platform) ? [platformArg as Platform] : [];
 const selectedLanguages = languageArg === "all" ? languages : languages.includes(languageArg as Language) ? [languageArg as Language] : [];
 if (!selectedPlatforms.length || !selectedLanguages.length) throw new Error("Unsupported or missing platform/language");

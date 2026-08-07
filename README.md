@@ -182,7 +182,7 @@ Android NDK 和
 目标架构和输出目录：
 
 ```bash
-node --experimental-strip-types scripts/build-runtime.ts --help
+npm exec -- tsx scripts/build-runtime.ts --help
 ANDROID_ABIS=arm64-v8a just build-runtime-android luau
 IOS_SIMULATOR_TARGETS=aarch64-apple-ios-sim,x86_64-apple-ios just build-runtime-ios js
 ```
