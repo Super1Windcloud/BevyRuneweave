@@ -8,14 +8,7 @@ use bevy_mod_scripting::{
 };
 use mlua::{Lua, Table, Value};
 
-use super::super::{
-    command::{
-        clear_world, despawn_entity, entity_exists, get_component, get_resource, has_component,
-        insert_component, query_entities, query_entities_filtered, remove_component,
-        remove_resource, set_resource, spawn_entity, spawn_entity_bundle,
-    },
-    value::EcsValue,
-};
+use super::super::{command::EcsBridge, value::EcsValue};
 
 const MAX_VALUE_DEPTH: usize = 32;
 
@@ -110,6 +103,7 @@ fn ecs_to_lua(lua: &Lua, value: EcsValue, depth: usize) -> mlua::Result<Value> {
 }
 
 fn install_ecs_api(
+    bridge: &EcsBridge,
     _attachment: &ScriptAttachment,
     context: &mut LuaContext,
 ) -> Result<(), InteropError> {
@@ -117,104 +111,164 @@ fn install_ecs_api(
     let result = (|| -> mlua::Result<()> {
         globals.set(
             "ecs_world_clear",
-            context.create_function(|_, ()| {
-                clear_world();
-                Ok(())
+            context.create_function({
+                let bridge = bridge.clone();
+                move |_, ()| {
+                    bridge.clear_world();
+                    Ok(())
+                }
             })?,
         )?;
         globals.set(
             "ecs_entity_spawn",
-            context.create_function(|_, id: String| {
-                spawn_entity(id);
-                Ok(())
+            context.create_function({
+                let bridge = bridge.clone();
+                move |_, id: String| {
+                    bridge.spawn_entity(id);
+                    Ok(())
+                }
             })?,
         )?;
         globals.set(
             "ecs_entity_spawn_bundle",
-            context.create_function(|_, (id, bundle): (String, Table)| {
-                let EcsValue::Object(components) = table_to_ecs(bundle, 0)? else {
-                    unreachable!();
-                };
-                spawn_entity_bundle(id, components);
-                Ok(())
+            context.create_function({
+                let bridge = bridge.clone();
+                move |_, (id, bundle): (String, Table)| {
+                    let EcsValue::Object(components) = table_to_ecs(bundle, 0)? else {
+                        unreachable!();
+                    };
+                    bridge.spawn_entity_bundle(id, components);
+                    Ok(())
+                }
             })?,
         )?;
         globals.set(
             "ecs_entity_exists",
-            context.create_function(|_, id: String| Ok(entity_exists(&id)))?,
+            context.create_function({
+                let bridge = bridge.clone();
+                move |_, id: String| Ok(bridge.entity_exists(&id))
+            })?,
         )?;
         globals.set(
             "ecs_entity_despawn",
-            context.create_function(|_, id: String| Ok(despawn_entity(id)))?,
+            context.create_function({
+                let bridge = bridge.clone();
+                move |_, id: String| Ok(bridge.despawn_entity(id))
+            })?,
         )?;
         globals.set(
             "ecs_component_insert",
-            context.create_function(|_, (id, name, value): (String, String, Value)| {
-                Ok(insert_component(&id, name, lua_to_ecs(value, 0)?))
+            context.create_function({
+                let bridge = bridge.clone();
+                move |_, (id, name, value): (String, String, Value)| {
+                    Ok(bridge.insert_component(&id, name, lua_to_ecs(value, 0)?))
+                }
             })?,
         )?;
         globals.set(
             "ecs_component_get",
-            context.create_function(|lua, (id, name): (String, String)| {
-                get_component(&id, &name).map_or(Ok(Value::Nil), |value| ecs_to_lua(lua, value, 0))
+            context.create_function({
+                let bridge = bridge.clone();
+                move |lua, (id, name): (String, String)| {
+                    bridge
+                        .get_component(&id, &name)
+                        .map_or(Ok(Value::Nil), |value| ecs_to_lua(lua, value, 0))
+                }
             })?,
         )?;
         globals.set(
             "ecs_component_has",
-            context
-                .create_function(|_, (id, name): (String, String)| Ok(has_component(&id, &name)))?,
+            context.create_function({
+                let bridge = bridge.clone();
+                move |_, (id, name): (String, String)| Ok(bridge.has_component(&id, &name))
+            })?,
         )?;
         globals.set(
             "ecs_component_remove",
-            context.create_function(|_, (id, name): (String, String)| {
-                Ok(remove_component(&id, &name))
+            context.create_function({
+                let bridge = bridge.clone();
+                move |_, (id, name): (String, String)| Ok(bridge.remove_component(&id, &name))
             })?,
         )?;
         globals.set(
             "ecs_query",
-            context.create_function(|lua, required: Vec<String>| {
-                let result = lua.create_table_with_capacity(required.len(), 0)?;
-                for (index, id) in query_entities(&required).into_iter().enumerate() {
-                    result.raw_set(index + 1, id)?;
+            context.create_function({
+                let bridge = bridge.clone();
+                move |lua, required: Vec<String>| {
+                    let result = lua.create_table_with_capacity(required.len(), 0)?;
+                    for (index, id) in bridge.query_entities(&required).into_iter().enumerate() {
+                        result.raw_set(index + 1, id)?;
+                    }
+                    Ok(result)
                 }
-                Ok(result)
             })?,
         )?;
         globals.set(
             "ecs_query_filtered",
-            context.create_function(|lua, (required, excluded): (Vec<String>, Vec<String>)| {
-                let ids = query_entities_filtered(&required, &excluded);
-                let result = lua.create_table_with_capacity(ids.len(), 0)?;
-                for (index, id) in ids.into_iter().enumerate() {
-                    result.raw_set(index + 1, id)?;
+            context.create_function({
+                let bridge = bridge.clone();
+                move |lua, (required, excluded): (Vec<String>, Vec<String>)| {
+                    let ids = bridge.query_entities_filtered(&required, &excluded);
+                    let result = lua.create_table_with_capacity(ids.len(), 0)?;
+                    for (index, id) in ids.into_iter().enumerate() {
+                        result.raw_set(index + 1, id)?;
+                    }
+                    Ok(result)
                 }
-                Ok(result)
+            })?,
+        )?;
+        globals.set(
+            "ecs_query_matching",
+            context.create_function({
+                let bridge = bridge.clone();
+                move |lua, (required, any, excluded): (Vec<String>, Vec<String>, Vec<String>)| {
+                    let ids = bridge.query_entities_matching(&required, &any, &excluded);
+                    let result = lua.create_table_with_capacity(ids.len(), 0)?;
+                    for (index, id) in ids.into_iter().enumerate() {
+                        result.raw_set(index + 1, id)?;
+                    }
+                    Ok(result)
+                }
             })?,
         )?;
         globals.set(
             "ecs_resource_set",
-            context.create_function(|_, (name, value): (String, Value)| {
-                set_resource(name, lua_to_ecs(value, 0)?);
-                Ok(())
+            context.create_function({
+                let bridge = bridge.clone();
+                move |_, (name, value): (String, Value)| {
+                    bridge.set_resource(name, lua_to_ecs(value, 0)?);
+                    Ok(())
+                }
             })?,
         )?;
         globals.set(
             "ecs_resource_get",
-            context.create_function(|lua, name: String| {
-                get_resource(&name).map_or(Ok(Value::Nil), |value| ecs_to_lua(lua, value, 0))
+            context.create_function({
+                let bridge = bridge.clone();
+                move |lua, name: String| {
+                    bridge
+                        .get_resource(&name)
+                        .map_or(Ok(Value::Nil), |value| ecs_to_lua(lua, value, 0))
+                }
             })?,
         )?;
         globals.set(
             "ecs_resource_remove",
-            context.create_function(|_, name: String| Ok(remove_resource(&name)))?,
+            context.create_function({
+                let bridge = bridge.clone();
+                move |_, name: String| Ok(bridge.remove_resource(&name))
+            })?,
         )?;
         Ok(())
     })();
     result.map_err(interop_error)
 }
 
-pub(super) fn ecs_lua_plugin() -> LuaScriptingPlugin {
-    LuaScriptingPlugin::default().add_context_initializer(install_ecs_api)
+pub(super) fn ecs_lua_plugin(bridge: EcsBridge) -> LuaScriptingPlugin {
+    LuaScriptingPlugin::default().add_context_initializer(move |attachment, context| {
+        let owned_bridge = bridge.for_attachment(attachment);
+        install_ecs_api(&owned_bridge, attachment, context)
+    })
 }
 
 #[cfg(test)]

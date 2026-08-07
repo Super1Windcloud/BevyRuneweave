@@ -1,154 +1,258 @@
 use std::{
-    collections::BTreeMap,
-    sync::{Mutex, MutexGuard, OnceLock},
+    collections::{BTreeMap, BTreeSet},
+    sync::{Arc, Mutex, MutexGuard},
 };
+
+use bevy::prelude::Resource;
+use bevy_mod_scripting::script::ScriptAttachment;
 
 use super::value::EcsValue;
 
 pub(super) type ComponentMap = BTreeMap<String, EcsValue>;
 pub(super) type ResourceMap = BTreeMap<String, EcsValue>;
 
-#[derive(Debug)]
-pub(super) enum EcsCommand {
-    ClearWorld,
-    SpawnEntity { id: String, components: ComponentMap },
-    SetComponent { id: String, name: String, value: EcsValue },
-    RemoveComponent { id: String, name: String },
-    DespawnEntity {
-        id: String,
-    },
-    SetResource { name: String, value: EcsValue },
-    RemoveResource { name: String },
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(super) struct ScriptEntityKey {
+    pub owner: String,
+    pub id: String,
+}
+
+const MAX_KEY_LENGTH: usize = 128;
+
+fn valid_key(key: &str) -> bool {
+    !key.is_empty() && key.len() <= MAX_KEY_LENGTH && !key.chars().any(char::is_control)
 }
 
 #[derive(Default)]
 struct EcsSnapshot {
-    entities: BTreeMap<String, ComponentMap>,
+    entities: BTreeMap<ScriptEntityKey, ComponentMap>,
     resources: ResourceMap,
 }
 
 #[derive(Default)]
 struct BridgeState {
     snapshot: EcsSnapshot,
-    commands: Vec<EcsCommand>,
+    dirty_entities: BTreeSet<ScriptEntityKey>,
+    removed_entities: BTreeSet<ScriptEntityKey>,
+    cleared_owners: BTreeSet<String>,
+    resources_dirty: bool,
+    owners: std::collections::HashMap<ScriptAttachment, String>,
+    next_owner_id: u64,
 }
 
-static BRIDGE_STATE: OnceLock<Mutex<BridgeState>> = OnceLock::new();
-
-fn bridge_state() -> &'static Mutex<BridgeState> {
-    BRIDGE_STATE.get_or_init(|| Mutex::new(BridgeState::default()))
+/// App-local handle shared by script contexts and the Bevy synchronization system.
+#[derive(Resource, Clone, Default)]
+pub(super) struct EcsBridge {
+    state: Arc<Mutex<BridgeState>>,
+    owner: String,
 }
 
-fn lock_bridge() -> MutexGuard<'static, BridgeState> {
-    bridge_state()
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
+pub(super) struct EcsChanges {
+    pub cleared_owners: BTreeSet<String>,
+    pub upsert_entities: BTreeMap<ScriptEntityKey, ComponentMap>,
+    pub removed_entities: BTreeSet<ScriptEntityKey>,
+    pub resources: Option<ResourceMap>,
 }
 
-pub(super) fn reset_bridge() {
-    *lock_bridge() = BridgeState::default();
-}
-
-pub(super) fn clear_world() {
-    let mut bridge = lock_bridge();
-    bridge.snapshot.entities.clear();
-    bridge.commands.push(EcsCommand::ClearWorld);
-}
-
-pub(super) fn spawn_entity(id: String) {
-    spawn_entity_bundle(id, ComponentMap::new());
-}
-
-pub(super) fn spawn_entity_bundle(id: String, components: ComponentMap) {
-    let mut bridge = lock_bridge();
-    bridge.snapshot.entities.insert(id.clone(), components.clone());
-    bridge.commands.push(EcsCommand::SpawnEntity { id, components });
-}
-
-pub(super) fn entity_exists(id: &str) -> bool {
-    lock_bridge().snapshot.entities.contains_key(id)
-}
-
-pub(super) fn despawn_entity(id: String) -> bool {
-    let mut bridge = lock_bridge();
-    if bridge.snapshot.entities.remove(&id).is_none() {
-        return false;
+impl EcsBridge {
+    pub fn for_attachment(&self, attachment: &ScriptAttachment) -> Self {
+        let owner = {
+            let mut bridge = self.lock();
+            if let Some(owner) = bridge.owners.get(attachment) {
+                owner.clone()
+            } else {
+                bridge.next_owner_id += 1;
+                let owner = format!("script-{}", bridge.next_owner_id);
+                bridge.owners.insert(attachment.clone(), owner.clone());
+                owner
+            }
+        };
+        self.for_owner(owner)
     }
-    bridge.commands.push(EcsCommand::DespawnEntity { id });
-    true
-}
 
-pub(super) fn insert_component(id: &str, name: String, value: EcsValue) -> bool {
-    let mut bridge = lock_bridge();
-    let Some(components) = bridge.snapshot.entities.get_mut(id) else {
-        return false;
-    };
-    components.insert(name.clone(), value.clone());
-    bridge.commands.push(EcsCommand::SetComponent { id: id.to_owned(), name, value });
-    true
-}
-
-pub(super) fn remove_component(id: &str, name: &str) -> bool {
-    let mut bridge = lock_bridge();
-    let Some(components) = bridge.snapshot.entities.get_mut(id) else {
-        return false;
-    };
-    if components.remove(name).is_none() {
-        return false;
+    pub fn for_owner(&self, owner: String) -> Self {
+        Self {
+            state: Arc::clone(&self.state),
+            owner,
+        }
     }
-    bridge.commands.push(EcsCommand::RemoveComponent { id: id.to_owned(), name: name.to_owned() });
-    true
-}
 
-pub(super) fn get_component(id: &str, name: &str) -> Option<EcsValue> {
-    lock_bridge()
-        .snapshot
-        .entities
-        .get(id)
-        .and_then(|components| components.get(name))
-        .cloned()
-}
-
-pub(super) fn has_component(id: &str, name: &str) -> bool {
-    get_component(id, name).is_some()
-}
-
-pub(super) fn query_entities(required: &[String]) -> Vec<String> {
-    query_entities_filtered(required, &[])
-}
-
-pub(super) fn query_entities_filtered(required: &[String], excluded: &[String]) -> Vec<String> {
-    lock_bridge()
-        .snapshot
-        .entities
-        .iter()
-        .filter(|(_, components)| {
-            required.iter().all(|name| components.contains_key(name))
-                && excluded.iter().all(|name| !components.contains_key(name))
-        })
-        .map(|(id, _)| id.clone())
-        .collect()
-}
-
-pub(super) fn set_resource(name: String, value: EcsValue) {
-    let mut bridge = lock_bridge();
-    bridge.snapshot.resources.insert(name.clone(), value.clone());
-    bridge.commands.push(EcsCommand::SetResource { name, value });
-}
-
-pub(super) fn get_resource(name: &str) -> Option<EcsValue> {
-    lock_bridge().snapshot.resources.get(name).cloned()
-}
-
-pub(super) fn remove_resource(name: &str) -> bool {
-    let mut bridge = lock_bridge();
-    if bridge.snapshot.resources.remove(name).is_none() {
-        return false;
+    fn key(&self, id: impl Into<String>) -> ScriptEntityKey {
+        ScriptEntityKey {
+            owner: self.owner.clone(),
+            id: id.into(),
+        }
     }
-    bridge.commands.push(EcsCommand::RemoveResource { name: name.to_owned() });
-    true
-}
 
-pub(super) fn take_commands() -> Vec<EcsCommand> {
-    std::mem::take(&mut lock_bridge().commands)
+    fn lock(&self) -> MutexGuard<'_, BridgeState> {
+        self.state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    pub fn clear_world(&self) {
+        let mut bridge = self.lock();
+        bridge
+            .snapshot
+            .entities
+            .retain(|key, _| key.owner != self.owner);
+        bridge.dirty_entities.retain(|key| key.owner != self.owner);
+        bridge
+            .removed_entities
+            .retain(|key| key.owner != self.owner);
+        bridge.cleared_owners.insert(self.owner.clone());
+    }
+
+    pub fn spawn_entity(&self, id: String) {
+        self.spawn_entity_bundle(id, ComponentMap::new());
+    }
+
+    pub fn spawn_entity_bundle(&self, id: String, components: ComponentMap) {
+        if !valid_key(&id) || components.keys().any(|name| !valid_key(name)) {
+            return;
+        }
+        let mut bridge = self.lock();
+        let key = self.key(id);
+        bridge.snapshot.entities.insert(key.clone(), components);
+        bridge.removed_entities.remove(&key);
+        bridge.dirty_entities.insert(key);
+    }
+
+    pub fn entity_exists(&self, id: &str) -> bool {
+        self.lock().snapshot.entities.contains_key(&self.key(id))
+    }
+
+    pub fn despawn_entity(&self, id: String) -> bool {
+        let mut bridge = self.lock();
+        let key = self.key(id);
+        if bridge.snapshot.entities.remove(&key).is_none() {
+            return false;
+        }
+        bridge.dirty_entities.remove(&key);
+        bridge.removed_entities.insert(key);
+        true
+    }
+
+    pub fn insert_component(&self, id: &str, name: String, value: EcsValue) -> bool {
+        if !valid_key(id) || !valid_key(&name) {
+            return false;
+        }
+        let mut bridge = self.lock();
+        let key = self.key(id);
+        let Some(components) = bridge.snapshot.entities.get_mut(&key) else {
+            return false;
+        };
+        components.insert(name, value);
+        bridge.dirty_entities.insert(key);
+        true
+    }
+
+    pub fn remove_component(&self, id: &str, name: &str) -> bool {
+        if !valid_key(id) || !valid_key(name) {
+            return false;
+        }
+        let mut bridge = self.lock();
+        let key = self.key(id);
+        let Some(components) = bridge.snapshot.entities.get_mut(&key) else {
+            return false;
+        };
+        if components.remove(name).is_none() {
+            return false;
+        }
+        bridge.dirty_entities.insert(key);
+        true
+    }
+
+    pub fn get_component(&self, id: &str, name: &str) -> Option<EcsValue> {
+        self.lock()
+            .snapshot
+            .entities
+            .get(&self.key(id))
+            .and_then(|components| components.get(name))
+            .cloned()
+    }
+
+    pub fn has_component(&self, id: &str, name: &str) -> bool {
+        self.get_component(id, name).is_some()
+    }
+
+    pub fn query_entities(&self, required: &[String]) -> Vec<String> {
+        self.query_entities_filtered(required, &[])
+    }
+
+    pub fn query_entities_filtered(&self, required: &[String], excluded: &[String]) -> Vec<String> {
+        self.query_entities_matching(required, &[], excluded)
+    }
+
+    pub fn query_entities_matching(
+        &self,
+        required: &[String],
+        any: &[String],
+        excluded: &[String],
+    ) -> Vec<String> {
+        self.lock()
+            .snapshot
+            .entities
+            .iter()
+            .filter(|(_, components)| {
+                required.iter().all(|name| components.contains_key(name))
+                    && (any.is_empty() || any.iter().any(|name| components.contains_key(name)))
+                    && excluded.iter().all(|name| !components.contains_key(name))
+            })
+            .filter(|(key, _)| key.owner == self.owner)
+            .map(|(key, _)| key.id.clone())
+            .collect()
+    }
+
+    pub fn set_resource(&self, name: String, value: EcsValue) {
+        if !valid_key(&name) {
+            return;
+        }
+        let mut bridge = self.lock();
+        bridge.snapshot.resources.insert(name, value);
+        bridge.resources_dirty = true;
+    }
+
+    pub fn get_resource(&self, name: &str) -> Option<EcsValue> {
+        self.lock().snapshot.resources.get(name).cloned()
+    }
+
+    pub fn remove_resource(&self, name: &str) -> bool {
+        if !valid_key(name) {
+            return false;
+        }
+        let mut bridge = self.lock();
+        if bridge.snapshot.resources.remove(name).is_none() {
+            return false;
+        }
+        bridge.resources_dirty = true;
+        true
+    }
+
+    pub fn take_changes(&self) -> EcsChanges {
+        let mut bridge = self.lock();
+        let dirty_entities = std::mem::take(&mut bridge.dirty_entities);
+        let upsert_entities = dirty_entities
+            .into_iter()
+            .filter_map(|id| {
+                bridge
+                    .snapshot
+                    .entities
+                    .get(&id)
+                    .cloned()
+                    .map(|components| (id, components))
+            })
+            .collect();
+        let resources = bridge
+            .resources_dirty
+            .then(|| bridge.snapshot.resources.clone());
+        let changes = EcsChanges {
+            cleared_owners: std::mem::take(&mut bridge.cleared_owners),
+            upsert_entities,
+            removed_entities: std::mem::take(&mut bridge.removed_entities),
+            resources,
+        };
+        bridge.resources_dirty = false;
+        changes
+    }
 }

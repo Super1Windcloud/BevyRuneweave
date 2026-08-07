@@ -14,6 +14,11 @@ declare function ecs_query_filtered(
   requiredComponents: string[],
   excludedComponents: string[],
 ): string[];
+declare function ecs_query_matching(
+  requiredComponents: string[],
+  anyComponents: string[],
+  excludedComponents: string[],
+): string[];
 declare function ecs_resource_set(name: string, value: EcsValue): void;
 declare function ecs_resource_get(name: string): EcsValue | null;
 declare function ecs_resource_remove(name: string): boolean;

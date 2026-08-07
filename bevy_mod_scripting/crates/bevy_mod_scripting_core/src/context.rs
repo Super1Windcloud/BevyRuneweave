@@ -1,6 +1,6 @@
 //! Traits and types for managing script contexts.
 
-use std::any::Any;
+use std::{any::Any, ops::Deref, sync::Arc};
 
 use bevy_ecs::world::WorldId;
 use bevy_mod_scripting_bindings::{InteropError, WorldExtensions};
@@ -17,8 +17,40 @@ pub trait Context: 'static + Send + Any {}
 impl<T: 'static + Send + Any> Context for T {}
 
 /// Initializer run once after creating a context but before executing it for the first time as well as after re-loading the script
-pub type ContextInitializer<P> =
-    fn(&ScriptAttachment, &mut <P as IntoScriptPluginParams>::C) -> Result<(), InteropError>;
+pub struct ContextInitializer<P: IntoScriptPluginParams + ?Sized>(
+    Arc<dyn Fn(&ScriptAttachment, &mut P::C) -> Result<(), InteropError> + Send + Sync + 'static>,
+);
+
+impl<P: IntoScriptPluginParams + ?Sized> ContextInitializer<P> {
+    /// Wraps a context initializer function or capturing closure.
+    pub fn new(
+        initializer: impl Fn(&ScriptAttachment, &mut P::C) -> Result<(), InteropError>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self {
+        Self(Arc::new(initializer))
+    }
+}
+
+impl<P: IntoScriptPluginParams + ?Sized> Clone for ContextInitializer<P> {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
+    }
+}
+
+impl<P: IntoScriptPluginParams + ?Sized> std::fmt::Debug for ContextInitializer<P> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("ContextInitializer(..)")
+    }
+}
+
+impl<P: IntoScriptPluginParams + ?Sized> Deref for ContextInitializer<P> {
+    type Target = dyn Fn(&ScriptAttachment, &mut P::C) -> Result<(), InteropError> + Send + Sync;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref()
+    }
+}
 
 /// Initializer run every time before executing or loading/re-loading a script
 pub type ContextPreHandlingInitializer<P> =

@@ -21,11 +21,13 @@ use bevy_ecs::{
 use bevy_log::error;
 use bevy_mod_scripting_asset::{Language, LanguageExtensions, ScriptAsset, ScriptAssetLoader};
 
+use bevy_mod_scripting_bindings::InteropError;
 use bevy_mod_scripting_bindings::{
     AppReflectAllocator, AppScheduleRegistry, AppScriptFunctionRegistry,
     DummyScriptFunctionRegistry, DynamicScriptComponentPlugin, MarkAsCore, ReflectReference,
     ScriptTypeRegistration, ScriptValue, garbage_collector,
 };
+use bevy_mod_scripting_script::ScriptAttachment;
 use context::{Context, ContextInitializer, ContextPreHandlingInitializer};
 use event::{ScriptCallbackEvent, ScriptCallbackResponseEvent};
 use handler::HandlerFn;
@@ -187,8 +189,15 @@ impl<P: IntoScriptPluginParams> ScriptingPlugin<P> {
     /// Adds a context initializer to the plugin
     ///
     /// Initializers will be run every time a context is loaded or re-loaded and before any events are handled
-    pub fn add_context_initializer(&mut self, initializer: ContextInitializer<P>) -> &mut Self {
-        self.context_initializers.push(initializer);
+    pub fn add_context_initializer(
+        &mut self,
+        initializer: impl Fn(&ScriptAttachment, &mut P::C) -> Result<(), InteropError>
+        + Send
+        + Sync
+        + 'static,
+    ) -> &mut Self {
+        self.context_initializers
+            .push(ContextInitializer::new(initializer));
         self
     }
 
@@ -224,7 +233,16 @@ pub trait ConfigureScriptPlugin {
     type P: IntoScriptPluginParams;
 
     /// Add a context initializer to the plugin
-    fn add_context_initializer(self, initializer: ContextInitializer<Self::P>) -> Self;
+    fn add_context_initializer(
+        self,
+        initializer: impl Fn(
+            &ScriptAttachment,
+            &mut <Self::P as IntoScriptPluginParams>::C,
+        ) -> Result<(), InteropError>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self;
 
     /// Add a context pre-handling initializer to the plugin
     fn add_context_pre_handling_initializer(
@@ -261,7 +279,16 @@ pub trait ConfigureScriptPlugin {
 impl<P: IntoScriptPluginParams + AsMut<ScriptingPlugin<P>>> ConfigureScriptPlugin for P {
     type P = P;
 
-    fn add_context_initializer(mut self, initializer: ContextInitializer<Self::P>) -> Self {
+    fn add_context_initializer(
+        mut self,
+        initializer: impl Fn(
+            &ScriptAttachment,
+            &mut <Self::P as IntoScriptPluginParams>::C,
+        ) -> Result<(), InteropError>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self {
         self.as_mut().add_context_initializer(initializer);
         self
     }

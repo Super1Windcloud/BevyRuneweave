@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 
 use super::{
-    command::{ComponentMap, EcsCommand, ResourceMap, take_commands},
+    command::{ComponentMap, EcsBridge, ResourceMap, ScriptEntityKey},
     value::EcsValue,
 };
 
 #[derive(Resource, Default)]
-pub(super) struct ScriptEntityRegistry(HashMap<String, Entity>);
+pub(super) struct ScriptEntityRegistry(HashMap<ScriptEntityKey, Entity>);
 
 /// All script-defined components attached to one Bevy entity.
 #[derive(Component, Clone, Debug, Default)]
@@ -57,73 +57,56 @@ impl ScriptEntityId {
     }
 }
 
+/// Stable identity of the script context that owns an entity.
+#[derive(Component, Clone, Debug, PartialEq, Eq)]
+pub struct ScriptOwnerId(String);
+
+impl ScriptOwnerId {
+    /// Returns the stable owner identifier.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 pub(super) fn apply_ecs_writes(
     mut commands: Commands,
+    bridge: Res<EcsBridge>,
     mut entities: ResMut<ScriptEntityRegistry>,
     mut resources: ResMut<ScriptResources>,
-    script_entities: Query<(Entity, Option<&ScriptComponents>), With<ScriptOwned>>,
 ) {
-    for command in take_commands() {
-        match command {
-            EcsCommand::ClearWorld => {
-                let registered = entities
-                    .0
-                    .drain()
-                    .map(|(_, entity)| entity)
-                    .collect::<Vec<_>>();
-                for &entity in &registered {
-                    commands.entity(entity).despawn();
-                }
-                for (entity, _) in &script_entities {
-                    if !registered.contains(&entity) {
-                        commands.entity(entity).despawn();
-                    }
-                }
-            }
-            EcsCommand::SpawnEntity { id, components } => {
-                if let Some(old) = entities.0.remove(&id) {
-                    commands.entity(old).despawn();
-                }
-                let entity = commands
-                    .spawn((
-                        ScriptOwned,
-                        ScriptEntityId(id.clone()),
-                        ScriptComponents(components),
-                    ))
-                    .id();
-                entities.0.insert(id, entity);
-            }
-            EcsCommand::SetComponent { id, name, value } => {
-                if let Some(entity) = entities.0.get(&id) {
-                    let mut components = ScriptComponents::default();
-                    if let Ok((_, Some(current))) = script_entities.get(*entity) {
-                        components = current.clone();
-                    }
-                    components.0.insert(name, value);
-                    commands.entity(*entity).insert(components);
-                }
-            }
-            EcsCommand::RemoveComponent { id, name } => {
-                if let Some(entity) = entities.0.get(&id) {
-                    if let Ok((_, Some(current))) = script_entities.get(*entity) {
-                        let mut components = current.clone();
-                        components.0.remove(&name);
-                        commands.entity(*entity).insert(components);
-                    }
-                }
-            }
-            EcsCommand::DespawnEntity { id } => {
-                if let Some(entity) = entities.0.remove(&id) {
-                    commands.entity(entity).despawn();
-                }
-            }
-            EcsCommand::SetResource { name, value } => {
-                resources.0.insert(name, value);
-            }
-            EcsCommand::RemoveResource { name } => {
-                resources.0.remove(&name);
-            }
+    let changes = bridge.take_changes();
+    for owner in changes.cleared_owners {
+        let owned = entities
+            .0
+            .extract_if(|key, _| key.owner == owner)
+            .map(|(_, entity)| entity)
+            .collect::<Vec<_>>();
+        for entity in owned {
+            commands.entity(entity).despawn();
         }
+    }
+    for key in changes.removed_entities {
+        if let Some(entity) = entities.0.remove(&key) {
+            commands.entity(entity).despawn();
+        }
+    }
+    for (key, components) in changes.upsert_entities {
+        if let Some(entity) = entities.0.get(&key).copied() {
+            commands.entity(entity).insert(ScriptComponents(components));
+        } else {
+            let entity = commands
+                .spawn((
+                    ScriptOwned,
+                    ScriptOwnerId(key.owner.clone()),
+                    ScriptEntityId(key.id.clone()),
+                    ScriptComponents(components),
+                ))
+                .id();
+            entities.0.insert(key, entity);
+        }
+    }
+    if let Some(next_resources) = changes.resources {
+        resources.0 = next_resources;
     }
 }
 
@@ -131,12 +114,11 @@ pub(super) fn apply_ecs_writes(
 mod tests {
     use std::collections::BTreeMap;
 
+    use bevy::asset::Handle;
+    use bevy_mod_scripting::{prelude::ScriptAsset, script::ScriptAttachment};
+
     use super::*;
-    use crate::ecs_api::command::{
-        clear_world, entity_exists, get_component, get_resource, insert_component, query_entities,
-        query_entities_filtered, remove_component, reset_bridge, set_resource, spawn_entity,
-        spawn_entity_bundle,
-    };
+    use crate::ecs_api::command::EcsBridge;
 
     fn object(fields: impl IntoIterator<Item = (&'static str, EcsValue)>) -> EcsValue {
         EcsValue::Object(
@@ -149,15 +131,16 @@ mod tests {
 
     #[test]
     fn structured_components_resources_and_queries_sync_to_bevy() {
-        reset_bridge();
+        let bridge = EcsBridge::default();
         let mut app = App::new();
-        app.init_resource::<ScriptEntityRegistry>()
+        app.insert_resource(bridge.clone())
+            .init_resource::<ScriptEntityRegistry>()
             .init_resource::<ScriptResources>()
             .add_systems(Update, (apply_ecs_writes, ApplyDeferred).chain());
 
-        spawn_entity("player".to_owned());
-        assert!(entity_exists("player"));
-        assert!(insert_component(
+        bridge.spawn_entity("player".to_owned());
+        assert!(bridge.entity_exists("player"));
+        assert!(bridge.insert_component(
             "player",
             "transform".to_owned(),
             object([
@@ -165,12 +148,12 @@ mod tests {
                 ("y", EcsValue::Number(-34.0)),
             ]),
         ));
-        assert!(insert_component(
+        assert!(bridge.insert_component(
             "player",
             "sprite".to_owned(),
             object([("kind", EcsValue::String("player".to_owned()))]),
         ));
-        set_resource(
+        bridge.set_resource(
             "game_state".to_owned(),
             object([
                 ("score", EcsValue::Number(200.0)),
@@ -179,28 +162,42 @@ mod tests {
         );
 
         assert_eq!(
-            query_entities(&["sprite".to_owned(), "transform".to_owned()]),
+            bridge.query_entities(&["sprite".to_owned(), "transform".to_owned()]),
             ["player"]
         );
-        assert!(query_entities_filtered(&["sprite".to_owned()], &["transform".to_owned()]).is_empty());
+        assert!(
+            bridge
+                .query_entities_filtered(&["sprite".to_owned()], &["transform".to_owned()])
+                .is_empty()
+        );
 
-        spawn_entity_bundle(
+        bridge.spawn_entity_bundle(
             "pickup".to_owned(),
             [("sprite".to_owned(), EcsValue::String("pickup".to_owned()))]
                 .into_iter()
                 .collect(),
         );
         assert_eq!(
-            query_entities_filtered(&["sprite".to_owned()], &["transform".to_owned()]),
+            bridge.query_entities_filtered(&["sprite".to_owned()], &["transform".to_owned()]),
             ["pickup"]
         );
         assert_eq!(
-            get_component("player", "transform")
+            bridge.query_entities_matching(
+                &[],
+                &["transform".to_owned(), "missing".to_owned()],
+                &["disabled".to_owned()],
+            ),
+            ["player"]
+        );
+        assert_eq!(
+            bridge
+                .get_component("player", "transform")
                 .and_then(|value| value.field("x").and_then(EcsValue::as_number)),
             Some(12.0)
         );
         assert_eq!(
-            get_resource("game_state")
+            bridge
+                .get_resource("game_state")
                 .and_then(|value| value.field("lives").and_then(EcsValue::as_number)),
             Some(2.0)
         );
@@ -215,6 +212,13 @@ mod tests {
         assert_eq!(id.as_str(), "player");
         assert!(components.get("sprite").is_some());
         assert_eq!(
+            components
+                .get("transform")
+                .and_then(|value| value.field("x"))
+                .and_then(EcsValue::as_number),
+            Some(12.0)
+        );
+        assert_eq!(
             world
                 .resource::<ScriptResources>()
                 .get("game_state")
@@ -223,10 +227,10 @@ mod tests {
             Some(200.0)
         );
 
-        assert!(remove_component("player", "sprite"));
-        assert_eq!(query_entities(&["sprite".to_owned()]), ["pickup"]);
-        clear_world();
-        spawn_entity("final-player".to_owned());
+        assert!(bridge.remove_component("player", "sprite"));
+        assert_eq!(bridge.query_entities(&["sprite".to_owned()]), ["pickup"]);
+        bridge.clear_world();
+        bridge.spawn_entity("final-player".to_owned());
         app.update();
 
         let world = app.world_mut();
@@ -236,5 +240,86 @@ mod tests {
             .map(ScriptEntityId::as_str)
             .collect::<Vec<_>>();
         assert_eq!(ids, ["final-player"]);
+    }
+
+    #[test]
+    fn bridge_state_is_isolated_per_app() {
+        let first = EcsBridge::default();
+        let second = EcsBridge::default();
+
+        first.spawn_entity("only-first".to_owned());
+        first.set_resource("score".to_owned(), EcsValue::Number(10.0));
+
+        assert!(first.entity_exists("only-first"));
+        assert!(!second.entity_exists("only-first"));
+        assert_eq!(second.get_resource("score"), None);
+    }
+
+    #[test]
+    fn bridge_rejects_invalid_keys() {
+        let bridge = EcsBridge::default();
+        bridge.spawn_entity(String::new());
+        assert!(!bridge.entity_exists(""));
+        assert!(!bridge.insert_component("missing", String::new(), EcsValue::Null));
+        bridge.set_resource("\n".to_owned(), EcsValue::Bool(true));
+        assert_eq!(bridge.get_resource("\n"), None);
+    }
+
+    #[test]
+    fn script_owners_can_reuse_ids_and_clear_independently() {
+        let root = EcsBridge::default();
+        let first = root.for_owner("script-a".to_owned());
+        let second = root.for_owner("script-b".to_owned());
+        let mut app = App::new();
+        app.insert_resource(root)
+            .init_resource::<ScriptEntityRegistry>()
+            .init_resource::<ScriptResources>()
+            .add_systems(Update, (apply_ecs_writes, ApplyDeferred).chain());
+
+        first.spawn_entity("player".to_owned());
+        second.spawn_entity("player".to_owned());
+        assert_eq!(first.query_entities(&[]), ["player"]);
+        assert_eq!(second.query_entities(&[]), ["player"]);
+        app.update();
+
+        first.clear_world();
+        assert!(!first.entity_exists("player"));
+        assert!(second.entity_exists("player"));
+        app.update();
+
+        let world = app.world_mut();
+        let mut query = world.query::<(&ScriptOwnerId, &ScriptEntityId)>();
+        let owned = query
+            .iter(world)
+            .map(|(owner, id)| (owner.as_str(), id.as_str()))
+            .collect::<Vec<_>>();
+        assert_eq!(owned, [("script-b", "player")]);
+    }
+
+    #[test]
+    fn attachment_owner_id_is_stable_without_display_strings() {
+        let root = EcsBridge::default();
+        let script = Handle::<ScriptAsset>::default();
+        let first_attachment = ScriptAttachment::EntityScript(
+            Entity::from_raw_u32(1).expect("valid test entity"),
+            script.clone(),
+        );
+        let second_attachment = ScriptAttachment::EntityScript(
+            Entity::from_raw_u32(2).expect("valid test entity"),
+            script,
+        );
+
+        root.for_attachment(&first_attachment)
+            .spawn_entity("owned".to_owned());
+
+        assert!(
+            root.for_attachment(&first_attachment)
+                .entity_exists("owned")
+        );
+        assert!(
+            !root
+                .for_attachment(&second_attachment)
+                .entity_exists("owned")
+        );
     }
 }

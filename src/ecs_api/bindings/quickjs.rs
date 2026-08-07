@@ -10,14 +10,7 @@ use bevy_mod_scripting::{
     script::ScriptAttachment,
 };
 
-use super::super::{
-    command::{
-        clear_world, despawn_entity, entity_exists, get_component, get_resource, has_component,
-        insert_component, query_entities, query_entities_filtered, remove_component,
-        remove_resource, set_resource, spawn_entity, spawn_entity_bundle,
-    },
-    value::EcsValue,
-};
+use super::super::{command::EcsBridge, value::EcsValue};
 
 const MAX_VALUE_DEPTH: usize = 32;
 
@@ -105,11 +98,28 @@ fn ecs_to_js<'js>(ctx: &Ctx<'js>, value: EcsValue, depth: usize) -> rquickjs::Re
     }
 }
 
-fn js_component_insert(id: String, name: String, value: Value<'_>) -> rquickjs::Result<bool> {
-    Ok(insert_component(&id, name, js_to_ecs(value, 0)?))
+fn js_component_insert(
+    bridge: &EcsBridge,
+    id: String,
+    name: String,
+    value: Value<'_>,
+) -> rquickjs::Result<bool> {
+    Ok(bridge.insert_component(&id, name, js_to_ecs(value, 0)?))
 }
 
-fn js_entity_spawn_bundle(id: String, bundle: Value<'_>) -> rquickjs::Result<()> {
+struct JsEcsValue(EcsValue);
+
+impl<'js> IntoJs<'js> for JsEcsValue {
+    fn into_js(self, ctx: &Ctx<'js>) -> rquickjs::Result<Value<'js>> {
+        ecs_to_js(ctx, self.0, 0)
+    }
+}
+
+fn js_entity_spawn_bundle(
+    bridge: &EcsBridge,
+    id: String,
+    bundle: Value<'_>,
+) -> rquickjs::Result<()> {
     let EcsValue::Object(components) = js_to_ecs(bundle, 0)? else {
         return Err(rquickjs::Error::new_from_js_message(
             "value",
@@ -117,95 +127,149 @@ fn js_entity_spawn_bundle(id: String, bundle: Value<'_>) -> rquickjs::Result<()>
             "expected an object",
         ));
     };
-    spawn_entity_bundle(id, components);
+    bridge.spawn_entity_bundle(id, components);
     Ok(())
 }
 
-fn js_component_get<'js>(ctx: Ctx<'js>, id: String, name: String) -> rquickjs::Result<Value<'js>> {
-    get_component(&id, &name).map_or_else(
-        || Ok(Value::new_null(ctx.clone())),
-        |value| ecs_to_js(&ctx, value, 0),
-    )
-}
-
-fn js_query<'js>(ctx: Ctx<'js>, required: Vec<String>) -> rquickjs::Result<Array<'js>> {
-    let result = Array::new(ctx)?;
-    for (index, id) in query_entities(&required).into_iter().enumerate() {
-        result.set(index, id)?;
-    }
-    Ok(result)
-}
-
-fn js_query_filtered<'js>(
-    ctx: Ctx<'js>,
-    required: Vec<String>,
-    excluded: Vec<String>,
-) -> rquickjs::Result<Array<'js>> {
-    let result = Array::new(ctx)?;
-    for (index, id) in query_entities_filtered(&required, &excluded)
-        .into_iter()
-        .enumerate()
-    {
-        result.set(index, id)?;
-    }
-    Ok(result)
-}
-
-fn js_resource_set(name: String, value: Value<'_>) -> rquickjs::Result<()> {
-    set_resource(name, js_to_ecs(value, 0)?);
+fn js_resource_set(bridge: &EcsBridge, name: String, value: Value<'_>) -> rquickjs::Result<()> {
+    bridge.set_resource(name, js_to_ecs(value, 0)?);
     Ok(())
-}
-
-fn js_resource_get<'js>(ctx: Ctx<'js>, name: String) -> rquickjs::Result<Value<'js>> {
-    get_resource(&name).map_or_else(
-        || Ok(Value::new_null(ctx.clone())),
-        |value| ecs_to_js(&ctx, value, 0),
-    )
 }
 
 fn install_ecs_api(
+    bridge: &EcsBridge,
     _attachment: &ScriptAttachment,
     context: &mut QuickJsContext,
 ) -> Result<(), InteropError> {
+    let bridge = bridge.clone();
     context
-        .with(|ctx| {
+        .with(move |ctx| {
             let globals = ctx.globals();
-            globals.set("ecs_world_clear", Func::from(clear_world))?;
-            globals.set("ecs_entity_spawn", Func::from(spawn_entity))?;
+            globals.set(
+                "ecs_world_clear",
+                Func::from({
+                    let bridge = bridge.clone();
+                    move || bridge.clear_world()
+                }),
+            )?;
+            globals.set(
+                "ecs_entity_spawn",
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |id: String| bridge.spawn_entity(id)
+                }),
+            )?;
             globals.set(
                 "ecs_entity_spawn_bundle",
-                Func::from(js_entity_spawn_bundle),
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |id: String, bundle: Value<'_>| js_entity_spawn_bundle(&bridge, id, bundle)
+                }),
             )?;
             globals.set(
                 "ecs_entity_exists",
-                Func::from(|id: String| entity_exists(&id)),
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |id: String| bridge.entity_exists(&id)
+                }),
             )?;
-            globals.set("ecs_entity_despawn", Func::from(despawn_entity))?;
-            globals.set("ecs_component_insert", Func::from(js_component_insert))?;
-            globals.set("ecs_component_get", Func::from(js_component_get))?;
+            globals.set(
+                "ecs_entity_despawn",
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |id: String| bridge.despawn_entity(id)
+                }),
+            )?;
+            globals.set(
+                "ecs_component_insert",
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |id: String, name: String, value: Value<'_>| {
+                        js_component_insert(&bridge, id, name, value)
+                    }
+                }),
+            )?;
+            globals.set(
+                "ecs_component_get",
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |id: String, name: String| {
+                        JsEcsValue(bridge.get_component(&id, &name).unwrap_or(EcsValue::Null))
+                    }
+                }),
+            )?;
             globals.set(
                 "ecs_component_has",
-                Func::from(|id: String, name: String| has_component(&id, &name)),
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |id: String, name: String| bridge.has_component(&id, &name)
+                }),
             )?;
             globals.set(
                 "ecs_component_remove",
-                Func::from(|id: String, name: String| remove_component(&id, &name)),
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |id: String, name: String| bridge.remove_component(&id, &name)
+                }),
             )?;
-            globals.set("ecs_query", Func::from(js_query))?;
-            globals.set("ecs_query_filtered", Func::from(js_query_filtered))?;
-            globals.set("ecs_resource_set", Func::from(js_resource_set))?;
-            globals.set("ecs_resource_get", Func::from(js_resource_get))?;
+            globals.set(
+                "ecs_query",
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |required: Vec<String>| bridge.query_entities(&required)
+                }),
+            )?;
+            globals.set(
+                "ecs_query_filtered",
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |required: Vec<String>, excluded: Vec<String>| {
+                        bridge.query_entities_filtered(&required, &excluded)
+                    }
+                }),
+            )?;
+            globals.set(
+                "ecs_query_matching",
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |required: Vec<String>, any: Vec<String>, excluded: Vec<String>| {
+                        bridge.query_entities_matching(&required, &any, &excluded)
+                    }
+                }),
+            )?;
+            globals.set(
+                "ecs_resource_set",
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |name: String, value: Value<'_>| js_resource_set(&bridge, name, value)
+                }),
+            )?;
+            globals.set(
+                "ecs_resource_get",
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |name: String| {
+                        JsEcsValue(bridge.get_resource(&name).unwrap_or(EcsValue::Null))
+                    }
+                }),
+            )?;
             globals.set(
                 "ecs_resource_remove",
-                Func::from(|name: String| remove_resource(&name)),
+                Func::from({
+                    let bridge = bridge.clone();
+                    move |name: String| bridge.remove_resource(&name)
+                }),
             )?;
             Ok::<(), rquickjs::Error>(())
         })
         .map_err(interop_error)
 }
 
-pub(super) fn ecs_quickjs_plugin() -> QuickJsScriptingPlugin {
-    QuickJsScriptingPlugin::default().add_context_initializer(install_ecs_api)
+pub(super) fn ecs_quickjs_plugin(bridge: EcsBridge) -> QuickJsScriptingPlugin {
+    QuickJsScriptingPlugin::default().add_context_initializer(move |attachment, context| {
+        let owned_bridge = bridge.for_attachment(attachment);
+        install_ecs_api(&owned_bridge, attachment, context)
+    })
 }
 
 #[cfg(test)]

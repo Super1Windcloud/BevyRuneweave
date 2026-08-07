@@ -13,6 +13,13 @@ Entity 使用稳定字符串作为脚本标识。Component 是附着在 Entity �
 写操作会立即更新脚本可见快照，因此同一回调内可以读取刚写入的数据；Bevy World 在
 本帧的 `ApplyEcsCommands` 阶段统一同步。查询结果按 Entity ID 稳定排序。
 
+每个 Bevy `App` 拥有独立的 ECS 桥接实例，多个 App 或测试不会共享脚本快照。每个
+`ScriptAttachment` 还拥有独立实体命名空间，不同脚本可以复用相同 Entity ID；查询和
+`ecs_world_clear()` 只影响当前脚本拥有的实体。一个实体在同一帧内发生的多次修改会先
+合并为最终状态，再一次性提交到 Bevy World。Resource 仍是 App 级共享数据。
+Owner ID 由桥接层根据 `ScriptAttachment` 的结构化身份分配，不依赖其显示字符串；同一
+attachment 在热重载前后会解析到同一个 owner。
+
 ## API
 
 | API | 语义 |
@@ -68,8 +75,9 @@ ecs_resource_set("game_state", {
 
 ## Rust 消费端
 
-`RuneweaveEcsPlugin` 将脚本 Entity 同步为带有 `ScriptOwned`、`ScriptEntityId` 和
-`ScriptComponents` 的 Bevy Entity，并将全局数据同步到 `ScriptResources`。宿主系统
+`RuneweaveEcsPlugin` 将脚本 Entity 同步为带有 `ScriptOwned`、`ScriptOwnerId`、
+`ScriptEntityId` 和 `ScriptComponents` 的 Bevy Entity，并将全局数据同步到
+`ScriptResources`。宿主系统
 查询这些类型，将逻辑组件解释为自己的强类型渲染、物理或音频组件。Runeweave 核心
 不会硬编码业务组件名或资源结构。
 

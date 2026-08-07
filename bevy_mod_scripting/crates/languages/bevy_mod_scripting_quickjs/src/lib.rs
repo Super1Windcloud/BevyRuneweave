@@ -10,7 +10,7 @@ use bevy_mod_scripting_bindings::{InteropError, ScriptValue};
 use bevy_mod_scripting_core::{
     IntoScriptPluginParams, ScriptingPlugin,
     config::{GetPluginThreadConfig, ScriptingPluginConfiguration},
-    context::{ContextLoadFn, ContextReloadFn},
+    context::{ContextInitializer, ContextLoadFn, ContextReloadFn},
     event::CallbackLabel,
     handler::HandlerFn,
     make_plugin_config_static,
@@ -65,7 +65,7 @@ impl Default for QuickJsScriptingPlugin {
                 context_policy: ContextPolicy::default(),
                 language: QUICKJS_LANGUAGE,
                 supported_extensions: vec!["js", "mjs"],
-                context_initializers: vec![install_console],
+                context_initializers: vec![ContextInitializer::new(install_console)],
                 context_pre_handling_initializers: Vec::new(),
                 emit_responses: false,
                 processing_pipeline_plugin: Default::default(),
@@ -274,7 +274,9 @@ mod tests {
             world_id,
             ScriptingPluginConfiguration {
                 pre_handling_callbacks: &[],
-                context_initialization_callbacks: &[install_console],
+                context_initialization_callbacks: Vec::leak(vec![ContextInitializer::new(
+                    install_console,
+                )]),
                 emit_responses: false,
                 runtime,
                 language_extensions: extensions,
