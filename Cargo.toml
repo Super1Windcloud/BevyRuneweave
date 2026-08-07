@@ -12,6 +12,7 @@ autobins = false
 
 [workspace]
 members = [
+    "crates/windows-demo-host",
     "crates/runtime-cdylib",
     "crates/runtime-staticlib",
     "bevy_mod_scripting",

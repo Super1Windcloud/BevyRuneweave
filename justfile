@@ -166,27 +166,46 @@ build: build-lua build-luau build-js build-ts
 
 # Package one platform runtime (platform: windows/macos/linux/android/ios/all).
 build-runtime platform language="all":
-    bash scripts/build-runtime.sh "{{platform}}" "{{language}}"
+    node --experimental-strip-types scripts/build-runtime.ts "{{platform}}" "{{language}}"
 
 # Package Windows runtimes for one language or all languages.
 build-runtime-windows language="all":
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-runtime-windows.ps1 "{{language}}"
+    node --experimental-strip-types scripts/build-runtime.ts windows "{{language}}"
+
+# Package language assets and optionally upload them to a GitHub release.
+package-assets language="all" tag="0.0.1":
+    node --experimental-strip-types --env-file-if-exists=.env scripts/publish-release.ts --tag="{{tag}}" --language="{{language}}" --no-upload
+
+package-assets-js tag="0.0.1":
+    just package-assets js "{{tag}}"
+
+package-assets-typescript tag="0.0.1":
+    just package-assets typescript "{{tag}}"
+
+package-assets-lua tag="0.0.1":
+    just package-assets lua "{{tag}}"
+
+package-assets-luau tag="0.0.1":
+    just package-assets luau "{{tag}}"
+
+upload-assets tag="0.0.1":
+    node --experimental-strip-types --env-file=.env scripts/publish-release.ts --tag="{{tag}}"
 
 # Package macOS runtimes for one language or all languages.
 build-runtime-macos language="all":
-    bash scripts/build-runtime.sh macos "{{language}}"
+    node --experimental-strip-types scripts/build-runtime.ts macos "{{language}}"
 
 # Package Linux runtimes for one language or all languages.
 build-runtime-linux language="all":
-    bash scripts/build-runtime.sh linux "{{language}}"
+    node --experimental-strip-types scripts/build-runtime.ts linux "{{language}}"
 
 # Package Android runtimes for one language or all languages.
 build-runtime-android language="all":
-    bash scripts/build-runtime.sh android "{{language}}"
+    node --experimental-strip-types scripts/build-runtime.ts android "{{language}}"
 
 # Package iOS XCFramework runtimes for one language or all languages.
 build-runtime-ios language="all":
-    bash scripts/build-runtime.sh ios "{{language}}"
+    node --experimental-strip-types scripts/build-runtime.ts ios "{{language}}"
 
 # Run formatting, project checks, and gameplay tests.
 verify: fmt-check bms-check check bms-test test

@@ -1,0 +1,28 @@
+{
+  "name": "bevy-script-squadron-runtime",
+  "version": "1.0.0",
+  "description": "**Bevy Runeweave 是一个将多种脚本语言编织进 Bevy ECS 世界的游戏框架。**",
+  "homepage": "https://github.com/Super1Windcloud/bevy-script-squadron-runtime#readme",
+  "bugs": {
+    "url": "https://github.com/Super1Windcloud/bevy-script-squadron-runtime/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Super1Windcloud/bevy-script-squadron-runtime.git"
+  },
+  "license": "GPL",
+  "author": "Superwindcloud",
+  "type": "module",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "typecheck:scripts": "tsc --project scripts/tsconfig.json",
+    "test": "npm run typecheck:scripts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "7.0.2"
+  }
+}

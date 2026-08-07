@@ -3,7 +3,7 @@ name = "script-squadron-luau"
 version = "0.1.0"
 edition = "2024"
 authors.workspace = true
-build = "../../scripts/embed-windows-icon.rs"
+build = "../../build-support/embed-windows-icon.rs"
 
 [dependencies]
 bevy-runeweave = { path = "../..", default-features = false, features = ["luau"] }

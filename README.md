@@ -156,7 +156,7 @@ just ts-build
 
 ## 跨平台运行时
 
-`scripts/build-runtime.sh` 将 C ABI 运行时、头文件和对应语言的游戏资源一起归档到
+`scripts/build-runtime.ts` 将 C ABI 运行时、头文件和对应语言的游戏资源一起归档到
 `dist/runtimes/<platform>/<language>/`。每种语言会独立构建，避免 Lua 5.5 与 Luau
 后端的互斥 feature 被 Cargo 合并。
 
@@ -174,7 +174,7 @@ just build-runtime linux typescript
 ```
 
 Windows 和 Linux 在对应宿主机上可直接构建；从其他系统交叉构建时需安装 Zig 与
-`cargo-zigbuild`，Windows 上运行脚本需要 Git Bash。Android 需要 `cargo-ndk`、
+`cargo-zigbuild`。构建脚本需要支持直接执行 TypeScript 的 Node.js 版本。Android 需要 `cargo-ndk`、
 Android NDK 和
 `ANDROID_NDK_HOME`，默认构建 `arm64-v8a`、`armeabi-v7a`、`x86_64`，最低 API 为
 26。iOS 只能在安装 Xcode 的 macOS 上构建，默认生成包含 arm64 真机和 Apple Silicon
@@ -182,7 +182,7 @@ Android NDK 和
 目标架构和输出目录：
 
 ```bash
-scripts/build-runtime.sh --help
+node --experimental-strip-types scripts/build-runtime.ts --help
 ANDROID_ABIS=arm64-v8a just build-runtime-android luau
 IOS_SIMULATOR_TARGETS=aarch64-apple-ios-sim,x86_64-apple-ios just build-runtime-ios js
 ```
