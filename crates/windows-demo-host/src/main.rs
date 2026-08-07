@@ -9,6 +9,7 @@ fn main() {
 mod windows_host {
     use compress_tools::{Ownership, uncompress_archive};
     use libloading::{Library, Symbol};
+    use serde::Deserialize;
     use std::{
         ffi::{CString, OsStr, c_char, c_int},
         fs,
@@ -29,8 +30,42 @@ mod windows_host {
     const ID_URL: i32 = 1001;
     const ID_START: i32 = 1002;
     const WM_DOWNLOAD_DONE: u32 = WM_APP + 1;
-    const DLL_RELATIVE_PATH: &str =
-        "dist/runtimes/windows/typescript/x86_64-pc-windows-msvc/lib/bevy_runeweave.dll";
+    const CONFIG_FILE: &str = "engineConfig.json";
+
+    #[derive(Clone, Copy, Deserialize)]
+    #[serde(rename_all = "lowercase")]
+    enum Language {
+        Js,
+        TypeScript,
+        Lua,
+        Luau,
+    }
+
+    impl Language {
+        fn directory(self) -> &'static str {
+            match self {
+                Self::Js => "js",
+                Self::TypeScript => "typescript",
+                Self::Lua => "lua",
+                Self::Luau => "luau",
+            }
+        }
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct EngineConfig {
+        schema_version: u32,
+        name: String,
+        version: String,
+        script: ScriptConfig,
+    }
+
+    #[derive(Deserialize)]
+    struct ScriptConfig {
+        language: Language,
+        entry: PathBuf,
+    }
 
     #[derive(Default)]
     struct State {
@@ -46,17 +81,51 @@ mod windows_host {
 
     fn repo_root() -> Result<PathBuf, String> {
         let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+        if let Some(directory) = executable.parent()
+            && directory.join("lib").is_dir()
+        {
+            return Ok(directory.to_path_buf());
+        }
         for ancestor in executable.ancestors() {
-            if ancestor.join(DLL_RELATIVE_PATH).is_file() {
+            if ancestor.join("dist/runtimes/windows").is_dir() {
                 return Ok(ancestor.to_path_buf());
             }
         }
         let current = std::env::current_dir().map_err(|error| error.to_string())?;
-        if current.join(DLL_RELATIVE_PATH).is_file() {
+        if current.join("dist/runtimes/windows").is_dir() {
             Ok(current)
         } else {
-            Err(format!("找不到运行时 DLL: {DLL_RELATIVE_PATH}"))
+            Err("找不到 Windows 运行时目录".to_owned())
         }
+    }
+
+    fn load_config(assets: &Path) -> Result<EngineConfig, String> {
+        let bytes = fs::read(assets.join(CONFIG_FILE))
+            .map_err(|error| format!("读取 {CONFIG_FILE} 失败: {error}"))?;
+        let config: EngineConfig = serde_json::from_slice(&bytes)
+            .map_err(|error| format!("解析 {CONFIG_FILE} 失败: {error}"))?;
+        if config.schema_version != 1 {
+            return Err(format!(
+                "不支持的 engineConfig schemaVersion: {}",
+                config.schema_version
+            ));
+        }
+        if config.name.trim().is_empty() || config.version.trim().is_empty() {
+            return Err("engineConfig 的 name/version 不能为空".to_owned());
+        }
+        if config.script.entry.is_absolute()
+            || config
+                .script
+                .entry
+                .components()
+                .any(|part| matches!(part, std::path::Component::ParentDir))
+        {
+            return Err("script.entry 必须是 assets 内的相对路径".to_owned());
+        }
+        if !assets.join(&config.script.entry).is_file() {
+            return Err(format!("脚本入口不存在: {}", config.script.entry.display()));
+        }
+        Ok(config)
     }
 
     fn download_and_install(url: &str) -> Result<(), String> {
@@ -80,22 +149,23 @@ mod windows_host {
         let mut archive = BufReader::new(Cursor::new(bytes));
         uncompress_archive(&mut archive, staging.path(), Ownership::Ignore)
             .map_err(|error| format!("libarchive 解压失败: {error}"))?;
-        let script =
-            find_script(staging.path())?.ok_or_else(|| "资源包中缺少 shooter.js".to_owned())?;
-        let package_root = script
+        let config_path =
+            find_config(staging.path())?.ok_or_else(|| format!("资源包中缺少 {CONFIG_FILE}"))?;
+        let package_root = config_path
             .parent()
-            .ok_or_else(|| "无效的 shooter.js 路径".to_owned())?;
+            .ok_or_else(|| "无效的 engineConfig.json 路径".to_owned())?;
+        load_config(package_root)?;
         install_tree(package_root, &root.join("assets"))
     }
 
-    fn find_script(directory: &Path) -> Result<Option<PathBuf>, String> {
+    fn find_config(directory: &Path) -> Result<Option<PathBuf>, String> {
         for entry in fs::read_dir(directory).map_err(|error| error.to_string())? {
             let path = entry.map_err(|error| error.to_string())?.path();
             if path.is_dir() {
-                if let Some(found) = find_script(&path)? {
+                if let Some(found) = find_config(&path)? {
                     return Ok(Some(found));
                 }
-            } else if path.file_name() == Some(OsStr::new("shooter.js")) {
+            } else if path.file_name() == Some(OsStr::new(CONFIG_FILE)) {
                 return Ok(Some(path));
             }
         }
@@ -292,12 +362,32 @@ mod windows_host {
     fn run_game() -> Result<(), String> {
         let root = repo_root()?;
         std::env::set_current_dir(&root).map_err(|error| error.to_string())?;
-        let library = unsafe { Library::new(root.join(DLL_RELATIVE_PATH)) }
+        let config = load_config(&root.join("assets"))?;
+        let executable_dir = std::env::current_exe()
+            .map_err(|error| error.to_string())?
+            .parent()
+            .map(Path::to_path_buf)
+            .ok_or_else(|| "无法确定宿主目录".to_owned())?;
+        let bundled = executable_dir
+            .join("lib")
+            .join(config.script.language.directory())
+            .join("bevy_runeweave.dll");
+        let development = root
+            .join("dist/runtimes/windows")
+            .join(config.script.language.directory())
+            .join("x86_64-pc-windows-msvc/lib/bevy_runeweave.dll");
+        let dll = if bundled.is_file() {
+            bundled
+        } else {
+            development
+        };
+        let library = unsafe { Library::new(&dll) }
             .map_err(|error| format!("加载运行时 DLL 失败: {error}"))?;
         type Run = unsafe extern "C" fn(*const c_char) -> c_int;
         let run: Symbol<'_, Run> = unsafe { library.get(b"game_runtime_run\0") }
             .map_err(|error| format!("查找运行时入口失败: {error}"))?;
-        let script = CString::new("shooter.js").map_err(|error| error.to_string())?;
+        let script = CString::new(config.script.entry.to_string_lossy().as_bytes())
+            .map_err(|error| error.to_string())?;
         let code = unsafe { run(script.as_ptr()) };
         if code == 0 {
             Ok(())

@@ -172,6 +172,10 @@ build-runtime platform language="all":
 build-runtime-windows language="all":
     npm exec -- tsx scripts/build-runtime.ts windows "{{language}}"
 
+# Build one Windows launcher executable backed by all four language runtimes.
+build-runtime-unified-windows:
+    npm exec -- tsx scripts/build-runtime.ts unified-windows
+
 # Package language assets and optionally upload them to a GitHub release.
 package-assets language="all" tag="0.0.1":
     npm exec -- tsx --env-file-if-exists=.env scripts/publish-release.ts --tag="{{tag}}" --language="{{language}}" --no-upload

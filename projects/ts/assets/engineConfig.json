@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "name": "script-squadron-typescript",
+  "version": "0.1.0",
+  "script": { "language": "typescript", "entry": "shooter.js" },
+  "metadata": { "sourceLanguage": "typescript", "runtime": "quickjs" }
+}

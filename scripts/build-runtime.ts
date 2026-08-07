@@ -91,8 +91,25 @@ function ios(language: Language) {
   } finally { rmSync(work, { recursive: true, force: true }); }
 }
 
+function unifiedWindows() {
+  if (hostOs() !== "windows") throw new Error("The unified Windows runtime must be built on Windows");
+  const target = hostTarget();
+  for (const language of languages) desktop("windows", language);
+  run("cargo", ["build", "--release", "-p", "bevy-runeweave-windows-demo-host", "--target", target]);
+  const destination = resolve(dist, "windows", "unified", target);
+  rmSync(destination, { recursive: true, force: true }); mkdirSync(join(destination, "lib"), { recursive: true });
+  cpSync(join(targetDir, target, "release", "bevy-runeweave-demo.exe"), join(destination, "bevy-runeweave-runtime.exe"));
+  for (const language of languages) {
+    const libraryDirectory = join(destination, "lib", language); mkdirSync(libraryDirectory, { recursive: true });
+    cpSync(join(dist, "windows", language, target, "lib", "bevy_runeweave.dll"), join(libraryDirectory, "bevy_runeweave.dll"));
+  }
+  writeFileSync(join(destination, "build-info.txt"), `package=bevy-runeweave-unified-runtime\nplatform=windows\nlanguages=${languages.join(",")}\ntarget=${target}\nprofile=release\n`, "ascii");
+  console.log(`Unified runtime executable: ${join(destination, "bevy-runeweave-runtime.exe")}`);
+}
+
 const platformArg = process.argv[2], languageArg = process.argv[3] ?? "all";
-if (["-h", "--help"].includes(platformArg)) { console.log("Usage: npm exec -- tsx scripts/build-runtime.ts <windows|macos|linux|android|ios|all> [js|typescript|lua|luau|all]"); process.exit(0); }
+if (["-h", "--help"].includes(platformArg)) { console.log("Usage: npm exec -- tsx scripts/build-runtime.ts <windows|unified-windows|macos|linux|android|ios|all> [js|typescript|lua|luau|all]"); process.exit(0); }
+if (platformArg === "unified-windows") { unifiedWindows(); process.exit(0); }
 const selectedPlatforms = platformArg === "all" ? platforms : platforms.includes(platformArg as Platform) ? [platformArg as Platform] : [];
 const selectedLanguages = languageArg === "all" ? languages : languages.includes(languageArg as Language) ? [languageArg as Language] : [];
 if (!selectedPlatforms.length || !selectedLanguages.length) throw new Error("Unsupported or missing platform/language");

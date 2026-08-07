@@ -191,5 +191,27 @@ IOS_SIMULATOR_TARGETS=aarch64-apple-ios-sim,x86_64-apple-ios just build-runtime-
 Linux 和 Android 各生成一个动态库，`crates/runtime-staticlib` 仅用于组成 iOS
 XCFramework。宿主使用的 C 头文件位于 `include/game_runtime.h`。
 
+统一 Windows 宿主通过 `assets/engineConfig.json` 选择脚本语言和入口。执行
+`just build-runtime-unified-windows` 会生成一个供用户启动的
+`bevy-runeweave-runtime.exe`，并在其 `lib` 目录中打包四个互斥语言后端。
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "my-game",
+  "version": "0.1.0",
+  "script": {
+    "language": "typescript",
+    "entry": "main.js"
+  },
+  "metadata": {
+    "author": "example"
+  }
+}
+```
+
+`script.language` 支持 `js`、`typescript`、`lua`、`luau`；`script.entry` 必须是
+`assets` 内的相对路径。`metadata` 可承载游戏项目需要的其他 JSON 元数据。
+
 Rust 宿主窗口默认嵌入 Bevy 官方图标。运行时窗口图标在 Windows 和 Linux/X11
 生效；macOS Dock 图标以及 Android/iOS 应用图标仍应由宿主应用包配置。
