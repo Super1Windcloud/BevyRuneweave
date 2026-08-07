@@ -233,7 +233,6 @@ const fn active_language() -> &'static str {
 }
 
 /// Requests a BMS asset reload on the runtime's next frame.
-#[unsafe(no_mangle)]
 pub extern "C" fn game_runtime_request_reload() {
     RELOAD_REQUESTED.store(true, Ordering::Release);
 }
@@ -243,7 +242,6 @@ pub extern "C" fn game_runtime_request_reload() {
 /// # Safety
 ///
 /// `script_path` must point to a valid, NUL-terminated UTF-8 string for the duration of this call.
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn game_runtime_run(script_path: *const c_char) -> c_int {
     if script_path.is_null() {
         return 1;

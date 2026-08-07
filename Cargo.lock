@@ -339,6 +339,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy-runeweave-runtime-cdylib"
+version = "0.1.0"
+dependencies = [
+ "bevy-runeweave",
+]
+
+[[package]]
+name = "bevy-runeweave-runtime-staticlib"
+version = "0.1.0"
+dependencies = [
+ "bevy-runeweave",
+]
+
+[[package]]
 name = "bevy_a11y"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

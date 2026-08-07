@@ -12,6 +12,8 @@ autobins = false
 
 [workspace]
 members = [
+    "crates/runtime-cdylib",
+    "crates/runtime-staticlib",
     "bevy_mod_scripting",
     "bevy_mod_scripting/crates/bevy_mod_scripting_asset",
     "bevy_mod_scripting/crates/bevy_mod_scripting_bindings",
@@ -94,7 +96,7 @@ missing_docs = "deny"
 
 [lib]
 name = "bevy_runeweave"
-crate-type = ["rlib", "cdylib", "staticlib"]
+crate-type = ["rlib"]
 
 [features]
 # Keep the root package feature-neutral so IDEs can select one runtime without

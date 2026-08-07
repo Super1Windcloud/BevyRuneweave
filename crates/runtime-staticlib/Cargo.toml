@@ -1,0 +1,19 @@
+[package]
+name = "bevy-runeweave-runtime-staticlib"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "bevy_runeweave"
+crate-type = ["staticlib"]
+
+[features]
+default = []
+js = ["bevy-runeweave/js"]
+typescript = ["bevy-runeweave/typescript"]
+lua = ["bevy-runeweave/lua"]
+luau = ["bevy-runeweave/luau"]
+
+[dependencies]
+bevy-runeweave = { path = "../..", default-features = false }

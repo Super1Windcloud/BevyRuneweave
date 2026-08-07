@@ -154,5 +154,39 @@ just ts-build
 发布构建使用 `just build`，也可以用 `just build-lua`、`just build-luau`、
 `just build-js` 或 `just build-ts` 单独构建。
 
-共享库仍可产出 `rlib`、`cdylib` 和 `staticlib`，C 头文件位于
-`include/game_runtime.h`。
+## 跨平台运行时
+
+`scripts/build-runtime.sh` 将 C ABI 运行时、头文件和对应语言的游戏资源一起归档到
+`dist/runtimes/<platform>/<language>/`。每种语言会独立构建，避免 Lua 5.5 与 Luau
+后端的互斥 feature 被 Cargo 合并。
+
+```bash
+# 构建某个平台的全部语言运行时
+just build-runtime-macos
+just build-runtime-windows
+just build-runtime-linux
+just build-runtime-android
+just build-runtime-ios
+
+# 只构建一个语言，或通过统一入口指定平台
+just build-runtime-android js
+just build-runtime linux typescript
+```
+
+Windows 和 Linux 在对应宿主机上可直接构建；从其他系统交叉构建时需安装 Zig 与
+`cargo-zigbuild`，Windows 上运行脚本需要 Git Bash。Android 需要 `cargo-ndk`、
+Android NDK 和
+`ANDROID_NDK_HOME`，默认构建 `arm64-v8a`、`armeabi-v7a`、`x86_64`，最低 API 为
+26。iOS 只能在安装 Xcode 的 macOS 上构建，默认生成包含 arm64 真机和 Apple Silicon
+模拟器 slice 的 `BevyRuneweave.xcframework`。可通过脚本帮助中列出的环境变量覆盖
+目标架构和输出目录：
+
+```bash
+scripts/build-runtime.sh --help
+ANDROID_ABIS=arm64-v8a just build-runtime-android luau
+IOS_SIMULATOR_TARGETS=aarch64-apple-ios-sim,x86_64-apple-ios just build-runtime-ios js
+```
+
+框架主库产出供 Rust 项目使用的 `rlib`；`crates/runtime-cdylib` 为
+Windows、macOS、Linux 和 Android 生成动态库，`crates/runtime-staticlib` 为桌面端
+和 iOS 生成静态库。宿主使用的 C 头文件位于 `include/game_runtime.h`。

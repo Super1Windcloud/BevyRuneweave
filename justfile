@@ -164,5 +164,29 @@ build-ts: ts-build
 # Build all four games in release mode.
 build: build-lua build-luau build-js build-ts
 
+# Package one platform runtime (platform: windows/macos/linux/android/ios/all).
+build-runtime platform language="all":
+    bash scripts/build-runtime.sh "{{platform}}" "{{language}}"
+
+# Package Windows runtimes for one language or all languages.
+build-runtime-windows language="all":
+    bash scripts/build-runtime.sh windows "{{language}}"
+
+# Package macOS runtimes for one language or all languages.
+build-runtime-macos language="all":
+    bash scripts/build-runtime.sh macos "{{language}}"
+
+# Package Linux runtimes for one language or all languages.
+build-runtime-linux language="all":
+    bash scripts/build-runtime.sh linux "{{language}}"
+
+# Package Android runtimes for one language or all languages.
+build-runtime-android language="all":
+    bash scripts/build-runtime.sh android "{{language}}"
+
+# Package iOS XCFramework runtimes for one language or all languages.
+build-runtime-ios language="all":
+    bash scripts/build-runtime.sh ios "{{language}}"
+
 # Run formatting, project checks, and gameplay tests.
 verify: fmt-check bms-check check bms-test test
