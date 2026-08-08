@@ -330,10 +330,23 @@ fn platform_data_root() -> Result<PathBuf, String> {
 }
 
 fn active_assets_root() -> Result<PathBuf, String> {
-    let installed = platform_data_root()?.join("assets");
-    if installed.join(CONFIG_FILE).is_file() {
-        load_config(&installed)?;
-        return Ok(installed);
+    let installed_root = platform_data_root()?;
+    fs::create_dir_all(&installed_root).map_err(|error| error.to_string())?;
+    let legacy = installed_root.join("assets");
+    if legacy.join(CONFIG_FILE).is_file() {
+        load_config(&legacy)?;
+        return Ok(legacy);
+    }
+    let mut installed = fs::read_dir(&installed_root)
+        .map_err(|error| error.to_string())?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path().join("assets"))
+        .filter(|path| path.join(CONFIG_FILE).is_file())
+        .collect::<Vec<_>>();
+    installed.sort();
+    if let Some(path) = installed.into_iter().next() {
+        load_config(&path)?;
+        return Ok(path);
     }
     if let Ok(bundled) = bundled_assets_root() {
         load_config(&bundled)?;
@@ -626,7 +639,33 @@ fn download_and_install(url: &str) -> Result<(), String> {
     let bytes = response
         .bytes()
         .map_err(|error| format!("Could not read download: {error}"))?;
-    install_package(&bytes, &source_name, &root.join("assets"))
+    let project_root = root.join(project_name(&source_name)?);
+    let assets = project_root.join("assets");
+    fs::create_dir_all(&project_root).map_err(|error| error.to_string())?;
+    install_package(&bytes, &source_name, &assets)
+}
+
+fn project_name(source_name: &str) -> Result<String, String> {
+    let file_name = Path::new(source_name)
+        .file_name()
+        .and_then(OsStr::to_str)
+        .ok_or_else(|| "Downloaded package has no valid project name".to_owned())?;
+    let name = file_name
+        .strip_suffix(".zip")
+        .or_else(|| file_name.strip_suffix(".tar"))
+        .or_else(|| file_name.strip_suffix(".7z"))
+        .or_else(|| file_name.strip_suffix(".rar"))
+        .unwrap_or(file_name);
+    if name.is_empty()
+        || name == "."
+        || name == ".."
+        || !name.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
+        })
+    {
+        return Err(format!("Invalid project name in package: {file_name}"));
+    }
+    Ok(name.to_owned())
 }
 
 fn install_package(bytes: &[u8], source_name: &str, destination: &Path) -> Result<(), String> {
@@ -881,6 +920,15 @@ mod tests {
         assert!(destination.join(CONFIG_FILE).is_file());
         assert!(destination.join("shooter.js").is_file());
         assert!(!destination.join("stale.txt").exists());
+    }
+
+    #[test]
+    fn derives_project_directory_from_archive_name() {
+        assert_eq!(
+            project_name("script-squadron-typescript.zip").unwrap(),
+            "script-squadron-typescript"
+        );
+        assert!(project_name("bad project.zip").is_err());
     }
 
     #[test]
