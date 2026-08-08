@@ -180,12 +180,14 @@ class MainActivity : Activity() {
         val script = config.getJSONObject("script")
         val language = script.getString("language")
         check(language in setOf("js", "typescript", "lua")) { "Unsupported script language" }
-        check(language == BuildConfig.RUNEWEAVE_LANGUAGE) {
-            "Package language $language does not match the ${BuildConfig.RUNEWEAVE_LANGUAGE} runtime"
-        }
         val entry = script.getString("entry")
         check(entry.isNotBlank() && !entry.startsWith('/') && !entry.split('/').contains("..")) {
             "script.entry must stay inside assets"
+        }
+        val extension = File(entry).extension.lowercase()
+        check((language == "lua" && extension == "lua") ||
+            (language in setOf("js", "typescript") && extension in setOf("js", "mjs"))) {
+            "script.language does not match the entry extension"
         }
         check(File(assets, entry).isFile) { "Script entry does not exist: $entry" }
     }

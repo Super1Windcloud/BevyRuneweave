@@ -147,24 +147,28 @@ just ts-build
 `package-lock.json` 固定 TypeScript 7.0.2；编译后的 `assets/shooter.js` 已纳入
 项目，因此只运行游戏时不需要全局安装 `tsc`。
 
-发布构建使用 `just build`，也可以用 `just build-lua`、`just build-js` 或 `just build-ts` 单独构建。
+构建默认使用 debug profile；显式追加 `--release` 才使用 release profile。可执行
+`just build` 构建全部游戏，也可以用 `just build-lua`、`just build-js` 或 `just build-ts`
+单独构建，例如 `just build-ts --release`。
 
 ## 跨平台运行时
 
-`scripts/build-runtime.ts` 将 C ABI 运行时、头文件和对应语言的游戏资源一起归档到
-`dist/runtimes/<platform>/<language>/`。每种语言会独立构建。
+`scripts/build-runtime.ts` 将 C ABI 运行时和头文件归档到
+`dist/runtimes/<platform>/<architecture>/`。每个平台架构只生成一个同时包含 Lua 5.5 与
+QuickJS 的运行时；JavaScript 和编译后的 TypeScript 都由 QuickJS 执行。
+所有 runtime 命令默认打包 debug；追加 `--release` 才打包 release，例如
+`just build-runtime-macos --release`。
 
 ```bash
-# 构建某个平台的全部语言运行时
+# 构建某个平台的统一运行时
 just build-runtime-macos
 just build-runtime-windows
 just build-runtime-linux
 just build-runtime-android
 just build-runtime-ios
 
-# 只构建一个语言，或通过统一入口指定平台
-just build-runtime-android js
-just build-runtime linux typescript
+# 通过统一入口指定平台
+just build-runtime linux
 ```
 
 Windows 和 Linux 在对应宿主机上可直接构建；从其他系统交叉构建时需安装 Zig 与
@@ -177,8 +181,8 @@ Android NDK 和
 
 ```bash
 npm exec -- tsx scripts/build-runtime.ts --help
-ANDROID_ABIS=arm64-v8a just build-runtime-android lua
-IOS_SIMULATOR_TARGETS=aarch64-apple-ios-sim,x86_64-apple-ios just build-runtime-ios js
+ANDROID_ABIS=arm64-v8a just build-runtime-android
+IOS_SIMULATOR_TARGETS=aarch64-apple-ios-sim,x86_64-apple-ios just build-runtime-ios
 ```
 
 框架主库产出供 Rust 项目使用的 `rlib`；`crates/runtime-cdylib` 为 Windows、macOS、
@@ -188,7 +192,7 @@ XCFramework。宿主使用的 C 头文件位于 `include/game_runtime.h`。
 独立示例 `examples/desktop-demo-host` 在 Windows、macOS 和 Linux 上通过
 `assets/engineConfig.json` 选择脚本语言和入口。执行对应平台的
 `just build-runtime-unified-{windows,macos,linux}` 会生成一个供用户启动的
-`bevy-runeweave-runtime`（Windows 为 `.exe`），并在其 `lib` 目录中打包三个语言后端。
+`bevy-runeweave-runtime`（Windows 为 `.exe`），并在其 `lib` 目录中打包一个统一运行时库。
 资源下载支持 ZIP、tar、gzip、zstd、xz，以及只读解包的 7z 和 RAR；RAR 原生后端仅在
 Windows、macOS 和 Linux 构建。
 
@@ -211,18 +215,17 @@ Windows、macOS 和 Linux 构建。
 `assets` 内的相对路径。`metadata` 可承载游戏项目需要的其他 JSON 元数据。
 
 移动端宿主同样位于 `examples/`。`examples/android-demo-host` 提供 Kotlin 下载页，
-安全解压发布 ZIP 到应用私有目录后，跳转 Rust `NativeActivity` 启动 Bevy；默认编译
-TypeScript，可通过 `just build-android-demo lua arm64-v8a` 等参数选择单一语言和 ABI。
+安全解压发布 ZIP 到应用私有目录后，跳转 Rust `NativeActivity` 启动 Bevy。APK 内置统一
+运行时，可通过 `just build-android-demo arm64-v8a` 等参数选择 ABI，无需选择脚本语言。
 Android 需要 SDK、NDK、`cargo-ndk` 以及相应 Rust target。
 
 `examples/ios-demo-host` 是独立 Xcode 工程。由于 winit 必须自行首次调用
 `UIApplicationMain`，iOS 不能先显示 SwiftUI/UIKit 下载页再进入 Bevy，因此示例将
 `projects/ts/assets` 作为包内资源，并在 UIKit 启动前校验 `engineConfig.json`。执行
-`just build-ios-demo` 会先生成 TypeScript XCFramework，再构建模拟器应用。iOS 静态链接
-时一次只能选择一种脚本运行时。
+`just build-ios-demo` 会先生成同时包含 Lua 与 QuickJS 的 XCFramework，再构建模拟器应用。
 
 移动宿主使用 `game_runtime_run_with_assets(asset_root, script_path)` 显式传递资源目录；
 旧的 `game_runtime_run(script_path)` 继续为依赖当前工作目录的桌面宿主保留。
 
-Rust 宿主窗口默认嵌入 Bevy 官方图标。运行时窗口图标在 Windows 和 Linux/X11
-生效；macOS Dock 图标以及 Android/iOS 应用图标仍应由宿主应用包配置。
+所有示例宿主统一使用 `assets/branding/bevy_icon.png`：Windows/Linux 设置运行时窗口图标，
+macOS 设置 Dock 图标，Android 与 iOS 使用各自平台生成的 launcher/AppIcon 资源。

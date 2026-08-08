@@ -12,7 +12,7 @@
 
 		200000000000000000000001 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		200000000000000000000002 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../../projects/ts/assets; sourceTree = "<group>"; };
-		200000000000000000000003 /* BevyRuneweave.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BevyRuneweave.xcframework; path = ../../dist/runtimes/ios/typescript/xcframework/lib/BevyRuneweave.xcframework; sourceTree = "<group>"; };
+		200000000000000000000003 /* BevyRuneweave.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BevyRuneweave.xcframework; path = ../../dist/runtimes/ios/xcframework/lib/BevyRuneweave.xcframework; sourceTree = "<group>"; };
 		200000000000000000000004 /* BevyRuneweave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BevyRuneweave.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		200000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = ../Info.plist; sourceTree = "<group>"; };
 		200000000000000000000006 /* Runtime.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Runtime.xcconfig; sourceTree = "<group>"; };

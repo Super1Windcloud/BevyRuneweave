@@ -31,16 +31,6 @@ enum Language {
     Lua,
 }
 
-impl Language {
-    fn directory(self) -> &'static str {
-        match self {
-            Self::Js => "js",
-            Self::TypeScript => "typescript",
-            Self::Lua => "lua",
-        }
-    }
-}
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EngineConfig {
@@ -52,7 +42,8 @@ struct EngineConfig {
 
 #[derive(Deserialize)]
 struct ScriptConfig {
-    language: Language,
+    #[serde(rename = "language")]
+    _language: Language,
     entry: PathBuf,
 }
 
@@ -522,13 +513,11 @@ fn run_game() -> Result<(), String> {
         .parent()
         .map(Path::to_path_buf)
         .ok_or_else(|| "Could not determine the launcher directory".to_owned())?;
-    let language = config.script.language.directory();
     let library_name = runtime_library_name();
-    let bundled = executable_dir.join("lib").join(language).join(library_name);
+    let bundled = executable_dir.join("lib").join(library_name);
     let development = root
         .join("dist/runtimes")
         .join(platform_directory())
-        .join(language)
         .join(BUILD_TARGET)
         .join("lib")
         .join(library_name);

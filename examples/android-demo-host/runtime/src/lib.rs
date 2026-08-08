@@ -5,14 +5,6 @@ use bevy::prelude::bevy_main;
 #[cfg(target_os = "android")]
 use serde::Deserialize;
 
-#[cfg(not(any(feature = "js", feature = "typescript", feature = "lua")))]
-compile_error!("enable exactly one scripting feature: js, typescript, or lua");
-#[cfg(any(
-    all(feature = "js", any(feature = "typescript", feature = "lua")),
-    all(feature = "typescript", feature = "lua")
-))]
-compile_error!("the js, typescript, and lua features are mutually exclusive");
-
 #[cfg(target_os = "android")]
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,25 +41,18 @@ fn run_android() {
     .expect("failed to parse engineConfig.json");
 
     assert_eq!(config.schema_version, 1, "unsupported engineConfig schema");
-    assert_eq!(
-        config.script.language,
-        active_language(),
-        "asset language does not match the compiled Android runtime"
+    let extension = config
+        .script
+        .entry
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    assert!(
+        matches!(
+            (config.script.language.as_str(), extension),
+            ("lua", "lua") | ("js" | "typescript", "js" | "mjs")
+        ),
+        "asset language does not match the script entry extension"
     );
     bevy_runeweave::run_with_assets(assets, config.script.entry);
-}
-
-#[cfg(all(target_os = "android", feature = "js"))]
-const fn active_language() -> &'static str {
-    "js"
-}
-
-#[cfg(all(target_os = "android", feature = "typescript"))]
-const fn active_language() -> &'static str {
-    "typescript"
-}
-
-#[cfg(all(target_os = "android", feature = "lua"))]
-const fn active_language() -> &'static str {
-    "lua"
 }

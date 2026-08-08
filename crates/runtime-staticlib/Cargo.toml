@@ -9,7 +9,8 @@ name = "bevy_runeweave"
 crate-type = ["staticlib"]
 
 [features]
-default = []
+default = ["unified"]
+unified = ["bevy-runeweave/unified"]
 js = ["bevy-runeweave/js"]
 typescript = ["bevy-runeweave/typescript"]
 lua = ["bevy-runeweave/lua"]

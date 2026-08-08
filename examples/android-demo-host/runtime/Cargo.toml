@@ -11,10 +11,8 @@ crate-type = ["cdylib"]
 [workspace]
 
 [features]
-default = ["typescript"]
-js = ["bevy-runeweave/js"]
-typescript = ["bevy-runeweave/typescript"]
-lua = ["bevy-runeweave/lua"]
+default = ["unified"]
+unified = ["bevy-runeweave/unified"]
 
 [dependencies]
 bevy = { version = "0.19.0", default-features = false, features = ["android-native-activity"] }

@@ -1,10 +1,7 @@
-#[cfg(not(any(feature = "js", feature = "typescript", feature = "lua",)))]
-compile_error!("enable exactly one scripting feature: js, typescript, or lua");
-#[cfg(any(
-    all(feature = "js", any(feature = "typescript", feature = "lua")),
-    all(feature = "typescript", feature = "lua")
-))]
-compile_error!("the js, typescript, and lua features are mutually exclusive");
+#[cfg(not(any(feature = "js", feature = "typescript", feature = "lua")))]
+compile_error!("enable a scripting feature: unified, js, typescript, or lua");
+#[cfg(all(feature = "js", feature = "typescript"))]
+compile_error!("the js and typescript features select the same QuickJS backend");
 
 pub mod ecs_api;
 mod example_host;

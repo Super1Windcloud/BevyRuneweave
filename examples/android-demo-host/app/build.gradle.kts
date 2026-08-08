@@ -6,8 +6,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val runtimeLanguage = providers.gradleProperty("runeweaveLanguage").orElse("typescript")
 val runtimeAbis = providers.gradleProperty("runeweaveAbis").orElse("arm64-v8a,x86_64")
+val requestedRelease = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+val releaseRuntime = providers.gradleProperty("runeweaveRelease").map(String::toBoolean).orElse(requestedRelease)
 val rustJniLibs = layout.buildDirectory.dir("generated/rustJniLibs")
 
 android {
@@ -20,12 +21,9 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("String", "RUNEWEAVE_LANGUAGE", "\"${runtimeLanguage.get()}\"")
     }
 
     sourceSets["main"].jniLibs.srcDir(rustJniLibs)
-    buildFeatures.buildConfig = true
-
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -54,20 +52,23 @@ val buildRustHost by tasks.registering(Exec::class) {
         rootProject.fileTree("../../bevy_mod_scripting") { exclude("**/target/**") },
         manifest,
     )
-    inputs.property("language", runtimeLanguage)
     inputs.property("abis", abis)
+    inputs.property("release", releaseRuntime)
     outputs.dir(output)
 
     doFirst { output.deleteRecursively() }
+    val profileArgs = if (releaseRuntime.get()) listOf("--release") else emptyList()
     commandLine(
         listOf("cargo", "ndk") +
             abis.flatMap { listOf("-t", it) } +
             listOf(
                 "-P", "26",
                 "-o", output.absolutePath,
-                "build", "--release",
+                "build",
+            ) + profileArgs +
+            listOf(
                 "--manifest-path", manifest.absolutePath,
-                "--no-default-features", "--features", runtimeLanguage.get(),
+                "--no-default-features", "--features", "unified",
             )
     )
 }

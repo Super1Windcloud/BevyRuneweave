@@ -104,6 +104,7 @@ default = []
 js = ["bevy_mod_scripting/quickjs"]
 typescript = ["bevy_mod_scripting/typescript"]
 lua = ["bevy_mod_scripting/lua"]
+unified = ["js", "lua"]
 
 [dependencies]
 # This is Bevy's `2d` feature set with `default_platform` expanded so the
@@ -142,9 +143,35 @@ objc2 = "0.6.4"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSApplication", "NSBitmapImageRep", "NSGraphics", "NSImage", "NSImageRep", "NSResponder"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSGeometry"] }
 
-[profile.dev]
-opt-level = 1
 
+[profile.dev]
+debug = 0
+
+#最快编译时间
 [profile.release]
-lto = "thin"
-strip = "symbols"
+lto = false
+codegen-units = 256
+panic = "abort"
+debug = 0
+
+# 最快运行性能
+[profile.perf]
+inherits = "release"
+opt-level = 3
+debug = false
+strip = "none"
+lto = true
+codegen-units = 1
+incremental = false
+panic = "abort"
+
+# 最小二进制
+[profile.minsize]
+inherits = "release"
+opt-level = "z"
+debug = false
+strip = true
+lto = true
+codegen-units = 1
+incremental = false
+panic = "abort"

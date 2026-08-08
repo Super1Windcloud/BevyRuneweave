@@ -1,4 +1,3 @@
-RUNEWEAVE_LANGUAGE = typescript
 IPHONEOS_DEPLOYMENT_TARGET = 13.0
 PRODUCT_BUNDLE_IDENTIFIER = io.github.super1windcloud.runeweave.demo
 PRODUCT_NAME = BevyRuneweave

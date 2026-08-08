@@ -22,8 +22,9 @@ Change the Rust runtime or host only when the scripting API cannot provide the r
 - `just fmt-check` verifies Rust formatting; `just check` checks all three language projects.
 - `just test` runs runtime gameplay tests for JS, TypeScript, and Lua.
 - `just verify` runs the complete formatting, check, and test suite.
-- `just build-runtime-unified-{windows,macos,linux}` builds one desktop launcher with all three language libraries.
-- `just build-android-demo` and `just build-ios-demo` build the native TypeScript host examples.
+- `just build-runtime-unified-{windows,macos,linux}` builds one desktop launcher with one Lua/QuickJS runtime library.
+- `just build-android-demo` and `just build-ios-demo` build native hosts using the unified runtime.
+- All build recipes default to debug; pass `--release` explicitly for release artifacts.
 - `npm run release:assets` packages assets and uploads same-named Release assets using `.env` credentials.
 
 ## Configuration and Assets

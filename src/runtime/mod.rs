@@ -28,10 +28,10 @@ use crate::{
     example_host::ScriptSquadronHostPlugin,
 };
 
-#[cfg(all(not(any(feature = "js", feature = "typescript")), feature = "lua"))]
-use bevy_mod_scripting::lua::LuaScriptingPlugin as ActiveScriptingPlugin;
+#[cfg(feature = "lua")]
+use bevy_mod_scripting::lua::LuaScriptingPlugin;
 #[cfg(any(feature = "js", feature = "typescript"))]
-use bevy_mod_scripting::quickjs::QuickJsScriptingPlugin as ActiveScriptingPlugin;
+use bevy_mod_scripting::quickjs::QuickJsScriptingPlugin;
 
 static RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
 
@@ -207,9 +207,21 @@ fn normalize_script_path(asset_root: &Path, path: &Path) -> Result<PathBuf, Stri
     Ok(relative.to_path_buf())
 }
 
+fn script_backend(path: &Path) -> Result<&'static str, String> {
+    match path.extension().and_then(|extension| extension.to_str()) {
+        #[cfg(any(feature = "js", feature = "typescript"))]
+        Some("js" | "mjs") => Ok("QuickJS"),
+        #[cfg(feature = "lua")]
+        Some("lua") => Ok("Lua 5.5"),
+        Some(extension) => Err(format!("unsupported script extension: .{extension}")),
+        None => Err("script path must have a supported extension".to_owned()),
+    }
+}
+
 /// Builds the Bevy application without starting its platform event loop.
 pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Result<App, String> {
     let asset_path = normalize_script_path(&asset_root, &script_path)?;
+    let backend = script_backend(&asset_path)?;
     if !asset_root.is_dir() {
         return Err(format!(
             "asset directory does not exist: {}",
@@ -219,7 +231,10 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
 
     let mut app = App::new();
     let scripting_plugins = BMSPlugin.build();
-    let scripting_plugins = scripting_plugins.disable::<ActiveScriptingPlugin>();
+    #[cfg(any(feature = "js", feature = "typescript"))]
+    let scripting_plugins = scripting_plugins.disable::<QuickJsScriptingPlugin>();
+    #[cfg(feature = "lua")]
+    let scripting_plugins = scripting_plugins.disable::<LuaScriptingPlugin>();
 
     app.add_plugins(
         DefaultPlugins
@@ -230,7 +245,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             })
             .set(WindowPlugin {
                 primary_window: Some(Window {
-                    title: format!("Script Squadron - {}", active_language()),
+                    title: format!("Script Squadron - {backend}"),
                     resolution: WindowResolution::new(WINDOW_WIDTH, WINDOW_HEIGHT),
                     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
                     position: WindowPosition::Centered(MonitorSelection::Primary),
@@ -263,7 +278,10 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         (
             request_asset_reload,
             emit_update,
-            event_handler::<OnUpdate, ActiveScriptingPlugin>,
+            #[cfg(any(feature = "js", feature = "typescript"))]
+            event_handler::<OnUpdate, QuickJsScriptingPlugin>,
+            #[cfg(feature = "lua")]
+            event_handler::<OnUpdate, LuaScriptingPlugin>,
         )
             .chain()
             .before(ApplyEcsCommands),
@@ -305,15 +323,6 @@ pub const fn default_script_path() -> &'static str {
     return "assets/shooter.js";
     #[cfg(all(not(any(feature = "js", feature = "typescript")), feature = "lua"))]
     return "assets/shooter.lua";
-}
-
-const fn active_language() -> &'static str {
-    #[cfg(feature = "js")]
-    return "QuickJS";
-    #[cfg(all(not(feature = "js"), feature = "typescript"))]
-    return "TypeScript / QuickJS";
-    #[cfg(all(not(any(feature = "js", feature = "typescript")), feature = "lua"))]
-    return "Lua 5.5";
 }
 
 /// Requests a BMS asset reload on the runtime's next frame.
@@ -402,5 +411,14 @@ mod tests {
         assert!(source_has_changed(Some(first), Some(second)));
         assert!(source_has_changed(None, Some(first)));
         assert!(!source_has_changed(Some(first), None));
+    }
+
+    #[cfg(all(feature = "lua", any(feature = "js", feature = "typescript")))]
+    #[test]
+    fn unified_runtime_routes_lua_and_quickjs_scripts() -> Result<(), String> {
+        assert_eq!(script_backend(Path::new("shooter.lua"))?, "Lua 5.5");
+        assert_eq!(script_backend(Path::new("shooter.js"))?, "QuickJS");
+        assert_eq!(script_backend(Path::new("shooter.mjs"))?, "QuickJS");
+        Ok(())
     }
 }

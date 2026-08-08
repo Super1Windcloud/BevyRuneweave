@@ -126,40 +126,43 @@ fmt-check:
 clean-bms:
     cargo clean {{bms_packages}}
 
-# Build the Lua 5.5 game in release mode.
-build-lua:
-    cargo build --release -p script-squadron-lua
+# Build the Lua 5.5 game (debug by default).
+build-lua profile="":
+    cargo build {{profile}} -p script-squadron-lua
 
-# Build the JavaScript game in release mode.
-build-js:
-    cargo build --release -p script-squadron-js
+# Build the JavaScript game (debug by default).
+build-js profile="":
+    cargo build {{profile}} -p script-squadron-js
 
-# Compile TypeScript and build its game in release mode.
-build-ts: ts-build
-    cargo build --release -p script-squadron-typescript
+# Compile TypeScript and build its game (debug by default).
+build-ts profile="": ts-build
+    cargo build {{profile}} -p script-squadron-typescript
 
-# Build all three games in release mode.
-build: build-lua build-js build-ts
+# Build all three games (debug by default).
+build profile="":
+    just build-lua {{profile}}
+    just build-js {{profile}}
+    just build-ts {{profile}}
 
-# Package one platform runtime (platform: windows/macos/linux/android/ios/all).
-build-runtime platform language="all":
-    npm exec -- tsx scripts/build-runtime.ts "{{platform}}" "{{language}}"
+# Package one unified runtime for a platform (windows/macos/linux/android/ios/all).
+build-runtime platform profile="":
+    npm exec -- tsx scripts/build-runtime.ts "{{platform}}" {{profile}}
 
-# Package Windows runtimes for one language or all languages.
-build-runtime-windows language="all":
-    npm exec -- tsx scripts/build-runtime.ts windows "{{language}}"
+# Package the Windows runtime with Lua and QuickJS.
+build-runtime-windows profile="":
+    npm exec -- tsx scripts/build-runtime.ts windows {{profile}}
 
-# Build one Windows launcher executable backed by all three language runtimes.
-build-runtime-unified-windows:
-    npm exec -- tsx scripts/build-runtime.ts unified-windows
+# Build one Windows launcher executable backed by the unified runtime.
+build-runtime-unified-windows profile="":
+    npm exec -- tsx scripts/build-runtime.ts unified-windows {{profile}}
 
-# Build one macOS launcher executable backed by all three language runtimes.
-build-runtime-unified-macos:
-    npm exec -- tsx scripts/build-runtime.ts unified-macos
+# Build one macOS launcher executable backed by the unified runtime.
+build-runtime-unified-macos profile="":
+    npm exec -- tsx scripts/build-runtime.ts unified-macos {{profile}}
 
-# Build one Linux launcher executable backed by all three language runtimes.
-build-runtime-unified-linux:
-    npm exec -- tsx scripts/build-runtime.ts unified-linux
+# Build one Linux launcher executable backed by the unified runtime.
+build-runtime-unified-linux profile="":
+    npm exec -- tsx scripts/build-runtime.ts unified-linux {{profile}}
 
 # Package language assets and optionally upload them to a GitHub release.
 package-assets language="all" tag="0.0.1":
@@ -177,30 +180,30 @@ package-assets-lua tag="0.0.1":
 upload-assets tag="0.0.1":
     npm exec -- tsx --env-file=.env scripts/publish-release.ts --tag="{{tag}}"
 
-# Package macOS runtimes for one language or all languages.
-build-runtime-macos language="all":
-    npm exec -- tsx scripts/build-runtime.ts macos "{{language}}"
+# Package the macOS runtime with Lua and QuickJS.
+build-runtime-macos profile="":
+    npm exec -- tsx scripts/build-runtime.ts macos {{profile}}
 
-# Package Linux runtimes for one language or all languages.
-build-runtime-linux language="all":
-    npm exec -- tsx scripts/build-runtime.ts linux "{{language}}"
+# Package the Linux runtime with Lua and QuickJS.
+build-runtime-linux profile="":
+    npm exec -- tsx scripts/build-runtime.ts linux {{profile}}
 
-# Package Android runtimes for one language or all languages.
-build-runtime-android language="all":
-    npm exec -- tsx scripts/build-runtime.ts android "{{language}}"
+# Package the Android runtime with Lua and QuickJS.
+build-runtime-android profile="":
+    npm exec -- tsx scripts/build-runtime.ts android {{profile}}
 
-# Package iOS XCFramework runtimes for one language or all languages.
-build-runtime-ios language="all":
-    npm exec -- tsx scripts/build-runtime.ts ios "{{language}}"
+# Package the iOS XCFramework with Lua and QuickJS.
+build-runtime-ios profile="":
+    npm exec -- tsx scripts/build-runtime.ts ios {{profile}}
 
-# Build the standalone Android host and its Rust NativeActivity library.
-build-android-demo language="typescript" abis="arm64-v8a,x86_64":
-    examples/android-demo-host/gradlew -p examples/android-demo-host :app:assembleDebug -PruneweaveLanguage="{{language}}" -PruneweaveAbis="{{abis}}"
+# Build the standalone Android host and its Rust NativeActivity library (debug by default).
+build-android-demo profile="" abis="arm64-v8a,x86_64":
+    examples/android-demo-host/gradlew -p examples/android-demo-host :app:{{ if profile == "--release" { "assembleRelease" } else { "assembleDebug" } }} -PruneweaveAbis="{{abis}}" -PruneweaveRelease="{{ if profile == "--release" { "true" } else { "false" } }}"
 
-# Build the TypeScript iOS XCFramework and standalone simulator host app.
-build-ios-demo:
-    npm exec -- tsx scripts/build-runtime.ts ios typescript
-    xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj -scheme BevyRuneweaveHost -sdk iphonesimulator -configuration Debug -derivedDataPath dist/ios-demo-derived-data CODE_SIGNING_ALLOWED=NO build
+# Build the unified iOS XCFramework and standalone simulator host app.
+build-ios-demo profile="":
+    npm exec -- tsx scripts/build-runtime.ts ios {{profile}}
+    xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj -scheme BevyRuneweaveHost -sdk iphonesimulator -configuration {{ if profile == "--release" { "Release" } else { "Debug" } }} -derivedDataPath dist/ios-demo-derived-data CODE_SIGNING_ALLOWED=NO build
 
 # Run formatting, project checks, and gameplay tests.
 verify: fmt-check bms-check check bms-test test

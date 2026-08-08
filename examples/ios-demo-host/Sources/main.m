@@ -31,16 +31,22 @@ int main(int argc, char *argv[]) {
         NSDictionary *script = config[@"script"];
         NSString *language = script[@"language"];
         NSString *entry = script[@"entry"];
-        NSString *expectedLanguage = [NSBundle mainBundle].infoDictionary[@"RuneweaveLanguage"];
-        if (![language isEqualToString:expectedLanguage]) {
-            return fail(@"asset language does not match the linked runtime", 13);
+        if (![@[ @"js", @"typescript", @"lua" ] containsObject:language]) {
+            return fail(@"unsupported script language", 13);
         }
         if (![entry isKindOfClass:NSString.class] || entry.length == 0 || entry.isAbsolutePath ||
             [entry.pathComponents containsObject:@".."]) {
             return fail(@"script.entry must stay inside assets", 14);
         }
+        NSString *extension = entry.pathExtension.lowercaseString;
+        BOOL isLua = [language isEqualToString:@"lua"] && [extension isEqualToString:@"lua"];
+        BOOL isQuickJs = ([@[ @"js", @"typescript" ] containsObject:language] &&
+                          [@[ @"js", @"mjs" ] containsObject:extension]);
+        if (!isLua && !isQuickJs) {
+            return fail(@"script language does not match the entry extension", 15);
+        }
         if (![[NSFileManager defaultManager] fileExistsAtPath:[assets stringByAppendingPathComponent:entry]]) {
-            return fail(@"script entry does not exist", 15);
+            return fail(@"script entry does not exist", 16);
         }
 
         return game_runtime_run_with_assets(assets.fileSystemRepresentation,
