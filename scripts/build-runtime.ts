@@ -66,7 +66,7 @@ function android(language: Language) {
   for (const abi of values("ANDROID_ABIS", "arm64-v8a,armeabi-v7a,x86_64")) {
     const target = mapping[abi]; if (!target) throw new Error(`Unsupported Android ABI: ${abi}`); requireTarget(target);
     const destination = fresh("android", language, abi);
-    run("cargo", ["ndk", "-t", abi, "-p", process.env.ANDROID_PLATFORM ?? "26", "-o", join(destination, "lib"), "build", "--release", "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--no-default-features", "--features", language]);
+    run("cargo", ["ndk", "-t", abi, "-P", process.env.ANDROID_PLATFORM ?? "26", "-o", join(destination, "lib"), "build", "--release", "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--no-default-features", "--features", language]);
     const nested = join(destination, "lib", abi, "libbevy_runeweave.so");
     if (!existsSync(nested)) throw new Error(`Android runtime was not produced for ${abi}`);
     renameSync(nested, join(destination, "lib", "libbevy_runeweave.so")); rmSync(join(destination, "lib", abi), { recursive: true });

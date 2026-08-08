@@ -1,0 +1,157 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+		100000000000000000000001 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000001 /* main.m */; };
+		100000000000000000000002 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000002 /* assets */; };
+		100000000000000000000003 /* BevyRuneweave.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 200000000000000000000003 /* BevyRuneweave.xcframework */; };
+		100000000000000000000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000007 /* Assets.xcassets */; };
+
+		200000000000000000000001 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		200000000000000000000002 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../../projects/ts/assets; sourceTree = "<group>"; };
+		200000000000000000000003 /* BevyRuneweave.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BevyRuneweave.xcframework; path = ../../dist/runtimes/ios/typescript/xcframework/lib/BevyRuneweave.xcframework; sourceTree = "<group>"; };
+		200000000000000000000004 /* BevyRuneweave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BevyRuneweave.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		200000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = ../Info.plist; sourceTree = "<group>"; };
+		200000000000000000000006 /* Runtime.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Runtime.xcconfig; sourceTree = "<group>"; };
+		200000000000000000000007 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+
+		300000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (100000000000000000000003 /* BevyRuneweave.xcframework in Frameworks */,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		300000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+				files = (100000000000000000000002 /* assets in Resources */, 100000000000000000000004 /* Assets.xcassets in Resources */,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		300000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (100000000000000000000001 /* main.m in Sources */,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+		400000000000000000000001 = {
+			isa = PBXGroup;
+				children = (
+					400000000000000000000002 /* Sources */,
+					200000000000000000000007 /* Assets.xcassets */,
+					200000000000000000000002 /* assets */,
+				200000000000000000000003 /* BevyRuneweave.xcframework */,
+				400000000000000000000003 /* Config */,
+				400000000000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		400000000000000000000002 /* Sources */ = {
+			isa = PBXGroup;
+			children = (200000000000000000000001 /* main.m */,);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		400000000000000000000003 /* Config */ = {
+			isa = PBXGroup;
+			children = (200000000000000000000006 /* Runtime.xcconfig */, 200000000000000000000005 /* Info.plist */,);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		400000000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (200000000000000000000004 /* BevyRuneweave.app */,);
+			name = Products;
+			sourceTree = "<group>";
+		};
+
+		500000000000000000000001 /* BevyRuneweaveHost */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 700000000000000000000001;
+			buildPhases = (
+				300000000000000000000003 /* Sources */,
+				300000000000000000000001 /* Frameworks */,
+				300000000000000000000002 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = BevyRuneweaveHost;
+			productName = BevyRuneweave;
+			productReference = 200000000000000000000004 /* BevyRuneweave.app */;
+			productType = "com.apple.product-type.application";
+		};
+
+		600000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {500000000000000000000001 = {CreatedOnToolsVersion = 26.0;};};
+			};
+			buildConfigurationList = 700000000000000000000002;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base,);
+			mainGroup = 400000000000000000000001;
+			productRefGroup = 400000000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (500000000000000000000001 /* BevyRuneweaveHost */,);
+		};
+
+		700000000000000000000001 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (800000000000000000000001 /* Debug */, 800000000000000000000002 /* Release */,);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		700000000000000000000002 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (800000000000000000000003 /* Debug */, 800000000000000000000004 /* Release */,);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+
+		800000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 200000000000000000000006 /* Runtime.xcconfig */;
+				buildSettings = {
+					ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+					CODE_SIGNING_ALLOWED = NO;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		800000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 200000000000000000000006 /* Runtime.xcconfig */;
+				buildSettings = {
+					ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+					CODE_SIGNING_ALLOWED = NO;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		800000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {CLANG_ENABLE_MODULES = YES; ENABLE_STRICT_OBJC_MSGSEND = YES;};
+			name = Debug;
+		};
+		800000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {CLANG_ENABLE_MODULES = YES; ENABLE_STRICT_OBJC_MSGSEND = YES;};
+			name = Release;
+		};
+	};
+	rootObject = 600000000000000000000001 /* Project object */;
+}

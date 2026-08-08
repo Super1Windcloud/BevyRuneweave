@@ -12,5 +12,5 @@ mod runtime;
 
 pub use runtime::{
     build_app, build_app_with_assets, default_script_path, game_runtime_request_reload,
-    game_runtime_run, run, run_with_assets,
+    game_runtime_run, game_runtime_run_with_assets, run, run_with_assets,
 };

@@ -193,5 +193,14 @@ build-runtime-android language="all":
 build-runtime-ios language="all":
     npm exec -- tsx scripts/build-runtime.ts ios "{{language}}"
 
+# Build the standalone Android host and its Rust NativeActivity library.
+build-android-demo language="typescript" abis="arm64-v8a,x86_64":
+    examples/android-demo-host/gradlew -p examples/android-demo-host :app:assembleDebug -PruneweaveLanguage="{{language}}" -PruneweaveAbis="{{abis}}"
+
+# Build the TypeScript iOS XCFramework and standalone simulator host app.
+build-ios-demo:
+    npm exec -- tsx scripts/build-runtime.ts ios typescript
+    xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj -scheme BevyRuneweaveHost -sdk iphonesimulator -configuration Debug -derivedDataPath dist/ios-demo-derived-data CODE_SIGNING_ALLOWED=NO build
+
 # Run formatting, project checks, and gameplay tests.
 verify: fmt-check bms-check check bms-test test

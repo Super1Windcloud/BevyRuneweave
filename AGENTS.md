@@ -5,6 +5,7 @@
 - `src/` contains the Bevy runtime and ECS bindings; `bevy_mod_scripting/` contains the scripting framework.
 - `crates/runtime-cdylib` and `crates/runtime-staticlib` expose C ABI libraries for host applications.
 - `examples/desktop-demo-host` is the standalone Windows, macOS, and Linux launcher and resource downloader.
+- `examples/android-demo-host` and `examples/ios-demo-host` are standalone native mobile launchers.
 - `projects/{js,ts,lua}/` contain language examples, source, compiled scripts, and sprites.
 - `scripts/` contains TypeScript build and release tooling; `build-support/` contains Cargo Rust build helpers.
 - `include/` contains the public C header; `docs/` contains ECS API documentation.
@@ -22,6 +23,7 @@ Change the Rust runtime or host only when the scripting API cannot provide the r
 - `just test` runs runtime gameplay tests for JS, TypeScript, and Lua.
 - `just verify` runs the complete formatting, check, and test suite.
 - `just build-runtime-unified-{windows,macos,linux}` builds one desktop launcher with all three language libraries.
+- `just build-android-demo` and `just build-ios-demo` build the native TypeScript host examples.
 - `npm run release:assets` packages assets and uploads same-named Release assets using `.env` credentials.
 
 ## Configuration and Assets

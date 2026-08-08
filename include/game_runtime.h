@@ -8,6 +8,9 @@ extern "C" {
 /* Blocks until the Bevy event loop exits. Returns 0 on success. */
 int game_runtime_run(const char *script_path);
 
+/* Runs with an explicit asset directory. Both paths must be UTF-8. */
+int game_runtime_run_with_assets(const char *asset_root, const char *script_path);
+
 /* Reloads the configured script on the next frame. */
 void game_runtime_request_reload(void);
 
@@ -16,4 +19,3 @@ void game_runtime_request_reload(void);
 #endif
 
 #endif
-

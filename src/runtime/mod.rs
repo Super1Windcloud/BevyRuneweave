@@ -37,7 +37,7 @@ static RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 const WINDOW_WIDTH: u32 = 600;
 const WINDOW_HEIGHT: u32 = 800;
-#[cfg(any(target_os = "windows", target_os = "linux"))]
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
 const DEFAULT_WINDOW_ICON: &[u8] = include_bytes!("../../assets/branding/bevy_icon.png");
 
 callback_labels!(OnUpdate => "on_update");
@@ -86,6 +86,57 @@ fn set_default_window_icon(primary_window: Single<Entity, With<PrimaryWindow>>) 
             warn!("Failed to find the native primary window for its default icon");
         }
     });
+}
+
+#[cfg(target_os = "macos")]
+fn set_default_window_icon() {
+    use objc2::AnyThread as _;
+    use objc2_app_kit::{NSApplication, NSBitmapImageRep, NSDeviceRGBColorSpace, NSImage};
+    use objc2_foundation::NSSize;
+
+    let image = match image::load_from_memory(DEFAULT_WINDOW_ICON) {
+        Ok(image) => image.into_rgba8(),
+        Err(error) => {
+            warn!("Failed to decode the embedded Bevy application icon: {error}");
+            return;
+        }
+    };
+    let (width, height) = image.dimensions();
+    let mut pixels = image.into_raw();
+    let mut planes = [pixels.as_mut_ptr()];
+
+    unsafe extern "C" {
+        static NSApp: Option<&'static NSApplication>;
+    }
+
+    // SAFETY: this startup system runs on the main thread, and AppKit copies the
+    // pixel representation into the retained application image.
+    unsafe {
+        let Some(application) = NSApp else {
+            warn!("Failed to find the macOS application for its default icon");
+            return;
+        };
+        let Some(representation) = NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel(
+            NSBitmapImageRep::alloc(),
+            planes.as_mut_ptr(),
+            width as isize,
+            height as isize,
+            8,
+            4,
+            true,
+            false,
+            NSDeviceRGBColorSpace,
+            (width * 4) as isize,
+            32,
+        ) else {
+            warn!("Failed to create the macOS application icon representation");
+            return;
+        };
+        let application_icon =
+            NSImage::initWithSize(NSImage::alloc(), NSSize::new(width as f64, height as f64));
+        application_icon.addRepresentation(&representation);
+        application.setApplicationIconImage(Some(&application_icon));
+    }
 }
 
 fn source_has_changed(
@@ -184,7 +235,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
                     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
                     position: WindowPosition::Centered(MonitorSelection::Primary),
                     present_mode: PresentMode::AutoVsync,
-                    resizable: false,
+                    resizable: true,
                     ..default()
                 }),
                 ..default()
@@ -203,7 +254,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         Startup,
         (
             attach_script,
-            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
             set_default_window_icon,
         ),
     )
@@ -276,18 +327,48 @@ pub extern "C" fn game_runtime_request_reload() {
 ///
 /// `script_path` must point to a valid, NUL-terminated UTF-8 string for the duration of this call.
 pub unsafe extern "C" fn game_runtime_run(script_path: *const c_char) -> c_int {
-    if script_path.is_null() {
-        return 1;
-    }
-    // SAFETY: The caller promises a valid, NUL-terminated string for this call.
-    let path = unsafe { CStr::from_ptr(script_path) };
-    let Ok(path) = path.to_str() else {
-        return 2;
+    let script_path = match unsafe { c_path(script_path) } {
+        Ok(path) => path,
+        Err(code) => return code,
     };
-    match std::panic::catch_unwind(|| run(PathBuf::from(path))) {
+    match std::panic::catch_unwind(|| run(script_path)) {
         Ok(()) => 0,
         Err(_) => 3,
     }
+}
+
+/// C ABI entry point using an explicit asset directory.
+///
+/// # Safety
+///
+/// Both arguments must point to valid, NUL-terminated UTF-8 strings for the duration of this call.
+pub unsafe extern "C" fn game_runtime_run_with_assets(
+    asset_root: *const c_char,
+    script_path: *const c_char,
+) -> c_int {
+    let asset_root = match unsafe { c_path(asset_root) } {
+        Ok(path) => path,
+        Err(code) => return code,
+    };
+    let script_path = match unsafe { c_path(script_path) } {
+        Ok(path) => path,
+        Err(code) => return code,
+    };
+    match std::panic::catch_unwind(|| run_with_assets(asset_root, script_path)) {
+        Ok(()) => 0,
+        Err(_) => 3,
+    }
+}
+
+unsafe fn c_path(path: *const c_char) -> Result<PathBuf, c_int> {
+    if path.is_null() {
+        return Err(1);
+    }
+    // SAFETY: The caller promises a valid, NUL-terminated string for this call.
+    unsafe { CStr::from_ptr(path) }
+        .to_str()
+        .map(PathBuf::from)
+        .map_err(|_| 2)
 }
 
 #[cfg(test)]

@@ -188,7 +188,7 @@ fn load_config(assets: &Path) -> Result<EngineConfig, String> {
             .script
             .entry
             .components()
-            .any(|part| matches!(part, std::path::Component::ParentDir))
+            .any(|part| matches!(part, Component::ParentDir))
     {
         return Err("script.entry must be a relative path inside assets".to_owned());
     }
@@ -555,11 +555,15 @@ fn run_game() -> Result<(), String> {
 fn main() -> eframe::Result {
     let launch = Arc::new(AtomicBool::new(false));
     let app_launch = Arc::clone(&launch);
+    let icon =
+        eframe::icon_data::from_png_bytes(include_bytes!("../../../assets/branding/bevy_icon.png"))
+            .unwrap_or_default();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([576.0, 210.0])
+            .with_inner_size([1000.0, 693.0])
             .with_min_inner_size([420.0, 210.0])
-            .with_resizable(false),
+            .with_icon(icon)
+            .with_resizable(true),
         ..Default::default()
     };
     eframe::run_native(

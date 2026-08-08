@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join, relative, resolve, sep } from "node:path";
 import { deflateRawSync } from "node:zlib";
 
@@ -64,7 +65,12 @@ function crc32(data: Uint8Array) {
 async function main() {
   mkdirSync(output, { recursive: true });
   const archives: string[] = [];
-  for (const [directory, packageName] of projects.filter(([directory]) => language === "all" || directory === language || (language === "typescript" && directory === "ts"))) {
+  const selectedProjects = projects.filter(([directory]) => language === "all" || directory === language || (language === "typescript" && directory === "ts"));
+  if (selectedProjects.some(([directory]) => directory === "ts")) {
+    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+    execFileSync(npm, ["--prefix", join(root, "projects", "ts"), "run", "build"], { cwd: root, stdio: "inherit" });
+  }
+  for (const [directory, packageName] of selectedProjects) {
     const assets = join(root, "projects", directory, "assets");
     const archive = join(output, `${packageName}.zip`);
     if (!existsSync(assets)) throw new Error(`Missing assets directory: ${assets}`);

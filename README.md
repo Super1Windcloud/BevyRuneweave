@@ -55,6 +55,7 @@ src/                     # bevy-runeweave 框架核心与共享 Bevy 宿主
 docs/ecs-api.md          # 通用 ECS API 契约与三语言示例
 bevy_mod_scripting/      # Lua 5.5、QuickJS/TypeScript 脚本运行时
 include/                 # 可选的原生宿主 C ABI
+examples/                # 桌面、Android 与 iOS 独立宿主工程
 ```
 
 资源被有意复制到每个子项目中。运行时使用子项目传入的绝对资源根目录，
@@ -208,6 +209,20 @@ Windows、macOS 和 Linux 构建。
 
 `script.language` 支持 `js`、`typescript`、`lua`；`script.entry` 必须是
 `assets` 内的相对路径。`metadata` 可承载游戏项目需要的其他 JSON 元数据。
+
+移动端宿主同样位于 `examples/`。`examples/android-demo-host` 提供 Kotlin 下载页，
+安全解压发布 ZIP 到应用私有目录后，跳转 Rust `NativeActivity` 启动 Bevy；默认编译
+TypeScript，可通过 `just build-android-demo lua arm64-v8a` 等参数选择单一语言和 ABI。
+Android 需要 SDK、NDK、`cargo-ndk` 以及相应 Rust target。
+
+`examples/ios-demo-host` 是独立 Xcode 工程。由于 winit 必须自行首次调用
+`UIApplicationMain`，iOS 不能先显示 SwiftUI/UIKit 下载页再进入 Bevy，因此示例将
+`projects/ts/assets` 作为包内资源，并在 UIKit 启动前校验 `engineConfig.json`。执行
+`just build-ios-demo` 会先生成 TypeScript XCFramework，再构建模拟器应用。iOS 静态链接
+时一次只能选择一种脚本运行时。
+
+移动宿主使用 `game_runtime_run_with_assets(asset_root, script_path)` 显式传递资源目录；
+旧的 `game_runtime_run(script_path)` 继续为依赖当前工作目录的桌面宿主保留。
 
 Rust 宿主窗口默认嵌入 Bevy 官方图标。运行时窗口图标在 Windows 和 Linux/X11
 生效；macOS Dock 图标以及 Android/iOS 应用图标仍应由宿主应用包配置。
