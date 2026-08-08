@@ -1,3 +1,5 @@
+//! Embeds the Bevy icon into the Windows demo host executable.
+
 #[cfg(target_os = "windows")]
 fn main() {
     use std::{env, fs, path::PathBuf};

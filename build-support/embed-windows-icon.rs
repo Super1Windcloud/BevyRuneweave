@@ -1,3 +1,5 @@
+//! Shared Cargo build script for embedding the Bevy icon in example executables.
+
 #[cfg(target_os = "windows")]
 fn main() {
     use std::{env, fs, path::PathBuf};

@@ -1,3 +1,5 @@
+//! Windows launcher for downloading assets and starting a configured scripting runtime.
+
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 #[cfg(not(target_os = "windows"))]
