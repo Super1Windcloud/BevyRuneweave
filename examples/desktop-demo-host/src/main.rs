@@ -13,11 +13,7 @@ use std::{
     io::{self, Cursor, Read, Write},
     path::{Component, Path, PathBuf},
     process::Command,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-        mpsc::{self, Receiver},
-    },
+    sync::mpsc::{self, Receiver},
     thread,
 };
 
@@ -77,11 +73,10 @@ struct LauncherApp {
     result: Option<Receiver<Result<(), String>>>,
     releases: Vec<Release>,
     releases_result: Option<Receiver<Result<Vec<Release>, String>>>,
-    launch: Arc<AtomicBool>,
 }
 
 impl LauncherApp {
-    fn new(launch: Arc<AtomicBool>) -> Self {
+    fn new() -> Self {
         Self {
             url: String::new(),
             downloading: false,
@@ -90,7 +85,6 @@ impl LauncherApp {
             result: None,
             releases: Vec::new(),
             releases_result: fetch_releases(),
-            launch,
         }
     }
 
@@ -112,7 +106,7 @@ impl LauncherApp {
         });
     }
 
-    fn poll_download(&mut self, context: &egui::Context) {
+    fn poll_download(&mut self) {
         let Some(receiver) = &self.result else {
             return;
         };
@@ -124,8 +118,9 @@ impl LauncherApp {
         self.downloading = false;
         match result {
             Ok(()) => {
-                self.launch.store(true, Ordering::Release);
-                context.send_viewport_cmd(egui::ViewportCommand::Close);
+                if let Err(error) = launch_runtime_process() {
+                    self.error = Some(error);
+                }
             }
             Err(error) => self.error = Some(error),
         }
@@ -150,7 +145,7 @@ impl LauncherApp {
 impl eframe::App for LauncherApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let context = ui.ctx().clone();
-        self.poll_download(&context);
+        self.poll_download();
         self.poll_releases(&context);
         egui::Frame::central_panel(ui.style()).show(ui, |ui| {
             ui.add_space(12.0);
@@ -216,8 +211,9 @@ impl eframe::App for LauncherApp {
                 && self.installed_game_available
                 && ui.button("Start Installed Game").clicked()
             {
-                self.launch.store(true, Ordering::Release);
-                context.send_viewport_cmd(egui::ViewportCommand::Close);
+                if let Err(error) = launch_runtime_process() {
+                    self.error = Some(error);
+                }
             }
 
             if let Some(error) = &self.error {
@@ -756,23 +752,8 @@ fn launch_runtime_process() -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
     let mut command = Command::new(executable);
     command.arg("--run-game");
-
-    // Replacing the UI process keeps eframe's winit and Bevy's winit from registering the same
-    // platform-global classes in one process. Windows has no exec equivalent, so it uses a child.
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        return Err(command.exec().to_string());
-    }
-    #[cfg(not(unix))]
-    {
-        let status = command.status().map_err(|error| error.to_string())?;
-        if status.success() {
-            Ok(())
-        } else {
-            Err(format!("Game process exited with status {status}"))
-        }
-    }
+    command.spawn().map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 fn main() -> eframe::Result {
@@ -784,8 +765,6 @@ fn main() -> eframe::Result {
         return Ok(());
     }
 
-    let launch = Arc::new(AtomicBool::new(false));
-    let app_launch = Arc::clone(&launch);
     let icon =
         eframe::icon_data::from_png_bytes(include_bytes!("../../../assets/branding/bevy_icon.png"))
             .unwrap_or_default();
@@ -800,13 +779,8 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "Bevy RuneWeave",
         options,
-        Box::new(move |_creation_context| Ok(Box::new(LauncherApp::new(app_launch)))),
+        Box::new(move |_creation_context| Ok(Box::new(LauncherApp::new()))),
     )?;
-    if launch.load(Ordering::Acquire)
-        && let Err(error) = launch_runtime_process()
-    {
-        eprintln!("Bevy RuneWeave: {error}");
-    }
     Ok(())
 }
 
