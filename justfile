@@ -144,25 +144,13 @@ build profile="":
     just build-js {{profile}}
     just build-ts {{profile}}
 
-# Package one unified runtime for a platform (windows/macos/linux/android/ios/all).
+# Package one runtime for a platform (windows/macos/linux/android/ios).
 build-runtime platform profile="":
     npm exec -- tsx scripts/build-runtime.ts "{{platform}}" {{profile}}
 
 # Package the Windows runtime with Lua and QuickJS.
 build-runtime-windows profile="":
     npm exec -- tsx scripts/build-runtime.ts windows {{profile}}
-
-# Build one Windows launcher executable backed by the unified runtime.
-build-runtime-unified-windows profile="":
-    npm exec -- tsx scripts/build-runtime.ts unified-windows {{profile}}
-
-# Build one macOS launcher executable backed by the unified runtime.
-build-runtime-unified-macos profile="":
-    npm exec -- tsx scripts/build-runtime.ts unified-macos {{profile}}
-
-# Build one Linux launcher executable backed by the unified runtime.
-build-runtime-unified-linux profile="":
-    npm exec -- tsx scripts/build-runtime.ts unified-linux {{profile}}
 
 # Package language assets and optionally upload them to a GitHub release.
 package-assets language="all" tag="0.0.1":

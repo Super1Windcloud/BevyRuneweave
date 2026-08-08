@@ -18,5 +18,5 @@ cargo test --manifest-path examples/desktop-demo-host/Cargo.toml
 cargo run --manifest-path examples/desktop-demo-host/Cargo.toml
 ```
 
-Use `just build-runtime-unified-windows`, `just build-runtime-unified-macos`, or
-`just build-runtime-unified-linux` to package the launcher with all three language runtimes.
+Use `just build-runtime-windows`, `just build-runtime-macos`, or `just build-runtime-linux` to
+package the launcher with the single Lua/QuickJS runtime library.
