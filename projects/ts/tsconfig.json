@@ -5,6 +5,7 @@
     "rootDir": "src",
     "outDir": "assets",
     "strict": true,
+    "noEmit": true,
     "noEmitOnError": true,
     "removeComments": true,
     "skipLibCheck": true
