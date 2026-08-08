@@ -1,3 +1,5 @@
+local ecs = require("runeweave.ecs")
+
 local PLAYER_SPEED = 330
 local BULLET_SPEED = 570
 local ENEMY_SPEED = 145
@@ -47,9 +49,9 @@ local function spawn_entity(id, bundle)
     if bundle.role == "bullet" then world.bullets[id] = true end
     if bundle.role == "enemy" then world.enemies[id] = true end
 
-    ecs_entity_spawn(id)
-    ecs_component_insert(id, "sprite", { kind = bundle.sprite })
-    ecs_component_insert(id, "transform", {
+    ecs.entity_spawn(id)
+    ecs.component_insert(id, "sprite", { kind = bundle.sprite })
+    ecs.component_insert(id, "transform", {
         x = bundle.transform.x,
         y = bundle.transform.y,
     })
@@ -73,7 +75,7 @@ local function flush_entity_commands()
         world.players[id] = nil
         world.bullets[id] = nil
         world.enemies[id] = nil
-        ecs_entity_despawn(id)
+        ecs.entity_despawn(id)
     end
     world.pending_despawn = {}
 end
@@ -208,7 +210,7 @@ end
 
 local function render_sync_system()
     for id, transform in pairs(world.transforms) do
-        if is_active(id) then ecs_component_insert(id, "transform", transform) end
+        if is_active(id) then ecs.component_insert(id, "transform", transform) end
     end
 end
 
@@ -216,13 +218,13 @@ local function game_state_system()
     if resources.lives <= 0 then
         resources.lives = 0
         resources.game_over = true
-        ecs_resource_set("game_state", {
+        ecs.resource_set("game_state", {
             score = resources.score,
             lives = resources.lives,
             message = "GAME OVER - TAP SPACE TO RESTART",
         })
     else
-        ecs_resource_set("game_state", {
+        ecs.resource_set("game_state", {
             score = resources.score,
             lives = resources.lives,
             message = "",
@@ -240,11 +242,11 @@ local update_schedule = {
 }
 
 local function reset_game()
-    ecs_world_clear()
+    ecs.world_clear()
     world = create_world()
     resources = create_resources()
     spawn_player()
-    ecs_resource_set("game_state", {
+    ecs.resource_set("game_state", {
         score = resources.score,
         lives = resources.lives,
         message = "ARROWS/WASD - AUTO FIRE",
@@ -263,14 +265,14 @@ function on_update(dt, input_x, input_y, restart_pressed)
     if not resources.started then
         if restart_pressed and not resources.restart_was_pressed then
             resources.started = true
-            ecs_resource_set("game_state", {
+            ecs.resource_set("game_state", {
                 score = resources.score,
                 lives = resources.lives,
                 message = "ARROWS/WASD - AUTO FIRE",
             })
         else
             resources.restart_was_pressed = restart_pressed
-            ecs_resource_set("game_state", {
+            ecs.resource_set("game_state", {
                 score = resources.score,
                 lives = resources.lives,
                 message = "PRESS SPACE TO START",

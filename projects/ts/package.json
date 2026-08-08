@@ -4,11 +4,12 @@
   "author": "superwindcloud",
   "private": true,
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "watch": "tsc --project tsconfig.json --watch --preserveWatchOutput",
+    "build": "esbuild src/shooter.ts --bundle --format=iife --target=es2023 --outfile=assets/shooter.js",
+    "watch": "esbuild src/shooter.ts --bundle --format=iife --target=es2023 --outfile=assets/shooter.js --watch",
     "check": "tsc --project tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "esbuild": "^0.28.1",
     "typescript": "7.0.2"
   }
 }

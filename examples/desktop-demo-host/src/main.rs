@@ -774,6 +774,7 @@ fn main() -> eframe::Result {
             .with_min_inner_size([420.0, 210.0])
             .with_icon(icon)
             .with_resizable(true),
+        centered: true,
         ..Default::default()
     };
     eframe::run_native(

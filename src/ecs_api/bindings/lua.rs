@@ -259,6 +259,29 @@ fn install_ecs_api(
                 move |_, name: String| Ok(bridge.remove_resource(&name))
             })?,
         )?;
+        let ecs = context.create_table()?;
+        for (export, global) in [
+            ("world_clear", "ecs_world_clear"),
+            ("entity_spawn", "ecs_entity_spawn"),
+            ("entity_spawn_bundle", "ecs_entity_spawn_bundle"),
+            ("entity_exists", "ecs_entity_exists"),
+            ("entity_despawn", "ecs_entity_despawn"),
+            ("component_insert", "ecs_component_insert"),
+            ("component_get", "ecs_component_get"),
+            ("component_has", "ecs_component_has"),
+            ("component_remove", "ecs_component_remove"),
+            ("query", "ecs_query"),
+            ("query_filtered", "ecs_query_filtered"),
+            ("query_matching", "ecs_query_matching"),
+            ("resource_set", "ecs_resource_set"),
+            ("resource_get", "ecs_resource_get"),
+            ("resource_remove", "ecs_resource_remove"),
+        ] {
+            ecs.set(export, globals.get::<Value>(global)?)?;
+        }
+        let package: Table = globals.get("package")?;
+        let loaded: Table = package.get("loaded")?;
+        loaded.set("runeweave.ecs", ecs)?;
         Ok(())
     })();
     result.map_err(interop_error)
@@ -337,6 +360,20 @@ mod tests {
                 .unwrap(),
             )
             .unwrap();
+        let ecs = lua.create_table().unwrap();
+        for (export, global) in [
+            ("world_clear", "ecs_world_clear"),
+            ("entity_spawn", "ecs_entity_spawn"),
+            ("entity_despawn", "ecs_entity_despawn"),
+            ("component_insert", "ecs_component_insert"),
+            ("resource_set", "ecs_resource_set"),
+        ] {
+            ecs.set(export, globals.get::<Value>(global).unwrap())
+                .unwrap();
+        }
+        let package: Table = globals.get("package").unwrap();
+        let loaded_modules: Table = package.get("loaded").unwrap();
+        loaded_modules.set("runeweave.ecs", ecs).unwrap();
 
         #[cfg(feature = "lua")]
         let source = include_str!("../../../projects/lua/assets/shooter.lua");

@@ -1,7 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { join, relative, resolve, sep } from "node:path";
 import { deflateRawSync } from "node:zlib";
+import { transform } from "esbuild";
+
+const require = createRequire(import.meta.url);
+const luamin = require("luamin") as { minify(source: string): string };
 
 const root = resolve(import.meta.dirname, "..");
 const tag = process.argv.find((arg) => arg.startsWith("--tag="))?.slice(6) ?? "0.0.1";
@@ -62,6 +67,30 @@ function crc32(data: Uint8Array) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
+async function prepareAssets(source: string, destination: string, language: "js" | "ts" | "lua") {
+  cpSync(source, destination, { recursive: true });
+  const script = join(destination, language === "lua" ? "shooter.lua" : "shooter.js");
+  if (!existsSync(script)) return;
+  const sourceCode = readFileSync(script, "utf8");
+  if (language === "lua") {
+    writeFileSync(script, compressLua(sourceCode), "utf8");
+    return;
+  }
+  const result = await transform(sourceCode, {
+    loader: "js",
+    minifyIdentifiers: true,
+    minifySyntax: true,
+    minifyWhitespace: true,
+    legalComments: "none",
+    charset: "utf8",
+  });
+  writeFileSync(script, result.code, "utf8");
+}
+
+function compressLua(source: string) {
+  return `${luamin.minify(source)}\n`;
+}
+
 async function main() {
   mkdirSync(output, { recursive: true });
   const archives: string[] = [];
@@ -74,9 +103,13 @@ async function main() {
     const assets = join(root, "projects", directory, "assets");
     const archive = join(output, `${packageName}.zip`);
     if (!existsSync(assets)) throw new Error(`Missing assets directory: ${assets}`);
+    const staging = join(output, `.staging-${directory}-${process.pid}`);
+    rmSync(staging, { recursive: true, force: true });
+    await prepareAssets(assets, staging, directory);
     const replacing = existsSync(archive);
     rmSync(archive, { force: true });
-    createZip(assets, archive);
+    createZip(staging, archive);
+    rmSync(staging, { recursive: true, force: true });
     archives.push(archive);
     console.log(`${replacing ? "Replaced" : "Created"} ${archive}`);
   }
