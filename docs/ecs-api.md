@@ -1,6 +1,6 @@
 # Runeweave ECS API
 
-Runeweave 向 Lua 5.5、Luau、JavaScript 和 TypeScript 暴露同一组数据导向 API。
+Runeweave 向 Lua 5.5、JavaScript 和 TypeScript 暴露同一组数据导向 API。
 脚本声明 Entity、Component 和 Resource 数据，Bevy System 消费这些数据并决定如何
 渲染、播放声音或执行其他宿主行为。
 
@@ -8,7 +8,7 @@ Runeweave 向 Lua 5.5、Luau、JavaScript 和 TypeScript 暴露同一组数据�
 
 Entity 使用稳定字符串作为脚本标识。Component 是附着在 Entity 上的命名值，Resource
 是不属于单个 Entity 的命名全局值。值可以是 `null`、布尔、有限数字、字符串、数组或
-字符串键对象。Lua/Luau 使用原生 table，JavaScript/TypeScript 使用原生 object/array。
+字符串键对象。Lua 使用原生 table，JavaScript/TypeScript 使用原生 object/array。
 
 写操作会立即更新脚本可见快照，因此同一回调内可以读取刚写入的数据；Bevy World 在
 本帧的 `ApplyEcsCommands` 阶段统一同步。查询结果按 Entity ID 稳定排序。
@@ -56,7 +56,7 @@ ecs_resource_set("game_state", {
 
 TypeScript 全局声明见 `projects/ts/src/runeweave.d.ts`。
 
-## Lua / Luau
+## Lua
 
 ```lua
 ecs_entity_spawn("player")

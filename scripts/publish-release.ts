@@ -12,7 +12,6 @@ const projects = [
   ["js", "script-squadron-js"],
   ["ts", "script-squadron-typescript"],
   ["lua", "script-squadron-lua"],
-  ["luau", "script-squadron-luau"],
 ] as const;
 
 function api(path: string, init: RequestInit = {}) {

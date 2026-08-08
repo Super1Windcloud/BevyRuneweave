@@ -94,6 +94,6 @@ impl LanguageExtensions {
 
 impl Default for LanguageExtensions {
     fn default() -> Self {
-        LanguageExtensions::new([("lua", Language::Lua), ("luau", Language::Lua)])
+        LanguageExtensions::new([("lua", Language::Lua)])
     }
 }

@@ -1,19 +1,10 @@
-#[cfg(not(any(
-    feature = "js",
-    feature = "typescript",
-    feature = "lua",
-    feature = "luau"
-)))]
-compile_error!("enable exactly one scripting feature: js, typescript, lua, or luau");
+#[cfg(not(any(feature = "js", feature = "typescript", feature = "lua",)))]
+compile_error!("enable exactly one scripting feature: js, typescript, or lua");
 #[cfg(any(
-    all(
-        feature = "js",
-        any(feature = "typescript", feature = "lua", feature = "luau")
-    ),
-    all(feature = "typescript", any(feature = "lua", feature = "luau")),
-    all(feature = "lua", feature = "luau")
+    all(feature = "js", any(feature = "typescript", feature = "lua")),
+    all(feature = "typescript", feature = "lua")
 ))]
-compile_error!("the js, typescript, lua, and luau features are mutually exclusive");
+compile_error!("the js, typescript, and lua features are mutually exclusive");
 
 pub mod ecs_api;
 mod example_host;

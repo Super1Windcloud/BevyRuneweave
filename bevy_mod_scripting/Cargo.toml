@@ -24,7 +24,6 @@ features = ["lua55", "quickjs"]
 default = []
 lua = ["bevy_mod_scripting_lua"]
 lua55 = ["bevy_mod_scripting_lua/lua55", "lua"]
-luau = ["bevy_mod_scripting_lua/luau", "lua"]
 quickjs = ["bevy_mod_scripting_quickjs"]
 typescript = ["quickjs"]
 

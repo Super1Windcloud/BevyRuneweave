@@ -340,8 +340,6 @@ mod tests {
 
         #[cfg(feature = "lua")]
         let source = include_str!("../../../projects/lua/assets/shooter.lua");
-        #[cfg(feature = "luau")]
-        let source = include_str!("../../../projects/luau/assets/shooter.luau");
         lua.load(source).exec().unwrap();
         let loaded: mlua::Function = globals.get("on_script_loaded").unwrap();
         loaded.call::<()>(()).unwrap();

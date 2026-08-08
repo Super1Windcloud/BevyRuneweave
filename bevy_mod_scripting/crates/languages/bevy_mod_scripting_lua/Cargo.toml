@@ -19,7 +19,6 @@ enable-features = ["lua55"]
 
 [features]
 lua55 = ["dep:mlua", "mlua/lua55"]
-luau = ["dep:mlua", "mlua/luau"]
 
 [lib]
 name = "bevy_mod_scripting_lua"

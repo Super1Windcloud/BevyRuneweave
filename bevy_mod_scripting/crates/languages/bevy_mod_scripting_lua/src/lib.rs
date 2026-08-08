@@ -1,8 +1,5 @@
 //! Lua integration for the bevy_mod_scripting system.
-#![cfg(any(feature = "lua55", feature = "luau"))]
-
-#[cfg(all(feature = "lua55", feature = "luau"))]
-compile_error!("the lua55 and luau features are mutually exclusive");
+#![cfg(feature = "lua55")]
 
 use std::ops::{Deref, DerefMut};
 
@@ -80,7 +77,7 @@ impl Default for LuaScriptingPlugin {
         LuaScriptingPlugin {
             scripting_plugin: ScriptingPlugin {
                 runtime_initializers: Vec::default(),
-                supported_extensions: vec!["lua", "luau"],
+                supported_extensions: vec!["lua"],
                 context_initializers: Vec::new(),
                 context_pre_handling_initializers: Vec::new(),
                 language: Language::Lua,

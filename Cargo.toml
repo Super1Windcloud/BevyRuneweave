@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors.workspace = true
 homepage = "https://github.com/Super1windcloud/BevyRuneWeave"
-description = "A Bevy-based ECS game framework for Lua, Luau, JavaScript, and TypeScript"
+description = "A Bevy-based ECS game framework for Lua, JavaScript, and TypeScript"
 license = "MIT OR Apache-2.0"
 keywords = ["bevy", "ecs", "gamedev", "scripting"]
 categories = ["game-development", "game-engines"]
@@ -30,7 +30,6 @@ members = [
     "bevy_mod_scripting/crates/testing_crates/test_utils",
 #    "projects/js",
 #    "projects/lua",
-#    "projects/luau",
     "projects/ts",
 ]
 resolver = "2"
@@ -106,7 +105,6 @@ default = []
 js = ["bevy_mod_scripting/quickjs"]
 typescript = ["bevy_mod_scripting/typescript"]
 lua = ["bevy_mod_scripting/lua55"]
-luau = ["bevy_mod_scripting/luau"]
 
 [dependencies]
 # This is Bevy's `2d` feature set with `default_platform` expanded so the

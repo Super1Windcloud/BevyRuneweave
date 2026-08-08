@@ -28,10 +28,7 @@ use crate::{
     example_host::ScriptSquadronHostPlugin,
 };
 
-#[cfg(all(
-    not(any(feature = "js", feature = "typescript")),
-    any(feature = "lua", feature = "luau")
-))]
+#[cfg(all(not(any(feature = "js", feature = "typescript")), feature = "lua"))]
 use bevy_mod_scripting::lua::LuaScriptingPlugin as ActiveScriptingPlugin;
 #[cfg(any(feature = "js", feature = "typescript"))]
 use bevy_mod_scripting::quickjs::QuickJsScriptingPlugin as ActiveScriptingPlugin;
@@ -257,12 +254,6 @@ pub const fn default_script_path() -> &'static str {
     return "assets/shooter.js";
     #[cfg(all(not(any(feature = "js", feature = "typescript")), feature = "lua"))]
     return "assets/shooter.lua";
-    #[cfg(all(
-        not(any(feature = "js", feature = "typescript")),
-        not(feature = "lua"),
-        feature = "luau"
-    ))]
-    return "assets/shooter.luau";
 }
 
 const fn active_language() -> &'static str {
@@ -272,12 +263,6 @@ const fn active_language() -> &'static str {
     return "TypeScript / QuickJS";
     #[cfg(all(not(any(feature = "js", feature = "typescript")), feature = "lua"))]
     return "Lua 5.5";
-    #[cfg(all(
-        not(any(feature = "js", feature = "typescript")),
-        not(feature = "lua"),
-        feature = "luau"
-    ))]
-    return "Luau";
 }
 
 /// Requests a BMS asset reload on the runtime's next frame.

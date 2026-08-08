@@ -38,7 +38,6 @@ mod windows_host {
         Js,
         TypeScript,
         Lua,
-        Luau,
     }
 
     impl Language {
@@ -47,7 +46,6 @@ mod windows_host {
                 Self::Js => "js",
                 Self::TypeScript => "typescript",
                 Self::Lua => "lua",
-                Self::Luau => "luau",
             }
         }
     }

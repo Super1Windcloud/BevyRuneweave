@@ -27,10 +27,6 @@ ts-check:
 run-lua:
     cargo run -p script-squadron-lua
 
-# Run the Luau game.
-run-luau:
-    cargo run -p script-squadron-luau
-
 # Run the JavaScript game with QuickJS.
 run-js:
     cargo run -p script-squadron-js
@@ -58,10 +54,6 @@ run-ts-windows:
 check-lua:
     cargo check -p script-squadron-lua
 
-# Check the Luau executable project.
-check-luau:
-    cargo check -p script-squadron-luau
-
 # Check the JavaScript executable project.
 check-js:
     cargo check -p script-squadron-js
@@ -70,8 +62,8 @@ check-js:
 check-ts: ts-check
     cargo check -p script-squadron-typescript
 
-# Check all four isolated executable projects.
-check: check-lua check-luau check-js check-ts
+# Check all three isolated executable projects.
+check: check-lua check-js check-ts
 
 # Check all language-neutral BMS workspace targets.
 bms-check-base:
@@ -81,11 +73,6 @@ bms-check-base:
 bms-check-lua:
     cargo check -p bevy_mod_scripting --no-default-features --features lua55 --all-targets
     cargo check -p bevy_mod_scripting_lua --no-default-features --features lua55 --all-targets
-
-# Check the BMS root and language crate with Luau.
-bms-check-luau:
-    cargo check -p bevy_mod_scripting --no-default-features --features luau --all-targets
-    cargo check -p bevy_mod_scripting_lua --no-default-features --features luau --all-targets
 
 # Check the BMS root and language crate with QuickJS.
 bms-check-js:
@@ -97,15 +84,12 @@ bms-check-ts:
     cargo check -p bevy_mod_scripting --no-default-features --features typescript --all-targets
 
 # Check every supported BMS runtime configuration.
-bms-check: bms-check-base bms-check-lua bms-check-luau bms-check-js bms-check-ts
+bms-check: bms-check-base bms-check-lua bms-check-js bms-check-ts
 
 # Execute 600 gameplay frames with the Lua 5.5 VM.
 test-lua:
     cargo test -p bevy-runeweave --no-default-features --features lua --lib
 
-# Execute 600 gameplay frames with the Luau VM.
-test-luau:
-    cargo test -p bevy-runeweave --no-default-features --features luau --lib
 
 # Execute JavaScript gameplay frames with QuickJS.
 test-js:
@@ -116,22 +100,19 @@ test-ts: ts-build
     cargo test -p bevy-runeweave --no-default-features --features typescript --lib
 
 # Run all script-engine gameplay tests.
-test: test-lua test-luau test-js test-ts
+test: test-lua test-js test-ts
 
 # Test the BMS Lua 5.5 adapter.
 bms-test-lua:
     cargo test -p bevy_mod_scripting_lua --no-default-features --features lua55
 
-# Test the BMS Luau adapter.
-bms-test-luau:
-    cargo test -p bevy_mod_scripting_lua --no-default-features --features luau
 
 # Test the BMS QuickJS adapter.
 bms-test-js:
     cargo test -p bevy_mod_scripting_quickjs
 
 # Test every retained BMS language adapter.
-bms-test: bms-test-lua bms-test-luau bms-test-js
+bms-test: bms-test-lua bms-test-js
 
 # Format all first-party Rust packages.
 fmt:
@@ -149,10 +130,6 @@ clean-bms:
 build-lua:
     cargo build --release -p script-squadron-lua
 
-# Build the Luau game in release mode.
-build-luau:
-    cargo build --release -p script-squadron-luau
-
 # Build the JavaScript game in release mode.
 build-js:
     cargo build --release -p script-squadron-js
@@ -161,8 +138,8 @@ build-js:
 build-ts: ts-build
     cargo build --release -p script-squadron-typescript
 
-# Build all four games in release mode.
-build: build-lua build-luau build-js build-ts
+# Build all three games in release mode.
+build: build-lua build-js build-ts
 
 # Package one platform runtime (platform: windows/macos/linux/android/ios/all).
 build-runtime platform language="all":
@@ -172,7 +149,7 @@ build-runtime platform language="all":
 build-runtime-windows language="all":
     npm exec -- tsx scripts/build-runtime.ts windows "{{language}}"
 
-# Build one Windows launcher executable backed by all four language runtimes.
+# Build one Windows launcher executable backed by all three language runtimes.
 build-runtime-unified-windows:
     npm exec -- tsx scripts/build-runtime.ts unified-windows
 
@@ -188,9 +165,6 @@ package-assets-typescript tag="0.0.1":
 
 package-assets-lua tag="0.0.1":
     just package-assets lua "{{tag}}"
-
-package-assets-luau tag="0.0.1":
-    just package-assets luau "{{tag}}"
 
 upload-assets tag="0.0.1":
     npm exec -- tsx --env-file=.env scripts/publish-release.ts --tag="{{tag}}"

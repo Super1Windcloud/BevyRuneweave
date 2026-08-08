@@ -13,7 +13,6 @@ default = []
 js = ["bevy-runeweave/js"]
 typescript = ["bevy-runeweave/typescript"]
 lua = ["bevy-runeweave/lua"]
-luau = ["bevy-runeweave/luau"]
 
 [dependencies]
 bevy-runeweave = { path = "../..", default-features = false }
