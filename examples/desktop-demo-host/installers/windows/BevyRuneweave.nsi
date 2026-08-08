@@ -35,15 +35,15 @@ SetCompressor /SOLID lzma
 
 Section "Bevy RuneWeave" MainSection
   SetOutPath "$INSTDIR"
-  File "${SOURCE_DIR}/bevy-runeweave-runtime.exe"
-  File "${SOURCE_DIR}/game_runtime.h"
-  File "${SOURCE_DIR}/build-info.txt"
+  File "${SOURCE_DIR}\bevy-runeweave-runtime.exe"
+  File "${SOURCE_DIR}\game_runtime.h"
+  File "${SOURCE_DIR}\build-info.txt"
 
   SetOutPath "$INSTDIR\lib"
-  File "${SOURCE_DIR}/lib/bevy_runeweave.dll"
+  File "${SOURCE_DIR}\lib\bevy_runeweave.dll"
 
   SetOutPath "$INSTDIR\assets"
-  File /r "${ASSETS_DIR}/*"
+  File /r "${ASSETS_DIR}\*"
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKCU "Software\Bevy RuneWeave" "InstallLocation" "$INSTDIR"

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -31,6 +31,9 @@ function run(command: string, args: string[]) {
 
 function output(command: string, args: string[]) {
   return execFileSync(command, args, { cwd: root, encoding: "utf8" }).trim();
+}
+function windowsPath(path: string) {
+  return path.replaceAll("/", "\\");
 }
 
 function hostTarget() {
@@ -64,7 +67,9 @@ for (const target of targets()) {
   ]);
 
   const packageSource = mkdtempSync(join(tmpdir(), "runeweave-desktop-"));
-  cpSync(runtime, packageSource, { recursive: true });
+  for (const entry of readdirSync(runtime)) {
+    cpSync(join(runtime, entry), join(packageSource, entry), { recursive: true });
+  }
   const executableName = platform === "windows" ? "bevy-runeweave-demo.exe" : "bevy-runeweave-demo";
   const packagedName = platform === "windows" ? "bevy-runeweave-runtime.exe" : "bevy-runeweave-runtime";
   cpSync(join(root, "target", target, profile, executableName), join(packageSource, packagedName));
@@ -73,11 +78,11 @@ for (const target of targets()) {
     if (platform === "windows") {
       const installer = join(destination, `Bevy-RuneWeave-${packageJson.version}-${target}-setup.exe`);
       run("makensis", [
-        `-DSOURCE_DIR=${packageSource}`,
-        `-DASSETS_DIR=${assets}`,
-        `-DOUTPUT_FILE=${installer}`,
+        `-DSOURCE_DIR=${windowsPath(packageSource)}`,
+        `-DASSETS_DIR=${windowsPath(assets)}`,
+        `-DOUTPUT_FILE=${windowsPath(installer)}`,
         `-DAPP_VERSION=${packageJson.version}`,
-        join(root, "examples", "desktop-demo-host", "installers", "windows", "BevyRuneweave.nsi"),
+        windowsPath(join(root, "examples", "desktop-demo-host", "installers", "windows", "BevyRuneweave.nsi")),
       ]);
       console.log(`Created ${installer}`);
     } else {
