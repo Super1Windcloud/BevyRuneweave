@@ -3,6 +3,18 @@
 fn main() {
     let target = std::env::var("TARGET").expect("Cargo always sets TARGET");
     println!("cargo:rustc-env=RUNEWEAVE_BUILD_TARGET={target}");
+    println!("cargo:rerun-if-changed=../../.env");
+    if let Ok(contents) = std::fs::read_to_string("../../.env") {
+        for line in contents.lines() {
+            let line = line.trim();
+            if let Some(value) = line.strip_prefix("GITHUB_TOKEN=") {
+                let value = value.trim().trim_matches(['\"', '\'']);
+                if !value.is_empty() {
+                    println!("cargo:rustc-env=RUNEWEAVE_GITHUB_TOKEN={value}");
+                }
+            }
+        }
+    }
     embed_windows_icon();
 }
 

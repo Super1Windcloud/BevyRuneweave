@@ -2,6 +2,8 @@
   "schemaVersion": 1,
   "name": "script-squadron-typescript",
   "version": "0.1.0",
+  "appName": "Script Squadron",
+  "icon": "https://raw.githubusercontent.com/Super1Windcloud/bevy-script-squadron-runtime/main/assets/branding/bevy_icon.png",
   "script": { "language": "typescript", "entry": "shooter.js" },
   "metadata": { "sourceLanguage": "typescript", "runtime": "quickjs" }
 }

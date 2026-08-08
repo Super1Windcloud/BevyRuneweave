@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use std::{
     ffi::{CStr, c_char, c_int},
     fs,
@@ -40,6 +41,13 @@ const WINDOW_HEIGHT: u32 = 800;
 #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
 const DEFAULT_WINDOW_ICON: &[u8] = include_bytes!("../../assets/branding/bevy_icon.png");
 
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeConfig {
+    app_name: Option<String>,
+    icon: Option<String>,
+}
+
 callback_labels!(OnUpdate => "on_update");
 
 #[derive(Resource)]
@@ -48,6 +56,8 @@ struct LoadedScriptPath {
     source_path: PathBuf,
     modified: Option<std::time::SystemTime>,
 }
+#[derive(Resource)]
+struct RuntimeAssetRoot(PathBuf);
 
 fn attach_script(
     mut commands: Commands,
@@ -60,8 +70,13 @@ fn attach_script(
 }
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-fn set_default_window_icon(primary_window: Single<Entity, With<PrimaryWindow>>) {
-    let image = match image::load_from_memory(DEFAULT_WINDOW_ICON) {
+fn set_default_window_icon(
+    primary_window: Single<Entity, With<PrimaryWindow>>,
+    asset_root: Res<RuntimeAssetRoot>,
+) {
+    let bytes = fs::read(asset_root.0.join(".runtime-icon.png"))
+        .unwrap_or_else(|_| DEFAULT_WINDOW_ICON.to_vec());
+    let image = match image::load_from_memory(&bytes) {
         Ok(image) => image.into_rgba8(),
         Err(error) => {
             warn!("Failed to decode the embedded Bevy window icon: {error}");
@@ -228,6 +243,14 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             asset_root.display()
         ));
     }
+    let runtime_config = fs::read(asset_root.join("engineConfig.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<RuntimeConfig>(&bytes).ok())
+        .unwrap_or_default();
+    let title = runtime_config
+        .app_name
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| format!("Script Squadron - {backend}"));
 
     let mut app = App::new();
     let scripting_plugins = BMSPlugin.build();
@@ -245,7 +268,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             })
             .set(WindowPlugin {
                 primary_window: Some(Window {
-                    title: format!("Script Squadron - {backend}"),
+                    title,
                     resolution: WindowResolution::new(WINDOW_WIDTH, WINDOW_HEIGHT),
                     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
                     position: WindowPosition::Centered(MonitorSelection::Primary),
@@ -265,6 +288,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             .ok(),
         asset_path,
     })
+    .insert_resource(RuntimeAssetRoot(asset_root.clone()))
     .add_systems(
         Startup,
         (
