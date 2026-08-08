@@ -33,14 +33,14 @@ function requireTarget(target: string) {
 function targetPlatform(target: string): Exclude<Platform, "android" | "ios"> | "unknown" {
   return target.includes("windows") ? "windows" : target.includes("apple-darwin") ? "macos" : target.includes("linux") ? "linux" : "unknown";
 }
-function crossCargoCommand(target: string) {
+function crossCargoArgs(target: string) {
   if (target.endsWith("-pc-windows-msvc")) {
     try {
       output("cargo", ["xwin", "--version"]);
     } catch {
       throw new Error("Cross-compiling MSVC Windows runtimes requires cargo-xwin; install it with 'cargo install cargo-xwin'");
     }
-    return "xwin";
+    return ["xwin", "build"];
   }
   try {
     output("zig", ["version"]);
@@ -48,7 +48,7 @@ function crossCargoCommand(target: string) {
   } catch {
     throw new Error("Cross-compiling GNU desktop runtimes requires Zig and cargo-zigbuild; install them with 'brew install zig' and 'cargo install cargo-zigbuild'");
   }
-  return "zigbuild";
+  return ["zigbuild"];
 }
 function isAndroidNdk(directory: string) {
   return existsSync(join(directory, "source.properties")) && existsSync(join(directory, "toolchains", "llvm", "prebuilt"));
@@ -110,8 +110,8 @@ function desktop(platform: Exclude<Platform, "android" | "ios">) {
     cpSync(join(root, "include", "game_runtime.h"), join(staging, "game_runtime.h"));
     const extension = platform === "windows" ? ".dll" : platform === "macos" ? ".dylib" : ".so";
     const libraryName = platform === "windows" ? "bevy_runeweave.dll" : `libbevy_runeweave${extension}`;
-    const cargoCommand = cross ? crossCargoCommand(target) : "build";
-    run("cargo", [cargoCommand, ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--no-default-features", "--features", "unified", "--target", target]);
+    const cargoArgs = cross ? crossCargoArgs(target) : ["build"];
+    run("cargo", [...cargoArgs, ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--no-default-features", "--features", "unified", "--target", target]);
     cpSync(join(targetDir, target, profile, libraryName), join(staging, "lib", libraryName));
     if (platform === "macos") run("install_name_tool", ["-id", "@rpath/libbevy_runeweave.dylib", join(staging, "lib", libraryName)]);
     info(staging, platform, target);

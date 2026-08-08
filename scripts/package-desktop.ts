@@ -44,9 +44,9 @@ for (const target of targets()) {
   if (!existsSync(runtime)) throw new Error(`Runtime package is missing: ${runtime}`);
   const destination = join(installerDist, platform, profile);
   mkdirSync(destination, { recursive: true });
-  const cargoCommand = target === hostTarget() ? "build" : target.endsWith("-pc-windows-msvc") ? "xwin" : "zigbuild";
+  const cargoArgs = target === hostTarget() ? ["build"] : target.endsWith("-pc-windows-msvc") ? ["xwin", "build"] : ["zigbuild"];
   run("cargo", [
-    cargoCommand,
+    ...cargoArgs,
     ...(release ? ["--release"] : []),
     "--manifest-path",
     join(root, "examples", "desktop-demo-host", "Cargo.toml"),
