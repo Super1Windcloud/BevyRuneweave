@@ -22,3 +22,18 @@ declare function ecs_query_matching(
 declare function ecs_resource_set(name: string, value: EcsValue): void;
 declare function ecs_resource_get(name: string): EcsValue | null;
 declare function ecs_resource_remove(name: string): boolean;
+declare function http_get(url: string): number;
+declare function http_post(url: string, body: string, contentType: string): number;
+declare function http_poll(id: number): HttpPollResult;
+
+type HttpPollResult =
+  | { state: "pending" }
+  | { state: "complete"; status: number; body: string }
+  | { state: "error"; error: string }
+  | { state: "unknown" };
+
+interface RuneweaveCallbacks {
+  on_script_loaded: () => void;
+  on_script_reloaded: () => void;
+  on_update: (dt: number, inputX: number, inputY: number, restartPressed: boolean) => void;
+}

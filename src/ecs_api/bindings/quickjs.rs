@@ -10,7 +10,7 @@ use bevy_mod_scripting::{
     script::ScriptAttachment,
 };
 
-use super::super::{command::EcsBridge, value::EcsValue};
+use super::super::{command::EcsBridge, network::NetworkBridge, value::EcsValue};
 
 const MAX_VALUE_DEPTH: usize = 32;
 
@@ -138,10 +138,12 @@ fn js_resource_set(bridge: &EcsBridge, name: String, value: Value<'_>) -> rquick
 
 fn install_ecs_api(
     bridge: &EcsBridge,
+    network: &NetworkBridge,
     _attachment: &ScriptAttachment,
     context: &mut QuickJsContext,
 ) -> Result<(), InteropError> {
     let bridge = bridge.clone();
+    let network = network.clone();
     context
         .with(move |ctx| {
             let globals = ctx.globals();
@@ -260,15 +262,38 @@ fn install_ecs_api(
                     move |name: String| bridge.remove_resource(&name)
                 }),
             )?;
+            globals.set(
+                "http_get",
+                Func::from({
+                    let network = network.clone();
+                    move |url: String| network.get(url)
+                }),
+            )?;
+            globals.set(
+                "http_post",
+                Func::from({
+                    let network = network.clone();
+                    move |url: String, body: String, content_type: String| {
+                        network.post(url, body, content_type)
+                    }
+                }),
+            )?;
+            globals.set(
+                "http_poll",
+                Func::from(move |id: u32| JsEcsValue(network.poll(id))),
+            )?;
             Ok::<(), rquickjs::Error>(())
         })
         .map_err(interop_error)
 }
 
-pub(super) fn ecs_quickjs_plugin(bridge: EcsBridge) -> QuickJsScriptingPlugin {
+pub(super) fn ecs_quickjs_plugin(
+    bridge: EcsBridge,
+    network: NetworkBridge,
+) -> QuickJsScriptingPlugin {
     QuickJsScriptingPlugin::default().add_context_initializer(move |attachment, context| {
         let owned_bridge = bridge.for_attachment(attachment);
-        install_ecs_api(&owned_bridge, attachment, context)
+        install_ecs_api(&owned_bridge, &network, attachment, context)
     })
 }
 

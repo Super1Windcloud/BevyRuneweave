@@ -8,7 +8,7 @@ use bevy_mod_scripting::{
 };
 use mlua::{Lua, Table, Value};
 
-use super::super::{command::EcsBridge, value::EcsValue};
+use super::super::{command::EcsBridge, network::NetworkBridge, value::EcsValue};
 
 const MAX_VALUE_DEPTH: usize = 32;
 
@@ -104,6 +104,7 @@ fn ecs_to_lua(lua: &Lua, value: EcsValue, depth: usize) -> mlua::Result<Value> {
 
 fn install_ecs_api(
     bridge: &EcsBridge,
+    network: &NetworkBridge,
     _attachment: &ScriptAttachment,
     context: &mut LuaContext,
 ) -> Result<(), InteropError> {
@@ -282,15 +283,40 @@ fn install_ecs_api(
         let package: Table = globals.get("package")?;
         let loaded: Table = package.get("loaded")?;
         loaded.set("runeweave.ecs", ecs)?;
+        let network_module = context.create_table()?;
+        network_module.set(
+            "http_get",
+            context.create_function({
+                let network = network.clone();
+                move |_, url: String| Ok(network.get(url))
+            })?,
+        )?;
+        network_module.set(
+            "http_post",
+            context.create_function({
+                let network = network.clone();
+                move |_, (url, body, content_type): (String, String, String)| {
+                    Ok(network.post(url, body, content_type))
+                }
+            })?,
+        )?;
+        network_module.set(
+            "poll",
+            context.create_function({
+                let network = network.clone();
+                move |lua, id: u32| ecs_to_lua(lua, network.poll(id), 0)
+            })?,
+        )?;
+        loaded.set("runeweave.network", network_module)?;
         Ok(())
     })();
     result.map_err(interop_error)
 }
 
-pub(super) fn ecs_lua_plugin(bridge: EcsBridge) -> LuaScriptingPlugin {
+pub(super) fn ecs_lua_plugin(bridge: EcsBridge, network: NetworkBridge) -> LuaScriptingPlugin {
     LuaScriptingPlugin::default().add_context_initializer(move |attachment, context| {
         let owned_bridge = bridge.for_attachment(attachment);
-        install_ecs_api(&owned_bridge, attachment, context)
+        install_ecs_api(&owned_bridge, &network, attachment, context)
     })
 }
 

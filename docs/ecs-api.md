@@ -39,6 +39,26 @@ attachment 在热重载前后会解析到同一个 owner。
 
 ## JavaScript / TypeScript
 
+TypeScript 推荐通过 SDK 模块显式导入，构建时由 esbuild 打包为 QuickJS 可执行的单文件：
+
+```typescript
+import {
+  getComponent,
+  insertComponent,
+  queryEntities,
+  setResource,
+  spawnEntity,
+} from "./ecs.js";
+
+spawnEntity("player");
+insertComponent("player", "transform", { x: 0, y: -300 });
+const renderables = queryEntities(["transform", "sprite"]);
+const transform = getComponent("player", "transform");
+setResource("game_state", { score: 0, lives: 3, message: "READY" });
+```
+
+SDK 源码见 `projects/ts/src/ecs.ts`。底层全局 C ABI 风格函数仍可供普通 JavaScript 使用：
+
 ```javascript
 ecs_entity_spawn("player");
 ecs_component_insert("player", "transform", { x: 0, y: -300 });
@@ -59,19 +79,86 @@ TypeScript 全局声明见 `projects/ts/src/runeweave.d.ts`。
 ## Lua
 
 ```lua
-ecs_entity_spawn("player")
-ecs_component_insert("player", "transform", { x = 0, y = -300 })
-ecs_component_insert("player", "sprite", { kind = "player" })
+local ecs = require("runeweave.ecs")
 
-local renderables = ecs_query({ "transform", "sprite" })
-local transform = ecs_component_get("player", "transform")
+ecs.entity_spawn("player")
+ecs.component_insert("player", "transform", { x = 0, y = -300 })
+ecs.component_insert("player", "sprite", { kind = "player" })
 
-ecs_resource_set("game_state", {
+local renderables = ecs.query({ "transform", "sprite" })
+local transform = ecs.component_get("player", "transform")
+
+ecs.resource_set("game_state", {
     score = 0,
     lives = 3,
     message = "READY",
 })
 ```
+
+`runeweave.ecs` 是 Rust runtime 注册到 `package.loaded` 的虚拟模块，不对应磁盘文件。
+
+## HTTP API
+
+HTTP 请求在独立线程中执行，不阻塞 Bevy 主线程。GET/POST 立即返回数字请求 ID，脚本可在
+后续帧调用 `poll`。每个请求超时为 30 秒，响应正文上限为 1 MiB。完成或失败结果在读取后
+从队列删除，再次轮询同一 ID 会返回 `unknown`。
+
+轮询结果：
+
+| `state` | 附加字段 | 含义 |
+| --- | --- | --- |
+| `pending` | 无 | 请求仍在执行 |
+| `complete` | `status`, `body` | 收到 HTTP 响应，包括 4xx/5xx |
+| `error` | `error` | 网络、超时、读取或响应大小错误 |
+| `unknown` | 无 | 请求 ID 不存在或结果已被读取 |
+
+### TypeScript
+
+```typescript
+import { httpGet, httpPost, pollHttp } from "./network.js";
+
+const getRequest = httpGet("https://example.com/state.json");
+const postRequest = httpPost(
+  "https://example.com/scores",
+  JSON.stringify({ score: 100 }),
+);
+
+const result = pollHttp(getRequest);
+if (result.state === "complete") {
+  console.log(result.status, result.body);
+} else if (result.state === "error") {
+  console.log(result.error);
+}
+```
+
+SDK 源码见 `projects/ts/src/network.ts`。普通 JavaScript 可直接调用：
+
+```javascript
+const request = http_get("https://example.com/state.json");
+const result = http_poll(request);
+```
+
+### Lua
+
+```lua
+local network = require("runeweave.network")
+
+local request = network.http_get("https://example.com/state.json")
+local post_request = network.http_post(
+    "https://example.com/scores",
+    '{"score":100}',
+    "application/json"
+)
+
+local result = network.poll(request)
+if result.state == "complete" then
+    print(result.status, result.body)
+elseif result.state == "error" then
+    print(result.error)
+end
+```
+
+`runeweave.network` 同样是 runtime 注册的虚拟 Lua 模块。
 
 ## Rust 消费端
 

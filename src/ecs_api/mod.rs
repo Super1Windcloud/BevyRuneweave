@@ -2,6 +2,7 @@
 
 mod bindings;
 mod command;
+mod network;
 mod value;
 mod world;
 
@@ -9,6 +10,7 @@ use bevy::prelude::*;
 use bevy_mod_scripting::core::event::ScriptDetachedEvent;
 
 use command::EcsBridge;
+use network::NetworkBridge;
 pub use value::EcsValue;
 pub use world::{ScriptComponents, ScriptEntityId, ScriptOwned, ScriptOwnerId, ScriptResources};
 
@@ -22,8 +24,10 @@ pub struct RuneweaveEcsPlugin;
 impl Plugin for RuneweaveEcsPlugin {
     fn build(&self, app: &mut App) {
         let bridge = EcsBridge::default();
-        bindings::add_language(app, bridge.clone());
+        let network = NetworkBridge::default();
+        bindings::add_language(app, bridge.clone(), network.clone());
         app.insert_resource(bridge)
+            .insert_resource(network)
             .init_resource::<world::ScriptEntityRegistry>()
             .init_resource::<ScriptResources>()
             .add_systems(
