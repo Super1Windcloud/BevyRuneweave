@@ -7,9 +7,10 @@ type InstallerPlatform = "windows" | "macos";
 
 const root = resolve(import.meta.dirname, "..");
 const platform = process.argv[2] as InstallerPlatform | undefined;
-const release = process.argv.slice(3).includes("--release");
-const unknown = process.argv.slice(3).filter((argument) => argument !== "--release");
-if (platform !== "windows" && platform !== "macos") throw new Error("Usage: package-desktop.ts <windows|macos> [--release]");
+const options = process.argv.slice(3);
+const release = options.includes("--release");
+const unknown = options.filter((argument) => argument !== "--release" && argument !== "debug");
+if (platform !== "windows" && platform !== "macos") throw new Error("Usage: package-desktop.ts <windows|macos> [debug|--release]");
 if (unknown.length) throw new Error(`Unsupported argument: ${unknown.join(", ")}`);
 
 const profile = release ? "release" : "debug";
@@ -19,7 +20,13 @@ const installerDist = resolve(process.env.RUNEWEAVE_INSTALLER_DIR ?? join(root, 
 const assets = join(root, "projects", "ts", "assets");
 
 function run(command: string, args: string[]) {
-  execFileSync(command, args, { cwd: root, stdio: "inherit", env: process.env });
+  execFileSync(command, args, {
+    cwd: root,
+    stdio: "inherit",
+    env: process.env,
+    // Node 25 rejects direct spawning of Windows .cmd shims without a shell.
+    shell: process.platform === "win32",
+  });
 }
 
 function output(command: string, args: string[]) {
