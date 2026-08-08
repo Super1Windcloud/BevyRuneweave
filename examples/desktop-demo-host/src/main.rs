@@ -50,6 +50,7 @@ struct ScriptConfig {
 struct LauncherApp {
     url: String,
     downloading: bool,
+    installed_game_available: bool,
     error: Option<String>,
     result: Option<Receiver<Result<(), String>>>,
     launch: Arc<AtomicBool>,
@@ -60,6 +61,7 @@ impl LauncherApp {
         Self {
             url: String::new(),
             downloading: false,
+            installed_game_available: active_assets_root().is_ok(),
             error: None,
             result: None,
             launch,
@@ -132,6 +134,14 @@ impl eframe::App for LauncherApp {
                 }
             });
 
+            if !self.downloading
+                && self.installed_game_available
+                && ui.button("Start Installed Game").clicked()
+            {
+                self.launch.store(true, Ordering::Release);
+                context.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+
             if let Some(error) = &self.error {
                 ui.add_space(8.0);
                 ui.colored_label(ui.visuals().error_fg_color, error);
@@ -158,6 +168,68 @@ fn repo_root() -> Result<PathBuf, String> {
     } else {
         Err("Could not find the Bevy RuneWeave runtime directory".to_owned())
     }
+}
+
+fn executable_directory() -> Result<PathBuf, String> {
+    std::env::current_exe()
+        .map_err(|error| error.to_string())?
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| "Could not determine the launcher directory".to_owned())
+}
+
+fn bundled_assets_root() -> Result<PathBuf, String> {
+    let executable = executable_directory()?;
+    let adjacent = executable.join("assets");
+    if adjacent.join(CONFIG_FILE).is_file() {
+        return Ok(adjacent);
+    }
+    let app_resources = executable
+        .parent()
+        .map(|contents| contents.join("Resources/assets"));
+    if let Some(resources) = app_resources
+        && resources.join(CONFIG_FILE).is_file()
+    {
+        return Ok(resources);
+    }
+    Err("The installed application does not contain default assets".to_owned())
+}
+
+fn platform_data_root() -> Result<PathBuf, String> {
+    if let Some(path) = std::env::var_os("RUNEWEAVE_DATA_DIR") {
+        return Ok(PathBuf::from(path));
+    }
+    #[cfg(target_os = "windows")]
+    let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
+    #[cfg(target_os = "macos")]
+    let base = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .map(|home| home.join("Library/Application Support"));
+    #[cfg(target_os = "linux")]
+    let base = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .map(PathBuf::from)
+                .map(|home| home.join(".local/share"))
+        });
+    base.map(|path| path.join("Bevy RuneWeave"))
+        .ok_or_else(|| "Could not determine the user data directory".to_owned())
+}
+
+fn active_assets_root() -> Result<PathBuf, String> {
+    let installed = platform_data_root()?.join("assets");
+    if installed.join(CONFIG_FILE).is_file() {
+        load_config(&installed)?;
+        return Ok(installed);
+    }
+    if let Ok(bundled) = bundled_assets_root() {
+        load_config(&bundled)?;
+        return Ok(bundled);
+    }
+    let development = repo_root()?.join("assets");
+    load_config(&development)?;
+    Ok(development)
 }
 
 fn load_config(assets: &Path) -> Result<EngineConfig, String> {
@@ -423,7 +495,8 @@ fn extract_rar(_bytes: &[u8], _destination: &Path) -> Result<(), String> {
 }
 
 fn download_and_install(url: &str) -> Result<(), String> {
-    let root = repo_root()?;
+    let root = platform_data_root()?;
+    fs::create_dir_all(&root).map_err(|error| error.to_string())?;
     let response = reqwest::blocking::Client::builder()
         .user_agent("BevyRuneWeave-Desktop-Demo/0.1")
         .build()
@@ -505,17 +578,15 @@ fn runtime_library_name() -> &'static str {
 }
 
 fn run_game() -> Result<(), String> {
-    let root = repo_root()?;
-    std::env::set_current_dir(&root).map_err(|error| error.to_string())?;
-    let config = load_config(&root.join("assets"))?;
-    let executable_dir = std::env::current_exe()
-        .map_err(|error| error.to_string())?
-        .parent()
-        .map(Path::to_path_buf)
-        .ok_or_else(|| "Could not determine the launcher directory".to_owned())?;
+    let assets = active_assets_root()?;
+    let config = load_config(&assets)?;
+    let executable_dir = executable_directory()?;
     let library_name = runtime_library_name();
     let bundled = executable_dir.join("lib").join(library_name);
-    let development = root
+    let app_framework = executable_dir
+        .parent()
+        .map(|contents| contents.join("Frameworks").join(library_name));
+    let development = repo_root()?
         .join("dist/runtimes")
         .join(platform_directory())
         .join(BUILD_TARGET)
@@ -523,17 +594,23 @@ fn run_game() -> Result<(), String> {
         .join(library_name);
     let library_path = if bundled.is_file() {
         bundled
+    } else if let Some(framework) = app_framework
+        && framework.is_file()
+    {
+        framework
     } else {
         development
     };
     let library = unsafe { Library::new(&library_path) }
         .map_err(|error| format!("Could not load {}: {error}", library_path.display()))?;
-    type Run = unsafe extern "C" fn(*const c_char) -> c_int;
-    let run: Symbol<'_, Run> = unsafe { library.get(b"game_runtime_run\0") }
-        .map_err(|error| format!("Could not find game_runtime_run: {error}"))?;
+    type Run = unsafe extern "C" fn(*const c_char, *const c_char) -> c_int;
+    let run: Symbol<'_, Run> = unsafe { library.get(b"game_runtime_run_with_assets\0") }
+        .map_err(|error| format!("Could not find game_runtime_run_with_assets: {error}"))?;
+    let asset_root =
+        CString::new(assets.to_string_lossy().as_bytes()).map_err(|error| error.to_string())?;
     let script = CString::new(config.script.entry.to_string_lossy().as_bytes())
         .map_err(|error| error.to_string())?;
-    let code = unsafe { run(script.as_ptr()) };
+    let code = unsafe { run(asset_root.as_ptr(), script.as_ptr()) };
     if code == 0 {
         Ok(())
     } else {

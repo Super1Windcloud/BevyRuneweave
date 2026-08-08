@@ -70,10 +70,6 @@ function desktop(platform: Exclude<Platform, "android" | "ios">) {
     run("cargo", [cargoCommand, ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--no-default-features", "--features", "unified", "--target", target]);
     cpSync(join(targetDir, target, profile, libraryName), join(staging, "lib", libraryName));
     if (platform === "macos") run("install_name_tool", ["-id", "@rpath/libbevy_runeweave.dylib", join(staging, "lib", libraryName)]);
-    run("cargo", [cargoCommand, ...cargoProfileArgs, "--manifest-path", join(root, "examples", "desktop-demo-host", "Cargo.toml"), "--target", target, "--target-dir", targetDir]);
-    const executableName = platform === "windows" ? "bevy-runeweave-demo.exe" : "bevy-runeweave-demo";
-    const packagedName = platform === "windows" ? "bevy-runeweave-runtime.exe" : "bevy-runeweave-runtime";
-    cpSync(join(targetDir, target, profile, executableName), join(staging, packagedName));
     info(staging, platform, target);
     const destination = resolve(dist, platform, target);
     rmSync(destination, { recursive: true, force: true }); mkdirSync(resolve(destination, ".."), { recursive: true });

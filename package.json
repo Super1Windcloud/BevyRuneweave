@@ -18,6 +18,8 @@
     "doc": "docs"
   },
   "scripts": {
+    "package:windows": "tsx scripts/package-desktop.ts windows --release",
+    "package:macos": "tsx scripts/package-desktop.ts macos --release",
     "release:assets": "tsx --env-file=.env scripts/publish-release.ts",
     "typecheck:scripts": "tsc --project scripts/tsconfig.json",
     "test": "npm run typecheck:scripts"

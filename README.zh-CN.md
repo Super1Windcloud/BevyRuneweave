@@ -173,8 +173,9 @@ just build-runtime-ios
 just build-runtime linux
 ```
 
-桌面包包含原生 launcher。Windows 和 Linux 可在对应宿主机直接构建；macOS 可通过 Zig、
-`cargo-zigbuild` 和已安装的对应 Rust target 交叉编译。`WINDOWS_TARGETS` 与
+桌面 runtime 命令只打包动态库、C 头文件和构建信息，不编译或打包
+`desktop-demo-host`。Windows 和 Linux 可在对应宿主机直接构建；macOS 可通过 Zig、
+`cargo-zigbuild` 和已安装的对应 Rust target 交叉编译对应 runtime 库。`WINDOWS_TARGETS` 与
 `LINUX_TARGETS` 支持逗号分隔的目标覆盖；macOS 构建 Windows 时默认使用
 `x86_64-pc-windows-gnu`。构建脚本需要支持直接执行 TypeScript 的 Node.js 版本。
 Android 需要 `cargo-ndk`、
@@ -196,9 +197,9 @@ Linux 和 Android 各生成一个动态库，`crates/runtime-staticlib` 仅用�
 XCFramework。宿主使用的 C 头文件位于 `include/game_runtime.h`。
 
 独立示例 `examples/desktop-demo-host` 在 Windows、macOS 和 Linux 上通过
-`assets/engineConfig.json` 选择脚本语言和入口。执行对应平台的
-`just build-runtime-{windows,macos,linux}` 会生成一个供用户启动的
-`bevy-runeweave-runtime`（Windows 为 `.exe`），并在其 `lib` 目录中打包一个统一运行时库。
+`assets/engineConfig.json` 选择脚本语言和入口，并可加载
+`just build-runtime-{windows,macos,linux}` 生成的统一运行时库。launcher 需使用 Cargo
+单独构建。
 资源下载支持 ZIP、tar、gzip、zstd、xz，以及只读解包的 7z 和 RAR；RAR 原生后端仅在
 Windows、macOS 和 Linux 构建。
 
@@ -229,6 +230,17 @@ Android 需要 SDK、NDK、`cargo-ndk` 以及相应 Rust target。
 `UIApplicationMain`，iOS 不能先显示 SwiftUI/UIKit 下载页再进入 Bevy，因此示例将
 `projects/ts/assets` 作为包内资源，并在 UIKit 启动前校验 `engineConfig.json`。执行
 `just build-ios-demo` 会先生成同时包含 Lua 与 QuickJS 的 XCFramework，再构建模拟器应用。
+
+桌面安装包包含 launcher、当前 OS 对应的统一 runtime，以及默认 TypeScript demo 资源。
+后续下载的资源会写入用户应用数据目录，不会写入 Program Files 或 macOS `.app` 内部。
+
+```bash
+just package-windows-installer --release  # NSIS 安装程序 exe
+just package-macos-dmg --release           # DMG 内的已签名 .app
+```
+
+Windows 打包需要 `makensis`，macOS 可通过 `brew install nsis` 安装后交叉生成。macOS 默认
+使用 ad-hoc 签名；正式分发前可通过 `MACOS_SIGN_IDENTITY` 指定 Developer ID 证书。
 
 移动宿主使用 `game_runtime_run_with_assets(asset_root, script_path)` 显式传递资源目录；
 旧的 `game_runtime_run(script_path)` 继续为依赖当前工作目录的桌面宿主保留。

@@ -19,4 +19,17 @@ cargo run --manifest-path examples/desktop-demo-host/Cargo.toml
 ```
 
 Use `just build-runtime-windows`, `just build-runtime-macos`, or `just build-runtime-linux` to
-package the launcher with the single Lua/QuickJS runtime library.
+package the single Lua/QuickJS runtime library. These commands do not build this launcher.
+
+The packaged launcher selects the native library for its operating system and keeps downloaded
+assets in the user's application-data directory. Complete installers also include the TypeScript
+Script Squadron assets as a read-only fallback:
+
+```bash
+just package-windows-installer --release
+just package-macos-dmg --release
+```
+
+The Windows command uses the NSIS definition under `installers/windows`; it can run on macOS after
+installing `makensis`. The macOS command creates a conventional `.app`, signs it ad hoc by default,
+and wraps it in a DMG. Set `MACOS_SIGN_IDENTITY` to use a Developer ID certificate.

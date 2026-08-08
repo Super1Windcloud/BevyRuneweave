@@ -173,8 +173,9 @@ just build-runtime-ios
 just build-runtime linux
 ```
 
-Desktop packages include the native launcher. Windows and Linux build directly on their respective
-hosts; macOS can cross-compile them with Zig, `cargo-zigbuild`, and the corresponding installed Rust
+Desktop runtime commands package only the shared library, C header, and build metadata; they do not
+build or package `desktop-demo-host`. Windows and Linux build directly on their respective hosts;
+macOS can cross-compile their runtime libraries with Zig, `cargo-zigbuild`, and the corresponding installed Rust
 target. `WINDOWS_TARGETS` and `LINUX_TARGETS` accept comma-separated overrides. Windows defaults to
 `x86_64-pc-windows-gnu` when built on macOS. Android requires `cargo-ndk`, the Android NDK,
 `ANDROID_NDK_HOME`, and the relevant
@@ -196,8 +197,9 @@ public host header is [`include/game_runtime.h`](include/game_runtime.h).
 ## Host Examples
 
 `examples/desktop-demo-host` is a standalone Windows, macOS, and Linux launcher. It reads
-`assets/engineConfig.json`, selects the script language and entry point, and uses the unified runtime
-library packaged by `just build-runtime-{windows,macos,linux}`. Its downloader supports ZIP,
+`assets/engineConfig.json`, selects the script language and entry point, and can load the unified
+runtime library packaged by `just build-runtime-{windows,macos,linux}`. Build the host separately
+with Cargo. Its downloader supports ZIP,
 tar, gzip, zstd, xz, and read-only 7z and RAR extraction. The native RAR backend is built only on
 Windows, macOS, and Linux.
 
@@ -227,6 +229,18 @@ runtime; use a command such as `just build-android-demo arm64-v8a` to select ABI
 `UIApplicationMain` call, so the iOS host cannot display a SwiftUI or UIKit downloader before
 entering Bevy. The demo bundles `projects/ts/assets`, validates `engineConfig.json`, and starts the
 unified Lua and QuickJS XCFramework with `just build-ios-demo`.
+
+Desktop release installers include the launcher, the OS-specific unified runtime, and the default
+TypeScript demo assets. Downloaded packages are stored in the user's application-data directory,
+not in Program Files or inside the macOS application bundle.
+
+```bash
+just package-windows-installer --release  # NSIS setup executable
+just package-macos-dmg --release           # Signed .app inside a DMG
+```
+
+Windows packaging requires `makensis`. It can run on macOS after `brew install nsis`. macOS uses
+ad-hoc signing by default; set `MACOS_SIGN_IDENTITY` for Developer ID signing before distribution.
 
 Mobile hosts call `game_runtime_run_with_assets(asset_root, script_path)` to pass an explicit asset
 directory. The original `game_runtime_run(script_path)` remains available to desktop hosts that use

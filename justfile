@@ -148,7 +148,7 @@ build profile="":
 build-runtime platform profile="":
     npm exec -- tsx scripts/build-runtime.ts "{{platform}}" {{profile}}
 
-# Package the Windows runtime with Lua and QuickJS.
+# Package the Windows Lua/QuickJS runtime library.
 build-runtime-windows profile="":
     npm exec -- tsx scripts/build-runtime.ts windows {{profile}}
 
@@ -168,11 +168,11 @@ package-assets-lua tag="0.0.1":
 upload-assets tag="0.0.1":
     npm exec -- tsx --env-file=.env scripts/publish-release.ts --tag="{{tag}}"
 
-# Package the macOS runtime with Lua and QuickJS.
+# Package the macOS Lua/QuickJS runtime library.
 build-runtime-macos profile="":
     npm exec -- tsx scripts/build-runtime.ts macos {{profile}}
 
-# Package the Linux runtime with Lua and QuickJS.
+# Package the Linux Lua/QuickJS runtime library.
 build-runtime-linux profile="":
     npm exec -- tsx scripts/build-runtime.ts linux {{profile}}
 
@@ -183,6 +183,14 @@ build-runtime-android profile="":
 # Package the iOS XCFramework with Lua and QuickJS.
 build-runtime-ios profile="":
     npm exec -- tsx scripts/build-runtime.ts ios {{profile}}
+
+# Build the Windows runtime and package a complete NSIS installer.
+package-windows-installer profile="":
+    npm exec -- tsx scripts/package-desktop.ts windows {{profile}}
+
+# Build the macOS runtime and package a signed application in a DMG.
+package-macos-dmg profile="":
+    npm exec -- tsx scripts/package-desktop.ts macos {{profile}}
 
 # Build the standalone Android host and its Rust NativeActivity library (debug by default).
 build-android-demo profile="" abis="arm64-v8a,x86_64":
