@@ -91,30 +91,34 @@ function ios(language: Language) {
   } finally { rmSync(work, { recursive: true, force: true }); }
 }
 
-function unifiedWindows() {
-  if (hostOs() !== "windows") throw new Error("The unified Windows runtime must be built on Windows");
+function unifiedDesktop(platform: "windows" | "macos" | "linux") {
+  if (hostOs() !== platform) throw new Error(`The unified ${platform} runtime must be built on ${platform}`);
   const target = hostTarget();
-  const staging = resolve(dist, "windows", `.unified-${target}-${process.pid}`);
+  const staging = resolve(dist, platform, `.unified-${target}-${process.pid}`);
   rmSync(staging, { recursive: true, force: true }); mkdirSync(join(staging, "lib"), { recursive: true });
+  const extension = platform === "windows" ? ".dll" : platform === "macos" ? ".dylib" : ".so";
+  const libraryName = platform === "windows" ? "bevy_runeweave.dll" : `libbevy_runeweave${extension}`;
   for (const language of languages) {
     requireTarget(target);
     run("cargo", ["build", "--release", "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--no-default-features", "--features", language, "--target", target]);
     const libraryDirectory = join(staging, "lib", language); mkdirSync(libraryDirectory, { recursive: true });
-    cpSync(join(targetDir, target, "release", "bevy_runeweave.dll"), join(libraryDirectory, "bevy_runeweave.dll"));
+    cpSync(join(targetDir, target, "release", libraryName), join(libraryDirectory, libraryName));
   }
-  run("cargo", ["build", "--release", "-p", "bevy-runeweave-windows-demo-host", "--target", target]);
-  cpSync(join(targetDir, target, "release", "bevy-runeweave-demo.exe"), join(staging, "bevy-runeweave-runtime.exe"));
-  writeFileSync(join(staging, "build-info.txt"), `package=bevy-runeweave-unified-runtime\nplatform=windows\nlanguages=${languages.join(",")}\ntarget=${target}\nprofile=release\n`, "ascii");
-  const destination = resolve(dist, "windows", "unified", target);
+  run("cargo", ["build", "--release", "--manifest-path", join(root, "examples", "desktop-demo-host", "Cargo.toml"), "--target", target, "--target-dir", targetDir]);
+  const executableName = platform === "windows" ? "bevy-runeweave-demo.exe" : "bevy-runeweave-demo";
+  const packagedName = platform === "windows" ? "bevy-runeweave-runtime.exe" : "bevy-runeweave-runtime";
+  cpSync(join(targetDir, target, "release", executableName), join(staging, packagedName));
+  writeFileSync(join(staging, "build-info.txt"), `package=bevy-runeweave-unified-runtime\nplatform=${platform}\nlanguages=${languages.join(",")}\ntarget=${target}\nprofile=release\n`, "ascii");
+  const destination = resolve(dist, platform, "unified", target);
   rmSync(destination, { recursive: true, force: true }); mkdirSync(resolve(destination, ".."), { recursive: true });
   renameSync(staging, destination);
-  for (const language of languages) rmSync(resolve(dist, "windows", language), { recursive: true, force: true });
-  console.log(`Unified runtime executable: ${join(destination, "bevy-runeweave-runtime.exe")}`);
+  for (const language of languages) rmSync(resolve(dist, platform, language), { recursive: true, force: true });
+  console.log(`Unified runtime executable: ${join(destination, packagedName)}`);
 }
 
 const platformArg = process.argv[2], languageArg = process.argv[3] ?? "all";
-if (["-h", "--help"].includes(platformArg)) { console.log("Usage: npm exec -- tsx scripts/build-runtime.ts <windows|unified-windows|macos|linux|android|ios|all> [js|typescript|lua|all]"); process.exit(0); }
-if (platformArg === "unified-windows") { unifiedWindows(); process.exit(0); }
+if (["-h", "--help"].includes(platformArg)) { console.log("Usage: npm exec -- tsx scripts/build-runtime.ts <windows|macos|linux|unified-windows|unified-macos|unified-linux|android|ios|all> [js|typescript|lua|all]"); process.exit(0); }
+if (platformArg === "unified-windows" || platformArg === "unified-macos" || platformArg === "unified-linux") { unifiedDesktop(platformArg.slice(8) as "windows" | "macos" | "linux"); process.exit(0); }
 const selectedPlatforms = platformArg === "all" ? platforms : platforms.includes(platformArg as Platform) ? [platformArg as Platform] : [];
 const selectedLanguages = languageArg === "all" ? languages : languages.includes(languageArg as Language) ? [languageArg as Language] : [];
 if (!selectedPlatforms.length || !selectedLanguages.length) throw new Error("Unsupported or missing platform/language");

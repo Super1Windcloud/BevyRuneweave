@@ -12,7 +12,6 @@ autobins = false
 
 [workspace]
 members = [
-    "crates/windows-demo-host",
     "crates/runtime-cdylib",
     "crates/runtime-staticlib",
     "bevy_mod_scripting",
@@ -104,7 +103,7 @@ crate-type = ["rlib"]
 default = []
 js = ["bevy_mod_scripting/quickjs"]
 typescript = ["bevy_mod_scripting/typescript"]
-lua = ["bevy_mod_scripting/lua55"]
+lua = ["bevy_mod_scripting/lua"]
 
 [dependencies]
 # This is Bevy's `2d` feature set with `default_platform` expanded so the

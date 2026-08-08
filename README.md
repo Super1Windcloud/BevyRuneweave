@@ -184,9 +184,12 @@ IOS_SIMULATOR_TARGETS=aarch64-apple-ios-sim,x86_64-apple-ios just build-runtime-
 Linux 和 Android 各生成一个动态库，`crates/runtime-staticlib` 仅用于组成 iOS
 XCFramework。宿主使用的 C 头文件位于 `include/game_runtime.h`。
 
-统一 Windows 宿主通过 `assets/engineConfig.json` 选择脚本语言和入口。执行
-`just build-runtime-unified-windows` 会生成一个供用户启动的
-`bevy-runeweave-runtime.exe`，并在其 `lib` 目录中打包三个语言后端。
+独立示例 `examples/desktop-demo-host` 在 Windows、macOS 和 Linux 上通过
+`assets/engineConfig.json` 选择脚本语言和入口。执行对应平台的
+`just build-runtime-unified-{windows,macos,linux}` 会生成一个供用户启动的
+`bevy-runeweave-runtime`（Windows 为 `.exe`），并在其 `lib` 目录中打包三个语言后端。
+资源下载支持 ZIP、tar、gzip、zstd、xz，以及只读解包的 7z 和 RAR；RAR 原生后端仅在
+Windows、macOS 和 Linux 构建。
 
 ```json
 {

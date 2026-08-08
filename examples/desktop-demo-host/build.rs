@@ -1,7 +1,13 @@
-//! Embeds the Bevy icon into the Windows demo host executable.
+//! Provides target metadata and embeds the launcher icon on Windows.
+
+fn main() {
+    let target = std::env::var("TARGET").expect("Cargo always sets TARGET");
+    println!("cargo:rustc-env=RUNEWEAVE_BUILD_TARGET={target}");
+    embed_windows_icon();
+}
 
 #[cfg(target_os = "windows")]
-fn main() {
+fn embed_windows_icon() {
     use std::{env, fs, path::PathBuf};
 
     const ICON_PNG: &[u8] = include_bytes!("../../assets/branding/bevy_icon.png");
@@ -23,4 +29,4 @@ fn main() {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn main() {}
+fn embed_windows_icon() {}

@@ -1,7 +1,0 @@
-{
-  "schemaVersion": 1,
-  "name": "script-squadron-luau",
-  "version": "0.1.0",
-  "script": { "language": "luau", "entry": "shooter.luau" },
-  "metadata": { "runtime": "luau" }
-}

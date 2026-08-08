@@ -68,10 +68,11 @@ async function main() {
     const assets = join(root, "projects", directory, "assets");
     const archive = join(output, `${packageName}.zip`);
     if (!existsSync(assets)) throw new Error(`Missing assets directory: ${assets}`);
+    const replacing = existsSync(archive);
     rmSync(archive, { force: true });
     createZip(assets, archive);
     archives.push(archive);
-    console.log(`Created ${archive}`);
+    console.log(`${replacing ? "Replaced" : "Created"} ${archive}`);
   }
   if (!upload) return;
   const releaseResponse = await api(`/releases/tags/${tag}`);

@@ -21,9 +21,9 @@ bench = false
 features = ["lua55", "quickjs"]
 
 [features]
-default = []
-lua = ["bevy_mod_scripting_lua"]
-lua55 = ["bevy_mod_scripting_lua/lua55", "lua"]
+default = ["lua"]
+lua = ["bevy_mod_scripting_lua", "bevy_mod_scripting_lua/lua55"]
+lua55 = ["lua"]
 quickjs = ["bevy_mod_scripting_quickjs"]
 typescript = ["quickjs"]
 

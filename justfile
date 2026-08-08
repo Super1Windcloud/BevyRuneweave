@@ -153,6 +153,14 @@ build-runtime-windows language="all":
 build-runtime-unified-windows:
     npm exec -- tsx scripts/build-runtime.ts unified-windows
 
+# Build one macOS launcher executable backed by all three language runtimes.
+build-runtime-unified-macos:
+    npm exec -- tsx scripts/build-runtime.ts unified-macos
+
+# Build one Linux launcher executable backed by all three language runtimes.
+build-runtime-unified-linux:
+    npm exec -- tsx scripts/build-runtime.ts unified-linux
+
 # Package language assets and optionally upload them to a GitHub release.
 package-assets language="all" tag="0.0.1":
     npm exec -- tsx --env-file-if-exists=.env scripts/publish-release.ts --tag="{{tag}}" --language="{{language}}" --no-upload
