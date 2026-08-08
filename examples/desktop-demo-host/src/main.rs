@@ -12,6 +12,7 @@ use std::{
     fs::{self, File},
     io::{self, Cursor, Read, Write},
     path::{Component, Path, PathBuf},
+    process::Command,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -618,7 +619,38 @@ fn run_game() -> Result<(), String> {
     }
 }
 
+fn launch_runtime_process() -> Result<(), String> {
+    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+    let mut command = Command::new(executable);
+    command.arg("--run-game");
+
+    // Replacing the UI process keeps eframe's winit and Bevy's winit from registering the same
+    // platform-global classes in one process. Windows has no exec equivalent, so it uses a child.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        return Err(command.exec().to_string());
+    }
+    #[cfg(not(unix))]
+    {
+        let status = command.status().map_err(|error| error.to_string())?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(format!("Game process exited with status {status}"))
+        }
+    }
+}
+
 fn main() -> eframe::Result {
+    if std::env::args_os().nth(1).as_deref() == Some(OsStr::new("--run-game")) {
+        if let Err(error) = run_game() {
+            eprintln!("Bevy RuneWeave: {error}");
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
+
     let launch = Arc::new(AtomicBool::new(false));
     let app_launch = Arc::clone(&launch);
     let icon =
@@ -638,7 +670,7 @@ fn main() -> eframe::Result {
         Box::new(move |_creation_context| Ok(Box::new(LauncherApp::new(app_launch)))),
     )?;
     if launch.load(Ordering::Acquire)
-        && let Err(error) = run_game()
+        && let Err(error) = launch_runtime_process()
     {
         eprintln!("Bevy RuneWeave: {error}");
     }

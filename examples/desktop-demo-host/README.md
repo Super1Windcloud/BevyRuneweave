@@ -25,6 +25,10 @@ The packaged launcher selects the native library for its operating system and ke
 assets in the user's application-data directory. Complete installers also include the TypeScript
 Script Squadron assets as a read-only fallback:
 
+The launcher UI and Bevy runtime execute in separate process modes. This is required on macOS
+because eframe and the dynamically loaded Bevy runtime each link winit; starting both event loops in
+one process would register the same Objective-C application delegate twice.
+
 ```bash
 just package-windows-installer --release
 just package-macos-dmg --release

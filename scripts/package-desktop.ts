@@ -32,7 +32,7 @@ function hostTarget() {
 
 function targets() {
   const variable = platform === "windows" ? "WINDOWS_TARGETS" : "MACOS_TARGETS";
-  const fallback = platform === "windows" && !hostTarget().includes("windows") ? "x86_64-pc-windows-gnu" : hostTarget();
+  const fallback = platform === "windows" && !hostTarget().includes("windows") ? "x86_64-pc-windows-msvc" : hostTarget();
   return (process.env[variable] ?? fallback).split(",").map((target) => target.trim()).filter(Boolean);
 }
 
@@ -44,7 +44,7 @@ for (const target of targets()) {
   if (!existsSync(runtime)) throw new Error(`Runtime package is missing: ${runtime}`);
   const destination = join(installerDist, platform, profile);
   mkdirSync(destination, { recursive: true });
-  const cargoCommand = target === hostTarget() ? "build" : "zigbuild";
+  const cargoCommand = target === hostTarget() ? "build" : target.endsWith("-pc-windows-msvc") ? "xwin" : "zigbuild";
   run("cargo", [
     cargoCommand,
     ...(release ? ["--release"] : []),

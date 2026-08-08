@@ -20,6 +20,7 @@ Select an ABI set with a Gradle property:
 ./gradlew :app:assembleDebug -PruneweaveAbis=arm64-v8a
 ```
 
-`ANDROID_HOME` and `ANDROID_NDK_HOME` must point to an installed Android SDK and NDK. The build also
-requires the Rust Android targets and `cargo-ndk`. Downloaded Lua, JavaScript, and TypeScript asset
+`ANDROID_HOME` should point to an Android SDK containing a side-by-side NDK. Set `ANDROID_NDK_HOME`
+only to override automatic NDK selection. The build also requires the Rust Android targets and
+`cargo-ndk`. Downloaded Lua, JavaScript, and TypeScript asset
 packages all use the same native runtime. Mobile installation intentionally accepts ZIP packages only.

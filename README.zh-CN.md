@@ -174,20 +174,22 @@ just build-runtime linux
 ```
 
 桌面 runtime 命令只打包动态库、C 头文件和构建信息，不编译或打包
-`desktop-demo-host`。Windows 和 Linux 可在对应宿主机直接构建；macOS 可通过 Zig、
-`cargo-zigbuild` 和已安装的对应 Rust target 交叉编译对应 runtime 库。`WINDOWS_TARGETS` 与
-`LINUX_TARGETS` 支持逗号分隔的目标覆盖；macOS 构建 Windows 时默认使用
-`x86_64-pc-windows-gnu`。构建脚本需要支持直接执行 TypeScript 的 Node.js 版本。
-Android 需要 `cargo-ndk`、
-Android NDK 和
-`ANDROID_NDK_HOME`，默认构建 `arm64-v8a`、`armeabi-v7a`、`x86_64`，最低 API 为
+`desktop-demo-host`。Windows 和 Linux 可在对应宿主机直接构建；macOS 通过 `cargo-xwin`
+交叉编译 MSVC Windows runtime，Linux 交叉编译仍使用 Zig 与 `cargo-zigbuild`。
+`WINDOWS_TARGETS` 与 `LINUX_TARGETS` 支持逗号分隔的目标覆盖；macOS 构建 Windows 时默认使用
+`x86_64-pc-windows-msvc`。构建脚本需要支持直接执行 TypeScript 的 Node.js 版本。
+Android 需要 `cargo-ndk` 和已安装的 Android NDK，默认构建 `arm64-v8a`、
+`armeabi-v7a`、`x86_64`，最低 API 为
 26。iOS 只能在安装 Xcode 的 macOS 上构建，默认生成包含 arm64 真机和 Apple Silicon
 模拟器 slice 的 `BevyRuneweave.xcframework`。可通过脚本帮助中列出的环境变量覆盖
 目标架构和输出目录：
 
+Android 构建会自动选择 `ANDROID_HOME` 或 `ANDROID_SDK_ROOT` 下最新的 side-by-side NDK；
+仅在需要覆盖自动选择结果时设置 `ANDROID_NDK_HOME`。
+
 ```bash
 npm exec -- tsx scripts/build-runtime.ts --help
-WINDOWS_TARGETS=x86_64-pc-windows-gnu just build-runtime-windows
+WINDOWS_TARGETS=x86_64-pc-windows-msvc just build-runtime-windows
 ANDROID_ABIS=arm64-v8a just build-runtime-android
 IOS_SIMULATOR_TARGETS=aarch64-apple-ios-sim,x86_64-apple-ios just build-runtime-ios
 ```
@@ -233,6 +235,10 @@ Android 需要 SDK、NDK、`cargo-ndk` 以及相应 Rust target。
 
 桌面安装包包含 launcher、当前 OS 对应的统一 runtime，以及默认 TypeScript demo 资源。
 后续下载的资源会写入用户应用数据目录，不会写入 Program Files 或 macOS `.app` 内部。
+
+launcher 会在进入 Bevy 前将自身替换成仅运行 runtime 的进程模式。eframe launcher 事件循环
+与 Bevy 事件循环因此不会在同一进程重复注册 winit 平台全局类型，尤其是 macOS application
+delegate。
 
 ```bash
 just package-windows-installer --release  # NSIS 安装程序 exe

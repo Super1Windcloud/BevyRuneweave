@@ -174,18 +174,21 @@ just build-runtime linux
 ```
 
 Desktop runtime commands package only the shared library, C header, and build metadata; they do not
-build or package `desktop-demo-host`. Windows and Linux build directly on their respective hosts;
-macOS can cross-compile their runtime libraries with Zig, `cargo-zigbuild`, and the corresponding installed Rust
-target. `WINDOWS_TARGETS` and `LINUX_TARGETS` accept comma-separated overrides. Windows defaults to
-`x86_64-pc-windows-gnu` when built on macOS. Android requires `cargo-ndk`, the Android NDK,
-`ANDROID_NDK_HOME`, and the relevant
+build or package `desktop-demo-host`. Windows and Linux build directly on their respective hosts.
+macOS cross-compiles the MSVC Windows runtime with `cargo-xwin`, while Linux cross-compilation uses
+Zig and `cargo-zigbuild`. `WINDOWS_TARGETS` and `LINUX_TARGETS` accept comma-separated overrides.
+Windows defaults to `x86_64-pc-windows-msvc` when built on macOS. Android requires `cargo-ndk`, an installed Android NDK,
+and the relevant
 Rust targets. It builds `arm64-v8a`, `armeabi-v7a`, and `x86_64` by default with API level 26. iOS
 builds only on macOS with Xcode and produces `BevyRuneweave.xcframework` for arm64 devices and Apple
 Silicon simulators by default.
 
+The Android build automatically selects the newest side-by-side NDK under `ANDROID_HOME` or
+`ANDROID_SDK_ROOT`. Set `ANDROID_NDK_HOME` only when an explicit NDK should override it.
+
 ```bash
 npm exec -- tsx scripts/build-runtime.ts --help
-WINDOWS_TARGETS=x86_64-pc-windows-gnu just build-runtime-windows
+WINDOWS_TARGETS=x86_64-pc-windows-msvc just build-runtime-windows
 ANDROID_ABIS=arm64-v8a just build-runtime-android
 IOS_SIMULATOR_TARGETS=aarch64-apple-ios-sim,x86_64-apple-ios just build-runtime-ios
 ```
@@ -233,6 +236,10 @@ unified Lua and QuickJS XCFramework with `just build-ios-demo`.
 Desktop release installers include the launcher, the OS-specific unified runtime, and the default
 TypeScript demo assets. Downloaded packages are stored in the user's application-data directory,
 not in Program Files or inside the macOS application bundle.
+
+The launcher replaces itself with a runtime-only process before entering Bevy. Keeping the eframe
+launcher event loop and the Bevy event loop in separate process modes avoids duplicate winit
+platform-global registration, particularly the macOS application delegate.
 
 ```bash
 just package-windows-installer --release  # NSIS setup executable

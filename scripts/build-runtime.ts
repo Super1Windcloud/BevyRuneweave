@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 
 type Platform = "windows" | "macos" | "linux" | "android" | "ios";
 const platforms: Platform[] = ["windows", "macos", "linux", "android", "ios"];
@@ -33,13 +33,58 @@ function requireTarget(target: string) {
 function targetPlatform(target: string): Exclude<Platform, "android" | "ios"> | "unknown" {
   return target.includes("windows") ? "windows" : target.includes("apple-darwin") ? "macos" : target.includes("linux") ? "linux" : "unknown";
 }
-function requireCrossCompiler() {
+function crossCargoCommand(target: string) {
+  if (target.endsWith("-pc-windows-msvc")) {
+    try {
+      output("cargo", ["xwin", "--version"]);
+    } catch {
+      throw new Error("Cross-compiling MSVC Windows runtimes requires cargo-xwin; install it with 'cargo install cargo-xwin'");
+    }
+    return "xwin";
+  }
   try {
     output("zig", ["version"]);
     output("cargo-zigbuild", ["--version"]);
   } catch {
-    throw new Error("Cross-compiling desktop runtimes requires Zig and cargo-zigbuild; install them with 'brew install zig' and 'cargo install cargo-zigbuild'");
+    throw new Error("Cross-compiling GNU desktop runtimes requires Zig and cargo-zigbuild; install them with 'brew install zig' and 'cargo install cargo-zigbuild'");
   }
+  return "zigbuild";
+}
+function isAndroidNdk(directory: string) {
+  return existsSync(join(directory, "source.properties")) && existsSync(join(directory, "toolchains", "llvm", "prebuilt"));
+}
+function androidNdk() {
+  const configured = process.env.ANDROID_NDK_HOME ?? process.env.ANDROID_NDK_ROOT;
+  if (configured) {
+    const directory = resolve(configured);
+    if (!isAndroidNdk(directory)) throw new Error(`Configured Android NDK is invalid: ${directory}`);
+    return directory;
+  }
+
+  const defaults = process.platform === "darwin"
+    ? [join(homedir(), "Library", "Android", "sdk")]
+    : process.platform === "win32"
+      ? [join(process.env.LOCALAPPDATA ?? homedir(), "Android", "Sdk")]
+      : [join(homedir(), "Android", "Sdk")];
+  const sdkRoots = [...new Set([
+    process.env.ANDROID_HOME,
+    process.env.ANDROID_SDK_ROOT,
+    ...defaults,
+  ].filter((value): value is string => Boolean(value)).map((value) => resolve(value)))];
+
+  for (const sdk of sdkRoots) {
+    const sideBySide = join(sdk, "ndk");
+    if (existsSync(sideBySide)) {
+      const versions = readdirSync(sideBySide, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && isAndroidNdk(join(sideBySide, entry.name)))
+        .map((entry) => entry.name)
+        .sort((left, right) => right.localeCompare(left, undefined, { numeric: true }));
+      if (versions[0]) return join(sideBySide, versions[0]);
+    }
+    const legacy = join(sdk, "ndk-bundle");
+    if (isAndroidNdk(legacy)) return legacy;
+  }
+  throw new Error("Android NDK was not found; install it with sdkmanager 'ndk;<version>' or set ANDROID_NDK_HOME");
 }
 function fresh(platform: Platform, architecture: string) {
   const destination = resolve(dist, platform, architecture);
@@ -54,19 +99,18 @@ function info(destination: string, platform: Platform, target: string) {
 }
 function desktop(platform: Exclude<Platform, "android" | "ios">) {
   if (platform === "macos" && hostOs() !== "macos") throw new Error("macOS runtimes can only be built on macOS");
-  const fallback = platform === hostOs() ? hostTarget() : platform === "windows" ? "x86_64-pc-windows-gnu" : "x86_64-unknown-linux-gnu";
+  const fallback = platform === hostOs() ? hostTarget() : platform === "windows" ? "x86_64-pc-windows-msvc" : "x86_64-unknown-linux-gnu";
   for (const target of values(`${platform.toUpperCase()}_TARGETS`, fallback)) {
     if (targetPlatform(target) !== platform) throw new Error(`Target '${target}' does not belong to platform '${platform}'`);
     requireTarget(target);
     const cross = target !== hostTarget();
-    if (cross) requireCrossCompiler();
 
     const staging = resolve(dist, platform, `.staging-${target}-${process.pid}`);
     rmSync(staging, { recursive: true, force: true }); mkdirSync(join(staging, "lib"), { recursive: true });
     cpSync(join(root, "include", "game_runtime.h"), join(staging, "game_runtime.h"));
     const extension = platform === "windows" ? ".dll" : platform === "macos" ? ".dylib" : ".so";
     const libraryName = platform === "windows" ? "bevy_runeweave.dll" : `libbevy_runeweave${extension}`;
-    const cargoCommand = cross ? "zigbuild" : "build";
+    const cargoCommand = cross ? crossCargoCommand(target) : "build";
     run("cargo", [cargoCommand, ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--no-default-features", "--features", "unified", "--target", target]);
     cpSync(join(targetDir, target, profile, libraryName), join(staging, "lib", libraryName));
     if (platform === "macos") run("install_name_tool", ["-id", "@rpath/libbevy_runeweave.dylib", join(staging, "lib", libraryName)]);
@@ -79,11 +123,12 @@ function desktop(platform: Exclude<Platform, "android" | "ios">) {
 }
 function android() {
   const mapping: Record<string, string> = { "arm64-v8a": "aarch64-linux-android", "armeabi-v7a": "armv7-linux-androideabi", x86_64: "x86_64-linux-android", x86: "i686-linux-android" };
-  if (!process.env.ANDROID_NDK_HOME && !process.env.ANDROID_NDK_ROOT) throw new Error("Set ANDROID_NDK_HOME to the Android NDK directory");
+  const ndk = androidNdk();
+  console.log(`Android NDK: ${ndk}`);
   for (const abi of values("ANDROID_ABIS", "arm64-v8a,armeabi-v7a,x86_64")) {
     const target = mapping[abi]; if (!target) throw new Error(`Unsupported Android ABI: ${abi}`); requireTarget(target);
     const destination = fresh("android", abi);
-    run("cargo", ["ndk", "-t", abi, "-P", process.env.ANDROID_PLATFORM ?? "26", "-o", join(destination, "lib"), "build", ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--no-default-features", "--features", "unified"]);
+    run("cargo", ["ndk", "-t", abi, "-P", process.env.ANDROID_PLATFORM ?? "26", "-o", join(destination, "lib"), "build", ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--no-default-features", "--features", "unified"], { ANDROID_NDK_HOME: ndk, ANDROID_NDK_ROOT: ndk });
     const nested = join(destination, "lib", abi, "libbevy_runeweave.so");
     if (!existsSync(nested)) throw new Error(`Android runtime was not produced for ${abi}`);
     renameSync(nested, join(destination, "lib", "libbevy_runeweave.so")); rmSync(join(destination, "lib", abi), { recursive: true });
