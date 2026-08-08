@@ -1,0 +1,8 @@
+{
+    "schemaVersion": 1,
+    "name": "script-squadron-typescript",
+    "language": "ts",
+    "sourceDirectory": "game/src",
+    "assetDirectory": "game/assets",
+    "scriptEntry": "shooter.js"
+}

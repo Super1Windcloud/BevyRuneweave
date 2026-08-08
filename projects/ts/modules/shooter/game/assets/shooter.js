@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // projects/ts/src/ecs.ts
+  // projects/ts/modules/shooter/api/ecs.ts
   function clearWorld() {
     ecs_world_clear();
   }
@@ -17,7 +17,7 @@
     ecs_resource_set(name, value);
   }
 
-  // projects/ts/src/shooter.ts
+  // projects/ts/modules/shooter/game/src/shooter.ts
   var PLAYER_SPEED = 330;
   var BULLET_SPEED = 570;
   var ENEMY_SPEED = 145;

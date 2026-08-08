@@ -626,19 +626,38 @@ fn download_and_install(url: &str) -> Result<(), String> {
     let bytes = response
         .bytes()
         .map_err(|error| format!("Could not read download: {error}"))?;
-    let staging = tempfile::Builder::new()
-        .prefix("bevy-runeweave-assets-")
-        .tempdir_in(&root)
-        .map_err(|error| format!("Could not create staging directory: {error}"))?;
+    install_package(&bytes, &source_name, &root.join("assets"))
+}
 
-    extract_package(&bytes, &source_name, staging.path())?;
-    let config_path =
-        find_config(staging.path())?.ok_or_else(|| format!("Package is missing {CONFIG_FILE}"))?;
-    let package_root = config_path
-        .parent()
-        .ok_or_else(|| "Invalid engineConfig.json path".to_owned())?;
-    load_config(package_root)?;
-    install_tree(package_root, &root.join("assets"))
+fn install_package(bytes: &[u8], source_name: &str, destination: &Path) -> Result<(), String> {
+    if destination.exists() {
+        fs::remove_dir_all(destination)
+            .map_err(|error| format!("Could not replace installed assets: {error}"))?;
+    }
+    fs::create_dir_all(destination).map_err(|error| error.to_string())?;
+
+    let result = (|| {
+        extract_package(bytes, source_name, destination)?;
+        let config_path =
+            find_config(destination)?.ok_or_else(|| format!("Package is missing {CONFIG_FILE}"))?;
+        let package_root = config_path
+            .parent()
+            .ok_or_else(|| "Invalid engineConfig.json path".to_owned())?;
+        load_config(package_root)?;
+
+        // Packages may contain one or more wrapper directories. Copy their game root
+        // into assets so the runtime always finds engineConfig.json at the expected path.
+        if package_root != destination {
+            install_tree(package_root, destination)?;
+            load_config(destination)?;
+        }
+        Ok(())
+    })();
+
+    if result.is_err() {
+        let _ = fs::remove_dir_all(destination);
+    }
+    result
 }
 
 fn find_config(directory: &Path) -> Result<Option<PathBuf>, String> {
@@ -802,6 +821,24 @@ mod tests {
         writer.finish().unwrap().into_inner()
     }
 
+    fn asset_package_zip(prefix: &str) -> Vec<u8> {
+        let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+        let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+        writer
+            .start_file(format!("{prefix}engineConfig.json"), options)
+            .unwrap();
+        writer
+            .write_all(
+                br#"{"schemaVersion":1,"name":"Test","version":"1.0.0","script":{"language":"typescript","entry":"shooter.js"}}"#,
+            )
+            .unwrap();
+        writer
+            .start_file(format!("{prefix}shooter.js"), options)
+            .unwrap();
+        writer.write_all(b"globalThis.testGame = true;").unwrap();
+        writer.finish().unwrap().into_inner()
+    }
+
     fn tar_bytes() -> Vec<u8> {
         let mut builder = tar::Builder::new(Vec::new());
         let mut header = tar::Header::new_gnu();
@@ -830,6 +867,36 @@ mod tests {
             "package.zip",
             "nested/test.txt",
         );
+    }
+
+    #[test]
+    fn installs_assets_directly_into_destination() {
+        let root = tempfile::tempdir().unwrap();
+        let destination = root.path().join("assets");
+        fs::create_dir_all(&destination).unwrap();
+        fs::write(destination.join("stale.txt"), b"stale").unwrap();
+
+        install_package(&asset_package_zip(""), "package.zip", &destination).unwrap();
+
+        assert!(destination.join(CONFIG_FILE).is_file());
+        assert!(destination.join("shooter.js").is_file());
+        assert!(!destination.join("stale.txt").exists());
+    }
+
+    #[test]
+    fn promotes_assets_from_archive_wrapper_directory() {
+        let root = tempfile::tempdir().unwrap();
+        let destination = root.path().join("assets");
+
+        install_package(
+            &asset_package_zip("release-package/"),
+            "package.zip",
+            &destination,
+        )
+        .unwrap();
+
+        assert!(destination.join(CONFIG_FILE).is_file());
+        assert!(destination.join("shooter.js").is_file());
     }
 
     #[test]

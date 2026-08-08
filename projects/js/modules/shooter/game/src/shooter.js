@@ -1,68 +1,11 @@
-import {
-  clearWorld,
-  despawnEntity,
-  insertComponent,
-  setResource,
-  spawnEntity as spawnEcsEntity,
-} from "./ecs.js";
-
-type EntityId = string;
-type Role = "player" | "bullet" | "enemy";
-
-interface Vec2 {
-  x: number;
-  y: number;
-}
-
-interface SpawnBundle {
-  role: Role;
-  sprite: string;
-  transform: Vec2;
-  collider: Vec2;
-  velocity?: Vec2;
-}
-
-interface World {
-  entities: Set<EntityId>;
-  transforms: Map<EntityId, Vec2>;
-  velocities: Map<EntityId, Vec2>;
-  colliders: Map<EntityId, Vec2>;
-  sprites: Map<EntityId, string>;
-  players: Set<EntityId>;
-  bullets: Set<EntityId>;
-  enemies: Set<EntityId>;
-  pendingDespawn: Set<EntityId>;
-}
-
-interface GameResources {
-  score: number;
-  lives: number;
-  nextId: number;
-  fireTimer: number;
-  spawnTimer: number;
-  damageTimer: number;
-  seed: number;
-  gameOver: boolean;
-  restartWasPressed: boolean;
-  started: boolean;
-}
-
-interface FrameContext {
-  dt: number;
-  inputX: number;
-  inputY: number;
-}
-
-type GameSystem = (frame: FrameContext) => void;
-
-const PLAYER_SPEED = 330;
-const BULLET_SPEED = 570;
+const PLAYER_SPEED = 530;
+const BULLET_SPEED = 770;
 const ENEMY_SPEED = 145;
 const FIRE_DELAY = 0.18;
 const SPAWN_DELAY = 0.72;
 const DAMAGE_DELAY = 1.0;
 
-function createWorld(): World {
+function createWorld() {
   return {
     entities: new Set(),
     transforms: new Map(),
@@ -76,7 +19,7 @@ function createWorld(): World {
   };
 }
 
-function createResources(): GameResources {
+function createResources() {
   return {
     score: 0,
     lives: 3,
@@ -86,15 +29,15 @@ function createResources(): GameResources {
     damageTimer: 0,
     seed: 73129,
     gameOver: false,
-  restartWasPressed: false,
-  started: false,
+    restartWasPressed: false,
+    started: false,
   };
 }
 
 let world = createWorld();
 let resources = createResources();
 
-function spawnEntity(id: EntityId, bundle: SpawnBundle): void {
+function spawnEntity(id, bundle) {
   world.entities.add(id);
   world.transforms.set(id, bundle.transform);
   world.colliders.set(id, bundle.collider);
@@ -104,23 +47,23 @@ function spawnEntity(id: EntityId, bundle: SpawnBundle): void {
   if (bundle.role === "bullet") world.bullets.add(id);
   if (bundle.role === "enemy") world.enemies.add(id);
 
-  spawnEcsEntity(id);
-  insertComponent(id, "sprite", { kind: bundle.sprite });
-  insertComponent(id, "transform", {
+  ecs_entity_spawn(id);
+  ecs_component_insert(id, "sprite", { kind: bundle.sprite });
+  ecs_component_insert(id, "transform", {
     x: bundle.transform.x,
     y: bundle.transform.y,
   });
 }
 
-function queueDespawn(id: EntityId): void {
+function queueDespawn(id) {
   if (world.entities.has(id)) world.pendingDespawn.add(id);
 }
 
-function isActive(id: EntityId): boolean {
+function isActive(id) {
   return world.entities.has(id) && !world.pendingDespawn.has(id);
 }
 
-function flushEntityCommands(): void {
+function flushEntityCommands() {
   for (const id of world.pendingDespawn) {
     world.entities.delete(id);
     world.transforms.delete(id);
@@ -130,17 +73,17 @@ function flushEntityCommands(): void {
     world.players.delete(id);
     world.bullets.delete(id);
     world.enemies.delete(id);
-    despawnEntity(id);
+    ecs_entity_despawn(id);
   }
   world.pendingDespawn.clear();
 }
 
-function random01(): number {
+function random01() {
   resources.seed = (resources.seed * 48271) % 2147483647;
   return resources.seed / 2147483647;
 }
 
-function spawnPlayer(): void {
+function spawnPlayer() {
   spawnEntity("player", {
     role: "player",
     sprite: "player",
@@ -149,7 +92,7 @@ function spawnPlayer(): void {
   });
 }
 
-function spawnEnemy(): void {
+function spawnEnemy() {
   spawnEntity(`enemy_${resources.nextId++}`, {
     role: "enemy",
     sprite: "enemy",
@@ -159,7 +102,7 @@ function spawnEnemy(): void {
   });
 }
 
-function spawnBullet(playerTransform: Vec2): void {
+function spawnBullet(playerTransform) {
   spawnEntity(`bullet_${resources.nextId++}`, {
     role: "bullet",
     sprite: "bullet",
@@ -169,7 +112,7 @@ function spawnBullet(playerTransform: Vec2): void {
   });
 }
 
-function playerMovementSystem(frame: FrameContext): void {
+function playerMovementSystem(frame) {
   for (const id of world.players) {
     const transform = world.transforms.get(id);
     if (!transform || !isActive(id)) continue;
@@ -178,7 +121,7 @@ function playerMovementSystem(frame: FrameContext): void {
   }
 }
 
-function weaponSystem(frame: FrameContext): void {
+function weaponSystem(frame) {
   resources.fireTimer -= frame.dt;
   if (resources.fireTimer > 0) return;
   for (const id of world.players) {
@@ -188,7 +131,7 @@ function weaponSystem(frame: FrameContext): void {
   resources.fireTimer = FIRE_DELAY;
 }
 
-function enemySpawnSystem(frame: FrameContext): void {
+function enemySpawnSystem(frame) {
   resources.spawnTimer -= frame.dt;
   if (resources.spawnTimer <= 0) {
     spawnEnemy();
@@ -196,7 +139,7 @@ function enemySpawnSystem(frame: FrameContext): void {
   }
 }
 
-function movementSystem(frame: FrameContext): void {
+function movementSystem(frame) {
   for (const [id, velocity] of world.velocities) {
     const transform = world.transforms.get(id);
     if (!transform || !isActive(id)) continue;
@@ -205,7 +148,7 @@ function movementSystem(frame: FrameContext): void {
   }
 }
 
-function boundsSystem(): void {
+function boundsSystem() {
   for (const id of world.bullets) {
     const transform = world.transforms.get(id);
     if (transform && transform.y > 420) queueDespawn(id);
@@ -216,7 +159,7 @@ function boundsSystem(): void {
   }
 }
 
-function entitiesOverlap(left: EntityId, right: EntityId): boolean {
+function entitiesOverlap(left, right) {
   const leftTransform = world.transforms.get(left);
   const rightTransform = world.transforms.get(right);
   const leftCollider = world.colliders.get(left);
@@ -228,7 +171,7 @@ function entitiesOverlap(left: EntityId, right: EntityId): boolean {
   );
 }
 
-function collisionSystem(frame: FrameContext): void {
+function collisionSystem(frame) {
   for (const bullet of world.bullets) {
     if (!isActive(bullet)) continue;
     for (const enemy of world.enemies) {
@@ -240,7 +183,6 @@ function collisionSystem(frame: FrameContext): void {
       }
     }
   }
-
   resources.damageTimer = Math.max(0, resources.damageTimer - frame.dt);
   if (resources.damageTimer > 0) return;
   for (const player of world.players) {
@@ -256,23 +198,23 @@ function collisionSystem(frame: FrameContext): void {
   }
 }
 
-function renderSyncSystem(): void {
+function renderSyncSystem() {
   for (const [id, transform] of world.transforms) {
-    if (isActive(id)) insertComponent(id, "transform", transform);
+    if (isActive(id)) ecs_component_insert(id, "transform", transform);
   }
 }
 
-function gameStateSystem(): void {
+function gameStateSystem() {
   if (resources.lives <= 0) {
     resources.lives = 0;
     resources.gameOver = true;
-    setResource("game_state", {
+    ecs_resource_set("game_state", {
       score: resources.score,
       lives: resources.lives,
       message: "GAME OVER - TAP SPACE TO RESTART",
     });
   } else {
-    setResource("game_state", {
+    ecs_resource_set("game_state", {
       score: resources.score,
       lives: resources.lives,
       message: "",
@@ -280,7 +222,7 @@ function gameStateSystem(): void {
   }
 }
 
-const updateSchedule: GameSystem[] = [
+const updateSchedule = [
   playerMovementSystem,
   weaponSystem,
   enemySpawnSystem,
@@ -289,40 +231,32 @@ const updateSchedule: GameSystem[] = [
   collisionSystem,
 ];
 
-function resetGame(): void {
-  clearWorld();
+function resetGame() {
+  ecs_world_clear();
   world = createWorld();
   resources = createResources();
   spawnPlayer();
-  setResource("game_state", {
+  ecs_resource_set("game_state", {
     score: resources.score,
     lives: resources.lives,
     message: "ARROWS/WASD - AUTO FIRE",
   });
 }
 
-const callbacks = globalThis as typeof globalThis & RuneweaveCallbacks;
-
-callbacks.on_script_loaded = function (): void {
-  resetGame();
-};
-
-callbacks.on_script_reloaded = function (): void {
-  resetGame();
-};
-
-callbacks.on_update = function (dt: number, inputX: number, inputY: number, restartPressed: boolean): void {
+globalThis.on_script_loaded = resetGame;
+globalThis.on_script_reloaded = resetGame;
+globalThis.on_update = function (dt, inputX, inputY, restartPressed) {
   if (!resources.started) {
     if (restartPressed && !resources.restartWasPressed) {
       resources.started = true;
-      setResource("game_state", {
+      ecs_resource_set("game_state", {
         score: resources.score,
         lives: resources.lives,
         message: "ARROWS/WASD - AUTO FIRE",
       });
     } else {
       resources.restartWasPressed = restartPressed;
-      setResource("game_state", {
+      ecs_resource_set("game_state", {
         score: resources.score,
         lives: resources.lives,
         message: "PRESS SPACE TO START",

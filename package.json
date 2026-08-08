@@ -20,6 +20,7 @@
   "scripts": {
     "package:windows": "tsx scripts/package-desktop.ts windows --release",
     "package:macos": "tsx scripts/package-desktop.ts macos --release",
+    "create:game": "tsx scripts/create-game-project.ts",
     "release:assets": "tsx --env-file=.env scripts/publish-release.ts",
     "typecheck:scripts": "tsc --project scripts/tsconfig.json",
     "test": "npm run typecheck:scripts"

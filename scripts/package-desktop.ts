@@ -17,7 +17,7 @@ const profile = release ? "release" : "debug";
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string };
 const runtimeDist = resolve(process.env.RUNEWEAVE_DIST_DIR ?? join(root, "dist", "runtimes"));
 const installerDist = resolve(process.env.RUNEWEAVE_INSTALLER_DIR ?? join(root, "dist", "installers"));
-const assets = join(root, "projects", "ts", "assets");
+const assets = join(root, "projects", "ts", "modules", "shooter", "game", "assets");
 
 function run(command: string, args: string[]) {
   execFileSync(command, args, {

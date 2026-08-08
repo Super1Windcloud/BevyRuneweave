@@ -1,0 +1,8 @@
+{
+    "schemaVersion": 1,
+    "name": "script-squadron-lua",
+    "language": "lua",
+    "sourceDirectory": "game/src",
+    "assetDirectory": "game/assets",
+    "scriptEntry": "shooter.lua"
+}

@@ -39,12 +39,21 @@ the gameplay itself remains in Lua, JavaScript, or TypeScript.
 ```text
 projects/
 ├── lua/                 # Standalone Lua 5.5 executable project
-│   └── assets/          # shooter.lua and isolated sprites
+│   └── modules/shooter/
+│       ├── api/         # Virtual runtime API boundary
+│       └── game/        # Separate src/ and assets/ directories
 ├── js/                  # Standalone QuickJS executable project
-│   └── assets/          # shooter.js and isolated sprites
+│   └── modules/shooter/
+│       ├── api/         # Runtime global API boundary
+│       └── game/        # Separate src/ and assets/ directories
 └── ts/                  # TypeScript 7.0.2 and QuickJS executable project
-    ├── src/             # TypeScript gameplay source and Runeweave declarations
-    └── assets/          # Compiled shooter.js and isolated sprites
+    └── modules/shooter/
+        ├── api/         # Typed ECS and HTTP imports
+        └── game/        # TypeScript src/ and compiled runtime assets/
+templates/game-project/  # Standalone project templates, outside projects/
+├── lua/
+├── js/
+└── ts/
 src/                     # Framework core and shared Bevy host
 ├── ecs_api/             # Language-neutral ECS API
 │   ├── bindings/        # Lua and QuickJS/TypeScript adapters
@@ -62,6 +71,20 @@ examples/                # Standalone desktop, Android, and iOS hosts
 
 Assets are intentionally duplicated between language projects. Each runtime receives an explicit
 asset root and never loads scripts or images from another language project.
+
+Create a new independent game project from the airplane-shooter template:
+
+```bash
+npm run create:game -- --language=ts --name=my-game
+npm run create:game -- --language=js --name=my-game
+npm run create:game -- --language=lua --name=my-game
+```
+
+Templates are stored independently under `templates/game-project/<language>`; active projects are
+never used as template sources. Each command creates a complete standalone project at
+`projects/<name>`. TypeScript projects receive a separate typed `modules/shooter/api/` layer and are
+bundled immediately into `modules/shooter/game/assets/shooter.js`; JavaScript and Lua source is
+synchronized from `modules/shooter/game/src` into the runtime asset directory.
 
 ## Running
 
@@ -125,7 +148,7 @@ Script Squadron host maps their structured values to Bevy components. See
 
 Script files support Bevy asset hot reload. Updating the active project's script reinitializes game
 state and prints `Reloading script after source change`. `just run-ts` also runs the TypeScript watch
-compiler, so changes to `projects/ts/src/shooter.ts` are compiled and reloaded automatically.
+compiler, so changes to `projects/ts/modules/shooter/game/src/shooter.ts` are compiled and reloaded automatically.
 
 ## Build and Verification
 
@@ -145,7 +168,7 @@ just ts-install
 just ts-build
 ```
 
-`package-lock.json` pins TypeScript 7.0.2. The compiled `assets/shooter.js` is tracked, so a global
+`package-lock.json` pins TypeScript 7.0.2. The compiled `modules/shooter/game/assets/shooter.js` is tracked, so a global
 `tsc` installation is not required just to run the game.
 
 Build commands use the debug profile by default. Add `--release` explicitly for release builds:
@@ -230,7 +253,7 @@ runtime; use a command such as `just build-android-demo arm64-v8a` to select ABI
 
 `examples/ios-demo-host` is a standalone Xcode project. Winit must make the initial
 `UIApplicationMain` call, so the iOS host cannot display a SwiftUI or UIKit downloader before
-entering Bevy. The demo bundles `projects/ts/assets`, validates `engineConfig.json`, and starts the
+entering Bevy. The demo bundles `projects/ts/modules/shooter/game/assets`, validates `engineConfig.json`, and starts the
 unified Lua and QuickJS XCFramework with `just build-ios-demo`.
 
 Desktop release installers include the launcher, the OS-specific unified runtime, and the default

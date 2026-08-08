@@ -402,7 +402,7 @@ mod tests {
         loaded_modules.set("runeweave.ecs", ecs).unwrap();
 
         #[cfg(feature = "lua")]
-        let source = include_str!("../../../projects/lua/assets/shooter.lua");
+        let source = include_str!("../../../projects/lua/modules/shooter/game/assets/shooter.lua");
         lua.load(source).exec().unwrap();
         let loaded: mlua::Function = globals.get("on_script_loaded").unwrap();
         loaded.call::<()>(()).unwrap();

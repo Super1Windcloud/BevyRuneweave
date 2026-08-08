@@ -1,0 +1,8 @@
+{
+    "schemaVersion": 1,
+    "name": "script-squadron-js",
+    "language": "js",
+    "sourceDirectory": "game/src",
+    "assetDirectory": "game/assets",
+    "scriptEntry": "shooter.js"
+}

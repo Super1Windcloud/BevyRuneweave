@@ -15,7 +15,7 @@ xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj \
 `just build-ios-demo` builds Debug by default; `just build-ios-demo --release` selects the Release
 configuration for both the XCFramework and host app.
 
-The demo bundles `projects/ts/assets`, validates its `engineConfig.json`, and calls
+The demo bundles `projects/ts/modules/shooter/game/assets`, validates its `engineConfig.json`, and calls
 `game_runtime_run_with_assets` before UIKit starts. The same XCFramework supports Lua, JavaScript,
 and compiled TypeScript assets; to change the bundled example, point the `assets` folder reference
 at the matching project without rebuilding a language-specific runtime.

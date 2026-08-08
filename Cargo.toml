@@ -27,9 +27,7 @@ members = [
     "bevy_mod_scripting/crates/languages/bevy_mod_scripting_lua",
     "bevy_mod_scripting/crates/languages/bevy_mod_scripting_quickjs",
     "bevy_mod_scripting/crates/testing_crates/test_utils",
-    "projects/js",
-    "projects/lua",
-    "projects/ts",
+    "projects/*",
 ]
 resolver = "2"
 

@@ -57,7 +57,7 @@ const transform = getComponent("player", "transform");
 setResource("game_state", { score: 0, lives: 3, message: "READY" });
 ```
 
-SDK 源码见 `projects/ts/src/ecs.ts`。底层全局 C ABI 风格函数仍可供普通 JavaScript 使用：
+SDK 源码见 `projects/ts/modules/shooter/api/ecs.ts`。底层全局 C ABI 风格函数仍可供普通 JavaScript 使用：
 
 ```javascript
 ecs_entity_spawn("player");
@@ -74,7 +74,7 @@ ecs_resource_set("game_state", {
 });
 ```
 
-TypeScript 全局声明见 `projects/ts/src/runeweave.d.ts`。
+TypeScript 全局声明见 `projects/ts/modules/shooter/api/runeweave.d.ts`。
 
 ## Lua
 
@@ -131,7 +131,7 @@ if (result.state === "complete") {
 }
 ```
 
-SDK 源码见 `projects/ts/src/network.ts`。普通 JavaScript 可直接调用：
+SDK 源码见 `projects/ts/modules/shooter/api/network.ts`。普通 JavaScript 可直接调用：
 
 ```javascript
 const request = http_get("https://example.com/state.json");

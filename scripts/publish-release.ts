@@ -1,9 +1,8 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { join, relative, resolve, sep } from "node:path";
 import { deflateRawSync } from "node:zlib";
-import { transform } from "esbuild";
+import { build, transform } from "esbuild";
 
 const require = createRequire(import.meta.url);
 const luamin = require("luamin") as { minify(source: string): string };
@@ -96,11 +95,16 @@ async function main() {
   const archives: string[] = [];
   const selectedProjects = projects.filter(([directory]) => language === "all" || directory === language || (language === "typescript" && directory === "ts"));
   if (selectedProjects.some(([directory]) => directory === "ts")) {
-    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-    execFileSync(npm, ["--prefix", join(root, "projects", "ts"), "run", "build"], { cwd: root, stdio: "inherit" });
+    await build({
+      entryPoints: [join(root, "projects", "ts", "modules", "shooter", "game", "src", "shooter.ts")],
+      outfile: join(root, "projects", "ts", "modules", "shooter", "game", "assets", "shooter.js"),
+      bundle: true,
+      format: "iife",
+      target: "es2023",
+    });
   }
   for (const [directory, packageName] of selectedProjects) {
-    const assets = join(root, "projects", directory, "assets");
+    const assets = join(root, "projects", directory, "modules", "shooter", "game", "assets");
     const archive = join(output, `${packageName}.zip`);
     if (!existsSync(assets)) throw new Error(`Missing assets directory: ${assets}`);
     const staging = join(output, `.staging-${directory}-${process.pid}`);

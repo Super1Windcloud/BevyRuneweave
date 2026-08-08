@@ -377,14 +377,14 @@ mod tests {
     #[test]
     fn javascript_shooter_uses_structured_ecs_api() {
         assert_shooter_uses_structured_ecs_api(include_str!(
-            "../../../projects/js/assets/shooter.js"
+            "../../../projects/js/modules/shooter/game/assets/shooter.js"
         ));
     }
 
     #[test]
     fn compiled_typescript_shooter_uses_structured_ecs_api() {
         assert_shooter_uses_structured_ecs_api(include_str!(
-            "../../../projects/ts/assets/shooter.js"
+            "../../../projects/ts/modules/shooter/game/assets/shooter.js"
         ));
     }
 }

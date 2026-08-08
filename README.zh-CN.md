@@ -39,12 +39,17 @@ Runeweave 核心提供三种语言一致的 Entity、Component、Resource 与 Qu
 ```text
 projects/
 ├── lua/                 # 独立 Lua 5.5.0 可执行项目
-│   └── assets/          # shooter.lua + 独立 sprites
+│   └── modules/shooter/ # api 与 game/src、game/assets 分层
 ├── js/                  # 独立 QuickJS 可执行项目
-│   └── assets/          # shooter.js + 独立 sprites
+│   └── modules/shooter/ # api 与 game/src、game/assets 分层
 └── ts/                  # TypeScript 7.0.2 + QuickJS 可执行项目
-    ├── src/             # TypeScript 游戏源码 + Runeweave API 声明
-    └── assets/          # 编译后 shooter.js + 独立 sprites
+    └── modules/shooter/
+        ├── api/         # ECS、HTTP 类型接口与显式导入层
+        └── game/        # src 游戏源码与 assets 运行时资源
+templates/game-project/  # 独立项目模板，不属于任何 projects 游戏
+├── lua/
+├── js/
+└── ts/
 src/                     # bevy-runeweave 框架核心与共享 Bevy 宿主
 ├── ecs_api/             # 三语言统一的通用 ECS API
 │   ├── bindings/        # Lua 与 QuickJS/TypeScript 语言适配
@@ -62,6 +67,17 @@ examples/                # 桌面、Android 与 iOS 独立宿主工程
 
 资源被有意复制到每个子项目中。运行时使用子项目传入的绝对资源根目录，
 不会从其他语言项目加载脚本或图片。
+
+基于飞机大战模板创建独立游戏项目：
+
+```bash
+npm run create:game -- --language=ts --name=my-game
+npm run create:game -- --language=js --name=my-game
+npm run create:game -- --language=lua --name=my-game
+```
+
+模板只从 `templates/game-project/<language>` 读取，新项目生成到 `projects/<name>`。
+TypeScript 会额外复制独立 `api/` 层并立即打包 `game/assets/shooter.js`。
 
 ## 运行
 
@@ -129,7 +145,7 @@ ecs_resource_set / ecs_resource_get / ecs_resource_remove
 脚本文件支持 Bevy 资源热重载。修改当前项目 `assets` 下的脚本后，游戏状态
 会用新脚本重新初始化，并在终端打印 `Reloading script after source change`。
 `just run-ts` 会同时运行 TypeScript watch compiler，因此修改
-`projects/ts/src/shooter.ts` 也会自动编译并触发游戏重载。
+`projects/ts/modules/shooter/game/src/shooter.ts` 也会自动编译并触发游戏重载。
 
 ## 构建验证
 
@@ -230,7 +246,7 @@ Android 需要 SDK、NDK、`cargo-ndk` 以及相应 Rust target。
 
 `examples/ios-demo-host` 是独立 Xcode 工程。由于 winit 必须自行首次调用
 `UIApplicationMain`，iOS 不能先显示 SwiftUI/UIKit 下载页再进入 Bevy，因此示例将
-`projects/ts/assets` 作为包内资源，并在 UIKit 启动前校验 `engineConfig.json`。执行
+`projects/ts/modules/shooter/game/assets` 作为包内资源，并在 UIKit 启动前校验 `engineConfig.json`。执行
 `just build-ios-demo` 会先生成同时包含 Lua 与 QuickJS 的 XCFramework，再构建模拟器应用。
 
 桌面安装包包含 launcher、当前 OS 对应的统一 runtime，以及默认 TypeScript demo 资源。

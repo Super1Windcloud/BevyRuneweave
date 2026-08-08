@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "name": "script-squadron-lua",
+  "version": "0.1.0",
+  "script": { "language": "lua", "entry": "shooter.lua" },
+  "metadata": { "runtime": "lua55" }
+}
