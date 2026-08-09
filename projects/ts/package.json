@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "build": "esbuild modules/shooter/game/src/shooter.ts --bundle --format=iife --target=es2023 --outfile=modules/shooter/game/assets/shooter.js",
-    "watch": "esbuild modules/shooter/game/src/shooter.ts --bundle --format=iife --target=es2023 --outfile=modules/shooter/game/assets/shooter.js --watch",
+    "watch": "esbuild modules/shooter/game/src/shooter.ts --bundle --format=iife --target=es2023 --outfile=modules/shooter/game/assets/shooter.js --watch=forever",
     "check": "tsc --project tsconfig.json --noEmit"
   },
   "devDependencies": {

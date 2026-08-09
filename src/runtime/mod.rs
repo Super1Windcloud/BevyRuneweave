@@ -49,6 +49,7 @@ const DEFAULT_WINDOW_ICON: &[u8] = include_bytes!("../../assets/branding/bevy_ic
 #[serde(rename_all = "camelCase")]
 struct RuntimeConfig {
     app_name: Option<String>,
+    #[allow(dead_code)]
     icon: Option<String>,
 }
 
