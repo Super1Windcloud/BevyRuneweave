@@ -12,7 +12,7 @@ pub(super) struct ScriptEntityRegistry(HashMap<ScriptEntityKey, Entity>);
 
 /// All script-defined components attached to one Bevy entity.
 #[derive(Component, Clone, Debug, Default)]
-pub struct ScriptComponents(ComponentMap);
+pub struct ScriptComponents(pub(crate) ComponentMap);
 
 impl ScriptComponents {
     /// Returns a named component value.
@@ -151,7 +151,11 @@ mod tests {
         assert!(bridge.insert_component(
             "player",
             "sprite".to_owned(),
-            object([("kind", EcsValue::String("player".to_owned()))]),
+            object([
+                ("path", EcsValue::String("sprites/player.png".to_owned())),
+                ("width", EcsValue::Number(72.0)),
+                ("height", EcsValue::Number(88.0)),
+            ]),
         ));
         bridge.set_resource(
             "game_state".to_owned(),

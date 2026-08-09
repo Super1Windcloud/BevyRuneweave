@@ -51,7 +51,18 @@ import {
 } from "./ecs.js";
 
 spawnEntity("player");
-insertComponent("player", "transform", { x: 0, y: -300 });
+insertComponent("player", "sprite", {
+  path: "sprites/player.png",
+  width: 72,
+  height: 88,
+});
+insertComponent("player", "transform", { x: 0, y: -300, z: 3 });
+spawnEntity("hud");
+insertComponent("hud", "text", {
+  value: "SCORE 00000    LIVES 3",
+  fontSize: 25,
+  anchor: "top_center",
+});
 const renderables = queryEntities(["transform", "sprite"]);
 const transform = getComponent("player", "transform");
 setResource("game_state", { score: 0, lives: 3, message: "READY" });
@@ -61,8 +72,12 @@ SDK 源码见 `projects/ts/modules/shooter/api/ecs.ts`。底层全局 C ABI 风�
 
 ```javascript
 ecs_entity_spawn("player");
-ecs_component_insert("player", "transform", { x: 0, y: -300 });
-ecs_component_insert("player", "sprite", { kind: "player" });
+ecs_component_insert("player", "transform", { x: 0, y: -300, z: 3 });
+ecs_component_insert("player", "sprite", {
+  path: "sprites/player.png",
+  width: 72,
+  height: 88,
+});
 
 const renderables = ecs_query(["transform", "sprite"]);
 const transform = ecs_component_get("player", "transform");
@@ -82,8 +97,12 @@ TypeScript 全局声明见 `projects/ts/modules/shooter/api/runeweave.d.ts`。
 local ecs = require("runeweave.ecs")
 
 ecs.entity_spawn("player")
-ecs.component_insert("player", "transform", { x = 0, y = -300 })
-ecs.component_insert("player", "sprite", { kind = "player" })
+ecs.component_insert("player", "transform", { x = 0, y = -300, z = 3 })
+ecs.component_insert("player", "sprite", {
+    path = "sprites/player.png",
+    width = 72,
+    height = 88,
+})
 
 local renderables = ecs.query({ "transform", "sprite" })
 local transform = ecs.component_get("player", "transform")
@@ -161,6 +180,15 @@ end
 `runeweave.network` 同样是 runtime 注册的虚拟 Lua 模块。
 
 ## Rust 消费端
+
+Script Squadron 示例宿主将通用渲染数据解释为 Bevy 组件：
+
+- `sprite`: `path` 是 `assets` 内不允许 `..` 的相对路径，`width`/`height` 可选。
+- `transform`: `x`/`y` 必填，`z` 可选且默认为 `0`。
+- `text`: `value` 必填；支持 `fontSize`、`red`/`green`/`blue`/`alpha` 和九宫格 `anchor`。
+
+背景、精灵资源、尺寸、层级和 HUD 内容均由脚本定义；Rust 宿主不包含
+`player`/`enemy`/`bullet` 等游戏业务映射。
 
 `RuneweaveEcsPlugin` 将脚本 Entity 同步为带有 `ScriptOwned`、`ScriptOwnerId`、
 `ScriptEntityId` 和 `ScriptComponents` 的 Bevy Entity，并将全局数据同步到

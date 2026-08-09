@@ -324,7 +324,7 @@ pub(super) fn ecs_lua_plugin(bridge: EcsBridge, network: NetworkBridge) -> LuaSc
 mod tests {
     use std::sync::{
         Arc,
-        atomic::{AtomicI32, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering},
     };
 
     use super::*;
@@ -334,6 +334,8 @@ mod tests {
         let lua = Lua::new();
         let globals = lua.globals();
         let sprite_count = Arc::new(AtomicUsize::new(0));
+        let player_sprite_path = Arc::new(AtomicBool::new(false));
+        let hud_text = Arc::new(AtomicBool::new(false));
         let remaining_lives = Arc::new(AtomicI32::new(3));
 
         globals
@@ -359,9 +361,20 @@ mod tests {
                 "ecs_component_insert",
                 lua.create_function({
                     let sprite_count = Arc::clone(&sprite_count);
-                    move |_, (_, name, _): (String, String, Value)| {
+                    let player_sprite_path = Arc::clone(&player_sprite_path);
+                    let hud_text = Arc::clone(&hud_text);
+                    move |_, (entity, name, value): (String, String, Value)| {
                         if name == "sprite" {
                             sprite_count.fetch_add(1, Ordering::Relaxed);
+                            if entity == "player"
+                                && let Value::Table(sprite) = value
+                            {
+                                let path: String = sprite.get("path")?;
+                                player_sprite_path
+                                    .store(path == "sprites/player.png", Ordering::Relaxed);
+                            }
+                        } else if entity == "hud" && name == "text" {
+                            hud_text.store(true, Ordering::Relaxed);
                         }
                         Ok(true)
                     }
@@ -420,6 +433,8 @@ mod tests {
         }
 
         assert!(sprite_count.load(Ordering::Relaxed) > 1);
+        assert!(player_sprite_path.load(Ordering::Relaxed));
+        assert!(hud_text.load(Ordering::Relaxed));
         assert!(remaining_lives.load(Ordering::Relaxed) > 0);
     }
 }

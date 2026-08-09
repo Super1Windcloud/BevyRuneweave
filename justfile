@@ -15,6 +15,10 @@ default:
 ts-install:
     npm --prefix {{ts_dir}} install
 
+# Create an independent game project from a template (TypeScript by default).
+create-game name language="ts":
+    npm exec -- tsx scripts/create-game-project.ts --name="{{name}}" --language="{{language}}"
+
 # Compile TypeScript into its isolated QuickJS asset directory.
 ts-build:
     npm --prefix {{ts_dir}} run build

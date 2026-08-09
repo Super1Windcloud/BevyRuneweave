@@ -4,6 +4,12 @@ const ENEMY_SPEED = 145;
 const FIRE_DELAY = 0.18;
 const SPAWN_DELAY = 0.72;
 const DAMAGE_DELAY = 1.0;
+const SPRITES = {
+  background: { path: "sprites/background.png", width: 600, height: 800 },
+  player: { path: "sprites/player.png", width: 72, height: 88 },
+  enemy: { path: "sprites/enemy.png", width: 66, height: 70 },
+  bullet: { path: "sprites/bullet.png", width: 14, height: 34 },
+};
 
 function createWorld() {
   return {
@@ -48,11 +54,8 @@ function spawnEntity(id, bundle) {
   if (bundle.role === "enemy") world.enemies.add(id);
 
   ecs_entity_spawn(id);
-  ecs_component_insert(id, "sprite", { kind: bundle.sprite });
-  ecs_component_insert(id, "transform", {
-    x: bundle.transform.x,
-    y: bundle.transform.y,
-  });
+  ecs_component_insert(id, "sprite", bundle.sprite);
+  ecs_component_insert(id, "transform", bundle.transform);
 }
 
 function queueDespawn(id) {
@@ -86,8 +89,8 @@ function random01() {
 function spawnPlayer() {
   spawnEntity("player", {
     role: "player",
-    sprite: "player",
-    transform: { x: 0, y: -300 },
+    sprite: SPRITES.player,
+    transform: { x: 0, y: -300, z: 3 },
     collider: { x: 25, y: 35 },
   });
 }
@@ -95,8 +98,8 @@ function spawnPlayer() {
 function spawnEnemy() {
   spawnEntity(`enemy_${resources.nextId++}`, {
     role: "enemy",
-    sprite: "enemy",
-    transform: { x: -250 + random01() * 500, y: 350 },
+    sprite: SPRITES.enemy,
+    transform: { x: -250 + random01() * 500, y: 350, z: 2 },
     velocity: { x: 0, y: -ENEMY_SPEED },
     collider: { x: 30, y: 30 },
   });
@@ -105,8 +108,8 @@ function spawnEnemy() {
 function spawnBullet(playerTransform) {
   spawnEntity(`bullet_${resources.nextId++}`, {
     role: "bullet",
-    sprite: "bullet",
-    transform: { x: playerTransform.x, y: playerTransform.y + 50 },
+    sprite: SPRITES.bullet,
+    transform: { x: playerTransform.x, y: playerTransform.y + 50, z: 1 },
     velocity: { x: 0, y: BULLET_SPEED },
     collider: { x: 6, y: 12 },
   });
@@ -204,22 +207,36 @@ function renderSyncSystem() {
   }
 }
 
+function updateGameState(message) {
+  ecs_resource_set("game_state", { score: resources.score, lives: resources.lives, message });
+  const status = `SCORE ${String(resources.score).padStart(5, "0")}    LIVES ${resources.lives}`;
+  ecs_component_insert("hud", "text", {
+    value: message ? `${status}\n${message}` : status,
+    fontSize: 25,
+    red: 0.82,
+    green: 0.94,
+    blue: 1.0,
+    alpha: 1.0,
+    anchor: "top_center",
+  });
+}
+
 function gameStateSystem() {
   if (resources.lives <= 0) {
     resources.lives = 0;
     resources.gameOver = true;
-    ecs_resource_set("game_state", {
-      score: resources.score,
-      lives: resources.lives,
-      message: "GAME OVER - TAP SPACE TO RESTART",
-    });
+    updateGameState("GAME OVER - TAP SPACE TO RESTART");
   } else {
-    ecs_resource_set("game_state", {
-      score: resources.score,
-      lives: resources.lives,
-      message: "",
-    });
+    updateGameState("");
   }
+}
+
+function spawnScene() {
+  ecs_entity_spawn("background");
+  ecs_component_insert("background", "sprite", SPRITES.background);
+  ecs_component_insert("background", "transform", { x: 0, y: 0, z: -10 });
+  ecs_entity_spawn("hud");
+  ecs_component_insert("hud", "transform", { x: 0, y: 382, z: 20 });
 }
 
 const updateSchedule = [
@@ -235,12 +252,9 @@ function resetGame() {
   ecs_world_clear();
   world = createWorld();
   resources = createResources();
+  spawnScene();
   spawnPlayer();
-  ecs_resource_set("game_state", {
-    score: resources.score,
-    lives: resources.lives,
-    message: "ARROWS/WASD - AUTO FIRE",
-  });
+  updateGameState("ARROWS/WASD - AUTO FIRE");
 }
 
 globalThis.on_script_loaded = resetGame;
@@ -249,18 +263,10 @@ globalThis.on_update = function (dt, inputX, inputY, restartPressed) {
   if (!resources.started) {
     if (restartPressed && !resources.restartWasPressed) {
       resources.started = true;
-      ecs_resource_set("game_state", {
-        score: resources.score,
-        lives: resources.lives,
-        message: "ARROWS/WASD - AUTO FIRE",
-      });
+      updateGameState("ARROWS/WASD - AUTO FIRE");
     } else {
       resources.restartWasPressed = restartPressed;
-      ecs_resource_set("game_state", {
-        score: resources.score,
-        lives: resources.lives,
-        message: "PRESS SPACE TO START",
-      });
+      updateGameState("PRESS SPACE TO START");
       return;
     }
   }

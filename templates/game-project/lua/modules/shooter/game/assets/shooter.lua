@@ -6,6 +6,12 @@ local ENEMY_SPEED = 145
 local FIRE_DELAY = 0.18
 local SPAWN_DELAY = 0.72
 local DAMAGE_DELAY = 1.0
+local SPRITES = {
+    background = { path = "sprites/background.png", width = 600, height = 800 },
+    player = { path = "sprites/player.png", width = 72, height = 88 },
+    enemy = { path = "sprites/enemy.png", width = 66, height = 70 },
+    bullet = { path = "sprites/bullet.png", width = 14, height = 34 },
+}
 
 local function create_world()
     return {
@@ -50,11 +56,8 @@ local function spawn_entity(id, bundle)
     if bundle.role == "enemy" then world.enemies[id] = true end
 
     ecs.entity_spawn(id)
-    ecs.component_insert(id, "sprite", { kind = bundle.sprite })
-    ecs.component_insert(id, "transform", {
-        x = bundle.transform.x,
-        y = bundle.transform.y,
-    })
+    ecs.component_insert(id, "sprite", bundle.sprite)
+    ecs.component_insert(id, "transform", bundle.transform)
 end
 
 local function queue_despawn(id)
@@ -88,8 +91,8 @@ end
 local function spawn_player()
     spawn_entity("player", {
         role = "player",
-        sprite = "player",
-        transform = { x = 0, y = -300 },
+        sprite = SPRITES.player,
+        transform = { x = 0, y = -300, z = 3 },
         collider = { x = 25, y = 35 },
     })
 end
@@ -99,8 +102,8 @@ local function spawn_enemy()
     resources.next_id = resources.next_id + 1
     spawn_entity(id, {
         role = "enemy",
-        sprite = "enemy",
-        transform = { x = -250 + random01() * 500, y = 350 },
+        sprite = SPRITES.enemy,
+        transform = { x = -250 + random01() * 500, y = 350, z = 2 },
         velocity = { x = 0, y = -ENEMY_SPEED },
         collider = { x = 30, y = 30 },
     })
@@ -111,8 +114,8 @@ local function spawn_bullet(player_transform)
     resources.next_id = resources.next_id + 1
     spawn_entity(id, {
         role = "bullet",
-        sprite = "bullet",
-        transform = { x = player_transform.x, y = player_transform.y + 50 },
+        sprite = SPRITES.bullet,
+        transform = { x = player_transform.x, y = player_transform.y + 50, z = 1 },
         velocity = { x = 0, y = BULLET_SPEED },
         collider = { x = 6, y = 12 },
     })
@@ -214,22 +217,36 @@ local function render_sync_system()
     end
 end
 
+local function update_game_state(message)
+    ecs.resource_set("game_state", { score = resources.score, lives = resources.lives, message = message })
+    local status = string.format("SCORE %05d    LIVES %d", resources.score, resources.lives)
+    ecs.component_insert("hud", "text", {
+        value = message ~= "" and status .. "\n" .. message or status,
+        fontSize = 25,
+        red = 0.82,
+        green = 0.94,
+        blue = 1.0,
+        alpha = 1.0,
+        anchor = "top_center",
+    })
+end
+
 local function game_state_system()
     if resources.lives <= 0 then
         resources.lives = 0
         resources.game_over = true
-        ecs.resource_set("game_state", {
-            score = resources.score,
-            lives = resources.lives,
-            message = "GAME OVER - TAP SPACE TO RESTART",
-        })
+        update_game_state("GAME OVER - TAP SPACE TO RESTART")
     else
-        ecs.resource_set("game_state", {
-            score = resources.score,
-            lives = resources.lives,
-            message = "",
-        })
+        update_game_state("")
     end
+end
+
+local function spawn_scene()
+    ecs.entity_spawn("background")
+    ecs.component_insert("background", "sprite", SPRITES.background)
+    ecs.component_insert("background", "transform", { x = 0, y = 0, z = -10 })
+    ecs.entity_spawn("hud")
+    ecs.component_insert("hud", "transform", { x = 0, y = 382, z = 20 })
 end
 
 local update_schedule = {
@@ -245,12 +262,9 @@ local function reset_game()
     ecs.world_clear()
     world = create_world()
     resources = create_resources()
+    spawn_scene()
     spawn_player()
-    ecs.resource_set("game_state", {
-        score = resources.score,
-        lives = resources.lives,
-        message = "ARROWS/WASD - AUTO FIRE",
-    })
+    update_game_state("ARROWS/WASD - AUTO FIRE")
 end
 
 function on_script_loaded()
@@ -265,18 +279,10 @@ function on_update(dt, input_x, input_y, restart_pressed)
     if not resources.started then
         if restart_pressed and not resources.restart_was_pressed then
             resources.started = true
-            ecs.resource_set("game_state", {
-                score = resources.score,
-                lives = resources.lives,
-                message = "ARROWS/WASD - AUTO FIRE",
-            })
+            update_game_state("ARROWS/WASD - AUTO FIRE")
         else
             resources.restart_was_pressed = restart_pressed
-            ecs.resource_set("game_state", {
-                score = resources.score,
-                lives = resources.lives,
-                message = "PRESS SPACE TO START",
-            })
+            update_game_state("PRESS SPACE TO START")
             return
         end
     end

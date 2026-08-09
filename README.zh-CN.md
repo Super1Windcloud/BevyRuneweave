@@ -31,8 +31,8 @@ Script Squadron 的三个可执行示例分别为 `script-squadron-lua`、`scrip
 `script-squadron-typescript`。
 
 Runeweave 核心提供三种语言一致的 Entity、Component、Resource 与 Query API；
-飞机大战宿主只负责窗口、键盘输入，以及将示例组件映射成精灵和 HUD。具体玩法均
-分别由 Lua、JavaScript 和 TypeScript 实现。
+飞机大战宿主只提供窗口、键盘输入以及通用精灵/文本物化。资源路径、尺寸、层级、
+HUD 内容和具体玩法均分别由 Lua、JavaScript 和 TypeScript 实现。
 
 ## 项目结构
 
@@ -71,14 +71,16 @@ examples/                # 桌面、Android 与 iOS 独立宿主工程
 基于飞机大战模板创建独立游戏项目：
 
 ```bash
-npm run create:game -- --language=ts --name=my-game
-npm run create:game -- --language=js --name=my-game
-npm run create:game -- --language=lua --name=my-game
+just create-game my-game
+just create-game my-js-game js
+just create-game my-lua-game lua
 ```
 
 模板只从 `templates/game-project/<language>` 读取，新项目生成到 `projects/<name>`。
 TypeScript 会额外复制独立 `api/` 层并立即打包 `game/assets/shooter.js`；
-JavaScript 和 Lua 直接编辑 `game/assets` 内的唯一入口脚本。
+JavaScript 和 Lua 直接编辑 `game/assets` 内的唯一入口脚本。未指定语言时默认使用
+TypeScript，同时接受 `typescript` 作为 `ts` 的别名。模板校验和 TypeScript 首次编译都在
+临时目录中完成，创建失败不会在 `projects/` 中留下不完整项目。
 
 ## 运行
 
@@ -138,9 +140,9 @@ ecs_query
 ecs_resource_set / ecs_resource_get / ecs_resource_remove
 ```
 
-例如，一个可渲染实体由 `ecs_entity_spawn` 创建，再分别插入 `sprite` 和 `transform`
-组件。Runeweave 不认识这些业务名称；Script Squadron 宿主 System 查询结构化组件并
-映射成 Bevy `Sprite` 和 `Transform`。新增能力时不再修改四份语言绑定，而是新增组件、
+例如，一个可渲染实体由 `ecs_entity_spawn` 创建，再分别插入含资源路径与尺寸的
+`sprite` 和含 `x`/`y`/`z` 的 `transform` 组件。Runeweave 不认识游戏业务名称；
+Script Squadron 宿主 System 只将通用结构化组件物化为 Bevy 组件。新增能力时不再修改四份语言绑定，而是新增组件、
 资源和消费它们的 Bevy System。完整契约见 [`docs/ecs-api.md`](docs/ecs-api.md)。
 
 脚本文件支持 Bevy 资源热重载。修改 JavaScript 或 Lua 项目 `assets` 下的
@@ -177,6 +179,8 @@ just ts-build
 QuickJS 的运行时；JavaScript 和编译后的 TypeScript 都由 QuickJS 执行。
 所有 runtime 命令默认打包 debug；追加 `--release` 才打包 release，例如
 `just build-runtime-macos --release`。
+具体修改是否需要重新构建 runtime，请查看
+[Runtime 重新构建规则](docs/runtime-rebuild-rules.md)。
 
 ```bash
 # 构建某个平台的统一运行时

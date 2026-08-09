@@ -14,20 +14,30 @@ interface Vec2 {
   y: number;
 }
 
+interface ScriptTransform extends Vec2 {
+  z: number;
+}
+
+interface SpriteSpec {
+  path: string;
+  width: number;
+  height: number;
+}
+
 interface SpawnBundle {
   role: Role;
-  sprite: string;
-  transform: Vec2;
+  sprite: SpriteSpec;
+  transform: ScriptTransform;
   collider: Vec2;
   velocity?: Vec2;
 }
 
 interface World {
   entities: Set<EntityId>;
-  transforms: Map<EntityId, Vec2>;
+  transforms: Map<EntityId, ScriptTransform>;
   velocities: Map<EntityId, Vec2>;
   colliders: Map<EntityId, Vec2>;
-  sprites: Map<EntityId, string>;
+  sprites: Map<EntityId, SpriteSpec>;
   players: Set<EntityId>;
   bullets: Set<EntityId>;
   enemies: Set<EntityId>;
@@ -61,6 +71,12 @@ const ENEMY_SPEED = 145;
 const FIRE_DELAY = 0.18;
 const SPAWN_DELAY = 0.72;
 const DAMAGE_DELAY = 1.0;
+const sprites = {
+  background: { path: "sprites/background.png", width: 600, height: 800 },
+  player: { path: "sprites/player.png", width: 72, height: 88 },
+  enemy: { path: "sprites/enemy.png", width: 66, height: 70 },
+  bullet: { path: "sprites/bullet.png", width: 14, height: 34 },
+} satisfies Record<string, SpriteSpec>;
 
 function createWorld(): World {
   return {
@@ -86,8 +102,8 @@ function createResources(): GameResources {
     damageTimer: 0,
     seed: 73129,
     gameOver: false,
-  restartWasPressed: false,
-  started: false,
+    restartWasPressed: false,
+    started: false,
   };
 }
 
@@ -105,11 +121,8 @@ function spawnEntity(id: EntityId, bundle: SpawnBundle): void {
   if (bundle.role === "enemy") world.enemies.add(id);
 
   spawnEcsEntity(id);
-  insertComponent(id, "sprite", { kind: bundle.sprite });
-  insertComponent(id, "transform", {
-    x: bundle.transform.x,
-    y: bundle.transform.y,
-  });
+  insertComponent(id, "sprite", bundle.sprite);
+  insertComponent(id, "transform", bundle.transform);
 }
 
 function queueDespawn(id: EntityId): void {
@@ -143,8 +156,8 @@ function random01(): number {
 function spawnPlayer(): void {
   spawnEntity("player", {
     role: "player",
-    sprite: "player",
-    transform: { x: 0, y: -300 },
+    sprite: sprites.player,
+    transform: { x: 0, y: -300, z: 3 },
     collider: { x: 25, y: 35 },
   });
 }
@@ -152,8 +165,8 @@ function spawnPlayer(): void {
 function spawnEnemy(): void {
   spawnEntity(`enemy_${resources.nextId++}`, {
     role: "enemy",
-    sprite: "enemy",
-    transform: { x: -250 + random01() * 500, y: 350 },
+    sprite: sprites.enemy,
+    transform: { x: -250 + random01() * 500, y: 350, z: 2 },
     velocity: { x: 0, y: -ENEMY_SPEED },
     collider: { x: 30, y: 30 },
   });
@@ -162,8 +175,8 @@ function spawnEnemy(): void {
 function spawnBullet(playerTransform: Vec2): void {
   spawnEntity(`bullet_${resources.nextId++}`, {
     role: "bullet",
-    sprite: "bullet",
-    transform: { x: playerTransform.x, y: playerTransform.y + 50 },
+    sprite: sprites.bullet,
+    transform: { x: playerTransform.x, y: playerTransform.y + 50, z: 1 },
     velocity: { x: 0, y: BULLET_SPEED },
     collider: { x: 6, y: 12 },
   });
@@ -262,22 +275,36 @@ function renderSyncSystem(): void {
   }
 }
 
+function updateGameState(message: string): void {
+  setResource("game_state", { score: resources.score, lives: resources.lives, message });
+  const status = `SCORE ${String(resources.score).padStart(5, "0")}    LIVES ${resources.lives}`;
+  insertComponent("hud", "text", {
+    value: message ? `${status}\n${message}` : status,
+    fontSize: 25,
+    red: 0.82,
+    green: 0.94,
+    blue: 1.0,
+    alpha: 1.0,
+    anchor: "top_center",
+  });
+}
+
 function gameStateSystem(): void {
   if (resources.lives <= 0) {
     resources.lives = 0;
     resources.gameOver = true;
-    setResource("game_state", {
-      score: resources.score,
-      lives: resources.lives,
-      message: "GAME OVER - TAP SPACE TO RESTART",
-    });
+    updateGameState("GAME OVER - TAP SPACE TO RESTART");
   } else {
-    setResource("game_state", {
-      score: resources.score,
-      lives: resources.lives,
-      message: "",
-    });
+    updateGameState("");
   }
+}
+
+function spawnScene(): void {
+  spawnEcsEntity("background");
+  insertComponent("background", "sprite", sprites.background);
+  insertComponent("background", "transform", { x: 0, y: 0, z: -10 });
+  spawnEcsEntity("hud");
+  insertComponent("hud", "transform", { x: 0, y: 382, z: 20 });
 }
 
 const updateSchedule: GameSystem[] = [
@@ -293,12 +320,9 @@ function resetGame(): void {
   clearWorld();
   world = createWorld();
   resources = createResources();
+  spawnScene();
   spawnPlayer();
-  setResource("game_state", {
-    score: resources.score,
-    lives: resources.lives,
-    message: "ARROWS/WASD - AUTO FIRE",
-  });
+  updateGameState("ARROWS/WASD - AUTO FIRE");
 }
 
 const callbacks = globalThis as typeof globalThis & RuneweaveCallbacks;
@@ -315,18 +339,10 @@ callbacks.on_update = function (dt: number, inputX: number, inputY: number, rest
   if (!resources.started) {
     if (restartPressed && !resources.restartWasPressed) {
       resources.started = true;
-      setResource("game_state", {
-        score: resources.score,
-        lives: resources.lives,
-        message: "ARROWS/WASD - AUTO FIRE",
-      });
+      updateGameState("ARROWS/WASD - AUTO FIRE");
     } else {
       resources.restartWasPressed = restartPressed;
-      setResource("game_state", {
-        score: resources.score,
-        lives: resources.lives,
-        message: "PRESS SPACE TO START",
-      });
+      updateGameState("PRESS SPACE TO START");
       return;
     }
   }

@@ -31,8 +31,8 @@ TypeScript package is `@superwindcloud/bevy-runeweave`. The Script Squadron exec
 `script-squadron-lua`, `script-squadron-js`, and `script-squadron-typescript`.
 
 Runeweave exposes the same Entity, Component, Resource, and Query API to all three languages. The
-shooter host is responsible only for the window, keyboard input, sprite mapping, and HUD rendering;
-the gameplay itself remains in Lua, JavaScript, or TypeScript.
+shooter host provides the window, keyboard input, and generic sprite/text materialization. Scripts
+select asset paths, dimensions, render layers, and HUD content alongside the gameplay itself.
 
 ## Project Layout
 
@@ -75,16 +75,19 @@ asset root and never loads scripts or images from another language project.
 Create a new independent game project from the airplane-shooter template:
 
 ```bash
-npm run create:game -- --language=ts --name=my-game
-npm run create:game -- --language=js --name=my-game
-npm run create:game -- --language=lua --name=my-game
+just create-game my-game
+just create-game my-js-game js
+just create-game my-lua-game lua
 ```
 
 Templates are stored independently under `templates/game-project/<language>`; active projects are
 never used as template sources. Each command creates a complete standalone project at
 `projects/<name>`. TypeScript projects receive a separate typed `modules/shooter/api/` layer and are
 bundled immediately into `modules/shooter/game/assets/shooter.js`. JavaScript and Lua use the script
-in `modules/shooter/game/assets` as their single editable runtime entry.
+in `modules/shooter/game/assets` as their single editable runtime entry. The language defaults to
+TypeScript; `typescript` is also accepted as an alias for `ts`. Template validation and the initial
+TypeScript build finish in a temporary directory, so a failed creation does not leave a partial
+project behind.
 
 ## Running
 
@@ -185,6 +188,8 @@ just build-ts --release
 `dist/runtimes/<platform>/<architecture>/`. Each platform architecture receives one unified runtime
 containing Lua 5.5 and QuickJS; JavaScript and compiled TypeScript both execute through QuickJS.
 Runtime commands also default to debug builds and accept `--release` explicitly.
+See [Runtime Rebuild Rules](docs/runtime-rebuild-rules.md) for the runtime/assets/host decision
+boundary.
 
 ```bash
 just build-runtime-macos
