@@ -208,20 +208,20 @@ impl eframe::App for LauncherApp {
                 }
             });
 
-            if !self.downloading && self.installed_game_available {
-                ui.horizontal(|ui| {
+            ui.horizontal(|ui| {
+                if !self.downloading && self.installed_game_available {
                     if ui.button("Start Installed Game").clicked()
                         && let Err(error) = launch_runtime_process()
                     {
                         self.error = Some(error);
                     }
-                    if ui.button("Open Assets Folder").clicked()
-                        && let Err(error) = open_assets_directory()
-                    {
-                        self.error = Some(error);
-                    }
-                });
-            }
+                }
+                if ui.button("Open Resource Directory").clicked()
+                    && let Err(error) = open_resource_directory()
+                {
+                    self.error = Some(error);
+                }
+            });
 
             if let Some(error) = &self.error {
                 ui.add_space(8.0);
@@ -231,11 +231,17 @@ impl eframe::App for LauncherApp {
     }
 }
 
-fn open_assets_directory() -> Result<(), String> {
-    let assets = active_assets_root()?;
-    directory_open_command(&assets)
+fn open_resource_directory() -> Result<(), String> {
+    let resources = platform_data_root()?;
+    fs::create_dir_all(&resources).map_err(|error| {
+        format!(
+            "Could not create resource directory {}: {error}",
+            resources.display()
+        )
+    })?;
+    directory_open_command(&resources)
         .spawn()
-        .map_err(|error| format!("Could not open {}: {error}", assets.display()))?;
+        .map_err(|error| format!("Could not open {}: {error}", resources.display()))?;
     Ok(())
 }
 
@@ -955,6 +961,22 @@ mod tests {
             "script-squadron-typescript"
         );
         assert!(project_name("bad project.zip").is_err());
+    }
+
+    #[test]
+    fn builds_platform_directory_open_command() {
+        let path = Path::new("assets folder");
+        let command = directory_open_command(path);
+        let program = if cfg!(target_os = "windows") {
+            "explorer.exe"
+        } else if cfg!(target_os = "macos") {
+            "open"
+        } else {
+            "xdg-open"
+        };
+
+        assert_eq!(command.get_program(), OsStr::new(program));
+        assert_eq!(command.get_args().collect::<Vec<_>>(), [path.as_os_str()]);
     }
 
     #[test]
