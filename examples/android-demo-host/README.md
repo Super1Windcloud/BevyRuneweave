@@ -9,9 +9,12 @@ Gradle. Build the runtime once, then build and install the APK as often as neede
 
 ```bash
 just build-runtime-android
-./gradlew :app:assembleDebug
-./gradlew :app:installDebug
+just build-android-demo
 ```
+
+`just build-android-demo` installs the Debug APK and launches `MainActivity` on the connected device.
+When multiple devices are connected, set `ANDROID_SERIAL` to select one. The Release variant is not
+signed, so `just build-android-demo --release` only assembles the Release APK.
 
 Both runtime and APK recipes default to debug. For release, run `just build-runtime-android --release`
 once before `just build-android-demo --release`. The APK build checks that every selected ABI exists

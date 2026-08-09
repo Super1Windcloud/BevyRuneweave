@@ -5,6 +5,8 @@
 #include "game_runtime.h"
 
 static NSString *const HostErrorDomain = @"io.github.super1windcloud.runeweave.host";
+static NSString *const BootstrapScriptName = @"host-bootstrap.js";
+static NSString *const InstalledMarkerName = @".installed-package";
 static const NSUInteger MaxArchiveBytes = 64 * 1024 * 1024;
 static const NSUInteger MaxUnpackedBytes = 256 * 1024 * 1024;
 static const NSUInteger MaxArchiveEntries = 10000;
@@ -305,7 +307,29 @@ static NSString *installedAssetsPath(NSError **error) {
                                   withIntermediateDirectories:YES attributes:nil error:error]) {
         return nil;
     }
-    return [root stringByAppendingPathComponent:@"assets"];
+    return [root stringByAppendingPathComponent:@"runtime-assets"];
+}
+
+static BOOL copyBootstrapScript(NSString *assets, NSError **error) {
+    NSFileManager *files = NSFileManager.defaultManager;
+    NSString *source = [NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:
+        [@"assets" stringByAppendingPathComponent:BootstrapScriptName]];
+    NSString *target = [assets stringByAppendingPathComponent:BootstrapScriptName];
+    if (![files fileExistsAtPath:source]) {
+        if (error) *error = hostError(64, @"The bundled host bootstrap script is missing");
+        return NO;
+    }
+    [files removeItemAtPath:target error:nil];
+    return [files copyItemAtPath:source toPath:target error:error];
+}
+
+static NSDictionary *installedGameConfig(NSString *assets, NSError **error) {
+    NSString *marker = [assets stringByAppendingPathComponent:InstalledMarkerName];
+    if (![NSFileManager.defaultManager fileExistsAtPath:marker]) {
+        if (error) *error = hostError(65, @"No game package is installed");
+        return nil;
+    }
+    return validateAssets(assets, error);
 }
 
 static BOOL installArchive(NSData *archive, NSString *installed, NSError **error) {
@@ -327,12 +351,19 @@ static BOOL installArchive(NSData *archive, NSString *installed, NSError **error
         if ([files fileExistsAtPath:backup]) [files moveItemAtPath:backup toPath:installed error:nil];
         return NO;
     }
+    NSString *marker = [installed stringByAppendingPathComponent:InstalledMarkerName];
+    if (!copyBootstrapScript(installed, error) ||
+        ![@"installed\n" writeToFile:marker atomically:YES encoding:NSUTF8StringEncoding error:error]) {
+        [files removeItemAtPath:installed error:nil];
+        if ([files fileExistsAtPath:backup]) [files moveItemAtPath:backup toPath:installed error:nil];
+        return NO;
+    }
     [files removeItemAtPath:backup error:nil];
     return YES;
 }
 
 static BOOL installBundledAssetsIfNeeded(NSString *installed, NSError **error) {
-    if (validateAssets(installed, nil) != nil) return YES;
+    if (validateAssets(installed, nil) != nil) return copyBootstrapScript(installed, error);
     NSString *bundled = [NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"assets"];
     if (validateAssets(bundled, error) == nil) return NO;
 
@@ -347,89 +378,287 @@ static BOOL installBundledAssetsIfNeeded(NSString *installed, NSError **error) {
         [files removeItemAtPath:staging error:nil];
         return NO;
     }
-    return YES;
+    return copyBootstrapScript(installed, error);
 }
 
-static UIViewController *topViewController(void) {
-    UIWindow *window = nil;
+static UIWindow *HostLauncherWindow;
+
+static UIColor *hostColor(CGFloat red, CGFloat green, CGFloat blue) {
+    return [UIColor colorWithRed:red / 255.0 green:green / 255.0 blue:blue / 255.0 alpha:1.0];
+}
+
+static UIWindow *bevyWindow(void) {
+    UIWindow *fallback = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:UIWindowScene.class] ||
             scene.activationState == UISceneActivationStateUnattached) continue;
         for (UIWindow *candidate in ((UIWindowScene *)scene).windows) {
-            if (candidate.isKeyWindow) {
-                window = candidate;
-                break;
-            }
-            if (window == nil) window = candidate;
+            if (candidate == HostLauncherWindow) continue;
+            if (candidate.isKeyWindow) return candidate;
+            if (fallback == nil) fallback = candidate;
         }
-        if (window != nil) break;
     }
-    UIViewController *controller = window.rootViewController;
-    while (controller.presentedViewController != nil) controller = controller.presentedViewController;
-    return controller;
+    if (fallback != nil) return fallback;
+    for (UIWindow *candidate in UIApplication.sharedApplication.windows) {
+        if (candidate != HostLauncherWindow) return candidate;
+    }
+    return nil;
 }
 
-static void showErrorAlert(NSString *message) {
-    UIViewController *controller = topViewController();
-    if (controller == nil) return;
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Download failed"
+@interface HostLauncherViewController : UIViewController <UITextFieldDelegate>
+
+@property(nonatomic, copy) NSString *installed;
+@property(nonatomic, strong) UITextField *urlField;
+@property(nonatomic, strong) UIButton *downloadButton;
+@property(nonatomic, strong) UIButton *launchButton;
+@property(nonatomic, strong) NSMutableArray<UIButton *> *remoteButtons;
+@property(nonatomic, strong) UIActivityIndicatorView *spinner;
+@property(nonatomic, strong) UILabel *statusLabel;
+
+- (instancetype)initWithInstalledPath:(NSString *)installed;
+
+@end
+
+@implementation HostLauncherViewController
+
+- (instancetype)initWithInstalledPath:(NSString *)installed {
+    self = [super initWithNibName:nil bundle:nil];
+    if (self != nil) {
+        _installed = [installed copy];
+        _remoteButtons = [NSMutableArray array];
+    }
+    return self;
+}
+
+- (UILabel *)labelWithText:(NSString *)text size:(CGFloat)size color:(UIColor *)color {
+    UILabel *label = [[UILabel alloc] init];
+    label.text = text;
+    label.font = [UIFont systemFontOfSize:size];
+    label.textColor = color;
+    label.numberOfLines = 0;
+    return label;
+}
+
+- (UIButton *)buttonWithTitle:(NSString *)title action:(SEL)action {
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    [button setTitle:title forState:UIControlStateNormal];
+    button.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    button.backgroundColor = UIColor.whiteColor;
+    button.layer.cornerRadius = 6;
+    button.layer.borderWidth = 1;
+    button.layer.borderColor = hostColor(211, 216, 221).CGColor;
+    [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+    [button.heightAnchor constraintEqualToConstant:50].active = YES;
+    return button;
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = hostColor(244, 245, 247);
+
+    UIScrollView *scroll = [[UIScrollView alloc] init];
+    scroll.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:scroll];
+
+    UIStackView *content = [[UIStackView alloc] init];
+    content.translatesAutoresizingMaskIntoConstraints = NO;
+    content.axis = UILayoutConstraintAxisVertical;
+    content.spacing = 10;
+    [scroll addSubview:content];
+
+    UILabel *title = [self labelWithText:@"Bevy RuneWeave" size:28 color:hostColor(28, 32, 36)];
+    title.font = [UIFont systemFontOfSize:28 weight:UIFontWeightSemibold];
+    [content addArrangedSubview:title];
+
+    UILabel *subtitle = [self labelWithText:@"iOS host" size:15 color:hostColor(83, 90, 98)];
+    [content addArrangedSubview:subtitle];
+    [content setCustomSpacing:28 afterView:subtitle];
+
+    UILabel *section = [self labelWithText:@"GitHub release assets" size:16 color:hostColor(28, 32, 36)];
+    section.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+    [content addArrangedSubview:section];
+
+    for (NSUInteger index = 0; index < availableAssets().count; index++) {
+        NSDictionary<NSString *, NSString *> *asset = availableAssets()[index];
+        UIButton *button = [self buttonWithTitle:[@"Download " stringByAppendingString:asset[@"name"]]
+                                          action:@selector(downloadPreset:)];
+        button.tag = (NSInteger)index;
+        [self.remoteButtons addObject:button];
+        [content addArrangedSubview:button];
+    }
+
+    self.urlField = [[UITextField alloc] init];
+    self.urlField.translatesAutoresizingMaskIntoConstraints = NO;
+    self.urlField.placeholder = @"HTTPS asset package URL";
+    self.urlField.keyboardType = UIKeyboardTypeURL;
+    self.urlField.autocapitalizationType = UITextAutocapitalizationTypeNone;
+    self.urlField.autocorrectionType = UITextAutocorrectionTypeNo;
+    self.urlField.returnKeyType = UIReturnKeyGo;
+    self.urlField.clearButtonMode = UITextFieldViewModeWhileEditing;
+    self.urlField.backgroundColor = UIColor.whiteColor;
+    self.urlField.layer.cornerRadius = 6;
+    self.urlField.layer.borderWidth = 1;
+    self.urlField.layer.borderColor = hostColor(211, 216, 221).CGColor;
+    self.urlField.delegate = self;
+    UIView *leftPadding = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 12, 1)];
+    self.urlField.leftView = leftPadding;
+    self.urlField.leftViewMode = UITextFieldViewModeAlways;
+    [self.urlField.heightAnchor constraintEqualToConstant:52].active = YES;
+    [content addArrangedSubview:self.urlField];
+
+    self.downloadButton = [self buttonWithTitle:@"Download and start" action:@selector(downloadCustom)];
+    self.downloadButton.backgroundColor = hostColor(35, 105, 194);
+    [self.downloadButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    self.downloadButton.layer.borderWidth = 0;
+    [content addArrangedSubview:self.downloadButton];
+
+    self.launchButton = [self buttonWithTitle:@"Start installed game" action:@selector(launchInstalled)];
+    [content addArrangedSubview:self.launchButton];
+
+    self.spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+    self.spinner.hidesWhenStopped = YES;
+    [self.spinner.heightAnchor constraintEqualToConstant:42].active = YES;
+    [content addArrangedSubview:self.spinner];
+
+    self.statusLabel = [self labelWithText:@"" size:14 color:hostColor(73, 80, 87)];
+    self.statusLabel.textAlignment = NSTextAlignmentCenter;
+    [content addArrangedSubview:self.statusLabel];
+
+    UILayoutGuide *frame = scroll.frameLayoutGuide;
+    UILayoutGuide *layout = scroll.contentLayoutGuide;
+    [NSLayoutConstraint activateConstraints:@[
+        [scroll.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [scroll.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [scroll.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [scroll.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [content.leadingAnchor constraintEqualToAnchor:layout.leadingAnchor constant:24],
+        [content.trailingAnchor constraintEqualToAnchor:layout.trailingAnchor constant:-24],
+        [content.topAnchor constraintEqualToAnchor:layout.topAnchor constant:48],
+        [content.bottomAnchor constraintLessThanOrEqualToAnchor:layout.bottomAnchor constant:-24],
+        [content.widthAnchor constraintEqualToAnchor:frame.widthAnchor constant:-48],
+    ]];
+    [self updateInstalledState];
+}
+
+- (void)setBusy:(BOOL)busy status:(NSString *)status {
+    self.urlField.enabled = !busy;
+    self.downloadButton.enabled = !busy;
+    self.launchButton.enabled = !busy && installedGameConfig(self.installed, nil) != nil;
+    for (UIButton *button in self.remoteButtons) button.enabled = !busy;
+    if (busy) [self.spinner startAnimating]; else [self.spinner stopAnimating];
+    self.statusLabel.text = status;
+}
+
+- (void)updateInstalledState {
+    NSDictionary *config = installedGameConfig(self.installed, nil);
+    self.launchButton.enabled = config != nil;
+    if (config == nil) {
+        self.statusLabel.text = @"No game package installed";
+        return;
+    }
+    self.statusLabel.text = [NSString stringWithFormat:@"Installed: %@ %@",
+        config[@"name"], config[@"version"]];
+}
+
+- (void)showError:(NSString *)message {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Could not start game"
         message:message preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-    [controller presentViewController:alert animated:YES completion:nil];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
-static void downloadAndActivate(NSDictionary<NSString *, NSString *> *asset, NSString *installed) {
-    UIViewController *controller = topViewController();
-    if (controller == nil) return;
-    UIAlertController *progress = [UIAlertController alertControllerWithTitle:@"Downloading"
-        message:[NSString stringWithFormat:@"Loading %@ assets from GitHub...", asset[@"name"]]
-        preferredStyle:UIAlertControllerStyleAlert];
-    [controller presentViewController:progress animated:YES completion:^{
-        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-            NSError *error = nil;
-            NSURL *url = [NSURL URLWithString:asset[@"url"]];
-            NSData *archive = fetchData(url, @{@"User-Agent": @"bevy-runeweave-ios-host"},
-                                        MaxArchiveBytes, &error);
-            NSDictionary *config = archive == nil ? nil :
-                (installArchive(archive, installed, &error) ? validateAssets(installed, &error) : nil);
-            NSString *entry = config[@"script"][@"entry"];
-            int switchResult = entry == nil ? 1 : game_runtime_switch_script(entry.UTF8String);
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [progress dismissViewControllerAnimated:YES completion:^{
-                    if (error != nil) {
-                        showErrorAlert(error.localizedDescription);
-                    } else if (switchResult != 0) {
-                        showErrorAlert(@"The runtime could not activate the selected script");
-                    }
-                }];
-            });
+- (void)activateConfig:(NSDictionary *)config {
+    NSString *entry = config[@"script"][@"entry"];
+    if (entry.length == 0 || game_runtime_switch_script(entry.UTF8String) != 0) {
+        [self setBusy:NO status:@""];
+        [self showError:@"The runtime could not activate the selected script"];
+        [self updateInstalledState];
+        return;
+    }
+    UIWindow *runtimeWindow = bevyWindow();
+    HostLauncherWindow.hidden = YES;
+    HostLauncherWindow.rootViewController = nil;
+    HostLauncherWindow = nil;
+    [runtimeWindow makeKeyAndVisible];
+}
+
+- (void)downloadPreset:(UIButton *)sender {
+    NSDictionary<NSString *, NSString *> *asset = availableAssets()[(NSUInteger)sender.tag];
+    self.urlField.text = asset[@"url"];
+    [self downloadURL:[NSURL URLWithString:asset[@"url"]]];
+}
+
+- (void)downloadCustom {
+    NSString *raw = [self.urlField.text stringByTrimmingCharactersInSet:
+        NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    NSURL *url = [NSURL URLWithString:raw];
+    if (url == nil || ![url.scheme.lowercaseString isEqualToString:@"https"]) {
+        [self showError:@"Enter a valid HTTPS URL"];
+        return;
+    }
+    [self downloadURL:url];
+}
+
+- (void)downloadURL:(NSURL *)url {
+    [self.view endEditing:YES];
+    [self setBusy:YES status:@"Downloading package..."];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSError *error = nil;
+        NSData *archive = fetchData(url, @{@"User-Agent": @"bevy-runeweave-ios-host"},
+                                    MaxArchiveBytes, &error);
+        NSDictionary *config = archive == nil ? nil :
+            (installArchive(archive, self.installed, &error) ?
+                installedGameConfig(self.installed, &error) : nil);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (config != nil) {
+                [self activateConfig:config];
+            } else {
+                [self setBusy:NO status:@""];
+                [self showError:error.localizedDescription ?: @"Installation failed"];
+                [self updateInstalledState];
+            }
         });
-    }];
+    });
 }
 
-static void presentAssetPicker(NSString *installed, NSUInteger attempts) {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 500 * NSEC_PER_MSEC),
+- (void)launchInstalled {
+    NSError *error = nil;
+    NSDictionary *config = installedGameConfig(self.installed, &error);
+    if (config == nil) {
+        [self showError:error.localizedDescription];
+        [self updateInstalledState];
+        return;
+    }
+    [self setBusy:YES status:@"Starting installed game..."];
+    [self activateConfig:config];
+}
+
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
+    [textField resignFirstResponder];
+    [self downloadCustom];
+    return YES;
+}
+
+@end
+
+static void presentHostLauncher(NSString *installed, NSUInteger attempts) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 250 * NSEC_PER_MSEC),
                    dispatch_get_main_queue(), ^{
-        UIViewController *controller = topViewController();
-        if (controller == nil) {
-            if (attempts > 0) presentAssetPicker(installed, attempts - 1);
+        UIWindow *runtimeWindow = bevyWindow();
+        if (runtimeWindow == nil) {
+            if (attempts > 0) presentHostLauncher(installed, attempts - 1);
             return;
         }
-        UIAlertController *picker = [UIAlertController alertControllerWithTitle:@"GitHub assets"
-            message:@"Choose a resource package to download and start"
-            preferredStyle:UIAlertControllerStyleAlert];
-        for (NSDictionary<NSString *, NSString *> *asset in availableAssets()) {
-            [picker addAction:[UIAlertAction actionWithTitle:asset[@"name"]
-                style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
-                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 250 * NSEC_PER_MSEC),
-                                   dispatch_get_main_queue(), ^{
-                        downloadAndActivate(asset, installed);
-                    });
-                }]];
+        HostLauncherViewController *controller =
+            [[HostLauncherViewController alloc] initWithInstalledPath:installed];
+        if (@available(iOS 13.0, *)) {
+            HostLauncherWindow = [[UIWindow alloc] initWithWindowScene:runtimeWindow.windowScene];
+        } else {
+            HostLauncherWindow = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
         }
-        [picker addAction:[UIAlertAction actionWithTitle:@"Start installed game"
-            style:UIAlertActionStyleCancel handler:nil]];
-        [controller presentViewController:picker animated:YES completion:nil];
+        HostLauncherWindow.rootViewController = controller;
+        HostLauncherWindow.windowLevel = UIWindowLevelAlert + 1;
+        [HostLauncherWindow makeKeyAndVisible];
     });
 }
 
@@ -448,12 +677,10 @@ int main(int argc, char *argv[]) {
         if (installed == nil || !installBundledAssetsIfNeeded(installed, &error)) {
             return fail(error.localizedDescription ?: @"No valid game assets are installed", 10);
         }
-        NSDictionary *config = validateAssets(installed, &error);
-        if (config == nil) return fail(error.localizedDescription, 11);
+        if (validateAssets(installed, &error) == nil) return fail(error.localizedDescription, 11);
 
-        NSString *entry = config[@"script"][@"entry"];
-        presentAssetPicker(installed, 20);
+        presentHostLauncher(installed, 40);
         return game_runtime_run_with_assets(installed.fileSystemRepresentation,
-                                            entry.fileSystemRepresentation);
+                                            BootstrapScriptName.fileSystemRepresentation);
     }
 }

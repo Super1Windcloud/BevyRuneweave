@@ -73,3 +73,22 @@ val stageRustRuntime by tasks.registering(Sync::class) {
 }
 
 tasks.named("preBuild").configure { dependsOn(stageRustRuntime) }
+
+val adbExecutable = androidComponents.sdkComponents.adb
+tasks.register<Exec>("launchDebug") {
+    group = "install"
+    description = "Installs the Debug APK and launches the demo on the connected Android device."
+    dependsOn("installDebug")
+    doFirst {
+        commandLine(
+            adbExecutable.get().asFile.absolutePath,
+            "shell",
+            "am",
+            "start",
+            "-W",
+            "-S",
+            "-n",
+            "io.github.super1windcloud.runeweave.demo/.MainActivity",
+        )
+    }
+}

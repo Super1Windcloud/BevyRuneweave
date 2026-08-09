@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // projects/ts/modules/shooter/api/ecs.ts
+  // modules/shooter/api/ecs.ts
   function clearWorld() {
     ecs_world_clear();
   }
@@ -17,12 +17,12 @@
     ecs_resource_set(name, value);
   }
 
-  // projects/ts/modules/shooter/api/input.ts
+  // modules/shooter/api/input.ts
   function keyPressed(key) {
     return input_key_pressed(key);
   }
 
-  // projects/ts/modules/shooter/game/src/shooter.ts
+  // modules/shooter/game/src/shooter.ts
   var PLAYER_SPEED = 330;
   var BULLET_SPEED = 570;
   var ENEMY_SPEED = 145;

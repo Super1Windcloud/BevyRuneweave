@@ -1,0 +1,10 @@
+{
+    "schemaVersion": 1,
+    "name": "bevy-runeweave-ios-host",
+    "version": "0.1.0",
+    "appName": "Bevy RuneWeave",
+    "script": {
+        "language": "js",
+        "entry": "host-bootstrap.js"
+    }
+}

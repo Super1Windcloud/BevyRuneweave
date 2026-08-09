@@ -172,7 +172,8 @@ class MainActivity : Activity() {
             if (entry.isDirectory) {
                 check(output.mkdirs() || output.isDirectory) { "Could not create ${entry.name}" }
             } else {
-                check(output.parentFile?.mkdirs() != false) { "Could not create ${entry.name}" }
+                val parent = checkNotNull(output.parentFile) { "Archive entry has no parent directory" }
+                check(parent.isDirectory || parent.mkdirs()) { "Could not create ${entry.name}" }
                 output.outputStream().buffered().use { stream ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                     while (true) {

@@ -11,7 +11,7 @@
 		100000000000000000000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000007 /* Assets.xcassets */; };
 
 		200000000000000000000001 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
-		200000000000000000000002 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../../projects/ts/modules/shooter/game/assets; sourceTree = "<group>"; };
+		200000000000000000000002 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = "<group>"; };
 		200000000000000000000003 /* BevyRuneweave.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BevyRuneweave.xcframework; path = ../../dist/runtimes/ios/xcframework/lib/BevyRuneweave.xcframework; sourceTree = "<group>"; };
 		200000000000000000000004 /* BevyRuneweave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BevyRuneweave.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		200000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = ../Info.plist; sourceTree = "<group>"; };
