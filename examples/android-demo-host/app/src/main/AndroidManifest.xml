@@ -19,9 +19,10 @@
         </activity>
 
         <activity
-            android:name="android.app.NativeActivity"
+            android:name=".RuntimeActivity"
             android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|uiMode"
             android:exported="false"
+            android:launchMode="singleTask"
             android:screenOrientation="portrait">
             <meta-data
                 android:name="android.app.lib_name"

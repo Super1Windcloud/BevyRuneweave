@@ -63,6 +63,10 @@ struct LoadedScriptPath {
 #[derive(Resource)]
 struct RuntimeAssetRoot(PathBuf);
 
+#[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
+#[derive(Resource)]
+struct ScriptFilePollTimer(Timer);
+
 fn attach_script(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -205,16 +209,29 @@ fn request_asset_reload(
         return;
     }
 
+    let reload_requested = RELOAD_REQUESTED.swap(false, Ordering::AcqRel);
+    if reload_requested {
+        info!("Reloading script: {}", path.source_path.display());
+        asset_server.reload(path.asset_path.clone());
+    }
+}
+
+#[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
+fn poll_asset_reload(
+    time: Res<Time>,
+    mut timer: ResMut<ScriptFilePollTimer>,
+    asset_server: Res<AssetServer>,
+    mut path: ResMut<LoadedScriptPath>,
+) {
+    if !timer.0.tick(time.delta()).just_finished() {
+        return;
+    }
+
     let modified = fs::metadata(&path.source_path)
         .and_then(|metadata| metadata.modified())
         .ok();
-    let source_changed = source_has_changed(path.modified, modified);
-    let reload_requested = RELOAD_REQUESTED.swap(false, Ordering::AcqRel);
-
-    if source_changed {
+    if source_has_changed(path.modified, modified) {
         path.modified = modified;
-    }
-    if source_changed || reload_requested {
         info!(
             "Reloading script after source change: {}",
             path.source_path.display()
@@ -332,6 +349,8 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         Update,
         (
             request_asset_reload,
+            #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
+            poll_asset_reload,
             emit_update,
             #[cfg(any(feature = "js", feature = "typescript"))]
             event_handler::<OnUpdate, QuickJsScriptingPlugin>,
@@ -341,6 +360,11 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             .chain()
             .before(ApplyEcsCommands),
     );
+    #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
+    app.insert_resource(ScriptFilePollTimer(Timer::from_seconds(
+        0.5,
+        TimerMode::Repeating,
+    )));
     Ok(app)
 }
 
@@ -404,6 +428,7 @@ pub unsafe extern "C" fn game_runtime_switch_script(script_path: *const c_char) 
     match SCRIPT_SWITCH_REQUESTED.lock() {
         Ok(mut requested) => {
             *requested = Some(script_path);
+            RELOAD_REQUESTED.store(true, Ordering::Release);
             0
         }
         Err(_) => 3,

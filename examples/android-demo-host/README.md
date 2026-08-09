@@ -1,8 +1,11 @@
 # Android demo host
 
 This standalone Android application downloads a release ZIP into app-private storage, validates
-`engineConfig.json`, and launches the game through Android `NativeActivity`. The NativeActivity is
-required because Bevy/winit must receive Android's `AndroidApp` before it creates an event loop.
+`engineConfig.json`, and launches the game through one long-lived Android `NativeActivity`. The
+NativeActivity is required because Bevy/winit must receive Android's `AndroidApp` before it creates
+an event loop. The downloader never starts a second NativeActivity: it reorders the existing
+`RuntimeActivity` and sends `game_runtime_switch_script` through JNI. This avoids winit's
+`RecreationAttempt` failure and stale Activity/logger state.
 
 The APK reuses the prebuilt runtime under `dist/runtimes/android` instead of compiling Rust from
 Gradle. Build the runtime once, then build and install the APK as often as needed:
@@ -32,6 +35,7 @@ TypeScript asset packages all use the same native runtime. Mobile installation i
 ZIP packages only.
 
 The Android launcher accepts an HTTPS ZIP URL, extracts it into staging, validates
-`engineConfig.json`, atomically replaces the installed assets, and starts the shared NativeActivity
-runtime. This is the same resource lifecycle used by the desktop and iOS hosts; the presentation and
-remote asset selection remain platform-specific.
+`engineConfig.json`, atomically replaces the installed assets, and starts or reuses the shared
+`RuntimeActivity` runtime. This is the same resource lifecycle used by the desktop and iOS hosts;
+the presentation and remote asset selection remain platform-specific. When the runtime activity is
+actually finished, its process is terminated so a future launch gets a fresh winit event loop.

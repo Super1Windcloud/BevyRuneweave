@@ -1,7 +1,6 @@
 package io.github.super1windcloud.runeweave.demo
 
 import android.app.Activity
-import android.app.NativeActivity
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -230,7 +229,11 @@ class MainActivity : Activity() {
                 showError(it.message ?: "No valid game is installed")
                 return
             }
-        startActivity(Intent(this, NativeActivity::class.java))
+        startActivity(
+            Intent(this, RuntimeActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(RuntimeActivity.EXTRA_SCRIPT, JSONObject(File(File(filesDir, "assets"), "engineConfig.json").readText()).getJSONObject("script").getString("entry")),
+        )
     }
 
     private fun updateInstalledState() {

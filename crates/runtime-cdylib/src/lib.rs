@@ -1,6 +1,9 @@
 use std::ffi::{c_char, c_int};
 
 #[cfg(target_os = "android")]
+use std::ffi::CString;
+
+#[cfg(target_os = "android")]
 use std::{fs, path::PathBuf};
 
 #[cfg(target_os = "android")]
@@ -90,4 +93,22 @@ pub unsafe extern "C" fn game_runtime_run_with_assets(
 ) -> c_int {
     // SAFETY: The host contract is forwarded unchanged to the runtime.
     unsafe { bevy_runeweave::game_runtime_run_with_assets(asset_root, script_path) }
+}
+
+#[cfg(target_os = "android")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_github_super1windcloud_runeweave_demo_RuntimeActivity_nativeSwitchScript(
+    mut env: jni::JNIEnv<'_>,
+    _activity: jni::objects::JObject<'_>,
+    script_path: jni::objects::JString<'_>,
+) -> jni::sys::jint {
+    let path = match env.get_string(&script_path) {
+        Ok(path) => path.to_string_lossy().into_owned(),
+        Err(_) => return 1,
+    };
+    let path = match CString::new(path) {
+        Ok(path) => path,
+        Err(_) => return 2,
+    };
+    unsafe { game_runtime_switch_script(path.as_ptr()) }
 }
