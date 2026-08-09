@@ -3,7 +3,10 @@ use std::{
     ffi::{CStr, c_char, c_int},
     fs,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -35,6 +38,7 @@ use bevy_mod_scripting::lua::LuaScriptingPlugin;
 use bevy_mod_scripting::quickjs::QuickJsScriptingPlugin;
 
 static RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
+static SCRIPT_SWITCH_REQUESTED: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 const WINDOW_WIDTH: u32 = 600;
 const WINDOW_HEIGHT: u32 = 800;
@@ -161,7 +165,46 @@ fn source_has_changed(
     current.is_some() && current != previous
 }
 
-fn request_asset_reload(asset_server: Res<AssetServer>, mut path: ResMut<LoadedScriptPath>) {
+fn request_asset_reload(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    asset_root: Res<RuntimeAssetRoot>,
+    mut path: ResMut<LoadedScriptPath>,
+    scripts: Query<Entity, With<ScriptComponent>>,
+) {
+    let requested = SCRIPT_SWITCH_REQUESTED
+        .lock()
+        .ok()
+        .and_then(|mut requested| requested.take());
+    if let Some(requested) = requested {
+        let asset_path = match normalize_script_path(&asset_root.0, &requested)
+            .and_then(|path| script_backend(&path).map(|_| path))
+        {
+            Ok(path) if asset_root.0.join(&path).is_file() => path,
+            Ok(path) => {
+                error!("Requested script does not exist: {}", path.display());
+                return;
+            }
+            Err(error) => {
+                error!("Could not switch runtime script: {error}");
+                return;
+            }
+        };
+        for entity in &scripts {
+            commands.entity(entity).despawn();
+        }
+        commands.spawn(ScriptComponent::new(vec![
+            asset_server.load::<ScriptAsset>(asset_path.clone()),
+        ]));
+        path.source_path = asset_root.0.join(&asset_path);
+        path.modified = fs::metadata(&path.source_path)
+            .and_then(|metadata| metadata.modified())
+            .ok();
+        path.asset_path = asset_path;
+        info!("Switched runtime script to {}", path.source_path.display());
+        return;
+    }
+
     let modified = fs::metadata(&path.source_path)
         .and_then(|metadata| metadata.modified())
         .ok();
@@ -340,6 +383,31 @@ pub const fn default_script_path() -> &'static str {
 /// Requests a BMS asset reload on the runtime's next frame.
 pub extern "C" fn game_runtime_request_reload() {
     RELOAD_REQUESTED.store(true, Ordering::Release);
+}
+
+/// Switches the active script to another relative path inside the current asset directory.
+///
+/// # Safety
+///
+/// `script_path` must point to a valid, NUL-terminated UTF-8 string for the duration of this call.
+pub unsafe extern "C" fn game_runtime_switch_script(script_path: *const c_char) -> c_int {
+    let script_path = match unsafe { c_path(script_path) } {
+        Ok(path) => path,
+        Err(code) => return code,
+    };
+    if normalize_script_path(Path::new("assets"), &script_path)
+        .and_then(|path| script_backend(&path).map(|_| path))
+        .is_err()
+    {
+        return 2;
+    }
+    match SCRIPT_SWITCH_REQUESTED.lock() {
+        Ok(mut requested) => {
+            *requested = Some(script_path);
+            0
+        }
+        Err(_) => 3,
+    }
 }
 
 /// C ABI entry point for desktop/mobile hosts. Returns non-zero for invalid input or startup panic.

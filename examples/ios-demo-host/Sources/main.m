@@ -1,4 +1,5 @@
 #import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 #include <zlib.h>
 
 #include "game_runtime.h"
@@ -276,41 +277,20 @@ static NSData *fetchData(NSURL *url, NSDictionary<NSString *, NSString *> *heade
     return result;
 }
 
-static NSDictionary *remoteAsset(NSError **error) {
-    NSString *override = NSProcessInfo.processInfo.environment[@"RUNEWEAVE_ASSET_URL"];
-    if (override.length > 0) {
-        NSURL *url = [NSURL URLWithString:override];
-        if (url == nil || ![url.scheme.lowercaseString isEqualToString:@"https"]) {
-            if (error) *error = hostError(70, @"RUNEWEAVE_ASSET_URL must be a valid HTTPS URL");
-            return nil;
-        }
-        return @{@"id": [@"url:" stringByAppendingString:override], @"url": url};
-    }
-
-    NSBundle *bundle = NSBundle.mainBundle;
-    NSString *apiValue = [bundle objectForInfoDictionaryKey:@"RuneweaveReleaseAPI"];
-    NSString *assetName = [bundle objectForInfoDictionaryKey:@"RuneweaveReleaseAsset"];
-    NSURL *api = [NSURL URLWithString:apiValue ?: @""];
-    if (api == nil || assetName.length == 0) return nil;
-    NSData *data = fetchData(api, @{@"Accept": @"application/vnd.github+json",
-                                   @"User-Agent": @"bevy-runeweave-ios-host"},
-                             2 * 1024 * 1024, error);
-    if (data == nil) return nil;
-    NSDictionary *release = [NSJSONSerialization JSONObjectWithData:data options:0 error:error];
-    if (![release isKindOfClass:NSDictionary.class]) {
-        if (error) *error = hostError(71, @"Release API returned an invalid response");
-        return nil;
-    }
-    for (NSDictionary *asset in release[@"assets"]) {
-        if ([asset[@"name"] isEqualToString:assetName]) {
-            NSURL *url = [NSURL URLWithString:asset[@"browser_download_url"] ?: @""];
-            if (url == nil || ![url.scheme.lowercaseString isEqualToString:@"https"]) break;
-            return @{@"id": [NSString stringWithFormat:@"github:%@", asset[@"id"] ?: @"unknown"],
-                     @"url": url};
-        }
-    }
-    if (error) *error = hostError(72, [NSString stringWithFormat:@"Release asset is missing: %@", assetName]);
-    return nil;
+static NSArray<NSDictionary<NSString *, NSString *> *> *availableAssets(void) {
+    static NSArray<NSDictionary<NSString *, NSString *> *> *assets;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        assets = @[
+            @{@"name": @"TypeScript",
+              @"url": @"https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-typescript.zip"},
+            @{@"name": @"JavaScript",
+              @"url": @"https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-js.zip"},
+            @{@"name": @"Lua",
+              @"url": @"https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-lua.zip"},
+        ];
+    });
+    return assets;
 }
 
 static NSString *installedAssetsPath(NSError **error) {
@@ -351,29 +331,106 @@ static BOOL installArchive(NSData *archive, NSString *installed, NSError **error
     return YES;
 }
 
-static void updateInstalledAssets(NSString *installed) {
-    NSError *installedError = nil;
-    BOOL installedValid = validateAssets(installed, &installedError) != nil;
-    NSError *remoteError = nil;
-    NSDictionary *asset = remoteAsset(&remoteError);
-    if (asset == nil) {
-        if (remoteError != nil) NSLog(@"Bevy RuneWeave update skipped: %@", remoteError.localizedDescription);
-        return;
-    }
+static BOOL installBundledAssetsIfNeeded(NSString *installed, NSError **error) {
+    if (validateAssets(installed, nil) != nil) return YES;
+    NSString *bundled = [NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"assets"];
+    if (validateAssets(bundled, error) == nil) return NO;
 
-    NSString *identifier = asset[@"id"];
-    NSString *current = [NSUserDefaults.standardUserDefaults stringForKey:@"RuneweaveInstalledAssetID"];
-    BOOL force = [NSProcessInfo.processInfo.environment[@"RUNEWEAVE_FORCE_ASSET_UPDATE"] boolValue];
-    if (installedValid && !force && [identifier isEqualToString:current]) return;
-
-    NSData *archive = fetchData(asset[@"url"], @{@"User-Agent": @"bevy-runeweave-ios-host"},
-                                MaxArchiveBytes, &remoteError);
-    if (archive == nil || !installArchive(archive, installed, &remoteError)) {
-        NSLog(@"Bevy RuneWeave update failed: %@", remoteError.localizedDescription);
-        return;
+    NSFileManager *files = NSFileManager.defaultManager;
+    NSString *staging = [installed.stringByDeletingLastPathComponent
+        stringByAppendingPathComponent:@"assets.staging"];
+    [files removeItemAtPath:staging error:nil];
+    [files removeItemAtPath:installed error:nil];
+    if (![files copyItemAtPath:bundled toPath:staging error:error] ||
+        validateAssets(staging, error) == nil ||
+        ![files moveItemAtPath:staging toPath:installed error:error]) {
+        [files removeItemAtPath:staging error:nil];
+        return NO;
     }
-    [NSUserDefaults.standardUserDefaults setObject:identifier forKey:@"RuneweaveInstalledAssetID"];
-    NSLog(@"Bevy RuneWeave installed remote asset %@", identifier);
+    return YES;
+}
+
+static UIViewController *topViewController(void) {
+    UIWindow *window = nil;
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:UIWindowScene.class] ||
+            scene.activationState == UISceneActivationStateUnattached) continue;
+        for (UIWindow *candidate in ((UIWindowScene *)scene).windows) {
+            if (candidate.isKeyWindow) {
+                window = candidate;
+                break;
+            }
+            if (window == nil) window = candidate;
+        }
+        if (window != nil) break;
+    }
+    UIViewController *controller = window.rootViewController;
+    while (controller.presentedViewController != nil) controller = controller.presentedViewController;
+    return controller;
+}
+
+static void showErrorAlert(NSString *message) {
+    UIViewController *controller = topViewController();
+    if (controller == nil) return;
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Download failed"
+        message:message preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+    [controller presentViewController:alert animated:YES completion:nil];
+}
+
+static void downloadAndActivate(NSDictionary<NSString *, NSString *> *asset, NSString *installed) {
+    UIViewController *controller = topViewController();
+    if (controller == nil) return;
+    UIAlertController *progress = [UIAlertController alertControllerWithTitle:@"Downloading"
+        message:[NSString stringWithFormat:@"Loading %@ assets from GitHub...", asset[@"name"]]
+        preferredStyle:UIAlertControllerStyleAlert];
+    [controller presentViewController:progress animated:YES completion:^{
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            NSError *error = nil;
+            NSURL *url = [NSURL URLWithString:asset[@"url"]];
+            NSData *archive = fetchData(url, @{@"User-Agent": @"bevy-runeweave-ios-host"},
+                                        MaxArchiveBytes, &error);
+            NSDictionary *config = archive == nil ? nil :
+                (installArchive(archive, installed, &error) ? validateAssets(installed, &error) : nil);
+            NSString *entry = config[@"script"][@"entry"];
+            int switchResult = entry == nil ? 1 : game_runtime_switch_script(entry.UTF8String);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [progress dismissViewControllerAnimated:YES completion:^{
+                    if (error != nil) {
+                        showErrorAlert(error.localizedDescription);
+                    } else if (switchResult != 0) {
+                        showErrorAlert(@"The runtime could not activate the selected script");
+                    }
+                }];
+            });
+        });
+    }];
+}
+
+static void presentAssetPicker(NSString *installed, NSUInteger attempts) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 500 * NSEC_PER_MSEC),
+                   dispatch_get_main_queue(), ^{
+        UIViewController *controller = topViewController();
+        if (controller == nil) {
+            if (attempts > 0) presentAssetPicker(installed, attempts - 1);
+            return;
+        }
+        UIAlertController *picker = [UIAlertController alertControllerWithTitle:@"GitHub assets"
+            message:@"Choose a resource package to download and start"
+            preferredStyle:UIAlertControllerStyleAlert];
+        for (NSDictionary<NSString *, NSString *> *asset in availableAssets()) {
+            [picker addAction:[UIAlertAction actionWithTitle:asset[@"name"]
+                style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 250 * NSEC_PER_MSEC),
+                                   dispatch_get_main_queue(), ^{
+                        downloadAndActivate(asset, installed);
+                    });
+                }]];
+        }
+        [picker addAction:[UIAlertAction actionWithTitle:@"Start installed game"
+            style:UIAlertActionStyleCancel handler:nil]];
+        [controller presentViewController:picker animated:YES completion:nil];
+    });
 }
 
 static int fail(NSString *message, int code) {
@@ -388,18 +445,15 @@ int main(int argc, char *argv[]) {
 
         NSError *error = nil;
         NSString *installed = installedAssetsPath(&error);
-        if (installed != nil) updateInstalledAssets(installed);
-
-        NSDictionary *config = installed == nil ? nil : validateAssets(installed, &error);
-        NSString *assets = config == nil
-            ? [NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"assets"]
-            : installed;
-        error = nil;
-        config = validateAssets(assets, &error);
-        if (config == nil) return fail(error.localizedDescription ?: @"No valid game assets are installed", 10);
+        if (installed == nil || !installBundledAssetsIfNeeded(installed, &error)) {
+            return fail(error.localizedDescription ?: @"No valid game assets are installed", 10);
+        }
+        NSDictionary *config = validateAssets(installed, &error);
+        if (config == nil) return fail(error.localizedDescription, 11);
 
         NSString *entry = config[@"script"][@"entry"];
-        return game_runtime_run_with_assets(assets.fileSystemRepresentation,
+        presentAssetPicker(installed, 20);
+        return game_runtime_run_with_assets(installed.fileSystemRepresentation,
                                             entry.fileSystemRepresentation);
     }
 }

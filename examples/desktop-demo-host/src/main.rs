@@ -19,9 +19,20 @@ use std::{
 
 const CONFIG_FILE: &str = "engineConfig.json";
 const BUILD_TARGET: &str = env!("RUNEWEAVE_BUILD_TARGET");
-const GITHUB_RELEASES_API: &str =
-    "https://api.github.com/repos/Super1Windcloud/BevyRuneweave/releases?per_page=10";
-const EMBEDDED_GITHUB_TOKEN: Option<&str> = option_env!("RUNEWEAVE_GITHUB_TOKEN");
+const REMOTE_ASSETS: [(&str, &str); 3] = [
+    (
+        "TypeScript",
+        "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-typescript.zip",
+    ),
+    (
+        "JavaScript",
+        "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-js.zip",
+    ),
+    (
+        "Lua",
+        "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-lua.zip",
+    ),
+];
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -51,29 +62,12 @@ struct ScriptConfig {
     entry: PathBuf,
 }
 
-#[derive(Clone, Deserialize)]
-struct ReleaseAsset {
-    name: String,
-    browser_download_url: String,
-    size: u64,
-}
-
-#[derive(Clone, Deserialize)]
-struct Release {
-    tag_name: String,
-    name: String,
-    prerelease: bool,
-    assets: Vec<ReleaseAsset>,
-}
-
 struct LauncherApp {
     url: String,
     downloading: bool,
     installed_game_available: bool,
     error: Option<String>,
     result: Option<Receiver<Result<(), String>>>,
-    releases: Vec<Release>,
-    releases_result: Option<Receiver<Result<Vec<Release>, String>>>,
 }
 
 impl LauncherApp {
@@ -84,8 +78,6 @@ impl LauncherApp {
             installed_game_available: active_assets_root().is_ok(),
             error: None,
             result: None,
-            releases: Vec::new(),
-            releases_result: fetch_releases(),
         }
     }
 
@@ -127,68 +119,33 @@ impl LauncherApp {
             Err(error) => self.error = Some(error),
         }
     }
-
-    fn poll_releases(&mut self, context: &egui::Context) {
-        let Some(receiver) = &self.releases_result else {
-            return;
-        };
-        let Ok(result) = receiver.try_recv() else {
-            return;
-        };
-        self.releases_result = None;
-        match result {
-            Ok(releases) => self.releases = releases,
-            Err(error) => self.error = Some(format!("Could not load GitHub releases: {error}")),
-        }
-        context.request_repaint();
-    }
 }
 
 impl eframe::App for LauncherApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let context = ui.ctx().clone();
         self.poll_download();
-        self.poll_releases(&context);
         egui::Frame::central_panel(ui.style()).show(ui, |ui| {
             ui.add_space(12.0);
             ui.heading("Bevy RuneWeave");
             ui.add_space(12.0);
 
-            if let Some(receiver) = &self.releases_result {
-                let _ = receiver;
-                ui.horizontal(|ui| {
-                    ui.spinner();
-                    ui.label("Loading GitHub releases...");
-                });
-            } else if !self.releases.is_empty() {
-                ui.label("GitHub releases");
-                for release in self.releases.clone() {
-                    let title = if release.name.is_empty() {
-                        release.tag_name.clone()
-                    } else {
-                        format!("{} ({})", release.name, release.tag_name)
-                    };
-                    ui.collapsing(title, |ui| {
-                        if release.prerelease {
-                            ui.small("Pre-release");
-                        }
-                        for asset in release.assets {
-                            let size = format_size(asset.size);
-                            if ui
-                                .add_enabled(
-                                    !self.downloading,
-                                    egui::Button::new(format!("Download {} ({size})", asset.name)),
-                                )
-                                .clicked()
-                            {
-                                self.url = asset.browser_download_url;
-                                self.start_download(&context);
-                            }
-                        }
-                    });
+            ui.label("GitHub release assets");
+            ui.horizontal_wrapped(|ui| {
+                for (name, url) in REMOTE_ASSETS {
+                    if ui
+                        .add_enabled(
+                            !self.downloading,
+                            egui::Button::new(format!("Download {name}")),
+                        )
+                        .clicked()
+                    {
+                        self.url = url.to_owned();
+                        self.start_download(&context);
+                    }
                 }
-                ui.separator();
-            }
+            });
+            ui.add_space(10.0);
 
             let response = ui.add_enabled(
                 !self.downloading,
@@ -255,44 +212,6 @@ fn directory_open_command(path: &Path) -> Command {
     let mut command = Command::new("xdg-open");
     command.arg(path);
     command
-}
-
-fn fetch_releases() -> Option<Receiver<Result<Vec<Release>, String>>> {
-    let (sender, receiver) = mpsc::channel();
-    thread::spawn(move || {
-        let client = reqwest::blocking::Client::new();
-        let mut request = client
-            .get(GITHUB_RELEASES_API)
-            .header("User-Agent", "bevy-runeweave-launcher");
-        if let Some(token) = EMBEDDED_GITHUB_TOKEN {
-            request = request.bearer_auth(token);
-        }
-        let result = request
-            .send()
-            .map_err(|error| error.to_string())
-            .and_then(|response| {
-                response
-                    .error_for_status()
-                    .map_err(|error| error.to_string())
-            })
-            .and_then(|response| {
-                response
-                    .json::<Vec<Release>>()
-                    .map_err(|error| error.to_string())
-            });
-        let _ = sender.send(result);
-    });
-    Some(receiver)
-}
-
-fn format_size(bytes: u64) -> String {
-    if bytes >= 1024 * 1024 {
-        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
-    } else if bytes >= 1024 {
-        format!("{:.1} KB", bytes as f64 / 1024.0)
-    } else {
-        format!("{bytes} B")
-    }
 }
 
 fn repo_root() -> Result<PathBuf, String> {

@@ -14,6 +14,9 @@ int game_runtime_run_with_assets(const char *asset_root, const char *script_path
 /* Reloads the configured script on the next frame. */
 void game_runtime_request_reload(void);
 
+/* Switches to another relative script path inside the active asset directory. */
+int game_runtime_switch_script(const char *script_path);
+
 #ifdef __cplusplus
 }
 #endif

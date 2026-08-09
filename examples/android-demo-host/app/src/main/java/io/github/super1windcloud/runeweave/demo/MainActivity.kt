@@ -25,6 +25,7 @@ class MainActivity : Activity() {
     private lateinit var urlField: EditText
     private lateinit var downloadButton: Button
     private lateinit var launchButton: Button
+    private val remoteAssetButtons = mutableListOf<Button>()
     private lateinit var progress: ProgressBar
     private lateinit var status: TextView
 
@@ -60,6 +61,24 @@ class MainActivity : Activity() {
                 setTextColor(Color.rgb(83, 90, 98))
                 setPadding(0, dp(4), 0, dp(24))
             }, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+            addView(TextView(context).apply {
+                text = "GitHub release assets"
+                textSize = 16f
+                setTextColor(Color.rgb(28, 32, 36))
+            }, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+            REMOTE_ASSETS.forEach { (name, url) ->
+                val button = Button(context).apply {
+                    text = "Download $name"
+                    setOnClickListener {
+                        urlField.setText(url)
+                        installFromUrl()
+                    }
+                }
+                remoteAssetButtons += button
+                addView(button, ViewGroup.LayoutParams.MATCH_PARENT, dp(48))
+            }
 
             urlField = EditText(context).apply {
                 hint = "HTTPS asset package URL"
@@ -214,12 +233,15 @@ class MainActivity : Activity() {
     }
 
     private fun updateInstalledState() {
-        launchButton.isEnabled = runCatching {
-            validatePackage(File(filesDir, "assets"))
-        }.isSuccess
+        launchButton.isEnabled = installedGameAvailable()
     }
 
+    private fun installedGameAvailable() = runCatching {
+        validatePackage(File(filesDir, "assets"))
+    }.isSuccess
+
     private fun setBusy(busy: Boolean, message: String) {
+        remoteAssetButtons.forEach { it.isEnabled = !busy }
         urlField.isEnabled = !busy
         downloadButton.isEnabled = !busy
         launchButton.isEnabled = !busy && launchButton.isEnabled
@@ -234,6 +256,11 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        private val REMOTE_ASSETS = listOf(
+            "TypeScript" to "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-typescript.zip",
+            "JavaScript" to "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-js.zip",
+            "Lua" to "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-lua.zip",
+        )
         private const val MAX_ENTRIES = 10_000
         private const val MAX_UNPACKED_BYTES = 256L * 1024L * 1024L
     }

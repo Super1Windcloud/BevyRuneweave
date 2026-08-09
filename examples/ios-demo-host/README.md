@@ -28,12 +28,7 @@ xcrun simctl install booted \
 xcrun simctl launch booted io.github.super1windcloud.runeweave.demo
 ```
 
-Before starting Bevy, the host queries the GitHub release API configured by
-`RuneweaveReleaseAPI` in `Info.plist`, selects `RuneweaveReleaseAsset`, and installs a changed ZIP
-under Application Support. Packages are extracted into staging, validated through
-`engineConfig.json`, and atomically promoted. A failed update falls back to the last valid installed
-package, then to the assets bundled with the app.
-
-For simulator or development testing, `RUNEWEAVE_ASSET_URL` overrides the release lookup with one
-HTTPS ZIP URL. Set `RUNEWEAVE_FORCE_ASSET_UPDATE=1` to reinstall an unchanged URL or release asset.
-The same XCFramework supports Lua, JavaScript, and compiled TypeScript packages.
+After Bevy creates its iOS window, the host presents the available GitHub TypeScript, JavaScript,
+and Lua release assets. Downloading is always user initiated. The selected ZIP is extracted into
+staging, validated through `engineConfig.json`, atomically promoted under Application Support, and
+then activated in the running runtime.

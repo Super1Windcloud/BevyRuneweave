@@ -65,6 +65,16 @@ pub extern "C" fn game_runtime_request_reload() {
 /// `script_path` must point to a valid, NUL-terminated UTF-8 string for the
 /// duration of this call.
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn game_runtime_switch_script(script_path: *const c_char) -> c_int {
+    // SAFETY: The host contract is forwarded unchanged to the runtime.
+    unsafe { bevy_runeweave::game_runtime_switch_script(script_path) }
+}
+
+/// # Safety
+///
+/// `script_path` must point to a valid, NUL-terminated UTF-8 string for the
+/// duration of this call.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn game_runtime_run(script_path: *const c_char) -> c_int {
     // SAFETY: The host contract is forwarded unchanged to the runtime.
     unsafe { bevy_runeweave::game_runtime_run(script_path) }
