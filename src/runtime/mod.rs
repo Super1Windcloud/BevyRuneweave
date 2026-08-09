@@ -104,7 +104,11 @@ fn set_default_window_icon(
     WINIT_WINDOWS.with_borrow(|windows| {
         if let Some(window) = windows.get_window(*primary_window) {
             #[cfg(target_os = "windows")]
-            window.set_taskbar_icon(Some(icon.clone()));
+            {
+                window.set_window_icon(Some(icon.clone()));
+                window.set_taskbar_icon(Some(icon));
+            }
+            #[cfg(target_os = "linux")]
             window.set_window_icon(Some(icon));
         } else {
             warn!("Failed to find the native primary window for its default icon");
