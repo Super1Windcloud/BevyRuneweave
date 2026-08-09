@@ -1,9 +1,11 @@
 # Desktop Demo Host
 
 This standalone Cargo project builds the Bevy RuneWeave launcher for Windows, macOS, and Linux.
-It downloads an asset package, extracts it directly under a project-specific directory in the user
-data directory (`<project-name>/assets`), validates `engineConfig.json`, and loads the matching
-runtime library through the public C ABI.
+It downloads an asset package into staging, validates `engineConfig.json`, and installs it under a
+stable project-specific directory in the user data directory (`<engineConfig.name>/assets`). The
+`active-project` marker records which installed package the launcher starts through the public C
+ABI. Reinstalling the same project replaces that directory instead of creating a new one from an
+HTTP redirect filename.
 
 Supported package formats:
 

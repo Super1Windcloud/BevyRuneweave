@@ -18,6 +18,7 @@ use std::{
 };
 
 const CONFIG_FILE: &str = "engineConfig.json";
+const ACTIVE_PROJECT_FILE: &str = "active-project";
 const BUILD_TARGET: &str = env!("RUNEWEAVE_BUILD_TARGET");
 const REMOTE_ASSETS: [(&str, &str); 3] = [
     (
@@ -48,8 +49,8 @@ struct EngineConfig {
     schema_version: u32,
     name: String,
     version: String,
-    #[serde(default, alias = "appName")]
-    app_name: Option<String>,
+    #[serde(default, rename = "appName")]
+    _app_name: Option<String>,
     #[serde(default)]
     icon: Option<String>,
     script: ScriptConfig,
@@ -167,12 +168,12 @@ impl eframe::App for LauncherApp {
             });
 
             ui.horizontal(|ui| {
-                if !self.downloading && self.installed_game_available {
-                    if ui.button("Start Installed Game").clicked()
-                        && let Err(error) = launch_runtime_process()
-                    {
-                        self.error = Some(error);
-                    }
+                if !self.downloading
+                    && self.installed_game_available
+                    && ui.button("Start Installed Game").clicked()
+                    && let Err(error) = launch_runtime_process()
+                {
+                    self.error = Some(error);
                 }
                 if ui.button("Open Resource Directory").clicked()
                     && let Err(error) = open_resource_directory()
@@ -284,29 +285,61 @@ fn platform_data_root() -> Result<PathBuf, String> {
 fn active_assets_root() -> Result<PathBuf, String> {
     let installed_root = platform_data_root()?;
     fs::create_dir_all(&installed_root).map_err(|error| error.to_string())?;
+    active_assets_root_at(&installed_root).or_else(|_| {
+        if let Ok(bundled) = bundled_assets_root() {
+            load_config(&bundled)?;
+            return Ok(bundled);
+        }
+        let development = repo_root()?.join("assets");
+        load_config(&development)?;
+        Ok(development)
+    })
+}
+
+fn active_assets_root_at(installed_root: &Path) -> Result<PathBuf, String> {
+    let active_file = installed_root.join(ACTIVE_PROJECT_FILE);
+    if let Ok(key) = fs::read_to_string(&active_file) {
+        let key = key.trim();
+        if project_directory_name(key).is_ok() {
+            let active = installed_root.join(key).join("assets");
+            if active.join(CONFIG_FILE).is_file() {
+                load_config(&active)?;
+                return Ok(active);
+            }
+        }
+    }
+
     let legacy = installed_root.join("assets");
     if legacy.join(CONFIG_FILE).is_file() {
         load_config(&legacy)?;
         return Ok(legacy);
     }
-    let mut installed = fs::read_dir(&installed_root)
+
+    let mut installed = fs::read_dir(installed_root)
         .map_err(|error| error.to_string())?
         .filter_map(Result::ok)
         .map(|entry| entry.path().join("assets"))
         .filter(|path| path.join(CONFIG_FILE).is_file())
+        .filter_map(|path| {
+            let modified = fs::metadata(path.join(CONFIG_FILE))
+                .and_then(|metadata| metadata.modified())
+                .ok()?;
+            Some((modified, path))
+        })
         .collect::<Vec<_>>();
-    installed.sort();
-    if let Some(path) = installed.into_iter().next() {
+    installed.sort_by(|left, right| right.0.cmp(&left.0).then_with(|| left.1.cmp(&right.1)));
+    if let Some((_, path)) = installed.into_iter().next() {
         load_config(&path)?;
+        if let Some(key) = path
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(OsStr::to_str)
+        {
+            let _ = write_active_project(installed_root, key);
+        }
         return Ok(path);
     }
-    if let Ok(bundled) = bundled_assets_root() {
-        load_config(&bundled)?;
-        return Ok(bundled);
-    }
-    let development = repo_root()?.join("assets");
-    load_config(&development)?;
-    Ok(development)
+    Err("No installed game assets are available".to_owned())
 }
 
 fn load_config(assets: &Path) -> Result<EngineConfig, String> {
@@ -574,6 +607,14 @@ fn extract_rar(_bytes: &[u8], _destination: &Path) -> Result<(), String> {
 fn download_and_install(url: &str) -> Result<(), String> {
     let root = platform_data_root()?;
     fs::create_dir_all(&root).map_err(|error| error.to_string())?;
+    let source_name = reqwest::Url::parse(url)
+        .ok()
+        .and_then(|url| {
+            url.path_segments()
+                .and_then(|mut segments| segments.rfind(|segment| !segment.is_empty()))
+                .map(str::to_owned)
+        })
+        .unwrap_or_else(|| "package".to_owned());
     let response = reqwest::blocking::Client::builder()
         .user_agent("BevyRuneWeave-Desktop-Demo/0.1")
         .build()
@@ -582,42 +623,89 @@ fn download_and_install(url: &str) -> Result<(), String> {
         .send()
         .and_then(reqwest::blocking::Response::error_for_status)
         .map_err(|error| format!("Download failed: {error}"))?;
-    let source_name = response
-        .url()
-        .path_segments()
-        .and_then(|segments| segments.filter(|segment| !segment.is_empty()).next_back())
-        .unwrap_or("package")
-        .to_owned();
     let bytes = response
         .bytes()
         .map_err(|error| format!("Could not read download: {error}"))?;
-    let project_root = root.join(project_name(&source_name)?);
-    let assets = project_root.join("assets");
-    fs::create_dir_all(&project_root).map_err(|error| error.to_string())?;
-    install_package(&bytes, &source_name, &assets)
+    install_downloaded_package(&root, &bytes, &source_name).map(|_| ())
 }
 
-fn project_name(source_name: &str) -> Result<String, String> {
-    let file_name = Path::new(source_name)
-        .file_name()
-        .and_then(OsStr::to_str)
-        .ok_or_else(|| "Downloaded package has no valid project name".to_owned())?;
-    let name = file_name
-        .strip_suffix(".zip")
-        .or_else(|| file_name.strip_suffix(".tar"))
-        .or_else(|| file_name.strip_suffix(".7z"))
-        .or_else(|| file_name.strip_suffix(".rar"))
-        .unwrap_or(file_name);
+fn project_directory_name(name: &str) -> Result<String, String> {
+    let name = name.trim();
     if name.is_empty()
         || name == "."
         || name == ".."
+        || name.starts_with('.')
         || !name.chars().all(|character| {
             character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
         })
     {
-        return Err(format!("Invalid project name in package: {file_name}"));
+        return Err(format!("Invalid engineConfig project name: {name}"));
     }
-    Ok(name.to_owned())
+    Ok(name.to_ascii_lowercase())
+}
+
+fn write_active_project(root: &Path, project: &str) -> Result<(), String> {
+    let key = project_directory_name(project)?;
+    if key != project {
+        return Err("Active project key is not normalized".to_owned());
+    }
+    let marker = root.join(ACTIVE_PROJECT_FILE);
+    let temporary = root.join(format!(".{ACTIVE_PROJECT_FILE}.{}.tmp", std::process::id()));
+    fs::write(&temporary, format!("{key}\n"))
+        .map_err(|error| format!("Could not write active project marker: {error}"))?;
+    if marker.exists() {
+        fs::remove_file(&marker)
+            .map_err(|error| format!("Could not replace active project marker: {error}"))?;
+    }
+    fs::rename(&temporary, &marker)
+        .map_err(|error| format!("Could not activate installed project: {error}"))
+}
+
+fn install_downloaded_package(
+    root: &Path,
+    bytes: &[u8],
+    source_name: &str,
+) -> Result<PathBuf, String> {
+    fs::create_dir_all(root).map_err(|error| error.to_string())?;
+    let staging = tempfile::Builder::new()
+        .prefix(".installing-")
+        .tempdir_in(root)
+        .map_err(|error| format!("Could not create staging directory: {error}"))?;
+    let staged_project = staging.path().join("project");
+    let staged_assets = staged_project.join("assets");
+    fs::create_dir_all(&staged_project).map_err(|error| error.to_string())?;
+    install_package(bytes, source_name, &staged_assets)?;
+
+    let config = load_config(&staged_assets)?;
+    let project = project_directory_name(&config.name)?;
+    let destination = root.join(&project);
+    let backup = root.join(format!(".{project}.backup"));
+    if backup.exists() {
+        fs::remove_dir_all(&backup)
+            .map_err(|error| format!("Could not remove stale project backup: {error}"))?;
+    }
+    if destination.exists() {
+        fs::rename(&destination, &backup)
+            .map_err(|error| format!("Could not preserve installed project: {error}"))?;
+    }
+    if let Err(error) = fs::rename(&staged_project, &destination) {
+        if backup.exists() {
+            let _ = fs::rename(&backup, &destination);
+        }
+        return Err(format!("Could not install project: {error}"));
+    }
+    if let Err(error) = write_active_project(root, &project) {
+        let _ = fs::remove_dir_all(&destination);
+        if backup.exists() {
+            let _ = fs::rename(&backup, &destination);
+        }
+        return Err(error);
+    }
+    if backup.exists() {
+        fs::remove_dir_all(&backup)
+            .map_err(|error| format!("Could not remove project backup: {error}"))?;
+    }
+    Ok(destination.join("assets"))
 }
 
 fn install_package(bytes: &[u8], source_name: &str, destination: &Path) -> Result<(), String> {
@@ -707,10 +795,9 @@ fn run_game() -> Result<(), String> {
         if icon.starts_with("http://") || icon.starts_with("https://") {
             if let Ok(response) =
                 reqwest::blocking::get(icon).and_then(reqwest::blocking::Response::error_for_status)
+                && let Ok(bytes) = response.bytes()
             {
-                if let Ok(bytes) = response.bytes() {
-                    let _ = fs::write(target, bytes);
-                }
+                let _ = fs::write(target, bytes);
             }
         } else {
             let relative = Path::new(icon);
@@ -875,12 +962,46 @@ mod tests {
     }
 
     #[test]
-    fn derives_project_directory_from_archive_name() {
+    fn derives_project_directory_from_engine_config_name() {
         assert_eq!(
-            project_name("script-squadron-typescript.zip").unwrap(),
+            project_directory_name("Script-Squadron-TypeScript").unwrap(),
             "script-squadron-typescript"
         );
-        assert!(project_name("bad project.zip").is_err());
+        assert!(project_directory_name("bad project").is_err());
+        assert!(project_directory_name("../project").is_err());
+    }
+
+    #[test]
+    fn reuses_project_directory_and_records_active_project() {
+        let root = tempfile::tempdir().unwrap();
+        let first = install_downloaded_package(
+            root.path(),
+            &asset_package_zip("release-one/"),
+            "first-random-id.zip",
+        )
+        .unwrap();
+        let second = install_downloaded_package(
+            root.path(),
+            &asset_package_zip("release-two/"),
+            "second-random-id.zip",
+        )
+        .unwrap();
+
+        let expected = root.path().join("test/assets");
+        assert_eq!(first, expected);
+        assert_eq!(second, expected);
+        assert_eq!(
+            fs::read_to_string(root.path().join(ACTIVE_PROJECT_FILE)).unwrap(),
+            "test\n"
+        );
+        assert_eq!(active_assets_root_at(root.path()).unwrap(), expected);
+        let project_directories = fs::read_dir(root.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().is_dir())
+            .filter(|entry| !entry.file_name().to_string_lossy().starts_with('.'))
+            .count();
+        assert_eq!(project_directories, 1);
     }
 
     #[test]
