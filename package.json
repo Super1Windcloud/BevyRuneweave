@@ -28,6 +28,7 @@
   "devDependencies": {
     "@types/node": "^26.1.2",
     "esbuild": "^0.28.1",
+    "javascript-obfuscator": "^5.5.0",
     "luamin": "^1.0.4",
     "tsx": "^4.20.6",
     "typescript": "7.0.2"

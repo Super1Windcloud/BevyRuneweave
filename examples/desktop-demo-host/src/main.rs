@@ -118,6 +118,7 @@ impl LauncherApp {
         self.downloading = false;
         match result {
             Ok(()) => {
+                self.installed_game_available = true;
                 if let Err(error) = launch_runtime_process() {
                     self.error = Some(error);
                 }
@@ -207,13 +208,19 @@ impl eframe::App for LauncherApp {
                 }
             });
 
-            if !self.downloading
-                && self.installed_game_available
-                && ui.button("Start Installed Game").clicked()
-            {
-                if let Err(error) = launch_runtime_process() {
-                    self.error = Some(error);
-                }
+            if !self.downloading && self.installed_game_available {
+                ui.horizontal(|ui| {
+                    if ui.button("Start Installed Game").clicked()
+                        && let Err(error) = launch_runtime_process()
+                    {
+                        self.error = Some(error);
+                    }
+                    if ui.button("Open Assets Folder").clicked()
+                        && let Err(error) = open_assets_directory()
+                    {
+                        self.error = Some(error);
+                    }
+                });
             }
 
             if let Some(error) = &self.error {
@@ -222,6 +229,25 @@ impl eframe::App for LauncherApp {
             }
         });
     }
+}
+
+fn open_assets_directory() -> Result<(), String> {
+    let assets = active_assets_root()?;
+    directory_open_command(&assets)
+        .spawn()
+        .map_err(|error| format!("Could not open {}: {error}", assets.display()))?;
+    Ok(())
+}
+
+fn directory_open_command(path: &Path) -> Command {
+    #[cfg(target_os = "windows")]
+    let mut command = Command::new("explorer.exe");
+    #[cfg(target_os = "macos")]
+    let mut command = Command::new("open");
+    #[cfg(target_os = "linux")]
+    let mut command = Command::new("xdg-open");
+    command.arg(path);
+    command
 }
 
 fn fetch_releases() -> Option<Receiver<Result<Vec<Release>, String>>> {

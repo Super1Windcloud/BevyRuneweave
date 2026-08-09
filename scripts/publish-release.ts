@@ -6,6 +6,7 @@ import { build, transform } from "esbuild";
 
 const require = createRequire(import.meta.url);
 const luamin = require("luamin") as { minify(source: string): string };
+const { obfuscate } = require("javascript-obfuscator") as typeof import("javascript-obfuscator");
 
 const root = resolve(import.meta.dirname, "..");
 const tag = process.argv.find((arg) => arg.startsWith("--tag="))?.slice(6) ?? "0.0.1";
@@ -83,7 +84,25 @@ async function prepareAssets(source: string, destination: string, language: "js"
     legalComments: "none",
     charset: "utf8",
   });
-  writeFileSync(script, result.code, "utf8");
+  // Keep release obfuscation parse-time only so gameplay callbacks gain no per-frame overhead.
+  const obfuscated = obfuscate(result.code, {
+    compact: true,
+    controlFlowFlattening: false,
+    deadCodeInjection: false,
+    identifierNamesGenerator: "hexadecimal",
+    numbersToExpressions: false,
+    renameGlobals: true,
+    renameProperties: false,
+    seed: tag,
+    selfDefending: false,
+    simplify: true,
+    splitStrings: false,
+    stringArray: false,
+    target: "browser-no-eval",
+    transformObjectKeys: false,
+    unicodeEscapeSequence: true,
+  });
+  writeFileSync(script, `${obfuscated.getObfuscatedCode()}\n`, "utf8");
 }
 
 function compressLua(source: string) {
