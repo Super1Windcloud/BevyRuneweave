@@ -49,7 +49,7 @@ async function main() {
     schemaVersion: 1,
     name,
     language,
-    sourceDirectory: "game/src",
+    sourceDirectory: language === "ts" ? "game/src" : "game/assets",
     assetDirectory: "game/assets",
     scriptEntry: config.script.entry,
   };
@@ -84,12 +84,6 @@ async function main() {
       format: "iife",
       target: "es2023",
     });
-  } else {
-    const extension = language === "lua" ? "lua" : "js";
-    cpSync(
-      join(module, "game", "src", `shooter.${extension}`),
-      join(module, "game", "assets", `shooter.${extension}`),
-    );
   }
 
   console.log(`Created independent ${language} game project: ${destination}`);

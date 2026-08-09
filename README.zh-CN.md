@@ -39,9 +39,9 @@ Runeweave 核心提供三种语言一致的 Entity、Component、Resource 与 Qu
 ```text
 projects/
 ├── lua/                 # 独立 Lua 5.5.0 可执行项目
-│   └── modules/shooter/ # api 与 game/src、game/assets 分层
+│   └── modules/shooter/ # Lua 入口直接位于 game/assets
 ├── js/                  # 独立 QuickJS 可执行项目
-│   └── modules/shooter/ # api 与 game/src、game/assets 分层
+│   └── modules/shooter/ # JavaScript 入口直接位于 game/assets
 └── ts/                  # TypeScript 7.0.2 + QuickJS 可执行项目
     └── modules/shooter/
         ├── api/         # ECS、HTTP 类型接口与显式导入层
@@ -77,7 +77,8 @@ npm run create:game -- --language=lua --name=my-game
 ```
 
 模板只从 `templates/game-project/<language>` 读取，新项目生成到 `projects/<name>`。
-TypeScript 会额外复制独立 `api/` 层并立即打包 `game/assets/shooter.js`。
+TypeScript 会额外复制独立 `api/` 层并立即打包 `game/assets/shooter.js`；
+JavaScript 和 Lua 直接编辑 `game/assets` 内的唯一入口脚本。
 
 ## 运行
 
@@ -142,9 +143,9 @@ ecs_resource_set / ecs_resource_get / ecs_resource_remove
 映射成 Bevy `Sprite` 和 `Transform`。新增能力时不再修改四份语言绑定，而是新增组件、
 资源和消费它们的 Bevy System。完整契约见 [`docs/ecs-api.md`](docs/ecs-api.md)。
 
-脚本文件支持 Bevy 资源热重载。修改当前项目 `assets` 下的脚本后，游戏状态
-会用新脚本重新初始化，并在终端打印 `Reloading script after source change`。
-`just run-ts` 会同时运行 TypeScript watch compiler，因此修改
+脚本文件支持 Bevy 资源热重载。修改 JavaScript 或 Lua 项目 `assets` 下的
+唯一入口脚本后，游戏状态会用新脚本重新初始化，并在终端打印
+`Reloading script after source change`。TypeScript 单独处理：`just run-ts` 会同时运行 watch compiler，因此修改
 `projects/ts/modules/shooter/game/src/shooter.ts` 也会自动编译并触发游戏重载。
 
 ## 构建验证

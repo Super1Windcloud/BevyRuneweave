@@ -41,11 +41,11 @@ projects/
 ├── lua/                 # Standalone Lua 5.5 executable project
 │   └── modules/shooter/
 │       ├── api/         # Virtual runtime API boundary
-│       └── game/        # Separate src/ and assets/ directories
+│       └── game/assets/ # Editable Lua entry and runtime assets
 ├── js/                  # Standalone QuickJS executable project
 │   └── modules/shooter/
 │       ├── api/         # Runtime global API boundary
-│       └── game/        # Separate src/ and assets/ directories
+│       └── game/assets/ # Editable JavaScript entry and runtime assets
 └── ts/                  # TypeScript 7.0.2 and QuickJS executable project
     └── modules/shooter/
         ├── api/         # Typed ECS and HTTP imports
@@ -83,8 +83,8 @@ npm run create:game -- --language=lua --name=my-game
 Templates are stored independently under `templates/game-project/<language>`; active projects are
 never used as template sources. Each command creates a complete standalone project at
 `projects/<name>`. TypeScript projects receive a separate typed `modules/shooter/api/` layer and are
-bundled immediately into `modules/shooter/game/assets/shooter.js`; JavaScript and Lua source is
-synchronized from `modules/shooter/game/src` into the runtime asset directory.
+bundled immediately into `modules/shooter/game/assets/shooter.js`. JavaScript and Lua use the script
+in `modules/shooter/game/assets` as their single editable runtime entry.
 
 ## Running
 
@@ -146,9 +146,10 @@ For example, a renderable entity is created with `ecs_entity_spawn`, then receiv
 Script Squadron host maps their structured values to Bevy components. See
 [`docs/ecs-api.md`](docs/ecs-api.md) for the complete contract.
 
-Script files support Bevy asset hot reload. Updating the active project's script reinitializes game
-state and prints `Reloading script after source change`. `just run-ts` also runs the TypeScript watch
-compiler, so changes to `projects/ts/modules/shooter/game/src/shooter.ts` are compiled and reloaded automatically.
+Script files support Bevy asset hot reload. Updating `game/assets/shooter.js` or
+`game/assets/shooter.lua` in the active JavaScript or Lua project reinitializes game state and prints
+`Reloading script after source change`. TypeScript is handled separately: `just run-ts` runs its
+watch compiler, so changes to `projects/ts/modules/shooter/game/src/shooter.ts` are compiled and reloaded automatically.
 
 ## Build and Verification
 
