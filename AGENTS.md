@@ -16,6 +16,17 @@ Treat TypeScript as the default language for subsequent game development. Put ga
 systems, input, UI behavior, and iteration in TypeScript scripts and compiled JavaScript assets.
 Change the Rust runtime or host only when the scripting API cannot provide the required capability.
 
+## Runtime API Compatibility
+
+Every implementation of a runtime-exposed interface must remain compatible with all five supported
+platforms: Windows, macOS, Linux, Android, and iOS. This applies to the public C ABI in `include/`,
+the `runtime-cdylib` and `runtime-staticlib` implementations, and host-visible runtime behavior.
+Do not expose platform-specific types, paths, ownership assumptions, or lifecycle requirements in a
+shared interface. Keep necessary platform-specific code behind internal target guards and provide
+equivalent behavior or an explicit, portable error contract on every platform. Changes to exposed
+interfaces must assess all five targets and verify the available platform builds; any target that
+cannot be executed in the current environment must be called out explicitly as an unverified gap.
+
 ## Build and Test Commands
 
 - `npm install` installs root tooling; `npm run typecheck:scripts` checks release/build scripts.

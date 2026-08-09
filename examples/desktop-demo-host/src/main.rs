@@ -19,7 +19,8 @@ use std::{
 
 const CONFIG_FILE: &str = "engineConfig.json";
 const BUILD_TARGET: &str = env!("RUNEWEAVE_BUILD_TARGET");
-const GITHUB_RELEASES_API: &str = "https://api.github.com/repos/Super1Windcloud/bevy-script-squadron-runtime/releases?per_page=10";
+const GITHUB_RELEASES_API: &str =
+    "https://api.github.com/repos/Super1Windcloud/BevyRuneweave/releases?per_page=10";
 const EMBEDDED_GITHUB_TOKEN: Option<&str> = option_env!("RUNEWEAVE_GITHUB_TOKEN");
 
 #[derive(Clone, Copy, Deserialize)]

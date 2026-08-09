@@ -208,7 +208,7 @@ macOS cross-compiles the MSVC Windows runtime with `cargo-xwin`, while Linux cro
 Zig and `cargo-zigbuild`. `WINDOWS_TARGETS` and `LINUX_TARGETS` accept comma-separated overrides.
 Windows defaults to `x86_64-pc-windows-msvc` when built on macOS. Android requires `cargo-ndk`, an installed Android NDK,
 and the relevant
-Rust targets. It builds `arm64-v8a`, `armeabi-v7a`, and `x86_64` by default with API level 26. iOS
+Rust targets. It supports only `arm64-v8a` and `x86_64`, both built by default with API level 26. iOS
 builds only on macOS with Xcode and produces `BevyRuneweave.xcframework` for arm64 devices and Apple
 Silicon simulators by default.
 

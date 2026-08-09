@@ -199,8 +199,8 @@ just build-runtime linux
 交叉编译 MSVC Windows runtime，Linux 交叉编译仍使用 Zig 与 `cargo-zigbuild`。
 `WINDOWS_TARGETS` 与 `LINUX_TARGETS` 支持逗号分隔的目标覆盖；macOS 构建 Windows 时默认使用
 `x86_64-pc-windows-msvc`。构建脚本需要支持直接执行 TypeScript 的 Node.js 版本。
-Android 需要 `cargo-ndk` 和已安装的 Android NDK，默认构建 `arm64-v8a`、
-`armeabi-v7a`、`x86_64`，最低 API 为
+Android 需要 `cargo-ndk` 和已安装的 Android NDK，只支持并默认构建 `arm64-v8a`、
+`x86_64`，最低 API 为
 26。iOS 只能在安装 Xcode 的 macOS 上构建，默认生成包含 arm64 真机和 Apple Silicon
 模拟器 slice 的 `BevyRuneweave.xcframework`。可通过脚本帮助中列出的环境变量覆盖
 目标架构和输出目录：

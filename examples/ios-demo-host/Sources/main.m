@@ -1,6 +1,380 @@
 #import <Foundation/Foundation.h>
+#include <zlib.h>
 
 #include "game_runtime.h"
+
+static NSString *const HostErrorDomain = @"io.github.super1windcloud.runeweave.host";
+static const NSUInteger MaxArchiveBytes = 64 * 1024 * 1024;
+static const NSUInteger MaxUnpackedBytes = 256 * 1024 * 1024;
+static const NSUInteger MaxArchiveEntries = 10000;
+
+static NSError *hostError(NSInteger code, NSString *message) {
+    return [NSError errorWithDomain:HostErrorDomain
+                               code:code
+                           userInfo:@{NSLocalizedDescriptionKey: message}];
+}
+
+static uint16_t read16(const uint8_t *bytes) {
+    return (uint16_t)(bytes[0] | (bytes[1] << 8));
+}
+
+static uint32_t read32(const uint8_t *bytes) {
+    return (uint32_t)(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24));
+}
+
+static BOOL safeRelativePath(NSString *path) {
+    if (path.length == 0 || path.isAbsolutePath || [path containsString:@"\\"]) {
+        return NO;
+    }
+    NSArray<NSString *> *parts = [path componentsSeparatedByString:@"/"];
+    for (NSUInteger index = 0; index < parts.count; index++) {
+        NSString *part = parts[index];
+        BOOL trailingDirectoryMarker = index == parts.count - 1 && part.length == 0;
+        if (!trailingDirectoryMarker && (part.length == 0 || [part isEqualToString:@"."] ||
+                                         [part isEqualToString:@".."])) {
+            return NO;
+        }
+    }
+    return YES;
+}
+
+static NSData *inflateEntry(const uint8_t *bytes, NSUInteger compressedSize,
+                            NSUInteger unpackedSize, NSError **error) {
+    NSMutableData *output = [NSMutableData dataWithLength:MAX(unpackedSize, (NSUInteger)1)];
+    z_stream stream = {0};
+    stream.next_in = (Bytef *)bytes;
+    stream.avail_in = (uInt)compressedSize;
+    stream.next_out = output.mutableBytes;
+    stream.avail_out = (uInt)output.length;
+    if (inflateInit2(&stream, -MAX_WBITS) != Z_OK) {
+        if (error) *error = hostError(30, @"Could not initialize ZIP decompression");
+        return nil;
+    }
+    int status = inflate(&stream, Z_FINISH);
+    inflateEnd(&stream);
+    if (status != Z_STREAM_END || stream.total_out != unpackedSize) {
+        if (error) *error = hostError(31, @"ZIP entry decompression failed");
+        return nil;
+    }
+    output.length = unpackedSize;
+    return output;
+}
+
+static BOOL extractZip(NSData *archive, NSString *destination, NSError **error) {
+    const uint8_t *bytes = archive.bytes;
+    NSUInteger length = archive.length;
+    if (length < 22) {
+        if (error) *error = hostError(32, @"Asset ZIP is truncated");
+        return NO;
+    }
+
+    NSInteger endOffset = -1;
+    NSInteger minimum = MAX((NSInteger)0, (NSInteger)length - 65557);
+    for (NSInteger offset = (NSInteger)length - 22; offset >= minimum; offset--) {
+        if (read32(bytes + offset) == 0x06054b50) {
+            endOffset = offset;
+            break;
+        }
+    }
+    if (endOffset < 0) {
+        if (error) *error = hostError(33, @"Asset ZIP has no central directory");
+        return NO;
+    }
+
+    const uint8_t *end = bytes + endOffset;
+    NSUInteger entries = read16(end + 10);
+    NSUInteger centralSize = read32(end + 12);
+    NSUInteger centralOffset = read32(end + 16);
+    if (read16(end + 4) != 0 || read16(end + 6) != 0 || entries == 0 ||
+        entries > MaxArchiveEntries || centralOffset + centralSize > length) {
+        if (error) *error = hostError(34, @"Asset ZIP directory is invalid");
+        return NO;
+    }
+
+    NSFileManager *files = NSFileManager.defaultManager;
+    if (![files createDirectoryAtPath:destination withIntermediateDirectories:YES attributes:nil error:error]) {
+        return NO;
+    }
+    NSUInteger cursor = centralOffset;
+    NSUInteger totalUnpacked = 0;
+    for (NSUInteger index = 0; index < entries; index++) {
+        if (cursor + 46 > length || read32(bytes + cursor) != 0x02014b50) {
+            if (error) *error = hostError(35, @"Asset ZIP entry header is invalid");
+            return NO;
+        }
+        const uint8_t *header = bytes + cursor;
+        uint16_t flags = read16(header + 8);
+        uint16_t method = read16(header + 10);
+        uint32_t expectedCrc = read32(header + 16);
+        NSUInteger compressedSize = read32(header + 20);
+        NSUInteger unpackedSize = read32(header + 24);
+        NSUInteger nameLength = read16(header + 28);
+        NSUInteger extraLength = read16(header + 30);
+        NSUInteger commentLength = read16(header + 32);
+        uint32_t externalAttributes = read32(header + 38);
+        NSUInteger localOffset = read32(header + 42);
+        NSUInteger next = cursor + 46 + nameLength + extraLength + commentLength;
+        if (next > length || nameLength == 0 || (flags & 1) != 0 ||
+            (method != 0 && method != 8) || compressedSize == UINT32_MAX ||
+            unpackedSize == UINT32_MAX) {
+            if (error) *error = hostError(36, @"Asset ZIP contains an unsupported entry");
+            return NO;
+        }
+
+        NSString *name = [[NSString alloc] initWithBytes:header + 46
+                                                   length:nameLength
+                                                 encoding:NSUTF8StringEncoding];
+        uint16_t unixMode = (uint16_t)(externalAttributes >> 16);
+        if (name == nil || !safeRelativePath(name) || (unixMode & 0170000) == 0120000) {
+            if (error) *error = hostError(37, @"Asset ZIP contains an unsafe entry path");
+            return NO;
+        }
+        totalUnpacked += unpackedSize;
+        if (totalUnpacked > MaxUnpackedBytes || localOffset + 30 > length ||
+            read32(bytes + localOffset) != 0x04034b50) {
+            if (error) *error = hostError(38, @"Asset ZIP exceeds its extraction limits");
+            return NO;
+        }
+
+        NSString *target = [destination stringByAppendingPathComponent:name];
+        if ([name hasSuffix:@"/"]) {
+            if (![files createDirectoryAtPath:target withIntermediateDirectories:YES attributes:nil error:error]) {
+                return NO;
+            }
+        } else {
+            NSUInteger localNameLength = read16(bytes + localOffset + 26);
+            NSUInteger localExtraLength = read16(bytes + localOffset + 28);
+            NSUInteger dataOffset = localOffset + 30 + localNameLength + localExtraLength;
+            if (dataOffset + compressedSize > length) {
+                if (error) *error = hostError(39, @"Asset ZIP entry data is truncated");
+                return NO;
+            }
+            NSData *data;
+            if (method == 0) {
+                if (compressedSize != unpackedSize) {
+                    if (error) *error = hostError(40, @"Stored ZIP entry size is invalid");
+                    return NO;
+                }
+                data = [NSData dataWithBytes:bytes + dataOffset length:unpackedSize];
+            } else {
+                data = inflateEntry(bytes + dataOffset, compressedSize, unpackedSize, error);
+                if (data == nil) return NO;
+            }
+            uLong actualCrc = crc32(0L, Z_NULL, 0);
+            actualCrc = crc32(actualCrc, data.bytes, (uInt)data.length);
+            if ((uint32_t)actualCrc != expectedCrc) {
+                if (error) *error = hostError(41, @"Asset ZIP entry checksum failed");
+                return NO;
+            }
+            if (![files createDirectoryAtPath:target.stringByDeletingLastPathComponent
+                    withIntermediateDirectories:YES attributes:nil error:error] ||
+                ![data writeToFile:target options:NSDataWritingAtomic error:error]) {
+                return NO;
+            }
+        }
+        cursor = next;
+    }
+    return YES;
+}
+
+static NSDictionary *validateAssets(NSString *assets, NSError **error) {
+    NSString *configPath = [assets stringByAppendingPathComponent:@"engineConfig.json"];
+    NSData *data = [NSData dataWithContentsOfFile:configPath options:0 error:error];
+    if (data == nil) return nil;
+
+    id object = [NSJSONSerialization JSONObjectWithData:data options:0 error:error];
+    if (![object isKindOfClass:NSDictionary.class]) {
+        if (error) *error = hostError(50, @"engineConfig.json must contain an object");
+        return nil;
+    }
+    NSDictionary *config = object;
+    if ([config[@"schemaVersion"] integerValue] != 1) {
+        if (error) *error = hostError(51, @"Unsupported engineConfig schemaVersion");
+        return nil;
+    }
+    NSString *name = config[@"name"];
+    NSString *version = config[@"version"];
+    if (![name isKindOfClass:NSString.class] || name.length == 0 ||
+        ![version isKindOfClass:NSString.class] || version.length == 0) {
+        if (error) *error = hostError(52, @"engineConfig name and version must not be empty");
+        return nil;
+    }
+
+    NSDictionary *script = config[@"script"];
+    NSString *language = script[@"language"];
+    NSString *entry = script[@"entry"];
+    if (![script isKindOfClass:NSDictionary.class] ||
+        ![@[@"js", @"typescript", @"lua"] containsObject:language]) {
+        if (error) *error = hostError(53, @"Unsupported script language");
+        return nil;
+    }
+    if (![entry isKindOfClass:NSString.class] || !safeRelativePath(entry) || [entry hasSuffix:@"/"]) {
+        if (error) *error = hostError(54, @"script.entry must stay inside assets");
+        return nil;
+    }
+    NSString *extension = entry.pathExtension.lowercaseString;
+    BOOL isLua = [language isEqualToString:@"lua"] && [extension isEqualToString:@"lua"];
+    BOOL isQuickJs = ([@[@"js", @"typescript"] containsObject:language] &&
+                      [@[@"js", @"mjs"] containsObject:extension]);
+    if (!isLua && !isQuickJs) {
+        if (error) *error = hostError(55, @"script language does not match the entry extension");
+        return nil;
+    }
+    if (![NSFileManager.defaultManager fileExistsAtPath:[assets stringByAppendingPathComponent:entry]]) {
+        if (error) *error = hostError(56, [NSString stringWithFormat:@"Script entry does not exist: %@", entry]);
+        return nil;
+    }
+    return config;
+}
+
+static NSData *fetchData(NSURL *url, NSDictionary<NSString *, NSString *> *headers,
+                         NSUInteger maximumBytes, NSError **error) {
+    if (![url.scheme.lowercaseString isEqualToString:@"https"]) {
+        if (error) *error = hostError(60, @"Remote asset URL must use HTTPS");
+        return nil;
+    }
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    request.timeoutInterval = 8;
+    request.cachePolicy = NSURLRequestReloadRevalidatingCacheData;
+    for (NSString *header in headers) [request setValue:headers[header] forHTTPHeaderField:header];
+
+    NSURLSessionConfiguration *configuration = NSURLSessionConfiguration.ephemeralSessionConfiguration;
+    configuration.timeoutIntervalForRequest = 8;
+    configuration.timeoutIntervalForResource = 12;
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
+    dispatch_semaphore_t completed = dispatch_semaphore_create(0);
+    __block NSData *result = nil;
+    __block NSError *requestError = nil;
+    __block NSHTTPURLResponse *httpResponse = nil;
+    NSURLSessionDataTask *task = [session dataTaskWithRequest:request
+        completionHandler:^(NSData *data, NSURLResponse *response, NSError *taskError) {
+            result = data;
+            requestError = taskError;
+            if ([response isKindOfClass:NSHTTPURLResponse.class]) httpResponse = (NSHTTPURLResponse *)response;
+            dispatch_semaphore_signal(completed);
+        }];
+    [task resume];
+    if (dispatch_semaphore_wait(completed, dispatch_time(DISPATCH_TIME_NOW, 13 * NSEC_PER_SEC)) != 0) {
+        [task cancel];
+        requestError = hostError(61, @"Remote asset request timed out");
+    }
+    [session finishTasksAndInvalidate];
+    if (requestError != nil) {
+        if (error) *error = requestError;
+        return nil;
+    }
+    if (httpResponse.statusCode < 200 || httpResponse.statusCode >= 300 ||
+        ![httpResponse.URL.scheme.lowercaseString isEqualToString:@"https"]) {
+        if (error) *error = hostError(62, [NSString stringWithFormat:@"Remote asset request failed with HTTP %ld",
+                                         (long)httpResponse.statusCode]);
+        return nil;
+    }
+    if (result.length == 0 || result.length > maximumBytes) {
+        if (error) *error = hostError(63, @"Remote asset response has an invalid size");
+        return nil;
+    }
+    return result;
+}
+
+static NSDictionary *remoteAsset(NSError **error) {
+    NSString *override = NSProcessInfo.processInfo.environment[@"RUNEWEAVE_ASSET_URL"];
+    if (override.length > 0) {
+        NSURL *url = [NSURL URLWithString:override];
+        if (url == nil || ![url.scheme.lowercaseString isEqualToString:@"https"]) {
+            if (error) *error = hostError(70, @"RUNEWEAVE_ASSET_URL must be a valid HTTPS URL");
+            return nil;
+        }
+        return @{@"id": [@"url:" stringByAppendingString:override], @"url": url};
+    }
+
+    NSBundle *bundle = NSBundle.mainBundle;
+    NSString *apiValue = [bundle objectForInfoDictionaryKey:@"RuneweaveReleaseAPI"];
+    NSString *assetName = [bundle objectForInfoDictionaryKey:@"RuneweaveReleaseAsset"];
+    NSURL *api = [NSURL URLWithString:apiValue ?: @""];
+    if (api == nil || assetName.length == 0) return nil;
+    NSData *data = fetchData(api, @{@"Accept": @"application/vnd.github+json",
+                                   @"User-Agent": @"bevy-runeweave-ios-host"},
+                             2 * 1024 * 1024, error);
+    if (data == nil) return nil;
+    NSDictionary *release = [NSJSONSerialization JSONObjectWithData:data options:0 error:error];
+    if (![release isKindOfClass:NSDictionary.class]) {
+        if (error) *error = hostError(71, @"Release API returned an invalid response");
+        return nil;
+    }
+    for (NSDictionary *asset in release[@"assets"]) {
+        if ([asset[@"name"] isEqualToString:assetName]) {
+            NSURL *url = [NSURL URLWithString:asset[@"browser_download_url"] ?: @""];
+            if (url == nil || ![url.scheme.lowercaseString isEqualToString:@"https"]) break;
+            return @{@"id": [NSString stringWithFormat:@"github:%@", asset[@"id"] ?: @"unknown"],
+                     @"url": url};
+        }
+    }
+    if (error) *error = hostError(72, [NSString stringWithFormat:@"Release asset is missing: %@", assetName]);
+    return nil;
+}
+
+static NSString *installedAssetsPath(NSError **error) {
+    NSURL *support = [NSFileManager.defaultManager URLForDirectory:NSApplicationSupportDirectory
+                                                          inDomain:NSUserDomainMask
+                                                 appropriateForURL:nil
+                                                            create:YES
+                                                             error:error];
+    if (support == nil) return nil;
+    NSString *root = [support.path stringByAppendingPathComponent:@"BevyRuneweave"];
+    if (![NSFileManager.defaultManager createDirectoryAtPath:root
+                                  withIntermediateDirectories:YES attributes:nil error:error]) {
+        return nil;
+    }
+    return [root stringByAppendingPathComponent:@"assets"];
+}
+
+static BOOL installArchive(NSData *archive, NSString *installed, NSError **error) {
+    NSFileManager *files = NSFileManager.defaultManager;
+    NSString *root = installed.stringByDeletingLastPathComponent;
+    NSString *staging = [root stringByAppendingPathComponent:@"assets.staging"];
+    NSString *backup = [root stringByAppendingPathComponent:@"assets.backup"];
+    [files removeItemAtPath:staging error:nil];
+    [files removeItemAtPath:backup error:nil];
+    if (!extractZip(archive, staging, error) || validateAssets(staging, error) == nil) {
+        [files removeItemAtPath:staging error:nil];
+        return NO;
+    }
+    if ([files fileExistsAtPath:installed] && ![files moveItemAtPath:installed toPath:backup error:error]) {
+        [files removeItemAtPath:staging error:nil];
+        return NO;
+    }
+    if (![files moveItemAtPath:staging toPath:installed error:error]) {
+        if ([files fileExistsAtPath:backup]) [files moveItemAtPath:backup toPath:installed error:nil];
+        return NO;
+    }
+    [files removeItemAtPath:backup error:nil];
+    return YES;
+}
+
+static void updateInstalledAssets(NSString *installed) {
+    NSError *installedError = nil;
+    BOOL installedValid = validateAssets(installed, &installedError) != nil;
+    NSError *remoteError = nil;
+    NSDictionary *asset = remoteAsset(&remoteError);
+    if (asset == nil) {
+        if (remoteError != nil) NSLog(@"Bevy RuneWeave update skipped: %@", remoteError.localizedDescription);
+        return;
+    }
+
+    NSString *identifier = asset[@"id"];
+    NSString *current = [NSUserDefaults.standardUserDefaults stringForKey:@"RuneweaveInstalledAssetID"];
+    BOOL force = [NSProcessInfo.processInfo.environment[@"RUNEWEAVE_FORCE_ASSET_UPDATE"] boolValue];
+    if (installedValid && !force && [identifier isEqualToString:current]) return;
+
+    NSData *archive = fetchData(asset[@"url"], @{@"User-Agent": @"bevy-runeweave-ios-host"},
+                                MaxArchiveBytes, &remoteError);
+    if (archive == nil || !installArchive(archive, installed, &remoteError)) {
+        NSLog(@"Bevy RuneWeave update failed: %@", remoteError.localizedDescription);
+        return;
+    }
+    [NSUserDefaults.standardUserDefaults setObject:identifier forKey:@"RuneweaveInstalledAssetID"];
+    NSLog(@"Bevy RuneWeave installed remote asset %@", identifier);
+}
 
 static int fail(NSString *message, int code) {
     NSLog(@"Bevy RuneWeave host: %@", message);
@@ -12,43 +386,19 @@ int main(int argc, char *argv[]) {
         (void)argc;
         (void)argv;
 
-        NSString *assets = [[NSBundle mainBundle].resourcePath stringByAppendingPathComponent:@"assets"];
-        NSString *configPath = [assets stringByAppendingPathComponent:@"engineConfig.json"];
-        NSData *data = [NSData dataWithContentsOfFile:configPath];
-        if (data == nil) {
-            return fail(@"engineConfig.json is missing", 10);
-        }
-
         NSError *error = nil;
-        NSDictionary *config = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
-        if (![config isKindOfClass:NSDictionary.class]) {
-            return fail(error.localizedDescription ?: @"engineConfig.json is invalid", 11);
-        }
-        if ([config[@"schemaVersion"] integerValue] != 1) {
-            return fail(@"unsupported engineConfig schemaVersion", 12);
-        }
+        NSString *installed = installedAssetsPath(&error);
+        if (installed != nil) updateInstalledAssets(installed);
 
-        NSDictionary *script = config[@"script"];
-        NSString *language = script[@"language"];
-        NSString *entry = script[@"entry"];
-        if (![@[ @"js", @"typescript", @"lua" ] containsObject:language]) {
-            return fail(@"unsupported script language", 13);
-        }
-        if (![entry isKindOfClass:NSString.class] || entry.length == 0 || entry.isAbsolutePath ||
-            [entry.pathComponents containsObject:@".."]) {
-            return fail(@"script.entry must stay inside assets", 14);
-        }
-        NSString *extension = entry.pathExtension.lowercaseString;
-        BOOL isLua = [language isEqualToString:@"lua"] && [extension isEqualToString:@"lua"];
-        BOOL isQuickJs = ([@[ @"js", @"typescript" ] containsObject:language] &&
-                          [@[ @"js", @"mjs" ] containsObject:extension]);
-        if (!isLua && !isQuickJs) {
-            return fail(@"script language does not match the entry extension", 15);
-        }
-        if (![[NSFileManager defaultManager] fileExistsAtPath:[assets stringByAppendingPathComponent:entry]]) {
-            return fail(@"script entry does not exist", 16);
-        }
+        NSDictionary *config = installed == nil ? nil : validateAssets(installed, &error);
+        NSString *assets = config == nil
+            ? [NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"assets"]
+            : installed;
+        error = nil;
+        config = validateAssets(assets, &error);
+        if (config == nil) return fail(error.localizedDescription ?: @"No valid game assets are installed", 10);
 
+        NSString *entry = config[@"script"][@"entry"];
         return game_runtime_run_with_assets(assets.fileSystemRepresentation,
                                             entry.fileSystemRepresentation);
     }

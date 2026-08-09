@@ -25,7 +25,7 @@
             android:screenOrientation="portrait">
             <meta-data
                 android:name="android.app.lib_name"
-                android:value="bevy_runeweave_android_host" />
+                android:value="bevy_runeweave" />
         </activity>
     </application>
 </manifest>

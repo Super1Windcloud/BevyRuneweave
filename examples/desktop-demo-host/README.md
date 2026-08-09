@@ -26,6 +26,11 @@ The packaged launcher selects the native library for its operating system and ke
 assets in the user's application-data directory. Complete installers also include the TypeScript
 Script Squadron assets as a read-only fallback:
 
+Android, iOS, and desktop share the same remote resource lifecycle: download into staging, validate
+`engineConfig.json`, install under platform-private application data, and launch through the shared
+runtime. Mobile hosts accept ZIP packages; the desktop launcher additionally supports the archive
+formats listed above.
+
 The launcher UI and Bevy runtime execute in separate process modes. This is required on macOS
 because eframe and the dynamically loaded Bevy runtime each link winit; starting both event loops in
 one process would register the same Objective-C application delegate twice.

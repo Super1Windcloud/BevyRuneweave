@@ -122,11 +122,22 @@ function desktop(platform: Exclude<Platform, "android" | "ios">) {
   }
 }
 function android() {
-  const mapping: Record<string, string> = { "arm64-v8a": "aarch64-linux-android", "armeabi-v7a": "armv7-linux-androideabi", x86_64: "x86_64-linux-android", x86: "i686-linux-android" };
+  const mapping: Record<string, string> = {
+    "arm64-v8a": "aarch64-linux-android",
+    x86_64: "x86_64-linux-android",
+  };
+  const androidOutput = resolve(dist, "android");
+  if (existsSync(androidOutput)) {
+    for (const entry of readdirSync(androidOutput, { withFileTypes: true })) {
+      if (entry.isDirectory() && !mapping[entry.name]) {
+        rmSync(join(androidOutput, entry.name), { recursive: true, force: true });
+      }
+    }
+  }
   const ndk = androidNdk();
   console.log(`Android NDK: ${ndk}`);
-  for (const abi of values("ANDROID_ABIS", "arm64-v8a,armeabi-v7a,x86_64")) {
-    const target = mapping[abi]; if (!target) throw new Error(`Unsupported Android ABI: ${abi}`); requireTarget(target);
+  for (const abi of values("ANDROID_ABIS", "arm64-v8a,x86_64")) {
+    const target = mapping[abi]; if (!target) throw new Error(`Unsupported Android ABI '${abi}'; supported ABIs: arm64-v8a, x86_64`); requireTarget(target);
     const destination = fresh("android", abi);
     run("cargo", ["ndk", "-t", abi, "-P", process.env.ANDROID_PLATFORM ?? "26", "-o", join(destination, "lib"), "build", ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--no-default-features", "--features", "unified"], { ANDROID_NDK_HOME: ndk, ANDROID_NDK_ROOT: ndk });
     const nested = join(destination, "lib", abi, "libbevy_runeweave.so");
@@ -135,6 +146,15 @@ function android() {
     info(destination, "android", target);
   }
 }
+function vendoredLua(target: string) {
+  const buildRoot = join(targetDir, target, profile, "build");
+  const library = readdirSync(buildRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith("mlua-sys-"))
+    .map((entry) => join(buildRoot, entry.name, "out", "lib", "liblua5.5.a"))
+    .find((candidate) => existsSync(candidate));
+  if (!library) throw new Error(`Vendored Lua library was not produced for ${target}`);
+  return library;
+}
 function ios() {
   if (hostOs() !== "macos") throw new Error("iOS runtimes can only be built on macOS");
   const device = values("IOS_DEVICE_TARGETS", "aarch64-apple-ios"), simulator = values("IOS_SIMULATOR_TARGETS", "aarch64-apple-ios-sim");
@@ -142,7 +162,7 @@ function ios() {
   try {
     for (const [group, targets] of [["device", device], ["simulator", simulator]] as const) for (const target of targets) {
       requireTarget(target); run("cargo", ["build", ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-staticlib", "--no-default-features", "--features", "unified", "--target", target], { IPHONEOS_DEPLOYMENT_TARGET: process.env.IOS_DEPLOYMENT_TARGET ?? "13.0" });
-      cpSync(join(targetDir, target, profile, "libbevy_runeweave.a"), join(work, group, `${target}.a`));
+      run("libtool", ["-static", "-o", join(work, group, `${target}.a`), join(targetDir, target, profile, "libbevy_runeweave.a"), vendoredLua(target)]);
     }
     const deviceLib = join(work, "libbevy_runeweave-device.a"), simulatorLib = join(work, "libbevy_runeweave-simulator.a");
     run("lipo", ["-create", ...readdirSync(join(work, "device")).map((x) => join(work, "device", x)), "-output", deviceLib]);

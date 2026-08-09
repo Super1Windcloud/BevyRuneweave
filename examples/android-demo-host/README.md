@@ -4,15 +4,18 @@ This standalone Android application downloads a release ZIP into app-private sto
 `engineConfig.json`, and launches the game through Android `NativeActivity`. The NativeActivity is
 required because Bevy/winit must receive Android's `AndroidApp` before it creates an event loop.
 
-The APK contains one runtime with both Lua and QuickJS. Build and install it with:
+The APK reuses the prebuilt runtime under `dist/runtimes/android` instead of compiling Rust from
+Gradle. Build the runtime once, then build and install the APK as often as needed:
 
 ```bash
+just build-runtime-android
 ./gradlew :app:assembleDebug
 ./gradlew :app:installDebug
 ```
 
-Repository recipes also default to debug; use `just build-android-demo --release` for a release APK
-and release Rust runtime.
+Both runtime and APK recipes default to debug. For release, run `just build-runtime-android --release`
+once before `just build-android-demo --release`. The APK build checks that every selected ABI exists
+and matches the requested profile.
 
 Select an ABI set with a Gradle property:
 
@@ -20,7 +23,12 @@ Select an ABI set with a Gradle property:
 ./gradlew :app:assembleDebug -PruneweaveAbis=arm64-v8a
 ```
 
-`ANDROID_HOME` should point to an Android SDK containing a side-by-side NDK. Set `ANDROID_NDK_HOME`
-only to override automatic NDK selection. The build also requires the Rust Android targets and
-`cargo-ndk`. Downloaded Lua, JavaScript, and TypeScript asset
-packages all use the same native runtime. Mobile installation intentionally accepts ZIP packages only.
+Building the runtime requires an Android SDK, NDK, Rust Android targets, and `cargo-ndk`. Building
+the APK from an existing dist runtime does not invoke Cargo. Downloaded Lua, JavaScript, and
+TypeScript asset packages all use the same native runtime. Mobile installation intentionally accepts
+ZIP packages only.
+
+The Android launcher accepts an HTTPS ZIP URL, extracts it into staging, validates
+`engineConfig.json`, atomically replaces the installed assets, and starts the shared NativeActivity
+runtime. This is the same resource lifecycle used by the desktop and iOS hosts; the presentation and
+remote asset selection remain platform-specific.

@@ -1,4 +1,4 @@
-import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.Sync
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -6,9 +6,11 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val runtimeAbis = providers.gradleProperty("runeweaveAbis").orElse("arm64-v8a,x86_64")
+val supportedRuntimeAbis = setOf("arm64-v8a", "x86_64")
+val runtimeAbis = providers.gradleProperty("runeweaveAbis").orElse(supportedRuntimeAbis.joinToString(","))
 val requestedRelease = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
-val releaseRuntime = providers.gradleProperty("runeweaveRelease").map(String::toBoolean).orElse(requestedRelease)
+val runtimeProfile = if (requestedRelease) "release" else "debug"
+val runtimeDist = rootProject.layout.projectDirectory.dir("../../dist/runtimes/android")
 val rustJniLibs = layout.buildDirectory.dir("generated/rustJniLibs")
 
 android {
@@ -38,39 +40,36 @@ android {
 
 kotlin.compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
 
-val buildRustHost by tasks.registering(Exec::class) {
-    val output = rustJniLibs.get().asFile
-    val manifest = rootProject.layout.projectDirectory.file("runtime/Cargo.toml").asFile
+val stageRustRuntime by tasks.registering(Sync::class) {
     val abis = runtimeAbis.get().split(',').map(String::trim).filter(String::isNotEmpty)
+    require(abis.isNotEmpty() && abis.all(supportedRuntimeAbis::contains)) {
+        "runeweaveAbis supports only: ${supportedRuntimeAbis.joinToString(", ")}"
+    }
 
-    inputs.files(
-        rootProject.fileTree("runtime/src"),
-        rootProject.file("../../Cargo.toml"),
-        rootProject.file("../../Cargo.lock"),
-        rootProject.fileTree("../../src"),
-        rootProject.fileTree("../../crates"),
-        rootProject.fileTree("../../bevy_mod_scripting") { exclude("**/target/**") },
-        manifest,
-    )
     inputs.property("abis", abis)
-    inputs.property("release", releaseRuntime)
-    outputs.dir(output)
+    inputs.property("profile", runtimeProfile)
+    abis.forEach { abi ->
+        from(runtimeDist.dir("$abi/lib")) {
+            include("libbevy_runeweave.so")
+            into(abi)
+        }
+        inputs.file(runtimeDist.file("$abi/build-info.txt"))
+    }
+    into(rustJniLibs)
 
-    doFirst { output.deleteRecursively() }
-    val profileArgs = if (releaseRuntime.get()) listOf("--release") else emptyList()
-    commandLine(
-        listOf("cargo", "ndk") +
-            abis.flatMap { listOf("-t", it) } +
-            listOf(
-                "-P", "26",
-                "-o", output.absolutePath,
-                "build",
-            ) + profileArgs +
-            listOf(
-                "--manifest-path", manifest.absolutePath,
-                "--no-default-features", "--features", "unified",
-            )
-    )
+    doFirst {
+        abis.forEach { abi ->
+            val library = runtimeDist.file("$abi/lib/libbevy_runeweave.so").asFile
+            val buildInfo = runtimeDist.file("$abi/build-info.txt").asFile
+            require(library.isFile && buildInfo.isFile) {
+                "Missing $runtimeProfile Android runtime for $abi. Run `just build-runtime-android${if (requestedRelease) " --release" else ""}` first."
+            }
+            val profile = buildInfo.readLines().firstOrNull { it.startsWith("profile=") }?.substringAfter('=')
+            require(profile == runtimeProfile) {
+                "Android runtime for $abi uses profile '$profile', expected '$runtimeProfile'. Run `just build-runtime-android${if (requestedRelease) " --release" else ""}` first."
+            }
+        }
+    }
 }
 
-tasks.named("preBuild").configure { dependsOn(buildRustHost) }
+tasks.named("preBuild").configure { dependsOn(stageRustRuntime) }

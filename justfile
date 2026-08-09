@@ -196,14 +196,14 @@ package-windows-installer profile="":
 package-macos-dmg profile="":
     npm exec -- tsx scripts/package-desktop.ts macos {{profile}}
 
-# Build the standalone Android host and its Rust NativeActivity library (debug by default).
+# Build the standalone Android host with the prebuilt runtime from dist (debug by default).
 build-android-demo profile="" abis="arm64-v8a,x86_64":
-    examples/android-demo-host/gradlew -p examples/android-demo-host :app:{{ if profile == "--release" { "assembleRelease" } else { "assembleDebug" } }} -PruneweaveAbis="{{abis}}" -PruneweaveRelease="{{ if profile == "--release" { "true" } else { "false" } }}"
+    examples/android-demo-host/gradlew -p examples/android-demo-host :app:{{ if profile == "--release" { "assembleRelease" } else { "assembleDebug" } }} -PruneweaveAbis="{{abis}}"
 
-# Build the unified iOS XCFramework and standalone simulator host app.
+# Build the standalone simulator host app with the existing iOS XCFramework.
 build-ios-demo profile="":
-    npm exec -- tsx scripts/build-runtime.ts ios {{profile}}
-    xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj -scheme BevyRuneweaveHost -sdk iphonesimulator -configuration {{ if profile == "--release" { "Release" } else { "Debug" } }} -derivedDataPath dist/ios-demo-derived-data CODE_SIGNING_ALLOWED=NO build
+    npm --prefix projects/ts run build
+    xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj -scheme BevyRuneweaveHost -sdk iphonesimulator -destination "generic/platform=iOS Simulator" -configuration {{ if profile == "--release" { "Release" } else { "Debug" } }} -derivedDataPath dist/ios-demo-derived-data ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
 
 # Run formatting, project checks, and gameplay tests.
 verify: fmt-check bms-check check bms-test test

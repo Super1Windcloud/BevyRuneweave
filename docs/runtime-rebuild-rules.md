@@ -53,6 +53,9 @@ just build-runtime-android --release
 just build-runtime-ios --release
 ```
 
+Android runtime 只支持并默认构建 `arm64-v8a` 和 `x86_64`。`ANDROID_ABIS` 可以选择其中
+一个或两个，但不能重新启用 `armeabi-v7a` 或 `x86`。
+
 ## 只需重新生成 Runtime Package
 
 以下修改可能不改变 native library，但需要重新运行 `build-runtime` 来刷新归档内容：
