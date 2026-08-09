@@ -10,7 +10,9 @@ use bevy_mod_scripting::{
     script::ScriptAttachment,
 };
 
-use super::super::{command::EcsBridge, network::NetworkBridge, value::EcsValue};
+use super::super::{
+    command::EcsBridge, input::InputBridge, network::NetworkBridge, value::EcsValue,
+};
 
 const MAX_VALUE_DEPTH: usize = 32;
 
@@ -138,11 +140,13 @@ fn js_resource_set(bridge: &EcsBridge, name: String, value: Value<'_>) -> rquick
 
 fn install_ecs_api(
     bridge: &EcsBridge,
+    input: &InputBridge,
     network: &NetworkBridge,
     _attachment: &ScriptAttachment,
     context: &mut QuickJsContext,
 ) -> Result<(), InteropError> {
     let bridge = bridge.clone();
+    let input = input.clone();
     let network = network.clone();
     context
         .with(move |ctx| {
@@ -263,6 +267,24 @@ fn install_ecs_api(
                 }),
             )?;
             globals.set(
+                "input_key_pressed",
+                Func::from({
+                    let input = input.clone();
+                    move |key: String| input.pressed(&key)
+                }),
+            )?;
+            globals.set(
+                "input_key_just_pressed",
+                Func::from({
+                    let input = input.clone();
+                    move |key: String| input.just_pressed(&key)
+                }),
+            )?;
+            globals.set(
+                "input_key_just_released",
+                Func::from(move |key: String| input.just_released(&key)),
+            )?;
+            globals.set(
                 "http_get",
                 Func::from({
                     let network = network.clone();
@@ -289,11 +311,12 @@ fn install_ecs_api(
 
 pub(super) fn ecs_quickjs_plugin(
     bridge: EcsBridge,
+    input: InputBridge,
     network: NetworkBridge,
 ) -> QuickJsScriptingPlugin {
     QuickJsScriptingPlugin::default().add_context_initializer(move |attachment, context| {
         let owned_bridge = bridge.for_attachment(attachment);
-        install_ecs_api(&owned_bridge, &network, attachment, context)
+        install_ecs_api(&owned_bridge, &input, &network, attachment, context)
     })
 }
 
@@ -324,6 +347,18 @@ mod tests {
                 .unwrap();
             globals
                 .set("ecs_entity_despawn", Func::from(|_: String| true))
+                .unwrap();
+            globals
+                .set(
+                    "input_key_pressed",
+                    Func::from(|key: String| key == "Space"),
+                )
+                .unwrap();
+            globals
+                .set("input_key_just_pressed", Func::from(|_: String| false))
+                .unwrap();
+            globals
+                .set("input_key_just_released", Func::from(|_: String| false))
                 .unwrap();
             globals
                 .set(
@@ -372,16 +407,10 @@ mod tests {
             let loaded: Function = globals.get("on_script_loaded").unwrap();
             loaded.call::<_, ()>(()).unwrap();
             let update: Function = globals.get("on_update").unwrap();
-            update
-                .call::<_, ()>((0.016_f64, 0.0_f64, 0.0_f64, true))
-                .unwrap();
-            update
-                .call::<_, ()>((0.016_f64, 0.0_f64, 0.0_f64, false))
-                .unwrap();
+            update.call::<_, ()>((0.016_f64,)).unwrap();
+            update.call::<_, ()>((0.016_f64,)).unwrap();
             for _ in 0..600 {
-                update
-                    .call::<_, ()>((0.016_f64, 0.25_f64, 0.0_f64, false))
-                    .unwrap();
+                update.call::<_, ()>((0.016_f64,)).unwrap();
             }
         });
 

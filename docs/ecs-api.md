@@ -116,6 +116,27 @@ ecs.resource_set("game_state", {
 
 `runeweave.ecs` 是 Rust runtime 注册到 `package.loaded` 的虚拟模块，不对应磁盘文件。
 
+## 输入 API
+
+Rust 每帧只更新原始键盘状态并向 `on_update(dt)` 传入帧间隔。键位映射、方向轴、
+开始/重启等业务逻辑均由脚本决定。键名使用 Bevy `KeyCode` 变体，例如
+`ArrowLeft`、`KeyA` 和 `Space`。
+
+TypeScript 从 `api/input.ts` 导入 `keyPressed`、`keyJustPressed` 和 `keyJustReleased`。
+普通 JavaScript 使用对应全局函数：
+
+```javascript
+const horizontal = Number(input_key_pressed("ArrowRight") || input_key_pressed("KeyD"))
+  - Number(input_key_pressed("ArrowLeft") || input_key_pressed("KeyA"));
+```
+
+Lua 通过虚拟模块读取：
+
+```lua
+local input = require("runeweave.input")
+local restart_pressed = input.key_pressed("Space")
+```
+
 ## HTTP API
 
 HTTP 请求在独立线程中执行，不阻塞 Bevy 主线程。GET/POST 立即返回数字请求 ID，脚本可在

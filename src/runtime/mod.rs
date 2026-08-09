@@ -25,7 +25,7 @@ use bevy_mod_scripting::prelude::{
 use winit::platform::windows::WindowExtWindows;
 
 use crate::{
-    ecs_api::{ApplyEcsCommands, RuneweaveEcsPlugin},
+    ecs_api::{ApplyEcsCommands, InputBridge, RuneweaveEcsPlugin},
     example_host::ScriptSquadronHostPlugin,
 };
 
@@ -183,26 +183,14 @@ fn request_asset_reload(asset_server: Res<AssetServer>, mut path: ResMut<LoadedS
 fn emit_update(
     time: Res<Time>,
     keyboard: Res<ButtonInput<KeyCode>>,
+    input: Res<InputBridge>,
     mut callbacks: MessageWriter<ScriptCallbackEvent>,
 ) {
-    let horizontal = axis(&keyboard, KeyCode::ArrowLeft, KeyCode::ArrowRight)
-        + axis(&keyboard, KeyCode::KeyA, KeyCode::KeyD);
-    let vertical = axis(&keyboard, KeyCode::ArrowDown, KeyCode::ArrowUp)
-        + axis(&keyboard, KeyCode::KeyS, KeyCode::KeyW);
-    let restart_pressed = keyboard.pressed(KeyCode::Space);
+    input.update(&keyboard);
     callbacks.write(ScriptCallbackEvent::new_for_all_scripts(
         OnUpdate,
-        vec![
-            ScriptValue::Float(time.delta_secs_f64().min(0.05)),
-            ScriptValue::Float(horizontal.clamp(-1.0, 1.0)),
-            ScriptValue::Float(vertical.clamp(-1.0, 1.0)),
-            ScriptValue::Bool(restart_pressed),
-        ],
+        vec![ScriptValue::Float(time.delta_secs_f64().min(0.05))],
     ));
-}
-
-fn axis(keyboard: &ButtonInput<KeyCode>, negative: KeyCode, positive: KeyCode) -> f64 {
-    f64::from(keyboard.pressed(positive)) - f64::from(keyboard.pressed(negative))
 }
 
 fn normalize_script_path(asset_root: &Path, path: &Path) -> Result<PathBuf, String> {

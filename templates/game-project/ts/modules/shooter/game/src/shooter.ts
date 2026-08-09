@@ -5,6 +5,7 @@ import {
   setResource,
   spawnEntity as spawnEcsEntity,
 } from "../../api/ecs.js";
+import { keyPressed } from "../../api/input.js";
 
 type EntityId = string;
 type Role = "player" | "bullet" | "enemy";
@@ -335,7 +336,12 @@ callbacks.on_script_reloaded = function (): void {
   resetGame();
 };
 
-callbacks.on_update = function (dt: number, inputX: number, inputY: number, restartPressed: boolean): void {
+callbacks.on_update = function (dt: number): void {
+  const inputX = Number(keyPressed("ArrowRight") || keyPressed("KeyD"))
+    - Number(keyPressed("ArrowLeft") || keyPressed("KeyA"));
+  const inputY = Number(keyPressed("ArrowUp") || keyPressed("KeyW"))
+    - Number(keyPressed("ArrowDown") || keyPressed("KeyS"));
+  const restartPressed = keyPressed("Space");
   if (!resources.started) {
     if (restartPressed && !resources.restartWasPressed) {
       resources.started = true;

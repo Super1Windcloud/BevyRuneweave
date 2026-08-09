@@ -1,4 +1,5 @@
 local ecs = require("runeweave.ecs")
+local input = require("runeweave.input")
 
 local PLAYER_SPEED = 330
 local BULLET_SPEED = 570
@@ -275,7 +276,12 @@ function on_script_reloaded()
     reset_game()
 end
 
-function on_update(dt, input_x, input_y, restart_pressed)
+function on_update(dt)
+    local input_x = (input.key_pressed("ArrowRight") or input.key_pressed("KeyD")) and 1 or 0
+    input_x = input_x - ((input.key_pressed("ArrowLeft") or input.key_pressed("KeyA")) and 1 or 0)
+    local input_y = (input.key_pressed("ArrowUp") or input.key_pressed("KeyW")) and 1 or 0
+    input_y = input_y - ((input.key_pressed("ArrowDown") or input.key_pressed("KeyS")) and 1 or 0)
+    local restart_pressed = input.key_pressed("Space")
     if not resources.started then
         if restart_pressed and not resources.restart_was_pressed then
             resources.started = true

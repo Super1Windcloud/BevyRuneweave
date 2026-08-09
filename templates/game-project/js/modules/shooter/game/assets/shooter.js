@@ -259,7 +259,12 @@ function resetGame() {
 
 globalThis.on_script_loaded = resetGame;
 globalThis.on_script_reloaded = resetGame;
-globalThis.on_update = function (dt, inputX, inputY, restartPressed) {
+globalThis.on_update = function (dt) {
+  const inputX = Number(input_key_pressed("ArrowRight") || input_key_pressed("KeyD"))
+    - Number(input_key_pressed("ArrowLeft") || input_key_pressed("KeyA"));
+  const inputY = Number(input_key_pressed("ArrowUp") || input_key_pressed("KeyW"))
+    - Number(input_key_pressed("ArrowDown") || input_key_pressed("KeyS"));
+  const restartPressed = input_key_pressed("Space");
   if (!resources.started) {
     if (restartPressed && !resources.restartWasPressed) {
       resources.started = true;

@@ -8,7 +8,9 @@ use bevy_mod_scripting::{
 };
 use mlua::{Lua, Table, Value};
 
-use super::super::{command::EcsBridge, network::NetworkBridge, value::EcsValue};
+use super::super::{
+    command::EcsBridge, input::InputBridge, network::NetworkBridge, value::EcsValue,
+};
 
 const MAX_VALUE_DEPTH: usize = 32;
 
@@ -104,6 +106,7 @@ fn ecs_to_lua(lua: &Lua, value: EcsValue, depth: usize) -> mlua::Result<Value> {
 
 fn install_ecs_api(
     bridge: &EcsBridge,
+    input: &InputBridge,
     network: &NetworkBridge,
     _attachment: &ScriptAttachment,
     context: &mut LuaContext,
@@ -283,6 +286,29 @@ fn install_ecs_api(
         let package: Table = globals.get("package")?;
         let loaded: Table = package.get("loaded")?;
         loaded.set("runeweave.ecs", ecs)?;
+        let input_module = context.create_table()?;
+        input_module.set(
+            "key_pressed",
+            context.create_function({
+                let input = input.clone();
+                move |_, key: String| Ok(input.pressed(&key))
+            })?,
+        )?;
+        input_module.set(
+            "key_just_pressed",
+            context.create_function({
+                let input = input.clone();
+                move |_, key: String| Ok(input.just_pressed(&key))
+            })?,
+        )?;
+        input_module.set(
+            "key_just_released",
+            context.create_function({
+                let input = input.clone();
+                move |_, key: String| Ok(input.just_released(&key))
+            })?,
+        )?;
+        loaded.set("runeweave.input", input_module)?;
         let network_module = context.create_table()?;
         network_module.set(
             "http_get",
@@ -313,10 +339,14 @@ fn install_ecs_api(
     result.map_err(interop_error)
 }
 
-pub(super) fn ecs_lua_plugin(bridge: EcsBridge, network: NetworkBridge) -> LuaScriptingPlugin {
+pub(super) fn ecs_lua_plugin(
+    bridge: EcsBridge,
+    input: InputBridge,
+    network: NetworkBridge,
+) -> LuaScriptingPlugin {
     LuaScriptingPlugin::default().add_context_initializer(move |attachment, context| {
         let owned_bridge = bridge.for_attachment(attachment);
-        install_ecs_api(&owned_bridge, &network, attachment, context)
+        install_ecs_api(&owned_bridge, &input, &network, attachment, context)
     })
 }
 
@@ -413,6 +443,27 @@ mod tests {
         let package: Table = globals.get("package").unwrap();
         let loaded_modules: Table = package.get("loaded").unwrap();
         loaded_modules.set("runeweave.ecs", ecs).unwrap();
+        let input = lua.create_table().unwrap();
+        input
+            .set(
+                "key_pressed",
+                lua.create_function(|_, key: String| Ok(key == "Space"))
+                    .unwrap(),
+            )
+            .unwrap();
+        input
+            .set(
+                "key_just_pressed",
+                lua.create_function(|_, _: String| Ok(false)).unwrap(),
+            )
+            .unwrap();
+        input
+            .set(
+                "key_just_released",
+                lua.create_function(|_, _: String| Ok(false)).unwrap(),
+            )
+            .unwrap();
+        loaded_modules.set("runeweave.input", input).unwrap();
 
         #[cfg(feature = "lua")]
         let source = include_str!("../../../projects/lua/modules/shooter/game/assets/shooter.lua");
@@ -420,16 +471,10 @@ mod tests {
         let loaded: mlua::Function = globals.get("on_script_loaded").unwrap();
         loaded.call::<()>(()).unwrap();
         let update: mlua::Function = globals.get("on_update").unwrap();
-        update
-            .call::<()>((0.016_f64, 0.0_f64, 0.0_f64, true))
-            .unwrap();
-        update
-            .call::<()>((0.016_f64, 0.0_f64, 0.0_f64, false))
-            .unwrap();
+        update.call::<()>(0.016_f64).unwrap();
+        update.call::<()>(0.016_f64).unwrap();
         for _ in 0..600 {
-            update
-                .call::<()>((0.016_f64, 0.25_f64, 0.0_f64, false))
-                .unwrap();
+            update.call::<()>(0.016_f64).unwrap();
         }
 
         assert!(sprite_count.load(Ordering::Relaxed) > 1);

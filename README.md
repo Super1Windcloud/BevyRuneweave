@@ -31,8 +31,8 @@ TypeScript package is `@superwindcloud/bevy-runeweave`. The Script Squadron exec
 `script-squadron-lua`, `script-squadron-js`, and `script-squadron-typescript`.
 
 Runeweave exposes the same Entity, Component, Resource, and Query API to all three languages. The
-shooter host provides the window, keyboard input, and generic sprite/text materialization. Scripts
-select asset paths, dimensions, render layers, and HUD content alongside the gameplay itself.
+shooter host provides the window, raw keyboard state, and generic sprite/text materialization.
+Scripts select key mappings, asset paths, dimensions, render layers, and HUD content alongside the gameplay itself.
 
 ## Project Layout
 

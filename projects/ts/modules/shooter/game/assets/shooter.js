@@ -17,6 +17,11 @@
     ecs_resource_set(name, value);
   }
 
+  // modules/shooter/api/input.ts
+  function keyPressed(key) {
+    return input_key_pressed(key);
+  }
+
   // modules/shooter/game/src/shooter.ts
   var PLAYER_SPEED = 330;
   var BULLET_SPEED = 570;
@@ -256,7 +261,10 @@ ${message}` : status,
   callbacks.on_script_reloaded = function() {
     resetGame();
   };
-  callbacks.on_update = function(dt, inputX, inputY, restartPressed) {
+  callbacks.on_update = function(dt) {
+    const inputX = Number(keyPressed("ArrowRight") || keyPressed("KeyD")) - Number(keyPressed("ArrowLeft") || keyPressed("KeyA"));
+    const inputY = Number(keyPressed("ArrowUp") || keyPressed("KeyW")) - Number(keyPressed("ArrowDown") || keyPressed("KeyS"));
+    const restartPressed = keyPressed("Space");
     if (!resources.started) {
       if (restartPressed && !resources.restartWasPressed) {
         resources.started = true;
