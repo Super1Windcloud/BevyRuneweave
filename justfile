@@ -29,11 +29,11 @@ ts-check:
 
 # Run the Lua 5.5 game.
 run-lua:
-    if grep -qi microsoft /proc/version 2>/dev/null; then WGPU_BACKEND=gl cargo run -p script-squadron-lua; else cargo run -p script-squadron-lua; fi
+    cargo run -p script-squadron-lua
 
 # Run the JavaScript game with QuickJS.
 run-js:
-    if grep -qi microsoft /proc/version 2>/dev/null; then WGPU_BACKEND=gl cargo run -p script-squadron-js; else cargo run -p script-squadron-js; fi
+    cargo run -p script-squadron-js
 
 # Watch, compile, and run the TypeScript game with QuickJS.
 run-ts:
@@ -46,7 +46,7 @@ run-ts-unix:
     npm --prefix {{ts_dir}} run watch &
     watcher_pid=$!
     trap 'kill $watcher_pid 2>/dev/null || true' EXIT INT TERM
-    if grep -qi microsoft /proc/version 2>/dev/null; then WGPU_BACKEND=gl cargo run -p script-squadron-typescript; else cargo run -p script-squadron-typescript; fi
+    cargo run -p script-squadron-typescript
 
 # Windows/PowerShell variant of run-ts. The zsh recipe above remains the
 # default for Unix hosts because its process and signal handling are shell
