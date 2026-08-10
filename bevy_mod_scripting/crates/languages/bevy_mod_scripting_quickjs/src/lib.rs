@@ -21,7 +21,7 @@ use bevy_mod_scripting_core::{
 use bevy_mod_scripting_script::ScriptAttachment;
 pub use rquickjs;
 use rquickjs::{
-    Context, FromJs, Function, Runtime, Type, Value,
+    CatchResultExt, Context, FromJs, Function, Runtime, Type, Value,
     function::{Args, Func},
 };
 
@@ -159,9 +159,11 @@ fn create_context(
         .try_for_each(|initializer| initializer(attachment, &mut context))?;
 
     let source = std::str::from_utf8(content).map_err(interop_error)?;
-    context
-        .with(|ctx| ctx.eval::<(), _>(source))
-        .map_err(interop_error)?;
+    context.with(|ctx| {
+        ctx.eval::<(), _>(source)
+            .catch(&ctx)
+            .map_err(|error| interop_error(error.to_string()))
+    })?;
     Ok(context)
 }
 
@@ -255,7 +257,10 @@ pub fn quickjs_handler(
         for value in values {
             push_script_value(&mut args, value)?;
         }
-        let result = args.apply::<Value>(&function).map_err(interop_error)?;
+        let result = args
+            .apply::<Value>(&function)
+            .catch(&ctx)
+            .map_err(|error| interop_error(error.to_string()))?;
         from_js_value(&ctx, result)
     })
 }

@@ -1,6 +1,6 @@
 # Lua Runtime API
 
-The runtime provides `runeweave.ecs`, `runeweave.input`, and `runeweave.network` as virtual Lua
-modules. This directory marks the API boundary; game code and runtime assets live under `../game`.
+The runtime exposes reflected scene types plus keyboard and HTTP functions through the shared BMS
+registry. It does not install Runeweave-specific virtual Lua modules.
 
-See `docs/ecs-api.md` for the exported functions.
+See `docs/script-api.md` for the exported functions.

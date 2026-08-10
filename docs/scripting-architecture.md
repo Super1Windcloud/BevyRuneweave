@@ -30,15 +30,13 @@ All reflected world access goes through `WorldGuard` and its access claims. Refe
 `ReflectReference` validity and allocation rules. Script systems declare component/resource access
 and schedule placement through the BMS script-system infrastructure.
 
-## Legacy Migration
+## Removed Legacy Layer
 
-`src/ecs_api` currently maintains `EcsValue` snapshots and mirrors them into `ScriptComponents` and
-`ScriptResources`. It remains temporarily so existing game packages keep running, but it is frozen:
-
-- do not add new capabilities to it;
-- migrate one domain at a time to reflected Bevy types and BMS-registered functions;
-- keep Lua and QuickJS migrations behaviorally equivalent;
-- remove migrated snapshot state, language globals, SDK wrappers, and compatibility tests together.
+The former `src/ecs_api` snapshot bridge and its Lua/QuickJS adapters have been removed. Runtime
+code must not recreate `EcsValue` snapshots, string-keyed generic components, deferred mirror
+systems, or language-specific product globals. `src/script_api` contains the current domain types
+and registers each operation once through `NamespaceBuilder`; Lua and QuickJS consume the same BMS
+registry entries.
 
 Input, networking, rendering, physics, audio, and future script APIs follow the same BMS registration
 path even when their implementation uses platform-specific code internally.

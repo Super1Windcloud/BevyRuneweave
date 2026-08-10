@@ -48,22 +48,18 @@ projects/
 │       └── game/assets/ # Editable JavaScript entry and runtime assets
 └── ts/                  # TypeScript 7.0.2 and QuickJS executable project
     └── modules/shooter/
-        ├── api/         # Typed ECS and HTTP imports
+        ├── api/         # Typed BMS scene and platform-service imports
         └── game/        # TypeScript src/ and compiled runtime assets/
 templates/game-project/  # Standalone project templates, outside projects/
 ├── lua/
 ├── js/
 └── ts/
 src/                     # Framework core and shared Bevy host
-├── ecs_api/             # Frozen compatibility API during BMS reflection migration
-│   ├── bindings/        # Lua and QuickJS/TypeScript adapters
-│   ├── command.rs       # Readable snapshots and queued Bevy writes
-│   ├── value.rs         # Cross-language structured values
-│   └── world.rs         # Entity, Component, and Resource synchronization
+├── script_api/          # Reflected types and functions registered once through BMS
 ├── example_host.rs      # Script Squadron sprite, transform, and HUD mapping
 ├── runtime/             # App assembly, input callbacks, hot reload, and host entry points
 └── lib.rs               # Feature constraints and public API exports
-docs/ecs-api.md          # Legacy ECS compatibility contract and examples
+docs/script-api.md       # Current reflected scene and platform-service API
 docs/scripting-architecture.md # BMS-first API architecture and migration rules
 bevy_mod_scripting/      # Reflection, guarded World access, Lua, and QuickJS/TypeScript
 include/                 # Public native-host C ABI
@@ -117,11 +113,11 @@ Workspace object model. Scripts do not receive behavior-rich game objects or ask
 predefined workflow. They describe world changes by spawning and despawning entities, inserting and
 updating components, and writing resources.
 
-The Rust host commits these writes to the Bevy World. Independent systems then update `Sprite`,
-`Transform`, and HUD state from component and resource changes:
+Scripts mutate real reflected Bevy components through BMS-registered functions. Independent systems
+then update `Sprite`, `Transform`, and HUD state from those component and resource changes:
 
 ```text
-Script logic -> ECS write queue -> Components / Resources -> Bevy systems -> Rendering and UI
+Script logic -> BMS WorldGuard -> Components / Resources -> Bevy systems -> Rendering and UI
 ```
 
 The gameplay scripts follow the same data-oriented model:
@@ -135,25 +131,19 @@ The gameplay scripts follow the same data-oriented model:
 - Systems mark entities for deletion and flush structural changes after iteration. RenderSync then
   submits script component data to the host ECS.
 
-All languages share these operations:
+All languages consume the same BMS registry entries:
 
 ```text
-ecs_world_clear()
-ecs_entity_spawn / ecs_entity_exists / ecs_entity_despawn
-ecs_component_insert / ecs_component_get / ecs_component_has / ecs_component_remove
-ecs_query
-ecs_resource_set / ecs_resource_get / ecs_resource_remove
+scene_spawn / scene_despawn / scene_clear
+scene_set_sprite / scene_set_transform / scene_set_text
+scene_transform
+game_state_set
 ```
 
-For example, a renderable entity is created with `ecs_entity_spawn`, then receives separate
-`sprite` and `transform` components. Runeweave does not assign business meaning to those names; the
-Script Squadron host maps their structured values to Bevy components. See
-[`docs/ecs-api.md`](docs/ecs-api.md) for the complete contract.
-
-These operations are a frozen compatibility surface. New script-facing APIs and migrated ECS
-operations are defined once through `bevy_mod_scripting` reflection and function registries, with
-the real Bevy `World` as authoritative state. See
-[`docs/scripting-architecture.md`](docs/scripting-architecture.md).
+For example, `scene_set_transform` updates a real reflected `ScriptTransform` component, and
+`scene_transform` returns a BMS `ReflectReference` to that same value. The host observes it directly;
+there is no mirrored ECS or per-language product adapter. See [`docs/script-api.md`](docs/script-api.md)
+and [`docs/scripting-architecture.md`](docs/scripting-architecture.md).
 
 Script files support Bevy asset hot reload. Updating `game/assets/shooter.js` or
 `game/assets/shooter.lua` in the active JavaScript or Lua project reinitializes game state and prints

@@ -53,9 +53,8 @@ function spawnEntity(id, bundle) {
   if (bundle.role === "bullet") world.bullets.add(id);
   if (bundle.role === "enemy") world.enemies.add(id);
 
-  ecs_entity_spawn(id);
-  ecs_component_insert(id, "sprite", bundle.sprite);
-  ecs_component_insert(id, "transform", bundle.transform);
+  scene_spawn(id, bundle.transform.x, bundle.transform.y, bundle.transform.z);
+  scene_set_sprite(id, bundle.sprite.path, bundle.sprite.width, bundle.sprite.height);
 }
 
 function queueDespawn(id) {
@@ -76,7 +75,7 @@ function flushEntityCommands() {
     world.players.delete(id);
     world.bullets.delete(id);
     world.enemies.delete(id);
-    ecs_entity_despawn(id);
+    scene_despawn(id);
   }
   world.pendingDespawn.clear();
 }
@@ -203,22 +202,23 @@ function collisionSystem(frame) {
 
 function renderSyncSystem() {
   for (const [id, transform] of world.transforms) {
-    if (isActive(id)) ecs_component_insert(id, "transform", transform);
+    if (isActive(id)) scene_set_transform(id, transform.x, transform.y, transform.z);
   }
 }
 
 function updateGameState(message) {
-  ecs_resource_set("game_state", { score: resources.score, lives: resources.lives, message });
-  const status = `SCORE ${String(resources.score).padStart(5, "0")}    LIVES ${resources.lives}`;
-  ecs_component_insert("hud", "text", {
-    value: message ? `${status}\n${message}` : status,
-    fontSize: 25,
-    red: 0.82,
-    green: 0.94,
-    blue: 1.0,
-    alpha: 1.0,
-    anchor: "top_center",
-  });
+  game_state_set(resources.score, resources.lives, message);
+  const status = `SCORE ${(`00000${resources.score}`).slice(-5)}    LIVES ${resources.lives}`;
+  scene_set_text(
+    "hud",
+    message ? `${status}\n${message}` : status,
+    25,
+    0.82,
+    0.94,
+    1.0,
+    1.0,
+    "top_center",
+  );
 }
 
 function gameStateSystem() {
@@ -232,11 +232,14 @@ function gameStateSystem() {
 }
 
 function spawnScene() {
-  ecs_entity_spawn("background");
-  ecs_component_insert("background", "sprite", SPRITES.background);
-  ecs_component_insert("background", "transform", { x: 0, y: 0, z: -10 });
-  ecs_entity_spawn("hud");
-  ecs_component_insert("hud", "transform", { x: 0, y: 382, z: 20 });
+  scene_spawn("background", 0, 0, -10);
+  scene_set_sprite(
+    "background",
+    SPRITES.background.path,
+    SPRITES.background.width,
+    SPRITES.background.height,
+  );
+  scene_spawn("hud", 0, 382, 20);
 }
 
 const updateSchedule = [
@@ -249,7 +252,7 @@ const updateSchedule = [
 ];
 
 function resetGame() {
-  ecs_world_clear();
+  scene_clear();
   world = createWorld();
   resources = createResources();
   spawnScene();

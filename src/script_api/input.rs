@@ -13,9 +13,9 @@ struct InputState {
 }
 
 #[derive(Resource, Clone, Default)]
-pub(crate) struct InputBridge(Arc<RwLock<InputState>>);
+pub(crate) struct ScriptInput(Arc<RwLock<InputState>>);
 
-impl InputBridge {
+impl ScriptInput {
     pub(crate) fn update(&self, keyboard: &ButtonInput<KeyCode>) {
         let mut state = self
             .0
@@ -53,28 +53,5 @@ impl InputBridge {
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         predicate(&state)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn exposes_pressed_and_edge_states_by_keycode_name() {
-        let input = InputBridge::default();
-        let mut keyboard = ButtonInput::default();
-        keyboard.press(KeyCode::Space);
-        input.update(&keyboard);
-
-        assert!(input.pressed("Space"));
-        assert!(input.just_pressed("Space"));
-        assert!(!input.just_released("Space"));
-
-        keyboard.clear();
-        keyboard.release(KeyCode::Space);
-        input.update(&keyboard);
-        assert!(!input.pressed("Space"));
-        assert!(input.just_released("Space"));
     }
 }

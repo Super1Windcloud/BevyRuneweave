@@ -1,27 +1,31 @@
-type EcsValue = null | boolean | number | string | EcsValue[] | object;
+interface BmsReflectReference {
+  get(key: string | number): unknown;
+  set(key: string | number, value: unknown): void;
+  call(name: string, ...args: unknown[]): unknown;
+}
 
-declare function ecs_world_clear(): void;
-declare function ecs_entity_spawn(id: string): void;
-declare function ecs_entity_spawn_bundle(id: string, components: Record<string, EcsValue>): void;
-declare function ecs_entity_exists(id: string): boolean;
-declare function ecs_entity_despawn(id: string): boolean;
-declare function ecs_component_insert(id: string, name: string, value: EcsValue): boolean;
-declare function ecs_component_get(id: string, name: string): EcsValue | null;
-declare function ecs_component_has(id: string, name: string): boolean;
-declare function ecs_component_remove(id: string, name: string): boolean;
-declare function ecs_query(requiredComponents: string[]): string[];
-declare function ecs_query_filtered(
-  requiredComponents: string[],
-  excludedComponents: string[],
-): string[];
-declare function ecs_query_matching(
-  requiredComponents: string[],
-  anyComponents: string[],
-  excludedComponents: string[],
-): string[];
-declare function ecs_resource_set(name: string, value: EcsValue): void;
-declare function ecs_resource_get(name: string): EcsValue | null;
-declare function ecs_resource_remove(name: string): boolean;
+declare function scene_spawn(id: string, x: number, y: number, z: number): boolean;
+declare function scene_set_sprite(
+  id: string,
+  path: string,
+  width: number,
+  height: number,
+): boolean;
+declare function scene_set_transform(id: string, x: number, y: number, z: number): boolean;
+declare function scene_set_text(
+  id: string,
+  value: string,
+  fontSize: number,
+  red: number,
+  green: number,
+  blue: number,
+  alpha: number,
+  anchor: string,
+): boolean;
+declare function scene_despawn(id: string): boolean;
+declare function scene_clear(): void;
+declare function scene_transform(id: string): BmsReflectReference | null;
+declare function game_state_set(score: number, lives: number, message: string): void;
 declare function input_key_pressed(key: string): boolean;
 declare function input_key_just_pressed(key: string): boolean;
 declare function input_key_just_released(key: string): boolean;

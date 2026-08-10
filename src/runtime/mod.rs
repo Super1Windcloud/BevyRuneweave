@@ -28,8 +28,8 @@ use bevy_mod_scripting::prelude::{
 use winit::platform::windows::WindowExtWindows;
 
 use crate::{
-    ecs_api::{ApplyEcsCommands, InputBridge, RuneweaveEcsPlugin},
     example_host::ScriptSquadronHostPlugin,
+    script_api::{RuneweaveScriptApiPlugin, ScriptApiUpdated, ScriptInput},
 };
 
 #[cfg(feature = "lua")]
@@ -248,7 +248,7 @@ fn poll_asset_reload(
 fn emit_update(
     time: Res<Time>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    input: Res<InputBridge>,
+    input: Res<ScriptInput>,
     mut callbacks: MessageWriter<ScriptCallbackEvent>,
 ) {
     input.update(&keyboard);
@@ -333,7 +333,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             }),
     )
     .add_plugins(scripting_plugins)
-    .add_plugins((RuneweaveEcsPlugin, ScriptSquadronHostPlugin))
+    .add_plugins((RuneweaveScriptApiPlugin, ScriptSquadronHostPlugin))
     .insert_resource(LoadedScriptPath {
         source_path: asset_root.join(&asset_path),
         modified: fs::metadata(asset_root.join(&asset_path))
@@ -363,7 +363,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             event_handler::<OnUpdate, LuaScriptingPlugin>,
         )
             .chain()
-            .before(ApplyEcsCommands),
+            .in_set(ScriptApiUpdated),
     );
     #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
     app.insert_resource(ScriptFilePollTimer(Timer::from_seconds(

@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     io::Read,
     sync::{
         Arc, Mutex, MutexGuard,
@@ -9,8 +9,7 @@ use std::{
 };
 
 use bevy::prelude::Resource;
-
-use super::EcsValue;
+use bevy_mod_scripting::prelude::ScriptValue;
 
 const MAX_RESPONSE_BYTES: u64 = 1024 * 1024;
 
@@ -21,13 +20,13 @@ enum HttpRequestState {
 }
 
 #[derive(Resource, Clone)]
-pub(super) struct NetworkBridge {
+pub(super) struct ScriptNetwork {
     client: Option<reqwest::blocking::Client>,
     requests: Arc<Mutex<HashMap<u32, HttpRequestState>>>,
     next_id: Arc<AtomicU32>,
 }
 
-impl Default for NetworkBridge {
+impl Default for ScriptNetwork {
     fn default() -> Self {
         Self {
             client: reqwest::blocking::Client::builder()
@@ -40,18 +39,18 @@ impl Default for NetworkBridge {
     }
 }
 
-impl NetworkBridge {
+impl ScriptNetwork {
     fn lock(&self) -> MutexGuard<'_, HashMap<u32, HttpRequestState>> {
         self.requests
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    pub fn get(&self, url: String) -> u32 {
+    pub(super) fn get(&self, url: String) -> u32 {
         self.start(move |client| client.get(url))
     }
 
-    pub fn post(&self, url: String, body: String, content_type: String) -> u32 {
+    pub(super) fn post(&self, url: String, body: String, content_type: String) -> u32 {
         self.start(move |client| {
             client
                 .post(url)
@@ -77,16 +76,16 @@ impl NetworkBridge {
             return id;
         };
         std::thread::spawn(move || {
-            let result = perform_request(build(&client));
+            let next = perform_request(build(&client));
             requests
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .insert(id, result);
+                .insert(id, next);
         });
         id
     }
 
-    pub fn poll(&self, id: u32) -> EcsValue {
+    pub(super) fn poll(&self, id: u32) -> ScriptValue {
         let state = {
             let mut requests = self.lock();
             match requests.get(&id) {
@@ -99,12 +98,12 @@ impl NetworkBridge {
             Some(HttpRequestState::Complete { status, body }) => state_value(
                 "complete",
                 [
-                    ("status", EcsValue::Number(f64::from(status))),
-                    ("body", EcsValue::String(body)),
+                    ("status", ScriptValue::Integer(i64::from(status))),
+                    ("body", ScriptValue::from(body)),
                 ],
             ),
             Some(HttpRequestState::Error(error)) => {
-                state_value("error", [("error", EcsValue::String(error))])
+                state_value("error", [("error", ScriptValue::from(error))])
             }
             Some(HttpRequestState::Pending) => unreachable!(),
             None => state_value("unknown", []),
@@ -131,20 +130,17 @@ fn perform_request(request: reqwest::blocking::RequestBuilder) -> HttpRequestSta
     }
 }
 
-fn state_value<const N: usize>(state: &str, fields: [(&str, EcsValue); N]) -> EcsValue {
-    let mut result = BTreeMap::from([("state".to_owned(), EcsValue::String(state.to_owned()))]);
-    result.extend(
-        fields
-            .into_iter()
-            .map(|(name, value)| (name.to_owned(), value)),
-    );
-    EcsValue::Object(result)
+fn state_value<const N: usize>(state: &str, fields: [(&str, ScriptValue); N]) -> ScriptValue {
+    let mut result = bevy::platform::collections::HashMap::default();
+    result.insert("state".into(), ScriptValue::from(state.to_owned()));
+    result.extend(fields.into_iter().map(|(name, value)| (name.into(), value)));
+    ScriptValue::Map(result)
 }
 
 #[cfg(test)]
 mod tests {
     use std::{
-        io::{Read, Write},
+        io::Write,
         net::TcpListener,
         thread,
         time::{Duration, Instant},
@@ -153,38 +149,42 @@ mod tests {
     use super::*;
 
     #[test]
-    fn http_requests_complete_without_blocking_the_caller() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
+    fn http_requests_complete_without_blocking_the_caller() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let listener = TcpListener::bind("127.0.0.1:0")?;
+        let address = listener.local_addr()?;
+        let server = thread::spawn(move || -> std::io::Result<()> {
+            let (mut stream, _) = listener.accept()?;
             let mut request = [0_u8; 1024];
-            let _ = stream.read(&mut request).unwrap();
-            stream
-                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
-                .unwrap();
+            let _ = stream.read(&mut request)?;
+            stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
         });
 
-        let network = NetworkBridge::default();
+        let network = ScriptNetwork::default();
         let request = network.get(format!("http://{address}"));
         let deadline = Instant::now() + Duration::from_secs(2);
         loop {
-            let result = network.poll(request);
-            let EcsValue::Object(fields) = result else {
-                panic!("HTTP poll must return an object");
+            let ScriptValue::Map(fields) = network.poll(request) else {
+                return Err("HTTP poll must return a map".into());
             };
             match fields.get("state") {
-                Some(EcsValue::String(state)) if state == "pending" => {
-                    assert!(Instant::now() < deadline, "HTTP request timed out");
+                Some(ScriptValue::String(state)) if state == "pending" => {
+                    if Instant::now() >= deadline {
+                        return Err("HTTP request timed out".into());
+                    }
                     thread::sleep(Duration::from_millis(10));
                 }
-                Some(EcsValue::String(state)) if state == "complete" => {
-                    assert_eq!(fields.get("status"), Some(&EcsValue::Number(200.0)));
-                    assert_eq!(fields.get("body"), Some(&EcsValue::String("ok".to_owned())));
+                Some(ScriptValue::String(state)) if state == "complete" => {
+                    assert_eq!(fields.get("status"), Some(&ScriptValue::Integer(200)));
+                    assert_eq!(fields.get("body"), Some(&ScriptValue::from("ok")));
                     break;
                 }
-                other => panic!("unexpected HTTP state: {other:?}"),
+                other => return Err(format!("unexpected HTTP state: {other:?}").into()),
             }
         }
+        server
+            .join()
+            .map_err(|_| "HTTP test server thread panicked")??;
+        Ok(())
     }
 }

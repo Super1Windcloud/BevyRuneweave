@@ -1,6 +1,6 @@
 # JavaScript Runtime API
 
-The runtime injects the ECS, keyboard input, and HTTP functions as QuickJS globals. This directory
-marks the API boundary; game code and runtime assets live under `../game`.
+The runtime exposes reflected scene types plus keyboard and HTTP functions through the shared BMS
+registry. This directory marks the API boundary; game code and runtime assets live under `../game`.
 
-See `docs/ecs-api.md` for the exported functions.
+See `docs/script-api.md` for the exported functions.

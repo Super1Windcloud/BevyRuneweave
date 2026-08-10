@@ -1,10 +1,12 @@
 import {
-  clearWorld,
-  despawnEntity,
-  insertComponent,
-  setResource,
-  spawnEntity as spawnEcsEntity,
-} from "../../api/ecs.js";
+  clearScene,
+  despawnSceneEntity,
+  setGameState,
+  setSprite,
+  setText,
+  setTransform,
+  spawnSceneEntity,
+} from "../../api/scene.js";
 import { keyPressed } from "../../api/input.js";
 
 type EntityId = string;
@@ -121,9 +123,8 @@ function spawnEntity(id: EntityId, bundle: SpawnBundle): void {
   if (bundle.role === "bullet") world.bullets.add(id);
   if (bundle.role === "enemy") world.enemies.add(id);
 
-  spawnEcsEntity(id);
-  insertComponent(id, "sprite", bundle.sprite);
-  insertComponent(id, "transform", bundle.transform);
+  spawnSceneEntity(id, bundle.transform);
+  setSprite(id, bundle.sprite);
 }
 
 function queueDespawn(id: EntityId): void {
@@ -144,7 +145,7 @@ function flushEntityCommands(): void {
     world.players.delete(id);
     world.bullets.delete(id);
     world.enemies.delete(id);
-    despawnEntity(id);
+    despawnSceneEntity(id);
   }
   world.pendingDespawn.clear();
 }
@@ -272,14 +273,14 @@ function collisionSystem(frame: FrameContext): void {
 
 function renderSyncSystem(): void {
   for (const [id, transform] of world.transforms) {
-    if (isActive(id)) insertComponent(id, "transform", transform);
+    if (isActive(id)) setTransform(id, transform);
   }
 }
 
 function updateGameState(message: string): void {
-  setResource("game_state", { score: resources.score, lives: resources.lives, message });
-  const status = `SCORE ${String(resources.score).padStart(5, "0")}    LIVES ${resources.lives}`;
-  insertComponent("hud", "text", {
+  setGameState(resources.score, resources.lives, message);
+  const status = `SCORE ${(`00000${resources.score}`).slice(-5)}    LIVES ${resources.lives}`;
+  setText("hud", {
     value: message ? `${status}\n${message}` : status,
     fontSize: 25,
     red: 0.82,
@@ -301,11 +302,9 @@ function gameStateSystem(): void {
 }
 
 function spawnScene(): void {
-  spawnEcsEntity("background");
-  insertComponent("background", "sprite", sprites.background);
-  insertComponent("background", "transform", { x: 0, y: 0, z: -10 });
-  spawnEcsEntity("hud");
-  insertComponent("hud", "transform", { x: 0, y: 382, z: 20 });
+  spawnSceneEntity("background", { x: 0, y: 0, z: -10 });
+  setSprite("background", sprites.background);
+  spawnSceneEntity("hud", { x: 0, y: 382, z: 20 });
 }
 
 const updateSchedule: GameSystem[] = [
@@ -318,7 +317,7 @@ const updateSchedule: GameSystem[] = [
 ];
 
 function resetGame(): void {
-  clearWorld();
+  clearScene();
   world = createWorld();
   resources = createResources();
   spawnScene();

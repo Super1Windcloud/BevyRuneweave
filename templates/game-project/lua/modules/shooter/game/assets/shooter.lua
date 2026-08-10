@@ -1,6 +1,3 @@
-local ecs = require("runeweave.ecs")
-local input = require("runeweave.input")
-
 local PLAYER_SPEED = 330
 local BULLET_SPEED = 570
 local ENEMY_SPEED = 145
@@ -56,9 +53,8 @@ local function spawn_entity(id, bundle)
     if bundle.role == "bullet" then world.bullets[id] = true end
     if bundle.role == "enemy" then world.enemies[id] = true end
 
-    ecs.entity_spawn(id)
-    ecs.component_insert(id, "sprite", bundle.sprite)
-    ecs.component_insert(id, "transform", bundle.transform)
+    scene_spawn(id, bundle.transform.x, bundle.transform.y, bundle.transform.z)
+    scene_set_sprite(id, bundle.sprite.path, bundle.sprite.width, bundle.sprite.height)
 end
 
 local function queue_despawn(id)
@@ -79,7 +75,7 @@ local function flush_entity_commands()
         world.players[id] = nil
         world.bullets[id] = nil
         world.enemies[id] = nil
-        ecs.entity_despawn(id)
+        scene_despawn(id)
     end
     world.pending_despawn = {}
 end
@@ -214,22 +210,17 @@ end
 
 local function render_sync_system()
     for id, transform in pairs(world.transforms) do
-        if is_active(id) then ecs.component_insert(id, "transform", transform) end
+        if is_active(id) then scene_set_transform(id, transform.x, transform.y, transform.z) end
     end
 end
 
 local function update_game_state(message)
-    ecs.resource_set("game_state", { score = resources.score, lives = resources.lives, message = message })
+    game_state_set(resources.score, resources.lives, message)
     local status = string.format("SCORE %05d    LIVES %d", resources.score, resources.lives)
-    ecs.component_insert("hud", "text", {
-        value = message ~= "" and status .. "\n" .. message or status,
-        fontSize = 25,
-        red = 0.82,
-        green = 0.94,
-        blue = 1.0,
-        alpha = 1.0,
-        anchor = "top_center",
-    })
+    scene_set_text(
+        "hud", message ~= "" and status .. "\n" .. message or status,
+        25, 0.82, 0.94, 1.0, 1.0, "top_center"
+    )
 end
 
 local function game_state_system()
@@ -243,11 +234,11 @@ local function game_state_system()
 end
 
 local function spawn_scene()
-    ecs.entity_spawn("background")
-    ecs.component_insert("background", "sprite", SPRITES.background)
-    ecs.component_insert("background", "transform", { x = 0, y = 0, z = -10 })
-    ecs.entity_spawn("hud")
-    ecs.component_insert("hud", "transform", { x = 0, y = 382, z = 20 })
+    scene_spawn("background", 0, 0, -10)
+    scene_set_sprite(
+        "background", SPRITES.background.path, SPRITES.background.width, SPRITES.background.height
+    )
+    scene_spawn("hud", 0, 382, 20)
 end
 
 local update_schedule = {
@@ -260,7 +251,7 @@ local update_schedule = {
 }
 
 local function reset_game()
-    ecs.world_clear()
+    scene_clear()
     world = create_world()
     resources = create_resources()
     spawn_scene()
@@ -277,11 +268,11 @@ function on_script_reloaded()
 end
 
 function on_update(dt)
-    local input_x = (input.key_pressed("ArrowRight") or input.key_pressed("KeyD")) and 1 or 0
-    input_x = input_x - ((input.key_pressed("ArrowLeft") or input.key_pressed("KeyA")) and 1 or 0)
-    local input_y = (input.key_pressed("ArrowUp") or input.key_pressed("KeyW")) and 1 or 0
-    input_y = input_y - ((input.key_pressed("ArrowDown") or input.key_pressed("KeyS")) and 1 or 0)
-    local restart_pressed = input.key_pressed("Space")
+    local input_x = (input_key_pressed("ArrowRight") or input_key_pressed("KeyD")) and 1 or 0
+    input_x = input_x - ((input_key_pressed("ArrowLeft") or input_key_pressed("KeyA")) and 1 or 0)
+    local input_y = (input_key_pressed("ArrowUp") or input_key_pressed("KeyW")) and 1 or 0
+    input_y = input_y - ((input_key_pressed("ArrowDown") or input_key_pressed("KeyS")) and 1 or 0)
+    local restart_pressed = input_key_pressed("Space")
     if not resources.started then
         if restart_pressed and not resources.restart_was_pressed then
             resources.started = true

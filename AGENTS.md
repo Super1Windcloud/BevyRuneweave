@@ -2,13 +2,13 @@
 
 ## Project Structure
 
-- `src/` contains the Bevy runtime and ECS bindings; `bevy_mod_scripting/` contains the scripting framework.
+- `src/` contains the Bevy runtime and BMS-registered script APIs; `bevy_mod_scripting/` contains the scripting framework.
 - `crates/runtime-cdylib` and `crates/runtime-staticlib` expose C ABI libraries for host applications.
 - `examples/desktop-demo-host` is the standalone Windows, macOS, and Linux launcher and resource downloader.
 - `examples/android-demo-host` and `examples/ios-demo-host` are standalone native mobile launchers.
 - `projects/{js,ts,lua}/` contain language examples, source, compiled scripts, and sprites.
 - `scripts/` contains TypeScript build and release tooling; `build-support/` contains Cargo Rust build helpers.
-- `include/` contains the public C header; `docs/` contains ECS API documentation.
+- `include/` contains the public C header; `docs/` contains scripting API documentation.
 
 ## Development Defaults
 
@@ -33,9 +33,9 @@ systems, and language conversion infrastructure instead of introducing a paralle
 - Preserve `WorldGuard` access checks, `ReflectReference` lifetime rules, dynamic component/resource
   registration, script-system query declarations, and schedule ordering. Do not bypass them with
   raw world pointers, independently locked mirrors, or host-only mutation queues.
-- `src/ecs_api` is a legacy compatibility layer during migration. Do not add features there. Move
-  its callers to reflected Bevy components/resources and BMS-registered functions, then remove the
-  migrated compatibility surface and its `EcsValue` storage.
+- The removed `src/ecs_api` compatibility layer must not be reintroduced. Do not add `EcsValue`
+  snapshots, string-keyed generic component stores, per-language product bindings, or virtual SDK
+  modules that bypass the BMS registries.
 - Host-only platform integration and the public C ABI may remain outside BMS when they are not
   script-facing. Any script-visible part of those capabilities must still enter through BMS.
 - Every new or migrated API must have equivalent Lua and QuickJS/TypeScript behavior, generated or

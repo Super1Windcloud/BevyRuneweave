@@ -1,20 +1,35 @@
 "use strict";
 (() => {
-  // modules/shooter/api/ecs.ts
-  function clearWorld() {
-    ecs_world_clear();
+  // modules/shooter/api/scene.ts
+  function clearScene() {
+    scene_clear();
   }
-  function spawnEntity(id) {
-    ecs_entity_spawn(id);
+  function spawnSceneEntity(id, transform) {
+    return scene_spawn(id, transform.x, transform.y, transform.z);
   }
-  function despawnEntity(id) {
-    return ecs_entity_despawn(id);
+  function setSprite(id, sprite) {
+    return scene_set_sprite(id, sprite.path, sprite.width, sprite.height);
   }
-  function insertComponent(id, name, value) {
-    return ecs_component_insert(id, name, value);
+  function setTransform(id, transform) {
+    return scene_set_transform(id, transform.x, transform.y, transform.z);
   }
-  function setResource(name, value) {
-    ecs_resource_set(name, value);
+  function setText(id, text) {
+    return scene_set_text(
+      id,
+      text.value,
+      text.fontSize,
+      text.red,
+      text.green,
+      text.blue,
+      text.alpha,
+      text.anchor
+    );
+  }
+  function despawnSceneEntity(id) {
+    return scene_despawn(id);
+  }
+  function setGameState(score, lives, message) {
+    game_state_set(score, lives, message);
   }
 
   // modules/shooter/api/input.ts
@@ -64,7 +79,7 @@
   }
   var world = createWorld();
   var resources = createResources();
-  function spawnEntity2(id, bundle) {
+  function spawnEntity(id, bundle) {
     world.entities.add(id);
     world.transforms.set(id, bundle.transform);
     world.colliders.set(id, bundle.collider);
@@ -73,9 +88,8 @@
     if (bundle.role === "player") world.players.add(id);
     if (bundle.role === "bullet") world.bullets.add(id);
     if (bundle.role === "enemy") world.enemies.add(id);
-    spawnEntity(id);
-    insertComponent(id, "sprite", bundle.sprite);
-    insertComponent(id, "transform", bundle.transform);
+    spawnSceneEntity(id, bundle.transform);
+    setSprite(id, bundle.sprite);
   }
   function queueDespawn(id) {
     if (world.entities.has(id)) world.pendingDespawn.add(id);
@@ -93,7 +107,7 @@
       world.players.delete(id);
       world.bullets.delete(id);
       world.enemies.delete(id);
-      despawnEntity(id);
+      despawnSceneEntity(id);
     }
     world.pendingDespawn.clear();
   }
@@ -102,7 +116,7 @@
     return resources.seed / 2147483647;
   }
   function spawnPlayer() {
-    spawnEntity2("player", {
+    spawnEntity("player", {
       role: "player",
       sprite: sprites.player,
       transform: { x: 0, y: -300, z: 3 },
@@ -110,7 +124,7 @@
     });
   }
   function spawnEnemy() {
-    spawnEntity2(`enemy_${resources.nextId++}`, {
+    spawnEntity(`enemy_${resources.nextId++}`, {
       role: "enemy",
       sprite: sprites.enemy,
       transform: { x: -250 + random01() * 500, y: 350, z: 2 },
@@ -119,7 +133,7 @@
     });
   }
   function spawnBullet(playerTransform) {
-    spawnEntity2(`bullet_${resources.nextId++}`, {
+    spawnEntity(`bullet_${resources.nextId++}`, {
       role: "bullet",
       sprite: sprites.bullet,
       transform: { x: playerTransform.x, y: playerTransform.y + 50, z: 1 },
@@ -205,13 +219,13 @@
   }
   function renderSyncSystem() {
     for (const [id, transform] of world.transforms) {
-      if (isActive(id)) insertComponent(id, "transform", transform);
+      if (isActive(id)) setTransform(id, transform);
     }
   }
   function updateGameState(message) {
-    setResource("game_state", { score: resources.score, lives: resources.lives, message });
-    const status = `SCORE ${String(resources.score).padStart(5, "0")}    LIVES ${resources.lives}`;
-    insertComponent("hud", "text", {
+    setGameState(resources.score, resources.lives, message);
+    const status = `SCORE ${`00000${resources.score}`.slice(-5)}    LIVES ${resources.lives}`;
+    setText("hud", {
       value: message ? `${status}
 ${message}` : status,
       fontSize: 25,
@@ -232,11 +246,9 @@ ${message}` : status,
     }
   }
   function spawnScene() {
-    spawnEntity("background");
-    insertComponent("background", "sprite", sprites.background);
-    insertComponent("background", "transform", { x: 0, y: 0, z: -10 });
-    spawnEntity("hud");
-    insertComponent("hud", "transform", { x: 0, y: 382, z: 20 });
+    spawnSceneEntity("background", { x: 0, y: 0, z: -10 });
+    setSprite("background", sprites.background);
+    spawnSceneEntity("hud", { x: 0, y: 382, z: 20 });
   }
   var updateSchedule = [
     playerMovementSystem,
@@ -247,7 +259,7 @@ ${message}` : status,
     collisionSystem
   ];
   function resetGame() {
-    clearWorld();
+    clearScene();
     world = createWorld();
     resources = createResources();
     spawnScene();

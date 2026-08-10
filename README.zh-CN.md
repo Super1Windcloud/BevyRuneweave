@@ -44,22 +44,18 @@ projects/
 │   └── modules/shooter/ # JavaScript 入口直接位于 game/assets
 └── ts/                  # TypeScript 7.0.2 + QuickJS 可执行项目
     └── modules/shooter/
-        ├── api/         # ECS、HTTP 类型接口与显式导入层
+        ├── api/         # BMS 场景、输入和 HTTP 类型接口
         └── game/        # src 游戏源码与 assets 运行时资源
 templates/game-project/  # 独立项目模板，不属于任何 projects 游戏
 ├── lua/
 ├── js/
 └── ts/
 src/                     # bevy-runeweave 框架核心与共享 Bevy 宿主
-├── ecs_api/             # 三语言统一的通用 ECS API
-│   ├── bindings/        # Lua 与 QuickJS/TypeScript 语言适配
-│   ├── command.rs       # 可同步读取的快照与 Bevy 写入队列
-│   ├── value.rs         # 跨语言结构化值模型
-│   └── world.rs         # 通用 Entity、Component、Resource 同步
+├── script_api/          # 真实反射类型与 BMS 统一函数注册
 ├── example_host.rs      # Script Squadron 贴图、Transform 与 HUD 映射
 ├── runtime/             # 应用装配、输入回调、热重载与宿主入口
 └── lib.rs               # feature 约束与公开 API 导出
-docs/ecs-api.md          # 通用 ECS API 契约与三语言示例
+docs/script-api.md       # 当前反射场景与平台服务 API
 bevy_mod_scripting/      # Lua 5.5、QuickJS/TypeScript 脚本运行时
 include/                 # 可选的原生宿主 C ABI
 examples/                # 桌面、Android 与 iOS 独立宿主工程
@@ -108,12 +104,12 @@ just run-ts
 获取带方法的游戏对象，也不会通过 Service 命令宿主执行一段预设业务流程；它只描述
 世界数据如何变化：创建或销毁 Entity、插入或更新 Component、写入 Resource。
 
-Rust 宿主将这些写入提交到 Bevy World，独立 System 再根据组件和资源变化更新
+脚本通过 BMS 注册函数直接修改真实 Bevy World，独立 System 再根据组件和资源变化更新
 `Sprite`、`Transform` 与 HUD。玩法数据与呈现逻辑因此解耦，同一种脚本绑定也可以
 扩展到新的组件和系统，而不需要继续扩张一个中心化门面。
 
 ```text
-脚本逻辑 -> ECS 写入队列 -> Component / Resource -> Bevy System -> 渲染与界面
+脚本逻辑 -> BMS WorldGuard -> Component / Resource -> Bevy System -> 渲染与界面
 ```
 
 游戏脚本内部也遵循相同的数据驱动模型，而不是使用包含位置、速度和行为的 Player、
@@ -129,21 +125,19 @@ Bullet、Enemy 对象数组：
 - System 只标记待销毁 Entity，遍历结束后统一 flush 结构变更，避免在查询期间修改
   组件集合；RenderSync System 最后把脚本组件数据提交给宿主 ECS。
 
-脚本侧使用稳定字符串作为跨语言 Entity key；它只用于定位 Bevy Entity，不代表带有
-行为和生命周期方法的对象。三种语言共享以下通用 API：
+脚本侧使用稳定字符串定位当前脚本拥有的真实 Bevy Entity。三种语言共享同一套 BMS
+注册函数：
 
 ```text
-ecs_world_clear()
-ecs_entity_spawn / ecs_entity_exists / ecs_entity_despawn
-ecs_component_insert / ecs_component_get / ecs_component_has / ecs_component_remove
-ecs_query
-ecs_resource_set / ecs_resource_get / ecs_resource_remove
+scene_spawn / scene_despawn / scene_clear
+scene_set_sprite / scene_set_transform / scene_set_text
+scene_transform
+game_state_set
 ```
 
-例如，一个可渲染实体由 `ecs_entity_spawn` 创建，再分别插入含资源路径与尺寸的
-`sprite` 和含 `x`/`y`/`z` 的 `transform` 组件。Runeweave 不认识游戏业务名称；
-Script Squadron 宿主 System 只将通用结构化组件物化为 Bevy 组件。新增能力时不再修改四份语言绑定，而是新增组件、
-资源和消费它们的 Bevy System。完整契约见 [`docs/ecs-api.md`](docs/ecs-api.md)。
+`scene_set_transform` 更新真实反射的 `ScriptTransform`，`scene_transform` 返回指向同一
+组件的 BMS `ReflectReference`。宿主直接观察这些组件，不再存在 ECS 快照或各语言产品
+adapter。完整契约见 [`docs/script-api.md`](docs/script-api.md)。
 
 脚本文件支持 Bevy 资源热重载。修改 JavaScript 或 Lua 项目 `assets` 下的
 唯一入口脚本后，游戏状态会用新脚本重新初始化，并在终端打印
