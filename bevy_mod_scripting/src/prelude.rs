@@ -6,6 +6,7 @@ pub use bevy_mod_scripting_core::{
 };
 
 pub use bevy_mod_scripting_bindings::{
+    CoreScriptGlobalsPlugin,
     function::namespace::{GlobalNamespace, NamespaceBuilder},
     script_value::ScriptValue,
 };
@@ -15,6 +16,7 @@ pub use bevy_mod_scripting_script::*;
 pub use bevy_mod_scripting_asset::*;
 
 pub use bevy_mod_scripting_core::commands::*;
+pub use bevy_mod_scripting_derive::*;
 
 #[cfg(feature = "typescript")]
 pub use crate::typescript::{TypeScriptContext, TypeScriptScriptingPlugin};

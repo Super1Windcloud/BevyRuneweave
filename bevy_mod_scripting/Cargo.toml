@@ -34,4 +34,7 @@ bevy_mod_scripting_lua = { workspace = true, optional = true }
 bevy_mod_scripting_quickjs = { workspace = true, optional = true }
 bevy_mod_scripting_asset = { workspace = true }
 bevy_mod_scripting_bindings = { workspace = true }
+bevy_mod_scripting_bindings_domain = { workspace = true }
+bevy_mod_scripting_derive = { workspace = true }
+bevy_mod_scripting_display = { workspace = true }
 bevy_mod_scripting_script = { workspace = true }

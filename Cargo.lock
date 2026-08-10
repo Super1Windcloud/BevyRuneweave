@@ -1129,7 +1129,10 @@ dependencies = [
  "bevy_app",
  "bevy_mod_scripting_asset",
  "bevy_mod_scripting_bindings",
+ "bevy_mod_scripting_bindings_domain",
  "bevy_mod_scripting_core",
+ "bevy_mod_scripting_derive",
+ "bevy_mod_scripting_display",
  "bevy_mod_scripting_lua",
  "bevy_mod_scripting_quickjs",
  "bevy_mod_scripting_script",
@@ -1239,10 +1242,14 @@ dependencies = [
  "bevy_log",
  "bevy_mod_scripting_asset",
  "bevy_mod_scripting_bindings",
+ "bevy_mod_scripting_bindings_domain",
  "bevy_mod_scripting_core",
+ "bevy_mod_scripting_display",
  "bevy_mod_scripting_script",
+ "bevy_mod_scripting_world",
  "bevy_platform",
  "mlua",
+ "profiling",
 ]
 
 [[package]]
@@ -1250,12 +1257,15 @@ name = "bevy_mod_scripting_quickjs"
 version = "0.21.0"
 dependencies = [
  "bevy_app",
+ "bevy_asset",
  "bevy_ecs",
  "bevy_log",
  "bevy_mod_scripting_asset",
  "bevy_mod_scripting_bindings",
  "bevy_mod_scripting_core",
+ "bevy_mod_scripting_display",
  "bevy_mod_scripting_script",
+ "bevy_mod_scripting_world",
  "bevy_platform",
  "rquickjs",
 ]

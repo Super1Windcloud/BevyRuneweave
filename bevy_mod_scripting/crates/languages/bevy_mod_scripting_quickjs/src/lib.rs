@@ -1,5 +1,7 @@
 //! QuickJS integration for `bevy_mod_scripting`.
 
+mod bindings;
+
 use std::{borrow::Cow, ops::Deref};
 
 use bevy_app::{App, Plugin};
@@ -65,8 +67,11 @@ impl Default for QuickJsScriptingPlugin {
                 context_policy: ContextPolicy::default(),
                 language: QUICKJS_LANGUAGE,
                 supported_extensions: vec!["js", "mjs"],
-                context_initializers: vec![ContextInitializer::new(install_console)],
-                context_pre_handling_initializers: Vec::new(),
+                context_initializers: vec![
+                    ContextInitializer::new(install_console),
+                    ContextInitializer::new(bindings::install_bms_globals),
+                ],
+                context_pre_handling_initializers: vec![bindings::install_attachment_globals],
                 emit_responses: false,
                 processing_pipeline_plugin: Default::default(),
             },
@@ -198,7 +203,7 @@ fn push_script_value(args: &mut Args<'_>, value: ScriptValue) -> Result<(), Inte
     .map_err(interop_error)
 }
 
-fn from_js_value<'js>(
+pub(crate) fn from_js_value<'js>(
     ctx: &rquickjs::Ctx<'js>,
     value: Value<'js>,
 ) -> Result<ScriptValue, InteropError> {
@@ -258,8 +263,16 @@ pub fn quickjs_handler(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy_app::App;
+    use bevy_asset::AssetPlugin;
     use bevy_mod_scripting_asset::LanguageExtensions;
+    use bevy_mod_scripting_bindings::{
+        CoreScriptGlobalsPlugin, CurrentScriptAttachment, GlobalNamespace, NamespaceBuilder,
+        WorldExtensions,
+    };
+    use bevy_mod_scripting_core::BMSScriptingInfrastructurePlugin;
     use bevy_mod_scripting_core::config::ScriptingPluginConfiguration;
+    use bevy_mod_scripting_world::WorldGuard;
 
     #[test]
     fn loads_script_and_dispatches_callback() -> Result<(), Box<dyn std::error::Error>> {
@@ -298,6 +311,41 @@ mod tests {
         )?;
 
         assert_eq!(result, ScriptValue::Float(0.5));
+        Ok(())
+    }
+
+    #[test]
+    fn exposes_registered_bms_global_functions() -> Result<(), Box<dyn std::error::Error>> {
+        let mut app = App::new();
+        app.add_plugins((
+            AssetPlugin::default(),
+            CoreScriptGlobalsPlugin::default(),
+            BMSScriptingInfrastructurePlugin::default(),
+            QuickJsScriptingPlugin::default(),
+        ));
+        NamespaceBuilder::<GlobalNamespace>::new_unregistered(app.world_mut())
+            .register("bms_add", |left: i64, right: i64| left + right);
+        app.finish();
+
+        let world_id = app.world().id();
+        let cache = WorldGuard::setup_cache(app.world(), CurrentScriptAttachment::default());
+        WorldGuard::with_static_guard(app.world_mut(), cache, |_world| {
+            let attachment = ScriptAttachment::StaticScript(Default::default());
+            let mut context = quickjs_context_load(
+                &attachment,
+                b"globalThis.on_update = () => bms_add(2, 3);",
+                world_id,
+            )?;
+            let result = quickjs_handler(
+                Vec::new(),
+                &attachment,
+                &CallbackLabel::from("on_update"),
+                &mut context,
+                world_id,
+            )?;
+            assert_eq!(result, ScriptValue::Integer(5));
+            Ok::<(), InteropError>(())
+        })?;
         Ok(())
     }
 }

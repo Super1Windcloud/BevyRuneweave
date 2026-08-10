@@ -55,7 +55,7 @@ templates/game-project/  # Standalone project templates, outside projects/
 ├── js/
 └── ts/
 src/                     # Framework core and shared Bevy host
-├── ecs_api/             # Language-neutral ECS API
+├── ecs_api/             # Frozen compatibility API during BMS reflection migration
 │   ├── bindings/        # Lua and QuickJS/TypeScript adapters
 │   ├── command.rs       # Readable snapshots and queued Bevy writes
 │   ├── value.rs         # Cross-language structured values
@@ -63,8 +63,9 @@ src/                     # Framework core and shared Bevy host
 ├── example_host.rs      # Script Squadron sprite, transform, and HUD mapping
 ├── runtime/             # App assembly, input callbacks, hot reload, and host entry points
 └── lib.rs               # Feature constraints and public API exports
-docs/ecs-api.md          # ECS API contract and examples
-bevy_mod_scripting/      # Lua 5.5 and QuickJS/TypeScript runtimes
+docs/ecs-api.md          # Legacy ECS compatibility contract and examples
+docs/scripting-architecture.md # BMS-first API architecture and migration rules
+bevy_mod_scripting/      # Reflection, guarded World access, Lua, and QuickJS/TypeScript
 include/                 # Public native-host C ABI
 examples/                # Standalone desktop, Android, and iOS hosts
 ```
@@ -148,6 +149,11 @@ For example, a renderable entity is created with `ecs_entity_spawn`, then receiv
 `sprite` and `transform` components. Runeweave does not assign business meaning to those names; the
 Script Squadron host maps their structured values to Bevy components. See
 [`docs/ecs-api.md`](docs/ecs-api.md) for the complete contract.
+
+These operations are a frozen compatibility surface. New script-facing APIs and migrated ECS
+operations are defined once through `bevy_mod_scripting` reflection and function registries, with
+the real Bevy `World` as authoritative state. See
+[`docs/scripting-architecture.md`](docs/scripting-architecture.md).
 
 Script files support Bevy asset hot reload. Updating `game/assets/shooter.js` or
 `game/assets/shooter.lua` in the active JavaScript or Lua project reinitializes game state and prints

@@ -1,4 +1,7 @@
-//! Language-neutral ECS operations exposed consistently to every script runtime.
+//! Legacy snapshot-based ECS compatibility for existing game packages.
+//!
+//! New script-facing APIs must use the BMS reflection and function registries. This module is
+//! frozen while its callers migrate to real reflected Bevy components and resources.
 
 mod bindings;
 mod command;

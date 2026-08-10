@@ -17,17 +17,20 @@ path = "src/lib.rs"
 
 [dependencies]
 bevy_app = { workspace = true }
+bevy_asset = { workspace = true }
 bevy_ecs = { workspace = true }
 bevy_log = { workspace = true }
 bevy_mod_scripting_asset = { workspace = true }
 bevy_mod_scripting_bindings = { workspace = true }
 bevy_mod_scripting_core = { workspace = true }
+bevy_mod_scripting_display = { workspace = true }
 bevy_mod_scripting_script = { workspace = true }
+bevy_mod_scripting_world = { workspace = true }
 bevy_platform = { workspace = true }
-rquickjs = { workspace = true, features = ["parallel"] }
+rquickjs = { workspace = true, features = ["macro", "parallel"] }
 
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
-rquickjs = { workspace = true, features = ["bindgen", "parallel"] }
+rquickjs = { workspace = true, features = ["bindgen", "macro", "parallel"] }
 
 [lints]
 workspace = true

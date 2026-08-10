@@ -21,10 +21,10 @@ runtime、脚本资源还是宿主安装包。
 下列修改会影响 native runtime library：
 
 - `src/runtime/**`：应用装配、脚本加载、热重载、窗口与运行时配置。
-- `src/ecs_api/**`：Lua/QuickJS bindings、ECS 数据转换和 World bridge。
+- `src/ecs_api/**`：迁移期间保留的 Lua/QuickJS 兼容 bindings、ECS 快照和 World bridge。
 - `src/example_host.rs`：虽然名称包含 host，但它属于根 Rust library，并会编入 runtime。
 - `src/lib.rs`：runtime 对外导出和模块装配。
-- `bevy_mod_scripting/**`：Lua 5.5、QuickJS、回调生命周期和脚本资源加载器。
+- `bevy_mod_scripting/**`：BMS 反射/函数注册、WorldGuard、Lua 5.5、QuickJS、回调生命周期和脚本资源加载器。
 - `crates/runtime-cdylib/**` 或 `crates/runtime-staticlib/**`：C ABI 动态库或静态库入口。
 - 会影响上述 crate 的 `Cargo.toml`、`Cargo.lock`、features、`build.rs` 或 native dependency。
 - 通过 `include_bytes!` 等方式编译进 runtime 的资源，例如默认窗口图标。

@@ -16,6 +16,32 @@ Treat TypeScript as the default language for subsequent game development. Put ga
 systems, input, UI behavior, and iteration in TypeScript scripts and compiled JavaScript assets.
 Change the Rust runtime or host only when the scripting API cannot provide the required capability.
 
+## BMS-First Scripting Architecture
+
+`bevy_mod_scripting` is the architectural foundation for every script-facing runtime API. New APIs
+must use its reflection, function registry, namespaces, `ReflectReference`, `WorldGuard`, script
+systems, and language conversion infrastructure instead of introducing a parallel scripting model.
+
+- The real Bevy `World` is the single source of truth for entities, components, resources, queries,
+  and schedules. Do not add another snapshot, mirrored ECS, or string-keyed component store.
+- Register script-facing Rust types through Bevy reflection and BMS type/function registration.
+  Register operations through `AppScriptFunctionRegistry`, `NamespaceBuilder`, script bindings, or
+  the corresponding BMS extension point. Do not expose new business globals directly through
+  `mlua::Lua::globals()` or `rquickjs::Ctx::globals()`.
+- Implement generic language conversion in the BMS Lua and QuickJS adapters. A product API must be
+  defined once in the BMS registry and must not have separate handwritten Lua and QuickJS behavior.
+- Preserve `WorldGuard` access checks, `ReflectReference` lifetime rules, dynamic component/resource
+  registration, script-system query declarations, and schedule ordering. Do not bypass them with
+  raw world pointers, independently locked mirrors, or host-only mutation queues.
+- `src/ecs_api` is a legacy compatibility layer during migration. Do not add features there. Move
+  its callers to reflected Bevy components/resources and BMS-registered functions, then remove the
+  migrated compatibility surface and its `EcsValue` storage.
+- Host-only platform integration and the public C ABI may remain outside BMS when they are not
+  script-facing. Any script-visible part of those capabilities must still enter through BMS.
+- Every new or migrated API must have equivalent Lua and QuickJS/TypeScript behavior, generated or
+  maintained TypeScript declarations, reflection/registry tests, and all-platform compatibility
+  assessment under the Runtime API Compatibility rules below.
+
 ## Runtime API Compatibility
 
 Every implementation of a runtime-exposed interface must remain compatible with all five supported

@@ -1,5 +1,9 @@
 # Runeweave ECS API
 
+> Migration notice: this snapshot-based API is retained for existing game packages only. New and
+> migrated APIs use the real Bevy World through `bevy_mod_scripting` reflection, function
+> registries, `WorldGuard`, and `ReflectReference`. See `docs/scripting-architecture.md`.
+
 Runeweave 向 Lua 5.5、JavaScript 和 TypeScript 暴露同一组数据导向 API。
 脚本声明 Entity、Component 和 Resource 数据，Bevy System 消费这些数据并决定如何
 渲染、播放声音或执行其他宿主行为。
