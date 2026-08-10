@@ -22,7 +22,9 @@ are connected, set `ANDROID_SERIAL` to select one. The Release variant is not si
 
 Both runtime and APK recipes default to debug. For release, run `just build-runtime-android --release`
 once before `just build-android-demo --release`. The APK build checks that every selected ABI exists
-and matches the requested profile.
+and matches the requested profile. Android Debug builds accept invalid TLS certificate chains and
+hostnames in both the launcher downloader and script HTTP API. Release builds always use strict TLS
+validation.
 
 Select an ABI set with a Gradle property:
 

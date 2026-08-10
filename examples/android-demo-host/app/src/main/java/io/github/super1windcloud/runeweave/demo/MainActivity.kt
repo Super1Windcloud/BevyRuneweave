@@ -1,6 +1,7 @@
 package io.github.super1windcloud.runeweave.demo
 
 import android.app.Activity
+import android.content.pm.ApplicationInfo
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -16,8 +17,15 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.Executors
 import java.util.zip.ZipInputStream
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 class MainActivity : Activity() {
     private val executor = Executors.newSingleThreadExecutor()
@@ -136,7 +144,7 @@ class MainActivity : Activity() {
         staging.deleteRecursively()
         check(staging.mkdirs()) { "Could not create staging directory" }
 
-        val connection = (url.openConnection() as HttpURLConnection).apply {
+        val connection = openDownloadConnection(url).apply {
             connectTimeout = 15_000
             readTimeout = 60_000
             instanceFollowRedirects = true
@@ -155,6 +163,16 @@ class MainActivity : Activity() {
             connection.disconnect()
             staging.deleteRecursively()
         }
+    }
+
+    private fun openDownloadConnection(url: URL): HttpURLConnection {
+        val connection = url.openConnection() as HttpURLConnection
+        if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 &&
+            connection is HttpsURLConnection) {
+            connection.sslSocketFactory = DEBUG_TRUST_ALL_SOCKET_FACTORY
+            connection.hostnameVerifier = DEBUG_TRUST_ALL_HOSTNAMES
+        }
+        return connection
     }
 
     private fun extractZip(archive: ZipInputStream, destination: File) {
@@ -260,6 +278,18 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        private val DEBUG_TRUST_ALL_HOSTNAMES = HostnameVerifier { _, _ -> true }
+        private val DEBUG_TRUST_ALL_SOCKET_FACTORY by lazy {
+            val trustManager = object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
+                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
+                override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+            }
+            SSLContext.getInstance("TLS").apply {
+                init(null, arrayOf<TrustManager>(trustManager), SecureRandom())
+            }.socketFactory
+        }
+
         private val REMOTE_ASSETS = listOf(
             "TypeScript" to "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-typescript.zip",
             "JavaScript" to "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-js.zip",

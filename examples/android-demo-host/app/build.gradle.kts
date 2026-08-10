@@ -98,6 +98,7 @@ tasks.register<Exec>("logcatDebug") {
     group = "install"
     description = "Installs and launches the Debug APK, then streams logcat for its process."
     dependsOn("launchDebug")
+    isIgnoreExitValue = true
 
     doFirst {
         val adb = adbExecutable.get().asFile.absolutePath

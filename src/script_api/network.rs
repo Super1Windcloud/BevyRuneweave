@@ -28,11 +28,14 @@ pub(super) struct ScriptNetwork {
 
 impl Default for ScriptNetwork {
     fn default() -> Self {
+        let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(30));
+        #[cfg(all(target_os = "android", debug_assertions))]
+        let client = client
+            .tls_danger_accept_invalid_certs(true)
+            .tls_danger_accept_invalid_hostnames(true);
+
         Self {
-            client: reqwest::blocking::Client::builder()
-                .timeout(Duration::from_secs(30))
-                .build()
-                .ok(),
+            client: client.build().ok(),
             requests: Arc::default(),
             next_id: Arc::new(AtomicU32::new(1)),
         }
