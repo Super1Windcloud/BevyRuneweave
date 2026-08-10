@@ -55,6 +55,10 @@ struct RuntimeConfig {
 
 callback_labels!(OnUpdate => "on_update");
 
+fn runtime_scripting_plugins() -> bevy::app::PluginGroupBuilder {
+    BMSPlugin.build()
+}
+
 #[derive(Resource)]
 struct LoadedScriptPath {
     asset_path: PathBuf,
@@ -306,11 +310,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         .unwrap_or_else(|| format!("Script Squadron - {backend}"));
 
     let mut app = App::new();
-    let scripting_plugins = BMSPlugin.build();
-    #[cfg(any(feature = "js", feature = "typescript"))]
-    let scripting_plugins = scripting_plugins.disable::<QuickJsScriptingPlugin>();
-    #[cfg(feature = "lua")]
-    let scripting_plugins = scripting_plugins.disable::<LuaScriptingPlugin>();
+    let scripting_plugins = runtime_scripting_plugins();
 
     app.add_plugins(
         DefaultPlugins
@@ -492,6 +492,9 @@ unsafe fn c_path(path: *const c_char) -> Result<PathBuf, c_int> {
 
 #[cfg(test)]
 mod tests {
+    use bevy::ecs::message::Messages;
+    use bevy_mod_scripting::core::event::{ScriptAttachedEvent, ScriptDetachedEvent};
+
     use super::*;
 
     #[test]
@@ -521,6 +524,22 @@ mod tests {
         assert!(source_has_changed(Some(first), Some(second)));
         assert!(source_has_changed(None, Some(first)));
         assert!(!source_has_changed(Some(first), None));
+    }
+
+    #[cfg(feature = "unified")]
+    #[test]
+    fn runtime_registers_script_loading_pipeline() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+            .add_plugins(runtime_scripting_plugins());
+        assert!(
+            app.world()
+                .contains_resource::<Messages<ScriptAttachedEvent>>()
+        );
+        assert!(
+            app.world()
+                .contains_resource::<Messages<ScriptDetachedEvent>>()
+        );
     }
 
     #[cfg(all(feature = "lua", any(feature = "js", feature = "typescript")))]

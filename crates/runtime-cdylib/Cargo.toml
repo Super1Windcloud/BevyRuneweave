@@ -8,15 +8,8 @@ publish = false
 name = "bevy_runeweave"
 crate-type = ["cdylib"]
 
-[features]
-default = ["unified"]
-unified = ["bevy-runeweave/unified"]
-js = ["bevy-runeweave/js"]
-typescript = ["bevy-runeweave/typescript"]
-lua = ["bevy-runeweave/lua"]
-
 [dependencies]
-bevy-runeweave = { path = "../..", default-features = false }
+bevy-runeweave = { path = "../..", default-features = false, features = ["unified"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 bevy = { version = "0.19.0", default-features = false, features = ["android-native-activity"] }

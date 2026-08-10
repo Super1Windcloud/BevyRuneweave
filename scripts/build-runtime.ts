@@ -111,7 +111,7 @@ function desktop(platform: Exclude<Platform, "android" | "ios">) {
     const extension = platform === "windows" ? ".dll" : platform === "macos" ? ".dylib" : ".so";
     const libraryName = platform === "windows" ? "bevy_runeweave.dll" : `libbevy_runeweave${extension}`;
     const cargoArgs = cross ? crossCargoArgs(target) : ["build"];
-    run("cargo", [...cargoArgs, ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--no-default-features", "--features", "unified", "--target", target]);
+    run("cargo", [...cargoArgs, ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--target", target]);
     cpSync(join(targetDir, target, profile, libraryName), join(staging, "lib", libraryName));
     if (platform === "macos") run("install_name_tool", ["-id", "@rpath/libbevy_runeweave.dylib", join(staging, "lib", libraryName)]);
     info(staging, platform, target);
@@ -139,7 +139,7 @@ function android() {
   for (const abi of values("ANDROID_ABIS", "arm64-v8a,x86_64")) {
     const target = mapping[abi]; if (!target) throw new Error(`Unsupported Android ABI '${abi}'; supported ABIs: arm64-v8a, x86_64`); requireTarget(target);
     const destination = fresh("android", abi);
-    run("cargo", ["ndk", "-t", abi, "-P", process.env.ANDROID_PLATFORM ?? "26", "-o", join(destination, "lib"), "build", ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--no-default-features", "--features", "unified"], { ANDROID_NDK_HOME: ndk, ANDROID_NDK_ROOT: ndk });
+    run("cargo", ["ndk", "-t", abi, "-P", process.env.ANDROID_PLATFORM ?? "26", "-o", join(destination, "lib"), "build", ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib"], { ANDROID_NDK_HOME: ndk, ANDROID_NDK_ROOT: ndk });
     const nested = join(destination, "lib", abi, "libbevy_runeweave.so");
     if (!existsSync(nested)) throw new Error(`Android runtime was not produced for ${abi}`);
     renameSync(nested, join(destination, "lib", "libbevy_runeweave.so")); rmSync(join(destination, "lib", abi), { recursive: true });
@@ -161,7 +161,7 @@ function ios() {
   const work = join(tmpdir(), `runeweave-ios-${process.pid}`); rmSync(work, { recursive: true, force: true }); mkdirSync(join(work, "device"), { recursive: true }); mkdirSync(join(work, "simulator"));
   try {
     for (const [group, targets] of [["device", device], ["simulator", simulator]] as const) for (const target of targets) {
-      requireTarget(target); run("cargo", ["build", ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-staticlib", "--no-default-features", "--features", "unified", "--target", target], { IPHONEOS_DEPLOYMENT_TARGET: process.env.IOS_DEPLOYMENT_TARGET ?? "13.0" });
+      requireTarget(target); run("cargo", ["build", ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-staticlib", "--target", target], { IPHONEOS_DEPLOYMENT_TARGET: process.env.IOS_DEPLOYMENT_TARGET ?? "13.0" });
       run("libtool", ["-static", "-o", join(work, group, `${target}.a`), join(targetDir, target, profile, "libbevy_runeweave.a"), vendoredLua(target)]);
     }
     const deviceLib = join(work, "libbevy_runeweave-device.a"), simulatorLib = join(work, "libbevy_runeweave-simulator.a");

@@ -63,6 +63,9 @@ cannot be executed in the current environment must be called out explicitly as a
 - `just build-android-demo` and `just build-ios-demo` build native hosts using the unified runtime.
 - `just package-windows-installer` and `just package-macos-dmg` create complete desktop installers.
 - All build recipes default to debug; pass `--release` explicitly for release artifacts.
+- Native runtime artifacts are always unified and embed every supported engine (Lua and QuickJS,
+  including TypeScript through emitted JavaScript). Do not add language-specific runtime features,
+  packages, or build recipes; single-language features are only for project development and tests.
 - `npm run release:assets` packages assets and uploads same-named Release assets using `.env` credentials.
 
 ## Configuration and Assets

@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // modules/shooter/api/scene.ts
+  // projects/ts/modules/shooter/api/scene.ts
   function clearScene() {
     scene_clear();
   }
@@ -32,12 +32,12 @@
     game_state_set(score, lives, message);
   }
 
-  // modules/shooter/api/input.ts
+  // projects/ts/modules/shooter/api/input.ts
   function keyPressed(key) {
     return input_key_pressed(key);
   }
 
-  // modules/shooter/game/src/shooter.ts
+  // projects/ts/modules/shooter/game/src/shooter.ts
   var PLAYER_SPEED = 330;
   var BULLET_SPEED = 570;
   var ENEMY_SPEED = 145;
