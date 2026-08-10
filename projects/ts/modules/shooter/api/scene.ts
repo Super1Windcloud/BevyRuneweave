@@ -56,4 +56,3 @@ export function despawnSceneEntity(id: string): boolean {
 export function setGameState(score: number, lives: number, message: string): void {
   game_state_set(score, lives, message);
 }
-
