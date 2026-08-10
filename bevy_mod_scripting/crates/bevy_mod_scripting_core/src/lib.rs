@@ -21,10 +21,15 @@ use bevy_ecs::{
 use bevy_log::error;
 use bevy_mod_scripting_asset::{Language, LanguageExtensions, ScriptAsset, ScriptAssetLoader};
 
+#[cfg(feature = "script_systems")]
+use bevy_mod_scripting_bindings::AppScheduleRegistry;
+#[cfg(feature = "documentation")]
+use bevy_mod_scripting_bindings::DummyScriptFunctionRegistry;
+#[cfg(feature = "dynamic_components")]
+use bevy_mod_scripting_bindings::DynamicScriptComponentPlugin;
 use bevy_mod_scripting_bindings::InteropError;
 use bevy_mod_scripting_bindings::{
-    AppReflectAllocator, AppScheduleRegistry, AppScriptFunctionRegistry,
-    DummyScriptFunctionRegistry, DynamicScriptComponentPlugin, MarkAsCore, ReflectReference,
+    AppReflectAllocator, AppScriptFunctionRegistry, MarkAsCore, ReflectReference,
     ScriptTypeRegistration, ScriptValue, garbage_collector,
 };
 use bevy_mod_scripting_script::ScriptAttachment;
@@ -48,6 +53,7 @@ pub mod handler;
 pub mod pipeline;
 pub mod runtime;
 pub mod script;
+#[cfg(feature = "script_systems")]
 pub mod script_system;
 #[derive(SystemSet, Hash, Debug, Eq, PartialEq, Clone)]
 /// Labels for various BMS systems
@@ -368,9 +374,12 @@ impl Plugin for BMSScriptingInfrastructurePlugin {
             .add_message::<ScriptCallbackResponseEvent>()
             .init_resource::<AppReflectAllocator>()
             .init_asset::<ScriptAsset>()
-            .init_resource::<AppScriptFunctionRegistry>()
-            .init_resource::<DummyScriptFunctionRegistry>()
-            .insert_resource(AppScheduleRegistry::new());
+            .init_resource::<AppScriptFunctionRegistry>();
+
+        #[cfg(feature = "documentation")]
+        app.init_resource::<DummyScriptFunctionRegistry>();
+        #[cfg(feature = "script_systems")]
+        app.insert_resource(AppScheduleRegistry::new());
 
         app.register_type::<ScriptAsset>();
         app.register_type::<Handle<ScriptAsset>>();
@@ -391,12 +400,14 @@ impl Plugin for BMSScriptingInfrastructurePlugin {
             app.add_systems(PostUpdate, script_error_logger);
         }
 
+        #[cfg(feature = "dynamic_components")]
         DynamicScriptComponentPlugin.build(app);
     }
 
     fn finish(&self, app: &mut App) {
         // Pre-register component IDs.
         pre_register_components(app);
+        #[cfg(feature = "dynamic_components")]
         DynamicScriptComponentPlugin.finish(app);
     }
 }
@@ -413,6 +424,7 @@ fn register_types(app: &mut App) {
 mod test {
     use bevy_asset::AssetPlugin;
     use bevy_ecs::prelude::*;
+    use bevy_mod_scripting_bindings::{AppScheduleRegistry, AppScriptComponentRegistry};
     use bevy_reflect::Reflect;
 
     use super::*;
@@ -434,5 +446,29 @@ mod test {
         BMSScriptingInfrastructurePlugin::default().finish(&mut app);
 
         assert!(app.world_mut().component_id::<Comp>().is_some());
+    }
+
+    #[test]
+    fn optional_infrastructure_matches_enabled_features() {
+        let mut app = App::new();
+        app.add_plugins(AssetPlugin::default());
+
+        BMSScriptingInfrastructurePlugin::default().build(&mut app);
+
+        assert_eq!(
+            app.world().contains_resource::<AppScheduleRegistry>(),
+            cfg!(feature = "script_systems")
+        );
+        assert_eq!(
+            app.world()
+                .contains_resource::<AppScriptComponentRegistry>(),
+            cfg!(feature = "dynamic_components")
+        );
+
+        #[cfg(feature = "documentation")]
+        assert!(
+            app.world()
+                .contains_resource::<bevy_mod_scripting_bindings::DummyScriptFunctionRegistry>()
+        );
     }
 }

@@ -27,10 +27,7 @@ use bevy_mod_scripting::prelude::{
 #[cfg(target_os = "windows")]
 use winit::platform::windows::WindowExtWindows;
 
-use crate::{
-    scene_renderer::RuneweaveSceneRendererPlugin,
-    script_api::{RuneweaveScriptApiPlugin, ScriptApiUpdated, ScriptInput},
-};
+use crate::script_api::RuneweaveScriptApiPlugin;
 
 #[cfg(feature = "lua")]
 use bevy_mod_scripting::lua::LuaScriptingPlugin;
@@ -80,6 +77,10 @@ fn attach_script(
     commands.spawn(ScriptComponent::new(vec![
         asset_server.load::<ScriptAsset>(path.asset_path.clone()),
     ]));
+}
+
+fn spawn_scene_camera(mut commands: Commands) {
+    commands.spawn(Camera2d);
 }
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -253,13 +254,7 @@ fn poll_asset_reload(
     }
 }
 
-fn emit_update(
-    time: Res<Time>,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    input: Res<ScriptInput>,
-    mut callbacks: MessageWriter<ScriptCallbackEvent>,
-) {
-    input.update(&keyboard);
+fn emit_update(time: Res<Time>, mut callbacks: MessageWriter<ScriptCallbackEvent>) {
     callbacks.write(ScriptCallbackEvent::new_for_all_scripts(
         OnUpdate,
         vec![ScriptValue::Float(time.delta_secs_f64().min(0.05))],
@@ -337,7 +332,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             }),
     )
     .add_plugins(scripting_plugins)
-    .add_plugins((RuneweaveScriptApiPlugin, RuneweaveSceneRendererPlugin))
+    .add_plugins(RuneweaveScriptApiPlugin)
     .insert_resource(LoadedScriptPath {
         source_path: asset_root.join(&asset_path),
         modified: fs::metadata(asset_root.join(&asset_path))
@@ -350,6 +345,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         Startup,
         (
             attach_script,
+            spawn_scene_camera,
             #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
             set_default_window_icon,
         ),
@@ -366,8 +362,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             #[cfg(feature = "lua")]
             event_handler::<OnUpdate, LuaScriptingPlugin>,
         )
-            .chain()
-            .in_set(ScriptApiUpdated),
+            .chain(),
     );
     #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
     app.insert_resource(ScriptFilePollTimer(Timer::from_seconds(

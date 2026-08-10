@@ -318,6 +318,7 @@ where
 
 /// Identical to the [`AppScriptFunctionRegistry`], but the functions only exist for docs purposes, use if you provide functions at a lower level,
 /// but still want to include the function in the docs
+#[cfg(feature = "documentation")]
 #[derive(Clone, Default, Resource, DebugWithTypeInfo)]
 #[debug_with_type_info(bms_display_path = "bevy_mod_scripting_display")]
 pub struct DummyScriptFunctionRegistry(pub ScriptFunctionRegistryArc);

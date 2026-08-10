@@ -11,6 +11,11 @@ keywords.workspace = true
 categories.workspace = true
 readme.workspace = true
 
+[features]
+default = []
+documentation = []
+script_systems = ["dep:bevy_system_reflection"]
+full_scripting = ["documentation", "script_systems"]
 
 [dependencies]
 bevy_mod_scripting_asset = { workspace = true }
@@ -19,7 +24,7 @@ bevy_mod_scripting_display = { workspace = true }
 bevy_mod_scripting_script = { workspace = true }
 bevy_mod_scripting_bindings_domain = { workspace = true }
 bevy_mod_scripting_world = { workspace = true }
-bevy_system_reflection = { workspace = true }
+bevy_system_reflection = { workspace = true, optional = true }
 bevy_diagnostic = { workspace = true }
 bevy_ecs = { workspace = true }
 bevy_reflect = { workspace = true }

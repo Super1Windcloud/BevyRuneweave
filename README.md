@@ -55,8 +55,7 @@ templates/game-project/  # Standalone project templates, outside projects/
 ├── js/
 └── ts/
 src/                     # Framework core and shared Bevy host
-├── script_api/          # Reflected types and functions registered once through BMS
-├── scene_renderer.rs    # Script-authored sprite, transform, and text rendering
+├── script_api/          # BMS-registered scene, input, and network APIs
 ├── runtime/             # App assembly, input callbacks, hot reload, and host entry points
 └── lib.rs               # Feature constraints and public API exports
 docs/script-api.md       # Current reflected scene and platform-service API
@@ -140,10 +139,11 @@ scene_transform
 game_state_set
 ```
 
-For example, `scene_set_transform` updates a real reflected `ScriptTransform` component, and
-`scene_transform` returns a BMS `ReflectReference` to that same value. The host observes it directly;
-there is no mirrored ECS or per-language product adapter. See [`docs/script-api.md`](docs/script-api.md)
-and [`docs/scripting-architecture.md`](docs/scripting-architecture.md).
+For example, `scene_set_transform` updates the entity's Bevy `Transform` component, and
+`scene_transform` returns a BMS `ReflectReference` to that same value. Rendering observes the Bevy
+components directly; there is no mirrored ECS or per-language product adapter. See
+[`docs/script-api.md`](docs/script-api.md) and
+[`docs/scripting-architecture.md`](docs/scripting-architecture.md).
 
 Script files support Bevy asset hot reload. Updating `game/assets/shooter.js` or
 `game/assets/shooter.lua` in the active JavaScript or Lua project reinitializes game state and prints

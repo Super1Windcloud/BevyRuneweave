@@ -10,7 +10,10 @@ pub mod path;
 pub mod query;
 pub mod reference;
 pub mod reflection_extensions;
+#[cfg(feature = "script_systems")]
 pub mod schedule;
+#[cfg(not(feature = "script_systems"))]
+mod schedule_disabled;
 pub mod script_component;
 pub mod script_value;
 pub mod type_data;
@@ -28,7 +31,10 @@ pub use path::*;
 pub use query::*;
 pub use reference::*;
 pub use reflection_extensions::*;
+#[cfg(feature = "script_systems")]
 pub use schedule::*;
+#[cfg(not(feature = "script_systems"))]
+pub use schedule_disabled::*;
 pub use script_component::*;
 pub use script_value::*;
 pub use type_data::*;

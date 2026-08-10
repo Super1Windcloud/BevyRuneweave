@@ -8,6 +8,13 @@ publish = false
 name = "bevy_runeweave"
 crate-type = ["cdylib"]
 
+[features]
+default = []
+documentation = ["bevy-runeweave/documentation"]
+dynamic_components = ["bevy-runeweave/dynamic_components"]
+script_systems = ["bevy-runeweave/script_systems"]
+full_scripting = ["documentation", "dynamic_components", "script_systems"]
+
 [dependencies]
 bevy-runeweave = { path = "../..", default-features = false, features = ["unified"] }
 

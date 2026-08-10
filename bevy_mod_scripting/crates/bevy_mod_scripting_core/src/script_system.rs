@@ -661,7 +661,7 @@ mod test {
                     .unwrap()
                     .systems()
                     .unwrap()
-                    .find(|(_, system)| system.name().contains("test_system_rust"))
+                    .next()
                     .unwrap();
 
                 ReflectSystem::from_system(system.as_ref(), node_id)

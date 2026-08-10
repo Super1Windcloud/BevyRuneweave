@@ -51,8 +51,7 @@ templates/game-project/  # 独立项目模板，不属于任何 projects 游戏
 ├── js/
 └── ts/
 src/                     # bevy-runeweave 框架核心与共享 Bevy 宿主
-├── script_api/          # 真实反射类型与 BMS 统一函数注册
-├── scene_renderer.rs    # 脚本定义的贴图、Transform 与文本渲染
+├── script_api/          # 通过 BMS 注册的场景、输入与网络 API
 ├── runtime/             # 应用装配、输入回调、热重载与宿主入口
 └── lib.rs               # feature 约束与公开 API 导出
 docs/script-api.md       # 当前反射场景与平台服务 API
@@ -135,9 +134,9 @@ scene_transform
 game_state_set
 ```
 
-`scene_set_transform` 更新真实反射的 `ScriptTransform`，`scene_transform` 返回指向同一
-组件的 BMS `ReflectReference`。宿主直接观察这些组件，不再存在 ECS 快照或各语言产品
-adapter。完整契约见 [`docs/script-api.md`](docs/script-api.md)。
+`scene_set_transform` 直接更新 Entity 的 Bevy `Transform`，`scene_transform` 返回指向同一
+组件的 BMS `ReflectReference`。渲染系统直接观察这些 Bevy 组件，不再存在 ECS 快照或
+各语言产品 adapter。完整契约见 [`docs/script-api.md`](docs/script-api.md)。
 
 脚本文件支持 Bevy 资源热重载。修改 JavaScript 或 Lua 项目 `assets` 下的
 唯一入口脚本后，游戏状态会用新脚本重新初始化，并在终端打印

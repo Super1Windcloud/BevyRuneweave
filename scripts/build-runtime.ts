@@ -10,10 +10,24 @@ const dist = resolve(process.env.RUNEWEAVE_DIST_DIR ?? join(root, "dist", "runti
 const targetDir = resolve(process.env.CARGO_TARGET_DIR ?? join(root, "target"));
 const platformArg = process.argv[2];
 const options = process.argv.slice(3);
-const unknownOptions = options.filter((option) => option !== "--release");
+const capabilityOptions = {
+  "--documentation": "documentation",
+  "--dynamic-components": "dynamic_components",
+  "--script-systems": "script_systems",
+  "--full-scripting": "full_scripting",
+} as const;
+const supportedOptions = new Set(["--release", ...Object.keys(capabilityOptions)]);
+const unknownOptions = options.filter((option) => !supportedOptions.has(option));
 if (unknownOptions.length) throw new Error(`Unsupported argument: ${unknownOptions.join(", ")}`);
 const profile = options.includes("--release") ? "release" : "debug";
 const cargoProfileArgs = profile === "release" ? ["--release"] : [];
+const cargoFeatures = [...new Set(options.flatMap((option) => option in capabilityOptions
+  ? [capabilityOptions[option as keyof typeof capabilityOptions]]
+  : []))];
+const cargoFeatureArgs = cargoFeatures.length ? ["--features", cargoFeatures.join(",")] : [];
+const capabilities = cargoFeatures.includes("full_scripting")
+  ? ["documentation", "dynamic_components", "script_systems"]
+  : cargoFeatures;
 
 function run(command: string, args: string[], env?: NodeJS.ProcessEnv) {
   execFileSync(command, args, { cwd: root, stdio: "inherit", env: { ...process.env, ...env } });
@@ -95,7 +109,7 @@ function fresh(platform: Platform, architecture: string) {
   return destination;
 }
 function info(destination: string, platform: Platform, target: string) {
-  writeFileSync(join(destination, "build-info.txt"), `package=${platform === "ios" ? "bevy-runeweave-runtime-staticlib" : "bevy-runeweave-runtime-cdylib"}\nplatform=${platform}\nbackends=lua,quickjs\nscript_languages=lua,js,typescript\ntarget=${target}\nprofile=${profile}\n`, "ascii");
+  writeFileSync(join(destination, "build-info.txt"), `package=${platform === "ios" ? "bevy-runeweave-runtime-staticlib" : "bevy-runeweave-runtime-cdylib"}\nplatform=${platform}\nbackends=lua,quickjs\nscript_languages=lua,js,typescript\ncapabilities=${capabilities.join(",")}\ntarget=${target}\nprofile=${profile}\n`, "ascii");
 }
 function desktop(platform: Exclude<Platform, "android" | "ios">) {
   if (platform === "macos" && hostOs() !== "macos") throw new Error("macOS runtimes can only be built on macOS");
@@ -111,7 +125,7 @@ function desktop(platform: Exclude<Platform, "android" | "ios">) {
     const extension = platform === "windows" ? ".dll" : platform === "macos" ? ".dylib" : ".so";
     const libraryName = platform === "windows" ? "bevy_runeweave.dll" : `libbevy_runeweave${extension}`;
     const cargoArgs = cross ? crossCargoArgs(target) : ["build"];
-    run("cargo", [...cargoArgs, ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--target", target]);
+    run("cargo", [...cargoArgs, ...cargoProfileArgs, ...cargoFeatureArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib", "--target", target]);
     cpSync(join(targetDir, target, profile, libraryName), join(staging, "lib", libraryName));
     if (platform === "macos") run("install_name_tool", ["-id", "@rpath/libbevy_runeweave.dylib", join(staging, "lib", libraryName)]);
     info(staging, platform, target);
@@ -139,7 +153,7 @@ function android() {
   for (const abi of values("ANDROID_ABIS", "arm64-v8a,x86_64")) {
     const target = mapping[abi]; if (!target) throw new Error(`Unsupported Android ABI '${abi}'; supported ABIs: arm64-v8a, x86_64`); requireTarget(target);
     const destination = fresh("android", abi);
-    run("cargo", ["ndk", "-t", abi, "-P", process.env.ANDROID_PLATFORM ?? "26", "-o", join(destination, "lib"), "build", ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib"], { ANDROID_NDK_HOME: ndk, ANDROID_NDK_ROOT: ndk });
+    run("cargo", ["ndk", "-t", abi, "-P", process.env.ANDROID_PLATFORM ?? "26", "-o", join(destination, "lib"), "build", ...cargoProfileArgs, ...cargoFeatureArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib"], { ANDROID_NDK_HOME: ndk, ANDROID_NDK_ROOT: ndk });
     const nested = join(destination, "lib", abi, "libbevy_runeweave.so");
     if (!existsSync(nested)) throw new Error(`Android runtime was not produced for ${abi}`);
     renameSync(nested, join(destination, "lib", "libbevy_runeweave.so")); rmSync(join(destination, "lib", abi), { recursive: true });
@@ -161,7 +175,7 @@ function ios() {
   const work = join(tmpdir(), `runeweave-ios-${process.pid}`); rmSync(work, { recursive: true, force: true }); mkdirSync(join(work, "device"), { recursive: true }); mkdirSync(join(work, "simulator"));
   try {
     for (const [group, targets] of [["device", device], ["simulator", simulator]] as const) for (const target of targets) {
-      requireTarget(target); run("cargo", ["build", ...cargoProfileArgs, "--lib", "-p", "bevy-runeweave-runtime-staticlib", "--target", target], { IPHONEOS_DEPLOYMENT_TARGET: process.env.IOS_DEPLOYMENT_TARGET ?? "13.0" });
+      requireTarget(target); run("cargo", ["build", ...cargoProfileArgs, ...cargoFeatureArgs, "--lib", "-p", "bevy-runeweave-runtime-staticlib", "--target", target], { IPHONEOS_DEPLOYMENT_TARGET: process.env.IOS_DEPLOYMENT_TARGET ?? "13.0" });
       run("libtool", ["-static", "-o", join(work, group, `${target}.a`), join(targetDir, target, profile, "libbevy_runeweave.a"), vendoredLua(target)]);
     }
     const deviceLib = join(work, "libbevy_runeweave-device.a"), simulatorLib = join(work, "libbevy_runeweave-simulator.a");
@@ -173,7 +187,7 @@ function ios() {
   } finally { rmSync(work, { recursive: true, force: true }); }
 }
 
-if (["-h", "--help"].includes(platformArg)) { console.log("Usage: npm exec -- tsx scripts/build-runtime.ts <windows|macos|linux|android|ios> [--release]"); process.exit(0); }
+if (["-h", "--help"].includes(platformArg)) { console.log("Usage: npm exec -- tsx scripts/build-runtime.ts <windows|macos|linux|android|ios> [--release] [--documentation] [--dynamic-components] [--script-systems] [--full-scripting]"); process.exit(0); }
 if (!platforms.includes(platformArg as Platform)) throw new Error("Unsupported or missing platform");
 mkdirSync(dist, { recursive: true });
 const platform = platformArg as Platform;

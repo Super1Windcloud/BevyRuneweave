@@ -1,7 +1,9 @@
 //! A module for managing namespaces for functions
 
+#[cfg(feature = "documentation")]
+use crate::DummyScriptFunctionRegistry;
 use crate::{
-    DummyScriptFunctionRegistry, ScriptFunctionRegistryArc,
+    ScriptFunctionRegistryArc,
     docgen::info::GetFunctionInfo,
     function::script_function::{AppScriptFunctionRegistry, ScriptFunction},
 };
@@ -114,6 +116,7 @@ impl<'a, S: IntoNamespace> NamespaceBuilder<'a, S> {
     /// Register functions for this namespace on the dummy function registry instead.
     ///
     /// This will appear in documentation but not become callable.
+    #[cfg(feature = "documentation")]
     pub fn with_dummy_registry(mut self) -> Self {
         self.registry = self
             .world

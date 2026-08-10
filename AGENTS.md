@@ -66,6 +66,9 @@ cannot be executed in the current environment must be called out explicitly as a
 - Native runtime artifacts are always unified and embed every supported engine (Lua and QuickJS,
   including TypeScript through emitted JavaScript). Do not add language-specific runtime features,
   packages, or build recipes; single-language features are only for project development and tests.
+- Optional BMS framework capabilities are disabled by default. Enable `documentation`,
+  `dynamic_components`, or `script_systems` independently, or use `full_scripting` to enable all
+  three. These capability features must not change which script engines are embedded.
 - `npm run release:assets` packages assets and uploads same-named Release assets using `.env` credentials.
 
 ## Configuration and Assets

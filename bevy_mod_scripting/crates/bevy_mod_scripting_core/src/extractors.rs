@@ -2,6 +2,7 @@
 //!
 //! These are designed to be used to pipe inputs into other systems which require them, while handling any configuration erorrs nicely.
 
+#[cfg(feature = "script_systems")]
 use bevy_ecs::{
     component::ComponentId,
     query::{Access, AccessConflicts, ComponentIdSet},
@@ -128,6 +129,7 @@ use bevy_ecs::{
 //     }
 // }
 
+#[cfg(feature = "script_systems")]
 fn individual_conflicts(conflicts: AccessConflicts) -> ComponentIdSet {
     match conflicts {
         // todo, not sure what to do here
@@ -136,6 +138,7 @@ fn individual_conflicts(conflicts: AccessConflicts) -> ComponentIdSet {
     }
 }
 
+#[cfg(feature = "script_systems")]
 pub(crate) fn get_all_access_ids(access: &Access) -> Vec<(ComponentId, bool)> {
     let mut access_all_read = Access::default();
     access_all_read.read_all();

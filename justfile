@@ -87,8 +87,12 @@ bms-check-js:
 bms-check-ts:
     cargo check -p bevy_mod_scripting --no-default-features --features typescript --all-targets
 
+# Check the unified runtime with every optional BMS framework capability.
+bms-check-full:
+    cargo check -p bevy_mod_scripting --no-default-features --features lua55,quickjs,full_scripting --all-targets
+
 # Check every supported BMS runtime configuration.
-bms-check: bms-check-base bms-check-lua bms-check-js bms-check-ts
+bms-check: bms-check-base bms-check-lua bms-check-js bms-check-ts bms-check-full
 
 # Execute 600 gameplay frames with the Lua 5.5 VM.
 test-lua:
@@ -148,13 +152,13 @@ build profile="":
     just build-js {{profile}}
     just build-ts {{profile}}
 
-# Package one runtime for a platform (windows/macos/linux/android/ios).
-build-runtime platform profile="":
-    npm exec -- tsx scripts/build-runtime.ts "{{platform}}" {{profile}}
+# Package one runtime for a platform. Options include --release and BMS capability flags.
+build-runtime platform profile="" capabilities="":
+    npm exec -- tsx scripts/build-runtime.ts "{{platform}}" {{profile}} {{capabilities}}
 
 # Package the Windows Lua/QuickJS runtime library.
-build-runtime-windows profile="":
-    npm exec -- tsx scripts/build-runtime.ts windows {{profile}}
+build-runtime-windows profile="" capabilities="":
+    npm exec -- tsx scripts/build-runtime.ts windows {{profile}} {{capabilities}}
 
 # Package language assets and optionally upload them to a GitHub release.
 package-assets language="all" tag="0.0.1":
@@ -173,20 +177,20 @@ upload-assets tag="0.0.1":
     npm exec -- tsx --env-file=.env scripts/publish-release.ts --tag="{{tag}}"
 
 # Package the macOS Lua/QuickJS runtime library.
-build-runtime-macos profile="":
-    npm exec -- tsx scripts/build-runtime.ts macos {{profile}}
+build-runtime-macos profile="" capabilities="":
+    npm exec -- tsx scripts/build-runtime.ts macos {{profile}} {{capabilities}}
 
 # Package the Linux Lua/QuickJS runtime library.
-build-runtime-linux profile="":
-    npm exec -- tsx scripts/build-runtime.ts linux {{profile}}
+build-runtime-linux profile="" capabilities="":
+    npm exec -- tsx scripts/build-runtime.ts linux {{profile}} {{capabilities}}
 
 # Package the Android runtime with Lua and QuickJS.
-build-runtime-android profile="":
-    npm exec -- tsx scripts/build-runtime.ts android {{profile}}
+build-runtime-android profile="" capabilities="":
+    npm exec -- tsx scripts/build-runtime.ts android {{profile}} {{capabilities}}
 
 # Package the iOS XCFramework with Lua and QuickJS.
-build-runtime-ios profile="":
-    npm exec -- tsx scripts/build-runtime.ts ios {{profile}}
+build-runtime-ios profile="" capabilities="":
+    npm exec -- tsx scripts/build-runtime.ts ios {{profile}} {{capabilities}}
 
 # Build the Windows runtime and package a complete NSIS installer.
 package-windows-installer profile="":

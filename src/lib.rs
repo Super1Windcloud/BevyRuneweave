@@ -4,7 +4,6 @@ compile_error!("enable a scripting feature: unified, js, typescript, or lua");
 compile_error!("the js and typescript features select the same QuickJS backend");
 
 mod runtime;
-mod scene_renderer;
 mod script_api;
 
 pub use runtime::{

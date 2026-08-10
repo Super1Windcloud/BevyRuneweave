@@ -2,14 +2,13 @@
 //! Implementations of [`WorldExtensions`] trait on the world guard.
 
 use super::{
-    AppReflectAllocator, AppScriptComponentRegistry, ReflectBase, ReflectBaseType,
-    ReflectReference, ScriptComponentRegistration, ScriptResourceRegistration,
+    AppReflectAllocator, AppScheduleRegistry, AppScriptComponentRegistry, ReflectBase,
+    ReflectBaseType, ReflectReference, ScriptComponentRegistration, ScriptResourceRegistration,
     ScriptTypeRegistration, Union,
     function::{
         namespace::Namespace,
         script_function::{AppScriptFunctionRegistry, DynamicScriptFunction, FunctionCallContext},
     },
-    schedule::AppScheduleRegistry,
     script_value::ScriptValue,
 };
 use crate::{
@@ -49,6 +48,7 @@ use bevy_reflect::{
     GetTypeRegistration, TypeInfo, enums::VariantInfo, structs::DynamicStruct, tuple::DynamicTuple,
     tuple_struct::DynamicTupleStruct,
 };
+#[cfg(feature = "script_systems")]
 use bevy_system_reflection::ReflectSchedule;
 use std::{
     alloc::Layout,
@@ -206,6 +206,7 @@ pub trait WorldExtensions {
     //     F: FnOnce(&mut World, &mut Schedule) -> O;
 
     /// Retrieves a schedule by its name.
+    #[cfg(feature = "script_systems")]
     fn get_schedule_by_name(&self, schedule_name: String) -> Option<ReflectSchedule>;
 
     /// Loads a script asset from the given path.
@@ -759,6 +760,7 @@ impl<'w> WorldExtensions for WorldAccessGuard<'w> {
         })
     }
 
+    #[cfg(feature = "script_systems")]
     fn get_schedule_by_name(&self, schedule_name: String) -> Option<ReflectSchedule> {
         let schedule_registry = self.schedule_registry();
         let schedule_registry = schedule_registry.read();

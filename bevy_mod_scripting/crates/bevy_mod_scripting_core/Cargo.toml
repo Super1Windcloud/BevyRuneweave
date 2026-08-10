@@ -17,12 +17,18 @@ path = "src/lib.rs"
 
 [features]
 default = []
-
+documentation = ["bevy_mod_scripting_bindings/documentation"]
+dynamic_components = []
+script_systems = [
+    "bevy_mod_scripting_bindings/script_systems",
+    "dep:bevy_system_reflection",
+]
+full_scripting = ["documentation", "dynamic_components", "script_systems"]
 
 [dependencies]
 bevy_mod_scripting_asset = { workspace = true }
 bevy_mod_scripting_bindings = { workspace = true }
-bevy_system_reflection = { workspace = true }
+bevy_system_reflection = { workspace = true, optional = true }
 bevy_mod_scripting_display = { workspace = true }
 bevy_mod_scripting_script = { workspace = true }
 bevy_mod_scripting_world = { workspace = true }

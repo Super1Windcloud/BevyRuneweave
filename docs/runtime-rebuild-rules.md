@@ -21,8 +21,7 @@ runtime、脚本资源还是宿主安装包。
 下列修改会影响 native runtime library：
 
 - `src/runtime/**`：应用装配、脚本加载、热重载、窗口与运行时配置。
-- `src/script_api/**`：BMS 函数注册、真实反射 Component/Resource、输入与网络服务。
-- `src/scene_renderer.rs`：脚本场景组件到 Bevy 渲染组件的桥接，会编入 runtime。
+- `src/script_api/**`：BMS 函数注册、真实 Bevy Component/Resource、输入与网络服务。
 - `src/lib.rs`：runtime 对外导出和模块装配。
 - `bevy_mod_scripting/**`：BMS 反射/函数注册、WorldGuard、Lua 5.5、QuickJS、回调生命周期和脚本资源加载器。
 - `crates/runtime-cdylib/**` 或 `crates/runtime-staticlib/**`：C ABI 动态库或静态库入口。
@@ -143,7 +142,7 @@ just build-runtime-linux --release
 | 修改 Lua/JS 脚本或 sprite | 否 | 是 | 否 |
 | 修改 `engineConfig.json` | 否 | 是 | 否 |
 | 新增 Lua/QuickJS ECS API | 是 | 同步脚本/API 声明后需要 | 仅 ABI 变化时需要 |
-| 修改 `src/scene_renderer.rs` 渲染实现 | 是 | 否 | 重新分发 runtime 时需要 |
+| 修改 `src/script_api` 场景渲染实现 | 是 | 否 | 重新分发 runtime 时需要 |
 | 修改 desktop launcher 按钮 | 否 | 否 | 是 |
 | 修改 `game_runtime.h` 注释 | 重新生成 package | 否 | 否 |
 | 修改 C ABI 函数签名 | 是 | 否 | 是 |

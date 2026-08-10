@@ -26,6 +26,16 @@ lua = ["bevy_mod_scripting_lua", "bevy_mod_scripting_lua/lua55"]
 lua55 = ["lua"]
 quickjs = ["bevy_mod_scripting_quickjs"]
 typescript = ["quickjs"]
+documentation = [
+    "bevy_mod_scripting_bindings/documentation",
+    "bevy_mod_scripting_core/documentation",
+]
+dynamic_components = ["bevy_mod_scripting_core/dynamic_components"]
+script_systems = [
+    "bevy_mod_scripting_bindings/script_systems",
+    "bevy_mod_scripting_core/script_systems",
+]
+full_scripting = ["documentation", "dynamic_components", "script_systems"]
 
 [dependencies]
 bevy_app = { workspace = true }

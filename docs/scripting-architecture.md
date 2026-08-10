@@ -9,6 +9,8 @@ queries, resources, and script systems.
 The Bevy `World` is authoritative. A script component is a real registered Bevy component, and a
 script resource is a real registered Bevy resource. Rust systems and scripts observe the same state.
 Runtime APIs must not maintain a second ECS snapshot that later materializes into Bevy components.
+Runeweave scene functions therefore insert Bevy `Transform`, `Sprite`, and text components directly,
+while input functions read the live `ButtonInput<KeyCode>` resource through `WorldGuard`.
 
 ## API Registration
 
