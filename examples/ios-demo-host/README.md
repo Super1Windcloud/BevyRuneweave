@@ -18,8 +18,11 @@ xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj \
 ```
 
 `just build-ios-demo` reuses the XCFramework under `dist/runtimes/ios`, builds the Debug host app,
-and then boots a simulator if needed, installs the app, and launches it. Run
-`just build-runtime-ios` separately when the runtime changes.
+and then boots a simulator if needed, installs the app, and launches it. The launch command remains
+attached to the app so Objective-C, Rust, Bevy, and script stdout/stderr are visible in the current
+terminal; close the app or press `Ctrl+C` to stop streaming. Native crash reports remain available
+under `$HOME/Library/Logs/DiagnosticReports/BevyRuneweave-*.ips`. Run `just build-runtime-ios`
+separately when the runtime changes.
 
 The Debug workflow prefers an already booted iPhone. Select a specific simulator by name or UDID:
 

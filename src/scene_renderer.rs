@@ -30,9 +30,9 @@ type ScriptVisualQuery<'w, 's> = Query<
     )>,
 >;
 
-pub(crate) struct ScriptSquadronHostPlugin;
+pub(crate) struct RuneweaveSceneRendererPlugin;
 
-impl Plugin for ScriptSquadronHostPlugin {
+impl Plugin for RuneweaveSceneRendererPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, |mut commands: Commands| {
             commands.spawn(Camera2d);
@@ -128,7 +128,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reflected_render_components_fully_define_host_output() {
+    fn reflected_render_components_fully_define_scene_output() {
         let sprite = ScriptSprite {
             path: "sprites/player.png".to_owned(),
             width: 72.0,

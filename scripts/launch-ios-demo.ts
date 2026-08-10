@@ -53,4 +53,12 @@ if (selected.state === "Shutdown") run("xcrun", ["simctl", "boot", selected.udid
 run("open", ["-a", "Simulator"]);
 run("xcrun", ["simctl", "bootstatus", selected.udid, "-b"]);
 run("xcrun", ["simctl", "install", selected.udid, app]);
-run("xcrun", ["simctl", "launch", "--terminate-running-process", selected.udid, bundleIdentifier]);
+console.log("Streaming app stdout and stderr. Close the app or press Ctrl+C to stop.");
+run("xcrun", [
+  "simctl",
+  "launch",
+  "--console-pty",
+  "--terminate-running-process",
+  selected.udid,
+  bundleIdentifier,
+]);

@@ -56,7 +56,7 @@ templates/game-project/  # Standalone project templates, outside projects/
 └── ts/
 src/                     # Framework core and shared Bevy host
 ├── script_api/          # Reflected types and functions registered once through BMS
-├── example_host.rs      # Script Squadron sprite, transform, and HUD mapping
+├── scene_renderer.rs    # Script-authored sprite, transform, and text rendering
 ├── runtime/             # App assembly, input callbacks, hot reload, and host entry points
 └── lib.rs               # Feature constraints and public API exports
 docs/script-api.md       # Current reflected scene and platform-service API

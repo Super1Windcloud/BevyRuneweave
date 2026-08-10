@@ -3,8 +3,8 @@ compile_error!("enable a scripting feature: unified, js, typescript, or lua");
 #[cfg(all(feature = "js", feature = "typescript"))]
 compile_error!("the js and typescript features select the same QuickJS backend");
 
-mod example_host;
 mod runtime;
+mod scene_renderer;
 mod script_api;
 
 pub use runtime::{

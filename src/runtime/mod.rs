@@ -28,7 +28,7 @@ use bevy_mod_scripting::prelude::{
 use winit::platform::windows::WindowExtWindows;
 
 use crate::{
-    example_host::ScriptSquadronHostPlugin,
+    scene_renderer::RuneweaveSceneRendererPlugin,
     script_api::{RuneweaveScriptApiPlugin, ScriptApiUpdated, ScriptInput},
 };
 
@@ -337,7 +337,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             }),
     )
     .add_plugins(scripting_plugins)
-    .add_plugins((RuneweaveScriptApiPlugin, ScriptSquadronHostPlugin))
+    .add_plugins((RuneweaveScriptApiPlugin, RuneweaveSceneRendererPlugin))
     .insert_resource(LoadedScriptPath {
         source_path: asset_root.join(&asset_path),
         modified: fs::metadata(asset_root.join(&asset_path))

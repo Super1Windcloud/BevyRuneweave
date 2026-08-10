@@ -77,13 +77,30 @@ fn register_static_core_globals(world: &mut World, filter: fn(&TypeRegistration)
     let mut global_registry = global_registry.write();
     let type_registry = type_registry.read();
 
-    // find all reflectable types without generics
+    let mut ident_counts = HashMap::<&str, usize>::default();
+    for registration in type_registry
+        .iter()
+        .filter(|registration| filter(registration))
+    {
+        if !registration.type_info().generics().is_empty() {
+            continue;
+        }
+        if let Some(ident) = registration.type_info().type_path_table().ident() {
+            *ident_counts.entry(ident).or_default() += 1;
+        }
+    }
+
+    // Only unique identifiers can be exposed safely as direct globals. Ambiguous
+    // types remain available through the `types` cache using their full paths.
     for registration in type_registry.iter().filter(|r| filter(r)) {
         if !registration.type_info().generics().is_empty() {
             continue;
         }
 
         if let Some(global_name) = registration.type_info().type_path_table().ident() {
+            if ident_counts.get(global_name) != Some(&1) {
+                continue;
+            }
             let documentation = "A reference to the type, allowing you to call static methods.";
             let type_info = registration.type_info();
             if global_registry
@@ -96,8 +113,8 @@ fn register_static_core_globals(world: &mut World, filter: fn(&TypeRegistration)
                 .is_some()
             {
                 warn!(
-                    "Duplicate global registration for type: '{}'. {MSG_DUPLICATE_GLOBAL}",
-                    type_info.type_path_table().short_path()
+                    "Global '{global_name}' for reflected type '{}' replaced an existing global. {MSG_DUPLICATE_GLOBAL}",
+                    type_info.type_path()
                 )
             };
         }
@@ -123,54 +140,86 @@ fn register_static_core_globals(world: &mut World, filter: fn(&TypeRegistration)
     };
 }
 
+type CachedTypeRegistration = Union<
+    V<ScriptTypeRegistration>,
+    Union<V<ScriptComponentRegistration>, V<ScriptResourceRegistration>>,
+>;
+type TypeCache = HashMap<String, CachedTypeRegistration>;
+
+fn build_type_cache(guard: WorldGuard) -> Result<TypeCache, InteropError> {
+    // profiling::function_scope!("registering core globals");
+    let type_registry = guard.type_registry();
+    let type_registry = type_registry.read();
+    let mut type_cache = TypeCache::default();
+    let filter = GLOBAL_OPTS.with(|opts| *opts.borrow());
+    let mut short_path_counts = HashMap::<&str, usize>::default();
+    for registration in type_registry
+        .iter()
+        .filter(|registration| filter(registration))
+    {
+        *short_path_counts
+            .entry(registration.type_info().type_path_table().short_path())
+            .or_default() += 1;
+    }
+    for registration in type_registry.iter().filter(|r| filter(r)) {
+        let path_table = registration.type_info().type_path_table();
+        let short_path = path_table.short_path();
+        let type_path = if short_path_counts.get(short_path) == Some(&1) {
+            short_path
+        } else {
+            path_table.path()
+        };
+        let registration = ScriptTypeRegistration::new(Arc::new(registration.clone()));
+        let registration = guard.clone().get_type_registration(registration)?;
+        let registration = registration.map_both(V::from, |u| u.map_both(V::from, V::from));
+        if type_cache
+            .insert(type_path.to_owned(), registration)
+            .is_some()
+        {
+            warn_once!(
+                "duplicate entry inside `types` global for type path: {}. {MSG_DUPLICATE_GLOBAL}",
+                type_path
+            )
+        };
+    }
+
+    Ok(type_cache)
+}
+
 #[script_globals(bms_bindings_path = "crate", name = "core_globals")]
 impl CoreGlobals {
     /// A cache of types normally available through the `world.get_type_by_name` function.
     ///
     /// You can use this to avoid having to store type references.
     ///
+    /// Types with unique short paths use that short path as their key. When
+    /// multiple types share a short path, each is keyed by its full type path.
+    ///
     /// Note that this cache will NOT contain types manually registered by scripts via `register_new_component`.
-    fn types(
-        guard: WorldGuard,
-    ) -> Result<
-        HashMap<
-            String,
-            Union<
-                V<ScriptTypeRegistration>,
-                Union<V<ScriptComponentRegistration>, V<ScriptResourceRegistration>>,
-            >,
-        >,
-        InteropError,
-    > {
-        // profiling::function_scope!("registering core globals");
-        let type_registry = guard.type_registry();
-        let type_registry = type_registry.read();
-        let mut type_cache = HashMap::<String, _>::default();
-        let filter = GLOBAL_OPTS.with(|opts| *opts.borrow());
-        for registration in type_registry.iter().filter(|r| filter(r)) {
-            let type_path = registration.type_info().type_path_table().short_path();
-            let registration = ScriptTypeRegistration::new(Arc::new(registration.clone()));
-            let registration = guard.clone().get_type_registration(registration)?;
-            let registration = registration.map_both(V::from, |u| u.map_both(V::from, V::from));
-            if type_cache
-                .insert(type_path.to_owned(), registration)
-                .is_some()
-            {
-                warn_once!(
-                    "duplicate entry inside `types` global for type: {}. {MSG_DUPLICATE_GLOBAL}",
-                    type_path
-                )
-            };
-        }
-
-        Ok(type_cache)
+    fn types(guard: WorldGuard) -> Result<TypeCache, InteropError> {
+        build_type_cache(guard)
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::CurrentScriptAttachment;
     use ::{bevy_app::App, bevy_reflect::Reflect};
+
+    mod first {
+        use bevy_reflect::Reflect;
+
+        #[derive(Reflect)]
+        pub struct SharedName;
+    }
+
+    mod second {
+        use bevy_reflect::Reflect;
+
+        #[derive(Reflect)]
+        pub struct SharedName;
+    }
 
     #[test]
     fn test_register_globals() {
@@ -208,5 +257,36 @@ mod test {
         // check that the type is not registered
         assert!(globals.len() == 1);
         assert!(globals.get("types").is_some());
+    }
+
+    #[test]
+    fn ambiguous_type_names_use_full_paths_instead_of_overwriting() {
+        let mut app = App::new();
+        app.register_type::<first::SharedName>()
+            .register_type::<second::SharedName>()
+            .register_type::<std::ops::Range<u32>>()
+            .register_type::<std::ops::Range<f32>>();
+
+        let plugin = CoreScriptGlobalsPlugin::default();
+        plugin.build(&mut app);
+        plugin.finish(&mut app);
+
+        {
+            let globals = app.world().resource::<AppScriptGlobalsRegistry>().read();
+            assert!(globals.get("SharedName").is_none());
+            assert!(globals.get("Range").is_none());
+        }
+
+        let cache = WorldGuard::setup_cache(app.world(), CurrentScriptAttachment::default());
+        WorldGuard::with_static_guard(app.world_mut(), cache, |guard| {
+            let types = build_type_cache(guard)?;
+            assert!(!types.contains_key("SharedName"));
+            assert!(types.contains_key(std::any::type_name::<first::SharedName>()));
+            assert!(types.contains_key(std::any::type_name::<second::SharedName>()));
+            assert!(types.contains_key("Range<u32>"));
+            assert!(types.contains_key("Range<f32>"));
+            Ok::<(), InteropError>(())
+        })
+        .unwrap();
     }
 }

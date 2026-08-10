@@ -52,7 +52,7 @@ templates/game-project/  # 独立项目模板，不属于任何 projects 游戏
 └── ts/
 src/                     # bevy-runeweave 框架核心与共享 Bevy 宿主
 ├── script_api/          # 真实反射类型与 BMS 统一函数注册
-├── example_host.rs      # Script Squadron 贴图、Transform 与 HUD 映射
+├── scene_renderer.rs    # 脚本定义的贴图、Transform 与文本渲染
 ├── runtime/             # 应用装配、输入回调、热重载与宿主入口
 └── lib.rs               # feature 约束与公开 API 导出
 docs/script-api.md       # 当前反射场景与平台服务 API
