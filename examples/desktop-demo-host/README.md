@@ -37,6 +37,15 @@ The launcher UI and Bevy runtime execute in separate process modes. This is requ
 because eframe and the dynamically loaded Bevy runtime each link winit; starting both event loops in
 one process would register the same Objective-C application delegate twice.
 
+Release builds redirect stdout and stderr to process-specific files under the application-data
+directory. Every process start truncates its own file, so `logs/launcher.log` contains only the
+latest launcher session and `logs/runtime.log` contains only the latest game-runtime session. Debug
+builds keep writing to the terminal. The application-data roots are:
+
+- Windows: `%LOCALAPPDATA%\Bevy RuneWeave`
+- macOS: `$HOME/Library/Application Support/Bevy RuneWeave`
+- Linux: `$XDG_DATA_HOME/Bevy RuneWeave`, or `$HOME/.local/share/Bevy RuneWeave`
+
 ```bash
 just package-windows-installer --release
 just package-macos-dmg --release

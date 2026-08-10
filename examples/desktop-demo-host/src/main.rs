@@ -35,6 +35,30 @@ const REMOTE_ASSETS: [(&str, &str); 3] = [
     ),
 ];
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ProcessMode {
+    Launcher,
+    Runtime,
+}
+
+impl ProcessMode {
+    fn from_args() -> Self {
+        if std::env::args_os().nth(1).as_deref() == Some(OsStr::new("--run-game")) {
+            Self::Runtime
+        } else {
+            Self::Launcher
+        }
+    }
+
+    #[cfg(any(not(debug_assertions), test))]
+    fn log_file_name(self) -> &'static str {
+        match self {
+            Self::Launcher => "launcher.log",
+            Self::Runtime => "runtime.log",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum Language {
@@ -280,6 +304,68 @@ fn platform_data_root() -> Result<PathBuf, String> {
         });
     base.map(|path| path.join("Bevy RuneWeave"))
         .ok_or_else(|| "Could not determine the user data directory".to_owned())
+}
+
+#[cfg(any(not(debug_assertions), test))]
+fn release_log_path_at(data_root: &Path, mode: ProcessMode) -> PathBuf {
+    data_root.join("logs").join(mode.log_file_name())
+}
+
+#[cfg(not(debug_assertions))]
+fn initialize_release_logging(mode: ProcessMode) -> Result<PathBuf, String> {
+    let path = release_log_path_at(&platform_data_root()?, mode);
+    let parent = path
+        .parent()
+        .ok_or_else(|| "Could not determine the release log directory".to_owned())?;
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("Could not create {}: {error}", parent.display()))?;
+    let file = fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&path)
+        .map_err(|error| format!("Could not reset {}: {error}", path.display()))?;
+    redirect_standard_streams(file)
+        .map_err(|error| format!("Could not redirect output to {}: {error}", path.display()))?;
+    println!(
+        "Bevy RuneWeave {mode:?} started (pid {})",
+        std::process::id()
+    );
+    Ok(path)
+}
+
+#[cfg(all(not(debug_assertions), unix))]
+fn redirect_standard_streams(file: File) -> io::Result<()> {
+    use std::os::fd::AsRawFd;
+
+    io::stdout().flush()?;
+    io::stderr().flush()?;
+    let descriptor = file.as_raw_fd();
+    if unsafe { libc::dup2(descriptor, libc::STDOUT_FILENO) } == -1 {
+        return Err(io::Error::last_os_error());
+    }
+    if unsafe { libc::dup2(descriptor, libc::STDERR_FILENO) } == -1 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
+}
+
+#[cfg(all(not(debug_assertions), target_os = "windows"))]
+fn redirect_standard_streams(file: File) -> io::Result<()> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::System::Console::{STD_ERROR_HANDLE, STD_OUTPUT_HANDLE, SetStdHandle};
+
+    io::stdout().flush()?;
+    io::stderr().flush()?;
+    let file = Box::leak(Box::new(file));
+    let handle = file.as_raw_handle();
+    if unsafe { SetStdHandle(STD_OUTPUT_HANDLE, handle) } == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    if unsafe { SetStdHandle(STD_ERROR_HANDLE, handle) } == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
 }
 
 fn active_assets_root() -> Result<PathBuf, String> {
@@ -854,7 +940,13 @@ fn launch_runtime_process() -> Result<(), String> {
 }
 
 fn main() -> eframe::Result {
-    if std::env::args_os().nth(1).as_deref() == Some(OsStr::new("--run-game")) {
+    let mode = ProcessMode::from_args();
+    #[cfg(not(debug_assertions))]
+    if let Err(error) = initialize_release_logging(mode) {
+        eprintln!("Bevy RuneWeave: {error}");
+    }
+
+    if mode == ProcessMode::Runtime {
         if let Err(error) = run_game() {
             eprintln!("Bevy RuneWeave: {error}");
             std::process::exit(1);
@@ -888,6 +980,19 @@ mod tests {
     use flate2::{Compression, write::GzEncoder};
     use lzma_rust2::{XzOptions, XzWriter};
     use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
+
+    #[test]
+    fn release_logs_are_separate_for_launcher_and_runtime() {
+        let data_root = Path::new("application-data");
+        assert_eq!(
+            release_log_path_at(data_root, ProcessMode::Launcher),
+            data_root.join("logs/launcher.log")
+        );
+        assert_eq!(
+            release_log_path_at(data_root, ProcessMode::Runtime),
+            data_root.join("logs/runtime.log")
+        );
+    }
 
     const CONTENT: &[u8] = b"archive format test";
 

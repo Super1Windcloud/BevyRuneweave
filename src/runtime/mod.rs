@@ -171,6 +171,10 @@ fn set_default_window_icon() {
     }
 }
 
+#[cfg(any(
+    test,
+    all(debug_assertions, not(any(target_os = "android", target_os = "ios")))
+))]
 fn source_has_changed(
     previous: Option<std::time::SystemTime>,
     current: Option<std::time::SystemTime>,
@@ -492,7 +496,9 @@ unsafe fn c_path(path: *const c_char) -> Result<PathBuf, c_int> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "unified")]
     use bevy::ecs::message::Messages;
+    #[cfg(feature = "unified")]
     use bevy_mod_scripting::core::event::{ScriptAttachedEvent, ScriptDetachedEvent};
 
     use super::*;
