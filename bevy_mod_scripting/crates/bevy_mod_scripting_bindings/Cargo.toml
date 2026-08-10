@@ -14,8 +14,9 @@ readme.workspace = true
 [features]
 default = []
 documentation = []
+dynamic_components = []
 script_systems = ["dep:bevy_system_reflection"]
-full_scripting = ["documentation", "script_systems"]
+full_scripting = ["documentation", "dynamic_components", "script_systems"]
 
 [dependencies]
 bevy_mod_scripting_asset = { workspace = true }

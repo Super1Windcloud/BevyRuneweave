@@ -11,8 +11,10 @@ use super::{
     },
     script_value::ScriptValue,
 };
+#[cfg(feature = "dynamic_components")]
+use crate::{DynamicComponent, DynamicComponentInfo};
 use crate::{
-    DynamicComponent, DynamicComponentInfo, ScriptQueryBuilder, ScriptQueryResult,
+    ScriptQueryBuilder, ScriptQueryResult,
     error::InteropError,
     function::{from::FromScript, from_ref::FromScriptRef},
     reflection_extensions::PartialReflectExt,
@@ -33,8 +35,10 @@ use ::{
 };
 use bevy_app::AppExit;
 use bevy_asset::AssetPath;
+#[cfg(feature = "dynamic_components")]
+use bevy_ecs::component::{ComponentCloneBehavior, ComponentDescriptor};
 use bevy_ecs::{
-    component::{Component, ComponentCloneBehavior, ComponentDescriptor, Mutable},
+    component::{Component, Mutable},
     hierarchy::{ChildOf, Children},
     resource::Resource,
     system::Commands,
@@ -44,19 +48,21 @@ use bevy_mod_scripting_asset::ScriptAsset;
 use bevy_mod_scripting_script::ScriptAttachment;
 use bevy_mod_scripting_world::{CachedRegistry, RegistryCache, WorldAccessGuard, WorldGuard};
 use bevy_platform::collections::HashMap;
+#[cfg(feature = "dynamic_components")]
+use bevy_reflect::GetTypeRegistration;
 use bevy_reflect::{
-    GetTypeRegistration, TypeInfo, enums::VariantInfo, structs::DynamicStruct, tuple::DynamicTuple,
+    TypeInfo, enums::VariantInfo, structs::DynamicStruct, tuple::DynamicTuple,
     tuple_struct::DynamicTupleStruct,
 };
 #[cfg(feature = "script_systems")]
 use bevy_system_reflection::ReflectSchedule;
+#[cfg(feature = "dynamic_components")]
+use std::{alloc::Layout, mem::needs_drop};
 use std::{
-    alloc::Layout,
     any::TypeId,
     borrow::Cow,
     cell::{Ref, RefCell},
     collections::VecDeque,
-    mem::needs_drop,
     rc::Rc,
     sync::Arc,
 };
@@ -299,6 +305,7 @@ pub trait WorldExtensions {
     fn allocator(&'_ self) -> Ref<'_, AppReflectAllocator>;
 
     /// Returns the component registry.
+    #[cfg(feature = "dynamic_components")]
     fn component_registry(&'_ self) -> Ref<'_, AppScriptComponentRegistry>;
 
     /// Returns the schedule registry.
@@ -311,6 +318,7 @@ pub trait WorldExtensions {
     fn set_current_attachment(&self, attachment: ScriptAttachment);
 
     /// Registers a dynamic script component, and returns a reference to its registration
+    #[cfg(feature = "dynamic_components")]
     fn register_script_component(
         &self,
         component_name: String,
@@ -1067,12 +1075,19 @@ impl<'w> WorldExtensions for WorldAccessGuard<'w> {
         Ok(match val {
             Some(registration) => Some(self.get_type_registration(registration)?),
             None => {
-                // try the component registry
-                let components = self.component_registry();
-                let components = components.read();
-                components
-                    .get(&type_name)
-                    .map(|c| Union::new_right(Union::new_left(c.registration.clone())))
+                #[cfg(feature = "dynamic_components")]
+                {
+                    // try the component registry
+                    let components = self.component_registry();
+                    let components = components.read();
+                    components
+                        .get(&type_name)
+                        .map(|c| Union::new_right(Union::new_left(c.registration.clone())))
+                }
+                #[cfg(not(feature = "dynamic_components"))]
+                {
+                    None
+                }
             }
         })
     }
@@ -1113,6 +1128,7 @@ impl<'w> WorldExtensions for WorldAccessGuard<'w> {
         self.get_cached_registry().unwrap()
     }
 
+    #[cfg(feature = "dynamic_components")]
     fn component_registry(&'_ self) -> Ref<'_, AppScriptComponentRegistry> {
         #[allow(
             clippy::unwrap_used,
@@ -1141,6 +1157,7 @@ impl<'w> WorldExtensions for WorldAccessGuard<'w> {
         )));
     }
 
+    #[cfg(feature = "dynamic_components")]
     fn register_script_component(
         &self,
         component_name: String,
@@ -1914,6 +1931,7 @@ mod test {
     // ── dynamic component registration ────────────────────────────────────────
 
     #[test]
+    #[cfg(feature = "dynamic_components")]
     fn register_script_component_and_duplicate_errors() {
         let mut world = setup_world(|_, _| {});
         let guard = make_guard(&mut world);

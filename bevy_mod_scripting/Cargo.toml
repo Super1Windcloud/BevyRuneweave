@@ -30,7 +30,10 @@ documentation = [
     "bevy_mod_scripting_bindings/documentation",
     "bevy_mod_scripting_core/documentation",
 ]
-dynamic_components = ["bevy_mod_scripting_core/dynamic_components"]
+dynamic_components = [
+    "bevy_mod_scripting_bindings/dynamic_components",
+    "bevy_mod_scripting_core/dynamic_components",
+]
 script_systems = [
     "bevy_mod_scripting_bindings/script_systems",
     "bevy_mod_scripting_core/script_systems",
