@@ -26,6 +26,7 @@ declare function scene_despawn(id: string): boolean;
 declare function scene_clear(): void;
 declare function scene_transform(id: string): BmsReflectReference | null;
 declare function game_state_set(score: number, lives: number, message: string): void;
+declare function app_request_exit(): boolean;
 declare function input_key_pressed(key: string): boolean;
 declare function input_key_just_pressed(key: string): boolean;
 declare function input_key_just_released(key: string): boolean;

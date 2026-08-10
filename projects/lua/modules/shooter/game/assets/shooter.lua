@@ -6,11 +6,15 @@ local ENEMY_SPEED = 145
 local FIRE_DELAY = 0.18
 local SPAWN_DELAY = 0.72
 local DAMAGE_DELAY = 1.0
+local SETTINGS_ICON_ID = "settings_icon"
+local SETTINGS_MENU_IDS = { "settings_panel", "settings_title", "settings_restart", "settings_exit" }
 local SPRITES = {
     background = { path = "sprites/background.png", width = 600, height = 800 },
     player = { path = "sprites/player.png", width = 72, height = 88 },
     enemy = { path = "sprites/enemy.png", width = 66, height = 70 },
     bullet = { path = "sprites/bullet.png", width = 14, height = 34 },
+    settings_icon = { path = "sprites/settings-icon.png", width = 64, height = 64 },
+    settings_panel = { path = "sprites/settings-panel.png", width = 440, height = 320 },
 }
 
 local function create_world()
@@ -39,6 +43,7 @@ local function create_resources()
         game_over = false,
         restart_was_pressed = false,
         started = false,
+        settings_open = false,
     }
 end
 
@@ -239,7 +244,7 @@ local function game_state_system()
     if resources.lives <= 0 then
         resources.lives = 0
         resources.game_over = true
-        update_game_state("GAME OVER - TAP SPACE TO RESTART")
+        update_game_state("GAME OVER - TOUCH OR PRESS SPACE")
     else
         update_game_state("")
     end
@@ -254,6 +259,40 @@ local function spawn_scene()
         SPRITES.background.height
     )
     scene_spawn("hud", 0, 382, 20)
+    scene_spawn(SETTINGS_ICON_ID, 260, 350, 50)
+    scene_set_sprite(
+        SETTINGS_ICON_ID,
+        SPRITES.settings_icon.path,
+        SPRITES.settings_icon.width,
+        SPRITES.settings_icon.height
+    )
+end
+
+local function set_settings_open(open)
+    if resources.settings_open == open then return end
+    resources.settings_open = open
+    if not open then
+        for _, id in ipairs(SETTINGS_MENU_IDS) do scene_despawn(id) end
+        return
+    end
+    scene_spawn("settings_panel", 0, 0, 40)
+    scene_set_sprite(
+        "settings_panel",
+        SPRITES.settings_panel.path,
+        SPRITES.settings_panel.width,
+        SPRITES.settings_panel.height
+    )
+    scene_spawn("settings_title", 0, 125, 41)
+    scene_set_text("settings_title", "SETTINGS", 28, 0.91, 0.97, 0.98, 1, "center")
+    scene_spawn("settings_restart", 0, 20, 41)
+    scene_set_text("settings_restart", "RESTART", 25, 0.91, 0.97, 0.98, 1, "center")
+    scene_spawn("settings_exit", 0, -86, 41)
+    scene_set_text("settings_exit", "EXIT GAME", 25, 1, 0.72, 0.74, 1, "center")
+    update_game_state("PAUSED")
+end
+
+local function touch_inside(touch, left, right, bottom, top)
+    return touch.x >= left and touch.x <= right and touch.y >= bottom and touch.y <= top
 end
 
 local update_schedule = {
@@ -265,13 +304,32 @@ local update_schedule = {
     collision_system,
 }
 
-local function reset_game()
+local function reset_game(started)
     scene_clear()
     world = create_world()
     resources = create_resources()
+    resources.started = started or false
     spawn_scene()
     spawn_player()
-    update_game_state("DRAG OR ARROWS/WASD - AUTO FIRE")
+    update_game_state(resources.started and "DRAG OR ARROWS/WASD - AUTO FIRE"
+        or "TOUCH OR PRESS SPACE TO START")
+end
+
+local function handle_settings_input(touch)
+    local toggle_pressed = input_key_just_pressed("Escape")
+        or (touch.justPressed and touch_inside(touch, 0.84, 1, 0.84, 1))
+    if toggle_pressed then
+        set_settings_open(not resources.settings_open)
+        return true
+    end
+    if not resources.settings_open then return false end
+    if not touch.justPressed then return true end
+    if touch_inside(touch, 0.16, 0.84, 0.50, 0.62) then
+        reset_game(true)
+    elseif touch_inside(touch, 0.16, 0.84, 0.34, 0.46) then
+        app_request_exit()
+    end
+    return true
 end
 
 function on_script_loaded()
@@ -284,6 +342,7 @@ end
 
 function on_update(dt)
     local touch = input_primary_touch()
+    if handle_settings_input(touch) then return end
     local input_x = (input_key_pressed("ArrowRight") or input_key_pressed("KeyD")) and 1 or 0
     input_x = input_x - ((input_key_pressed("ArrowLeft") or input_key_pressed("KeyA")) and 1 or 0)
     local input_y = (input_key_pressed("ArrowUp") or input_key_pressed("KeyW")) and 1 or 0
@@ -300,7 +359,7 @@ function on_update(dt)
         end
     end
     if resources.game_over then
-        if restart_pressed and not resources.restart_was_pressed then reset_game() end
+        if restart_pressed and not resources.restart_was_pressed then reset_game(true) end
         resources.restart_was_pressed = restart_pressed
         return
     end

@@ -6,11 +6,15 @@ const ENEMY_SPEED = 145;
 const FIRE_DELAY = 0.18;
 const SPAWN_DELAY = 0.72;
 const DAMAGE_DELAY = 1.0;
+const SETTINGS_ICON_ID = "settings_icon";
+const SETTINGS_MENU_IDS = ["settings_panel", "settings_title", "settings_restart", "settings_exit"];
 const SPRITES = {
   background: { path: "sprites/background.png", width: 600, height: 800 },
   player: { path: "sprites/player.png", width: 72, height: 88 },
   enemy: { path: "sprites/enemy.png", width: 66, height: 70 },
   bullet: { path: "sprites/bullet.png", width: 14, height: 34 },
+  settingsIcon: { path: "sprites/settings-icon.png", width: 64, height: 64 },
+  settingsPanel: { path: "sprites/settings-panel.png", width: 440, height: 320 },
 };
 
 function createWorld() {
@@ -39,6 +43,7 @@ function createResources() {
     gameOver: false,
     restartWasPressed: false,
     started: false,
+    settingsOpen: false,
   };
 }
 
@@ -226,7 +231,7 @@ function gameStateSystem() {
   if (resources.lives <= 0) {
     resources.lives = 0;
     resources.gameOver = true;
-    updateGameState("GAME OVER - TAP SPACE TO RESTART");
+    updateGameState("GAME OVER - TOUCH OR PRESS SPACE");
   } else {
     updateGameState("");
   }
@@ -238,6 +243,57 @@ function spawnScene() {
     "background", SPRITES.background.path, SPRITES.background.width, SPRITES.background.height,
   );
   scene_spawn("hud", 0, 382, 20);
+  scene_spawn(SETTINGS_ICON_ID, 260, 350, 50);
+  scene_set_sprite(
+    SETTINGS_ICON_ID,
+    SPRITES.settingsIcon.path,
+    SPRITES.settingsIcon.width,
+    SPRITES.settingsIcon.height,
+  );
+}
+
+function setSettingsOpen(open) {
+  if (resources.settingsOpen === open) return;
+  resources.settingsOpen = open;
+  if (!open) {
+    for (const id of SETTINGS_MENU_IDS) scene_despawn(id);
+    return;
+  }
+  scene_spawn("settings_panel", 0, 0, 40);
+  scene_set_sprite(
+    "settings_panel",
+    SPRITES.settingsPanel.path,
+    SPRITES.settingsPanel.width,
+    SPRITES.settingsPanel.height,
+  );
+  scene_spawn("settings_title", 0, 125, 41);
+  scene_set_text("settings_title", "SETTINGS", 28, 0.91, 0.97, 0.98, 1, "center");
+  scene_spawn("settings_restart", 0, 20, 41);
+  scene_set_text("settings_restart", "RESTART", 25, 0.91, 0.97, 0.98, 1, "center");
+  scene_spawn("settings_exit", 0, -86, 41);
+  scene_set_text("settings_exit", "EXIT GAME", 25, 1, 0.72, 0.74, 1, "center");
+  updateGameState("PAUSED");
+}
+
+function touchInside(touch, left, right, bottom, top) {
+  return touch.x >= left && touch.x <= right && touch.y >= bottom && touch.y <= top;
+}
+
+function handleSettingsInput(touch) {
+  const togglePressed = input_key_just_pressed("Escape")
+    || (touch.justPressed && touchInside(touch, 0.84, 1, 0.84, 1));
+  if (togglePressed) {
+    setSettingsOpen(!resources.settingsOpen);
+    return true;
+  }
+  if (!resources.settingsOpen) return false;
+  if (!touch.justPressed) return true;
+  if (touchInside(touch, 0.16, 0.84, 0.50, 0.62)) {
+    resetGame(true);
+  } else if (touchInside(touch, 0.16, 0.84, 0.34, 0.46)) {
+    app_request_exit();
+  }
+  return true;
 }
 
 const updateSchedule = [
@@ -249,19 +305,21 @@ const updateSchedule = [
   collisionSystem,
 ];
 
-function resetGame() {
+function resetGame(started = false) {
   scene_clear();
   world = createWorld();
   resources = createResources();
+  resources.started = started;
   spawnScene();
   spawnPlayer();
-  updateGameState("DRAG OR ARROWS/WASD - AUTO FIRE");
+  updateGameState(started ? "DRAG OR ARROWS/WASD - AUTO FIRE" : "TOUCH OR PRESS SPACE TO START");
 }
 
 globalThis.on_script_loaded = resetGame;
 globalThis.on_script_reloaded = resetGame;
 globalThis.on_update = function (dt) {
   const touch = input_primary_touch();
+  if (handleSettingsInput(touch)) return;
   const inputX = Number(input_key_pressed("ArrowRight") || input_key_pressed("KeyD"))
     - Number(input_key_pressed("ArrowLeft") || input_key_pressed("KeyA"));
   const inputY = Number(input_key_pressed("ArrowUp") || input_key_pressed("KeyW"))
@@ -278,7 +336,7 @@ globalThis.on_update = function (dt) {
     }
   }
   if (resources.gameOver) {
-    if (restartPressed && !resources.restartWasPressed) resetGame();
+    if (restartPressed && !resources.restartWasPressed) resetGame(true);
     resources.restartWasPressed = restartPressed;
     return;
   }

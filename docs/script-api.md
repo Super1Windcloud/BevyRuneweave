@@ -16,6 +16,7 @@ as real reflected Bevy components and resources; there is no script-side ECS sna
 | `scene_despawn(id)` | Despawns an entity owned by the current script. |
 | `scene_clear()` | Despawns every entity owned by the current script. |
 | `game_state_set(score, lives, message)` | Replaces the reflected `ScriptGameState` resource. |
+| `app_request_exit()` | Sends Bevy's portable `AppExit::Success` message and reports whether it was accepted. |
 
 Entity ownership is derived from BMS `CurrentScriptAttachment`. Detaching or reloading a script
 removes only the entities owned by that attachment.
@@ -28,6 +29,10 @@ Keyboard functions are `input_key_pressed`, `input_key_just_pressed`, and
 resource and returns `pressed`, `justPressed`, `x`, `y`, `deltaX`, and `deltaY`. Positions and deltas
 are normalized against the primary window; X runs left-to-right and Y runs bottom-to-top. On systems
 without an active touch it returns the same object with `pressed: false` and zero coordinates.
+
+The shooter uses the primary touch for drag movement and normalized hit testing. Its top-right
+settings icon pauses gameplay and opens `RESTART` and `EXIT GAME`; exit is routed through
+`app_request_exit()` on Windows, macOS, Linux, Android, and iOS.
 
 HTTP functions are `http_get`, `http_post`, and `http_poll`. These services are also registered once
 through BMS; the Lua and QuickJS runtimes contain no Runeweave-specific service bindings.

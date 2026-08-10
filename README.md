@@ -102,8 +102,9 @@ just run-js
 just run-ts
 ```
 
-Move with the arrow keys or `WASD`. Weapons fire automatically at a fixed cadence. After health
-reaches zero, release and press Space again to restart. Scores continue increasing without a cap.
+Drag on Android or iOS, or move with the arrow keys or `WASD`; weapons fire automatically. Tap the
+top-right settings icon to pause, restart, or exit the game. Touch or Space starts and restarts a
+run. Scores continue increasing without a cap.
 All three versions use equivalent parameters and random seeds for comparison.
 
 ## ECS Data Model

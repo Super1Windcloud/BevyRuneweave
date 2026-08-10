@@ -200,9 +200,9 @@ package-windows-installer profile="":
 package-macos-dmg profile="":
     npm exec -- tsx scripts/package-desktop.ts macos {{profile}}
 
-# Install and launch the Debug Android host, or assemble the unsigned Release host.
+# Install, launch, and stream Debug logcat, or assemble the unsigned Release host.
 build-android-demo profile="" abis="arm64-v8a,x86_64":
-    examples/android-demo-host/gradlew -p examples/android-demo-host :app:{{ if profile == "--release" { "assembleRelease" } else { "launchDebug" } }} -PruneweaveAbis="{{abis}}"
+    examples/android-demo-host/gradlew -p examples/android-demo-host :app:{{ if profile == "--release" { "assembleRelease" } else { "logcatDebug" } }} -PruneweaveAbis="{{abis}}"
 
 # Install and launch the Debug iOS host, or only build the Release host.
 build-ios-demo profile="":

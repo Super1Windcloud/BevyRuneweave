@@ -12,6 +12,9 @@ Runtime APIs must not maintain a second ECS snapshot that later materializes int
 Runeweave scene functions therefore insert Bevy `Transform`, `Sprite`, and text components directly,
 while input functions read the live `ButtonInput<KeyCode>` and `Touches` resources through
 `WorldGuard`.
+Application exit requests likewise enter Bevy through the BMS-registered `app_request_exit`
+function and its portable `AppExit` message, rather than calling a platform process API from a
+script.
 
 ## API Registration
 

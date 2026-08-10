@@ -75,6 +75,7 @@ val stageRustRuntime by tasks.registering(Sync::class) {
 tasks.named("preBuild").configure { dependsOn(stageRustRuntime) }
 
 val adbExecutable = androidComponents.sdkComponents.adb
+val demoApplicationId = "io.github.super1windcloud.runeweave.demo"
 tasks.register<Exec>("launchDebug") {
     group = "install"
     description = "Installs the Debug APK and launches the demo on the connected Android device."
@@ -88,7 +89,35 @@ tasks.register<Exec>("launchDebug") {
             "-W",
             "-S",
             "-n",
-            "io.github.super1windcloud.runeweave.demo/.MainActivity",
+            "$demoApplicationId/.MainActivity",
         )
+    }
+}
+
+tasks.register<Exec>("logcatDebug") {
+    group = "install"
+    description = "Installs and launches the Debug APK, then streams logcat for its process."
+    dependsOn("launchDebug")
+
+    doFirst {
+        val adb = adbExecutable.get().asFile.absolutePath
+        var pid = ""
+        for (attempt in 1..50) {
+            val process = ProcessBuilder(adb, "shell", "pidof", "-s", demoApplicationId)
+                .redirectErrorStream(true)
+                .start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+            if (process.waitFor() == 0 && output.all(Char::isDigit)) {
+                pid = output
+                break
+            }
+            Thread.sleep(100)
+        }
+        require(pid.isNotEmpty()) {
+            "The Debug app did not start within 5 seconds; inspect unfiltered logcat for startup failures."
+        }
+
+        logger.lifecycle("Streaming logcat for $demoApplicationId (pid $pid). Press Ctrl-C to stop.")
+        commandLine(adb, "logcat", "--pid=$pid", "-v", "threadtime")
     }
 }

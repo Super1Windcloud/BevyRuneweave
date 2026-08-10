@@ -7,7 +7,13 @@ import {
   setTransform,
   spawnSceneEntity,
 } from "../../api/scene.js";
-import { keyPressed, primaryTouch, type PrimaryTouch } from "../../api/input.js";
+import { requestExit } from "../../api/app.js";
+import {
+  keyJustPressed,
+  keyPressed,
+  primaryTouch,
+  type PrimaryTouch,
+} from "../../api/input.js";
 
 type EntityId = string;
 type Role = "player" | "bullet" | "enemy";
@@ -58,6 +64,7 @@ interface GameResources {
   gameOver: boolean;
   restartWasPressed: boolean;
   started: boolean;
+  settingsOpen: boolean;
 }
 
 interface FrameContext {
@@ -77,11 +84,15 @@ const ENEMY_SPEED = 145;
 const FIRE_DELAY = 0.18;
 const SPAWN_DELAY = 0.72;
 const DAMAGE_DELAY = 1.0;
+const SETTINGS_ICON_ID = "settings_icon";
+const SETTINGS_MENU_IDS = ["settings_panel", "settings_title", "settings_restart", "settings_exit"];
 const sprites = {
   background: { path: "sprites/background.png", width: 600, height: 800 },
   player: { path: "sprites/player.png", width: 72, height: 88 },
   enemy: { path: "sprites/enemy.png", width: 66, height: 70 },
   bullet: { path: "sprites/bullet.png", width: 14, height: 34 },
+  settingsIcon: { path: "sprites/settings-icon.png", width: 64, height: 64 },
+  settingsPanel: { path: "sprites/settings-panel.png", width: 440, height: 320 },
 } satisfies Record<string, SpriteSpec>;
 
 function createWorld(): World {
@@ -110,6 +121,7 @@ function createResources(): GameResources {
     gameOver: false,
     restartWasPressed: false,
     started: false,
+    settingsOpen: false,
   };
 }
 
@@ -304,7 +316,7 @@ function gameStateSystem(): void {
   if (resources.lives <= 0) {
     resources.lives = 0;
     resources.gameOver = true;
-    updateGameState("GAME OVER - TAP SPACE TO RESTART");
+    updateGameState("GAME OVER - TOUCH OR PRESS SPACE");
   } else {
     updateGameState("");
   }
@@ -314,6 +326,78 @@ function spawnScene(): void {
   spawnSceneEntity("background", { x: 0, y: 0, z: -10 });
   setSprite("background", sprites.background);
   spawnSceneEntity("hud", { x: 0, y: 382, z: 20 });
+  spawnSceneEntity(SETTINGS_ICON_ID, { x: 260, y: 350, z: 50 });
+  setSprite(SETTINGS_ICON_ID, sprites.settingsIcon);
+}
+
+function setSettingsOpen(open: boolean): void {
+  if (resources.settingsOpen === open) return;
+  resources.settingsOpen = open;
+  if (!open) {
+    for (const id of SETTINGS_MENU_IDS) despawnSceneEntity(id);
+    return;
+  }
+
+  spawnSceneEntity("settings_panel", { x: 0, y: 0, z: 40 });
+  setSprite("settings_panel", sprites.settingsPanel);
+  spawnSceneEntity("settings_title", { x: 0, y: 125, z: 41 });
+  setText("settings_title", {
+    value: "SETTINGS",
+    fontSize: 28,
+    red: 0.91,
+    green: 0.97,
+    blue: 0.98,
+    alpha: 1,
+    anchor: "center",
+  });
+  spawnSceneEntity("settings_restart", { x: 0, y: 20, z: 41 });
+  setText("settings_restart", {
+    value: "RESTART",
+    fontSize: 25,
+    red: 0.91,
+    green: 0.97,
+    blue: 0.98,
+    alpha: 1,
+    anchor: "center",
+  });
+  spawnSceneEntity("settings_exit", { x: 0, y: -86, z: 41 });
+  setText("settings_exit", {
+    value: "EXIT GAME",
+    fontSize: 25,
+    red: 1,
+    green: 0.72,
+    blue: 0.74,
+    alpha: 1,
+    anchor: "center",
+  });
+  updateGameState("PAUSED");
+}
+
+function touchInside(
+  touch: PrimaryTouch,
+  left: number,
+  right: number,
+  bottom: number,
+  top: number,
+): boolean {
+  return touch.x >= left && touch.x <= right && touch.y >= bottom && touch.y <= top;
+}
+
+function handleSettingsInput(touch: PrimaryTouch): boolean {
+  const togglePressed = keyJustPressed("Escape")
+    || (touch.justPressed && touchInside(touch, 0.84, 1, 0.84, 1));
+  if (togglePressed) {
+    setSettingsOpen(!resources.settingsOpen);
+    return true;
+  }
+  if (!resources.settingsOpen) return false;
+  if (!touch.justPressed) return true;
+  if (touchInside(touch, 0.16, 0.84, 0.50, 0.62)) {
+    resetGame(true);
+  } else if (touchInside(touch, 0.16, 0.84, 0.34, 0.46)) {
+    requestExit();
+  }
+  return true;
 }
 
 const updateSchedule: GameSystem[] = [
@@ -325,13 +409,14 @@ const updateSchedule: GameSystem[] = [
   collisionSystem,
 ];
 
-function resetGame(): void {
+function resetGame(started = false): void {
   clearScene();
   world = createWorld();
   resources = createResources();
+  resources.started = started;
   spawnScene();
   spawnPlayer();
-  updateGameState("DRAG OR ARROWS/WASD - AUTO FIRE");
+  updateGameState(started ? "DRAG OR ARROWS/WASD - AUTO FIRE" : "TOUCH OR PRESS SPACE TO START");
 }
 
 const callbacks = globalThis as typeof globalThis & RuneweaveCallbacks;
@@ -346,6 +431,7 @@ callbacks.on_script_reloaded = function (): void {
 
 callbacks.on_update = function (dt: number): void {
   const touch = primaryTouch();
+  if (handleSettingsInput(touch)) return;
   const inputX = Number(keyPressed("ArrowRight") || keyPressed("KeyD"))
     - Number(keyPressed("ArrowLeft") || keyPressed("KeyA"));
   const inputY = Number(keyPressed("ArrowUp") || keyPressed("KeyW"))
@@ -362,7 +448,7 @@ callbacks.on_update = function (dt: number): void {
     }
   }
   if (resources.gameOver) {
-    if (restartPressed && !resources.restartWasPressed) resetGame();
+    if (restartPressed && !resources.restartWasPressed) resetGame(true);
     resources.restartWasPressed = restartPressed;
     return;
   }

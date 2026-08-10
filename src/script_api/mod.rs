@@ -239,6 +239,12 @@ fn game_state_set(
     })
 }
 
+fn app_request_exit(context: FunctionCallContext) -> Result<bool, InteropError> {
+    context
+        .world()?
+        .with_world_mut(|world| world.write_message(AppExit::Success).is_some())
+}
+
 fn clear_owned_entities(world: &mut World, owner: &ScriptAttachment) {
     let mut query = world.query::<(Entity, &ScriptOwnedBy)>();
     let entities = query
@@ -291,6 +297,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("scene_clear", scene_clear)
             .register("scene_transform", scene_transform)
             .register("game_state_set", game_state_set)
+            .register("app_request_exit", app_request_exit)
             .register("input_key_pressed", input_key_pressed)
             .register("input_key_just_pressed", input_key_just_pressed)
             .register("input_key_just_released", input_key_just_released)
@@ -314,7 +321,10 @@ mod tests {
     use bevy::app::{App, TaskPoolPlugin};
     use bevy::asset::Handle;
     use bevy::asset::{AssetApp, AssetPlugin};
+    use bevy::ecs::message::Messages;
     use bevy::image::Image;
+    use bevy::input::touch::{TouchInput, TouchPhase, touch_screen_input_system};
+    use bevy::window::{PrimaryWindow, WindowResolution};
     use bevy_mod_scripting::{
         asset::{Language, ScriptAsset},
         bindings::{
@@ -369,16 +379,79 @@ mod tests {
         Ok(())
     }
 
-    fn assert_loaded_scene(world: &mut World) {
+    #[test]
+    fn app_exit_api_writes_the_portable_bevy_exit_message() -> Result<(), InteropError> {
+        let mut world = World::new();
+        world.init_resource::<AppScriptFunctionRegistry>();
+        world.init_resource::<bevy::ecs::reflect::AppTypeRegistry>();
+        world.init_resource::<bevy::ecs::message::Messages<AppExit>>();
+        let cache = WorldGuard::setup_cache(&world, CurrentScriptAttachment::default());
+
+        WorldGuard::with_static_guard(&mut world, cache, |_guard| {
+            assert!(app_request_exit(FunctionCallContext::new(
+                Language::Unknown
+            ))?);
+            Ok::<(), InteropError>(())
+        })?;
+
+        let exits = world
+            .resource_mut::<bevy::ecs::message::Messages<AppExit>>()
+            .drain()
+            .collect::<Vec<_>>();
+        assert_eq!(exits, vec![AppExit::Success]);
+        Ok(())
+    }
+
+    fn install_settings_touch(world: &mut World) -> Result<(), InteropError> {
+        world.init_resource::<Messages<TouchInput>>();
+        world.init_resource::<Touches>();
+        let window = world
+            .spawn((
+                Window {
+                    resolution: WindowResolution::new(200, 400),
+                    ..default()
+                },
+                PrimaryWindow,
+            ))
+            .id();
+        world.write_message(TouchInput {
+            phase: TouchPhase::Started,
+            position: Vec2::new(190.0, 20.0),
+            window,
+            force: None,
+            id: 1,
+        });
+        world
+            .run_system_cached(touch_screen_input_system)
+            .map_err(|error| InteropError::string(error.to_string()))?;
+        Ok(())
+    }
+
+    fn assert_loaded_settings_scene(world: &mut World) {
         let mut query = world.query::<(&ScriptEntityId, &Transform)>();
         let ids = query
             .iter(world)
             .map(|(id, _)| id.0.as_str())
             .collect::<std::collections::BTreeSet<_>>();
-        assert_eq!(ids, ["background", "hud", "player"].into_iter().collect());
-        assert_eq!(world.query::<&Sprite>().iter(world).count(), 2);
-        assert_eq!(world.query::<&Text2d>().iter(world).count(), 1);
+        assert_eq!(
+            ids,
+            [
+                "background",
+                "hud",
+                "player",
+                "settings_exit",
+                "settings_icon",
+                "settings_panel",
+                "settings_restart",
+                "settings_title",
+            ]
+            .into_iter()
+            .collect()
+        );
+        assert_eq!(world.query::<&Sprite>().iter(world).count(), 4);
+        assert_eq!(world.query::<&Text2d>().iter(world).count(), 4);
         assert_eq!(world.resource::<ScriptGameState>().lives, 3);
+        assert_eq!(world.resource::<ScriptGameState>().message, "PAUSED");
     }
 
     #[cfg(any(feature = "js", feature = "typescript"))]
@@ -399,6 +472,7 @@ mod tests {
         ))
         .init_asset::<Image>();
         app.finish();
+        install_settings_touch(app.world_mut())?;
         let world_id = app.world().id();
         let attachment = ScriptAttachment::StaticScript(Handle::default());
         let cache = WorldGuard::setup_cache(
@@ -429,7 +503,7 @@ mod tests {
             )?;
             Ok::<(), InteropError>(())
         })?;
-        assert_loaded_scene(app.world_mut());
+        assert_loaded_settings_scene(app.world_mut());
         Ok(())
     }
 
@@ -449,6 +523,7 @@ mod tests {
         ))
         .init_asset::<Image>();
         app.finish();
+        install_settings_touch(app.world_mut())?;
         let world_id = app.world().id();
         let attachment = ScriptAttachment::StaticScript(Handle::default());
         let cache = WorldGuard::setup_cache(
@@ -477,7 +552,7 @@ mod tests {
             )?;
             Ok::<(), InteropError>(())
         })?;
-        assert_loaded_scene(app.world_mut());
+        assert_loaded_settings_scene(app.world_mut());
         Ok(())
     }
 }

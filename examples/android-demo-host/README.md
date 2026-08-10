@@ -15,9 +15,10 @@ just build-runtime-android
 just build-android-demo
 ```
 
-`just build-android-demo` installs the Debug APK and launches `MainActivity` on the connected device.
-When multiple devices are connected, set `ANDROID_SERIAL` to select one. The Release variant is not
-signed, so `just build-android-demo --release` only assembles the Release APK.
+`just build-android-demo` installs the Debug APK, launches `MainActivity`, and streams `logcat`
+filtered to the application process. Press `Ctrl-C` to stop the log stream. When multiple devices
+are connected, set `ANDROID_SERIAL` to select one. The Release variant is not signed, so
+`just build-android-demo --release` only assembles the Release APK.
 
 Both runtime and APK recipes default to debug. For release, run `just build-runtime-android --release`
 once before `just build-android-demo --release`. The APK build checks that every selected ABI exists
