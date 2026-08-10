@@ -97,14 +97,19 @@ pub unsafe extern "C" fn game_runtime_run_with_assets(
 
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_io_github_super1windcloud_runeweave_demo_RuntimeActivity_nativeSwitchScript(
-    mut env: jni::JNIEnv<'_>,
-    _activity: jni::objects::JObject<'_>,
-    script_path: jni::objects::JString<'_>,
+pub extern "system" fn Java_io_github_super1windcloud_runeweave_demo_RuntimeActivity_nativeSwitchScript<
+    'local,
+>(
+    mut unowned_env: jni::EnvUnowned<'local>,
+    _activity: jni::objects::JObject<'local>,
+    script_path: jni::objects::JString<'local>,
 ) -> jni::sys::jint {
-    let path = match env.get_string(&script_path) {
-        Ok(path) => path.to_string_lossy().into_owned(),
-        Err(_) => return 1,
+    let path = match unowned_env
+        .with_env(|env| script_path.try_to_string(env))
+        .into_outcome()
+    {
+        jni::Outcome::Ok(path) => path,
+        jni::Outcome::Err(_) | jni::Outcome::Panic(_) => return 1,
     };
     let path = match CString::new(path) {
         Ok(path) => path,
