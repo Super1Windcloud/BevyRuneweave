@@ -7,6 +7,7 @@
 static NSString *const HostErrorDomain = @"io.github.super1windcloud.runeweave.host";
 static NSString *const BootstrapScriptName = @"host-bootstrap.js";
 static NSString *const InstalledMarkerName = @".installed-package";
+static NSString *const HostDarkModeDefaultsKey = @"host.darkMode";
 static const NSUInteger MaxArchiveBytes = 64 * 1024 * 1024;
 static const NSUInteger MaxUnpackedBytes = 256 * 1024 * 1024;
 static const NSUInteger MaxArchiveEntries = 10000;
@@ -383,8 +384,12 @@ static BOOL installBundledAssetsIfNeeded(NSString *installed, NSError **error) {
 
 static UIWindow *HostLauncherWindow;
 
-static UIColor *hostColor(CGFloat red, CGFloat green, CGFloat blue) {
-    return [UIColor colorWithRed:red / 255.0 green:green / 255.0 blue:blue / 255.0 alpha:1.0];
+static void applyHostInterfaceStyle(void) {
+    if (@available(iOS 13.0, *)) {
+        BOOL dark = [NSUserDefaults.standardUserDefaults boolForKey:HostDarkModeDefaultsKey];
+        HostLauncherWindow.overrideUserInterfaceStyle =
+            dark ? UIUserInterfaceStyleDark : UIUserInterfaceStyleLight;
+    }
 }
 
 static UIWindow *bevyWindow(void) {
@@ -404,6 +409,67 @@ static UIWindow *bevyWindow(void) {
     }
     return nil;
 }
+
+@interface HostSettingsViewController : UITableViewController
+@end
+
+@implementation HostSettingsViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.title = @"Settings";
+    self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor;
+    UILabel *title = [[UILabel alloc] initWithFrame:
+        CGRectMake(24, 0, UIScreen.mainScreen.bounds.size.width - 48, 72)];
+    title.text = @"Settings";
+    title.font = [UIFont systemFontOfSize:28 weight:UIFontWeightSemibold];
+    title.textColor = UIColor.labelColor;
+    self.tableView.tableHeaderView = title;
+}
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+    (void)tableView;
+    return 1;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    (void)tableView;
+    (void)section;
+    return 1;
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+    (void)tableView;
+    (void)section;
+    return @"Appearance";
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView
+         cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    (void)indexPath;
+    static NSString *const identifier = @"DarkModeCell";
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:identifier];
+    if (cell == nil) {
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault
+                                      reuseIdentifier:identifier];
+        UISwitch *toggle = [[UISwitch alloc] init];
+        [toggle addTarget:self action:@selector(darkModeChanged:)
+         forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = toggle;
+    }
+    cell.textLabel.text = @"Dark mode";
+    ((UISwitch *)cell.accessoryView).on =
+        [NSUserDefaults.standardUserDefaults boolForKey:HostDarkModeDefaultsKey];
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    return cell;
+}
+
+- (void)darkModeChanged:(UISwitch *)sender {
+    [NSUserDefaults.standardUserDefaults setBool:sender.isOn forKey:HostDarkModeDefaultsKey];
+    applyHostInterfaceStyle();
+}
+
+@end
 
 @interface HostLauncherViewController : UIViewController <UITextFieldDelegate>
 
@@ -443,10 +509,8 @@ static UIWindow *bevyWindow(void) {
     UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
     [button setTitle:title forState:UIControlStateNormal];
     button.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
-    button.backgroundColor = UIColor.whiteColor;
+    button.backgroundColor = UIColor.secondarySystemBackgroundColor;
     button.layer.cornerRadius = 6;
-    button.layer.borderWidth = 1;
-    button.layer.borderColor = hostColor(211, 216, 221).CGColor;
     [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
     [button.heightAnchor constraintEqualToConstant:50].active = YES;
     return button;
@@ -454,7 +518,7 @@ static UIWindow *bevyWindow(void) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = hostColor(244, 245, 247);
+    self.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
 
     UIScrollView *scroll = [[UIScrollView alloc] init];
     scroll.translatesAutoresizingMaskIntoConstraints = NO;
@@ -466,15 +530,15 @@ static UIWindow *bevyWindow(void) {
     content.spacing = 10;
     [scroll addSubview:content];
 
-    UILabel *title = [self labelWithText:@"Bevy RuneWeave" size:28 color:hostColor(28, 32, 36)];
+    UILabel *title = [self labelWithText:@"Bevy RuneWeave" size:28 color:UIColor.labelColor];
     title.font = [UIFont systemFontOfSize:28 weight:UIFontWeightSemibold];
     [content addArrangedSubview:title];
 
-    UILabel *subtitle = [self labelWithText:@"iOS host" size:15 color:hostColor(83, 90, 98)];
+    UILabel *subtitle = [self labelWithText:@"iOS host" size:15 color:UIColor.secondaryLabelColor];
     [content addArrangedSubview:subtitle];
     [content setCustomSpacing:28 afterView:subtitle];
 
-    UILabel *section = [self labelWithText:@"GitHub release assets" size:16 color:hostColor(28, 32, 36)];
+    UILabel *section = [self labelWithText:@"GitHub release assets" size:16 color:UIColor.labelColor];
     section.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
     [content addArrangedSubview:section];
 
@@ -495,10 +559,9 @@ static UIWindow *bevyWindow(void) {
     self.urlField.autocorrectionType = UITextAutocorrectionTypeNo;
     self.urlField.returnKeyType = UIReturnKeyGo;
     self.urlField.clearButtonMode = UITextFieldViewModeWhileEditing;
-    self.urlField.backgroundColor = UIColor.whiteColor;
+    self.urlField.backgroundColor = UIColor.secondarySystemBackgroundColor;
+    self.urlField.textColor = UIColor.labelColor;
     self.urlField.layer.cornerRadius = 6;
-    self.urlField.layer.borderWidth = 1;
-    self.urlField.layer.borderColor = hostColor(211, 216, 221).CGColor;
     self.urlField.delegate = self;
     UIView *leftPadding = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 12, 1)];
     self.urlField.leftView = leftPadding;
@@ -507,7 +570,7 @@ static UIWindow *bevyWindow(void) {
     [content addArrangedSubview:self.urlField];
 
     self.downloadButton = [self buttonWithTitle:@"Download and start" action:@selector(downloadCustom)];
-    self.downloadButton.backgroundColor = hostColor(35, 105, 194);
+    self.downloadButton.backgroundColor = UIColor.systemBlueColor;
     [self.downloadButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     self.downloadButton.layer.borderWidth = 0;
     [content addArrangedSubview:self.downloadButton];
@@ -520,7 +583,7 @@ static UIWindow *bevyWindow(void) {
     [self.spinner.heightAnchor constraintEqualToConstant:42].active = YES;
     [content addArrangedSubview:self.spinner];
 
-    self.statusLabel = [self labelWithText:@"" size:14 color:hostColor(73, 80, 87)];
+    self.statusLabel = [self labelWithText:@"" size:14 color:UIColor.secondaryLabelColor];
     self.statusLabel.textAlignment = NSTextAlignmentCenter;
     [content addArrangedSubview:self.statusLabel];
 
@@ -651,13 +714,22 @@ static void presentHostLauncher(NSString *installed, NSUInteger attempts) {
         }
         HostLauncherViewController *controller =
             [[HostLauncherViewController alloc] initWithInstalledPath:installed];
+        controller.tabBarItem = [[UITabBarItem alloc]
+            initWithTitle:@"Home" image:[UIImage systemImageNamed:@"house"] tag:0];
+        HostSettingsViewController *settings = [[HostSettingsViewController alloc]
+            initWithStyle:UITableViewStyleInsetGrouped];
+        settings.tabBarItem = [[UITabBarItem alloc]
+            initWithTitle:@"Settings" image:[UIImage systemImageNamed:@"gearshape"] tag:1];
+        UITabBarController *tabs = [[UITabBarController alloc] init];
+        tabs.viewControllers = @[controller, settings];
         if (@available(iOS 13.0, *)) {
             HostLauncherWindow = [[UIWindow alloc] initWithWindowScene:runtimeWindow.windowScene];
         } else {
             HostLauncherWindow = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
         }
-        HostLauncherWindow.rootViewController = controller;
+        HostLauncherWindow.rootViewController = tabs;
         HostLauncherWindow.windowLevel = UIWindowLevelAlert + 1;
+        applyHostInterfaceStyle();
         [HostLauncherWindow makeKeyAndVisible];
     });
 }

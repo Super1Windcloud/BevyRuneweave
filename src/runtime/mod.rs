@@ -9,6 +9,11 @@ use std::{
     },
 };
 
+#[cfg(target_os = "android")]
+use bevy::asset::{
+    AssetApp,
+    io::{AssetSourceBuilder, AssetSourceId, file::FileAssetReader},
+};
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use bevy::window::PrimaryWindow;
 #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
@@ -310,6 +315,17 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
 
     let mut app = App::new();
     let scripting_plugins = runtime_scripting_plugins();
+
+    #[cfg(target_os = "android")]
+    {
+        let file_asset_root = asset_root.clone();
+        app.register_asset_source(
+            AssetSourceId::Default,
+            AssetSourceBuilder::new(move || {
+                Box::new(FileAssetReader::new(file_asset_root.clone()))
+            }),
+        );
+    }
 
     app.add_plugins(
         DefaultPlugins
