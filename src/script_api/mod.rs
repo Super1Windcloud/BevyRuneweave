@@ -13,7 +13,9 @@ use bevy_mod_scripting::{
     script::ScriptAttachment,
 };
 
-use input::{input_key_just_pressed, input_key_just_released, input_key_pressed};
+use input::{
+    input_key_just_pressed, input_key_just_released, input_key_pressed, input_primary_touch,
+};
 use network::ScriptNetwork;
 
 const MAX_ENTITY_ID_LENGTH: usize = 128;
@@ -292,6 +294,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("input_key_pressed", input_key_pressed)
             .register("input_key_just_pressed", input_key_just_pressed)
             .register("input_key_just_released", input_key_just_released)
+            .register("input_primary_touch", input_primary_touch)
             .register("http_get", {
                 let network = network.clone();
                 move |url: String| network.get(url)
@@ -314,7 +317,10 @@ mod tests {
     use bevy::image::Image;
     use bevy_mod_scripting::{
         asset::{Language, ScriptAsset},
-        bindings::{AppScriptFunctionRegistry, CoreScriptGlobalsPlugin, CurrentScriptAttachment},
+        bindings::{
+            AppScriptFunctionRegistry, CoreScriptGlobalsPlugin, CurrentScriptAttachment,
+            ScriptValue,
+        },
         core::{BMSScriptingInfrastructurePlugin, event::CallbackLabel},
     };
 
@@ -414,6 +420,13 @@ mod tests {
                 &mut context,
                 world_id,
             )?;
+            quickjs_handler(
+                vec![ScriptValue::Float(1.0 / 60.0)],
+                &attachment,
+                &CallbackLabel::from("on_update"),
+                &mut context,
+                world_id,
+            )?;
             Ok::<(), InteropError>(())
         })?;
         assert_loaded_scene(app.world_mut());
@@ -452,6 +465,13 @@ mod tests {
                 Vec::new(),
                 &attachment,
                 &CallbackLabel::from("on_script_loaded"),
+                &mut context,
+                world_id,
+            )?;
+            lua_handler(
+                vec![ScriptValue::Float(1.0 / 60.0)],
+                &attachment,
+                &CallbackLabel::from("on_update"),
                 &mut context,
                 world_id,
             )?;

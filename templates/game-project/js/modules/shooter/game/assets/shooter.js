@@ -1,4 +1,6 @@
 const PLAYER_SPEED = 530;
+const TOUCH_WIDTH = 600;
+const TOUCH_HEIGHT = 800;
 const BULLET_SPEED = 770;
 const ENEMY_SPEED = 145;
 const FIRE_DELAY = 0.18;
@@ -118,8 +120,14 @@ function playerMovementSystem(frame) {
   for (const id of world.players) {
     const transform = world.transforms.get(id);
     if (!transform || !isActive(id)) continue;
-    transform.x = Math.max(-260, Math.min(260, transform.x + frame.inputX * PLAYER_SPEED * frame.dt));
-    transform.y = Math.max(-335, Math.min(300, transform.y + frame.inputY * PLAYER_SPEED * frame.dt));
+    const movementX = frame.touch.pressed
+      ? frame.touch.deltaX * TOUCH_WIDTH
+      : frame.inputX * PLAYER_SPEED * frame.dt;
+    const movementY = frame.touch.pressed
+      ? frame.touch.deltaY * TOUCH_HEIGHT
+      : frame.inputY * PLAYER_SPEED * frame.dt;
+    transform.x = Math.max(-260, Math.min(260, transform.x + movementX));
+    transform.y = Math.max(-335, Math.min(300, transform.y + movementY));
   }
 }
 
@@ -247,24 +255,25 @@ function resetGame() {
   resources = createResources();
   spawnScene();
   spawnPlayer();
-  updateGameState("ARROWS/WASD - AUTO FIRE");
+  updateGameState("DRAG OR ARROWS/WASD - AUTO FIRE");
 }
 
 globalThis.on_script_loaded = resetGame;
 globalThis.on_script_reloaded = resetGame;
 globalThis.on_update = function (dt) {
+  const touch = input_primary_touch();
   const inputX = Number(input_key_pressed("ArrowRight") || input_key_pressed("KeyD"))
     - Number(input_key_pressed("ArrowLeft") || input_key_pressed("KeyA"));
   const inputY = Number(input_key_pressed("ArrowUp") || input_key_pressed("KeyW"))
     - Number(input_key_pressed("ArrowDown") || input_key_pressed("KeyS"));
-  const restartPressed = input_key_pressed("Space");
+  const restartPressed = input_key_pressed("Space") || touch.justPressed;
   if (!resources.started) {
     if (restartPressed && !resources.restartWasPressed) {
       resources.started = true;
-      updateGameState("ARROWS/WASD - AUTO FIRE");
+      updateGameState("DRAG OR ARROWS/WASD - AUTO FIRE");
     } else {
       resources.restartWasPressed = restartPressed;
-      updateGameState("PRESS SPACE TO START");
+      updateGameState("TOUCH OR PRESS SPACE TO START");
       return;
     }
   }
@@ -274,7 +283,7 @@ globalThis.on_update = function (dt) {
     return;
   }
 
-  const frame = { dt, inputX, inputY };
+  const frame = { dt, inputX, inputY, touch };
   for (const system of updateSchedule) system(frame);
   flushEntityCommands();
   gameStateSystem();

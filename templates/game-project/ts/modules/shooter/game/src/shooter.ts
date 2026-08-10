@@ -7,7 +7,7 @@ import {
   setTransform,
   spawnSceneEntity,
 } from "../../api/scene.js";
-import { keyPressed } from "../../api/input.js";
+import { keyPressed, primaryTouch, type PrimaryTouch } from "../../api/input.js";
 
 type EntityId = string;
 type Role = "player" | "bullet" | "enemy";
@@ -64,11 +64,14 @@ interface FrameContext {
   dt: number;
   inputX: number;
   inputY: number;
+  touch: PrimaryTouch;
 }
 
 type GameSystem = (frame: FrameContext) => void;
 
 const PLAYER_SPEED = 330;
+const TOUCH_WIDTH = 600;
+const TOUCH_HEIGHT = 800;
 const BULLET_SPEED = 570;
 const ENEMY_SPEED = 145;
 const FIRE_DELAY = 0.18;
@@ -188,8 +191,14 @@ function playerMovementSystem(frame: FrameContext): void {
   for (const id of world.players) {
     const transform = world.transforms.get(id);
     if (!transform || !isActive(id)) continue;
-    transform.x = Math.max(-260, Math.min(260, transform.x + frame.inputX * PLAYER_SPEED * frame.dt));
-    transform.y = Math.max(-335, Math.min(300, transform.y + frame.inputY * PLAYER_SPEED * frame.dt));
+    const movementX = frame.touch.pressed
+      ? frame.touch.deltaX * TOUCH_WIDTH
+      : frame.inputX * PLAYER_SPEED * frame.dt;
+    const movementY = frame.touch.pressed
+      ? frame.touch.deltaY * TOUCH_HEIGHT
+      : frame.inputY * PLAYER_SPEED * frame.dt;
+    transform.x = Math.max(-260, Math.min(260, transform.x + movementX));
+    transform.y = Math.max(-335, Math.min(300, transform.y + movementY));
   }
 }
 
@@ -322,7 +331,7 @@ function resetGame(): void {
   resources = createResources();
   spawnScene();
   spawnPlayer();
-  updateGameState("ARROWS/WASD - AUTO FIRE");
+  updateGameState("DRAG OR ARROWS/WASD - AUTO FIRE");
 }
 
 const callbacks = globalThis as typeof globalThis & RuneweaveCallbacks;
@@ -336,18 +345,19 @@ callbacks.on_script_reloaded = function (): void {
 };
 
 callbacks.on_update = function (dt: number): void {
+  const touch = primaryTouch();
   const inputX = Number(keyPressed("ArrowRight") || keyPressed("KeyD"))
     - Number(keyPressed("ArrowLeft") || keyPressed("KeyA"));
   const inputY = Number(keyPressed("ArrowUp") || keyPressed("KeyW"))
     - Number(keyPressed("ArrowDown") || keyPressed("KeyS"));
-  const restartPressed = keyPressed("Space");
+  const restartPressed = keyPressed("Space") || touch.justPressed;
   if (!resources.started) {
     if (restartPressed && !resources.restartWasPressed) {
       resources.started = true;
-      updateGameState("ARROWS/WASD - AUTO FIRE");
+      updateGameState("DRAG OR ARROWS/WASD - AUTO FIRE");
     } else {
       resources.restartWasPressed = restartPressed;
-      updateGameState("PRESS SPACE TO START");
+      updateGameState("TOUCH OR PRESS SPACE TO START");
       return;
     }
   }
@@ -357,7 +367,7 @@ callbacks.on_update = function (dt: number): void {
     return;
   }
 
-  const frame = { dt, inputX, inputY };
+  const frame = { dt, inputX, inputY, touch };
   for (const system of updateSchedule) system(frame);
   flushEntityCommands();
   gameStateSystem();

@@ -1,4 +1,6 @@
 local PLAYER_SPEED = 330
+local TOUCH_WIDTH = 600
+local TOUCH_HEIGHT = 800
 local BULLET_SPEED = 570
 local ENEMY_SPEED = 145
 local FIRE_DELAY = 0.18
@@ -122,8 +124,12 @@ local function player_movement_system(frame)
     for id in pairs(world.players) do
         local transform = world.transforms[id]
         if transform and is_active(id) then
-            transform.x = math.max(-260, math.min(260, transform.x + frame.input_x * PLAYER_SPEED * frame.dt))
-            transform.y = math.max(-335, math.min(300, transform.y + frame.input_y * PLAYER_SPEED * frame.dt))
+            local movement_x = frame.touch.pressed and frame.touch.deltaX * TOUCH_WIDTH
+                or frame.input_x * PLAYER_SPEED * frame.dt
+            local movement_y = frame.touch.pressed and frame.touch.deltaY * TOUCH_HEIGHT
+                or frame.input_y * PLAYER_SPEED * frame.dt
+            transform.x = math.max(-260, math.min(260, transform.x + movement_x))
+            transform.y = math.max(-335, math.min(300, transform.y + movement_y))
         end
     end
 end
@@ -265,7 +271,7 @@ local function reset_game()
     resources = create_resources()
     spawn_scene()
     spawn_player()
-    update_game_state("ARROWS/WASD - AUTO FIRE")
+    update_game_state("DRAG OR ARROWS/WASD - AUTO FIRE")
 end
 
 function on_script_loaded()
@@ -277,18 +283,19 @@ function on_script_reloaded()
 end
 
 function on_update(dt)
+    local touch = input_primary_touch()
     local input_x = (input_key_pressed("ArrowRight") or input_key_pressed("KeyD")) and 1 or 0
     input_x = input_x - ((input_key_pressed("ArrowLeft") or input_key_pressed("KeyA")) and 1 or 0)
     local input_y = (input_key_pressed("ArrowUp") or input_key_pressed("KeyW")) and 1 or 0
     input_y = input_y - ((input_key_pressed("ArrowDown") or input_key_pressed("KeyS")) and 1 or 0)
-    local restart_pressed = input_key_pressed("Space")
+    local restart_pressed = input_key_pressed("Space") or touch.justPressed
     if not resources.started then
         if restart_pressed and not resources.restart_was_pressed then
             resources.started = true
-            update_game_state("ARROWS/WASD - AUTO FIRE")
+            update_game_state("DRAG OR ARROWS/WASD - AUTO FIRE")
         else
             resources.restart_was_pressed = restart_pressed
-            update_game_state("PRESS SPACE TO START")
+            update_game_state("TOUCH OR PRESS SPACE TO START")
             return
         end
     end
@@ -298,7 +305,7 @@ function on_update(dt)
         return
     end
 
-    local frame = { dt = dt, input_x = input_x, input_y = input_y }
+    local frame = { dt = dt, input_x = input_x, input_y = input_y, touch = touch }
     for _, system in ipairs(update_schedule) do system(frame) end
     flush_entity_commands()
     game_state_system()

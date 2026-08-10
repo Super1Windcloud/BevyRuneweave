@@ -24,6 +24,16 @@ declare function game_state_set(score: number, lives: number, message: string): 
 declare function input_key_pressed(key: string): boolean;
 declare function input_key_just_pressed(key: string): boolean;
 declare function input_key_just_released(key: string): boolean;
+declare function input_primary_touch(): RuneweaveTouchState;
+
+interface RuneweaveTouchState {
+  pressed: boolean;
+  justPressed: boolean;
+  x: number;
+  y: number;
+  deltaX: number;
+  deltaY: number;
+}
 declare function http_get(url: string): number;
 declare function http_post(url: string, body: string, contentType: string): number;
 declare function http_poll(id: number): HttpPollResult;

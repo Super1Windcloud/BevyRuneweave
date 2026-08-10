@@ -31,8 +31,8 @@ Script Squadron 的三个可执行示例分别为 `script-squadron-lua`、`scrip
 `script-squadron-typescript`。
 
 Runeweave 核心提供三种语言一致的 Entity、Component、Resource 与 Query API；
-飞机大战宿主只提供窗口、原始键盘状态以及通用精灵/文本物化。按键映射、资源路径、
-尺寸、层级、HUD 内容和具体玩法均分别由 Lua、JavaScript 和 TypeScript 实现。
+飞机大战 runtime 提供窗口、实时键盘和归一化触控输入，场景 API 直接写入 Bevy
+精灵/文本组件。输入行为、资源路径、尺寸、层级、HUD 内容和具体玩法均由脚本实现。
 
 ## 项目结构
 

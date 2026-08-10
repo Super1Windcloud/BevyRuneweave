@@ -24,7 +24,12 @@ removes only the entities owned by that attachment.
 
 Keyboard functions are `input_key_pressed`, `input_key_just_pressed`, and
 `input_key_just_released`; each reads Bevy's live `ButtonInput<KeyCode>` resource through
-`WorldGuard`. HTTP functions are `http_get`, `http_post`, and `http_poll`. These are also registered
-once through BMS; the Lua and QuickJS runtimes contain no Runeweave-specific service bindings.
+`WorldGuard`. `input_primary_touch()` reads the lowest-ID active touch from Bevy's live `Touches`
+resource and returns `pressed`, `justPressed`, `x`, `y`, `deltaX`, and `deltaY`. Positions and deltas
+are normalized against the primary window; X runs left-to-right and Y runs bottom-to-top. On systems
+without an active touch it returns the same object with `pressed: false` and zero coordinates.
+
+HTTP functions are `http_get`, `http_post`, and `http_poll`. These services are also registered once
+through BMS; the Lua and QuickJS runtimes contain no Runeweave-specific service bindings.
 
 TypeScript declarations and ergonomic wrappers live in `projects/ts/modules/shooter/api`.
