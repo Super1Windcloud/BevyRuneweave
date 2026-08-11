@@ -726,6 +726,19 @@ mod tests {
                 &mut context,
                 world_id,
             )?;
+            #[cfg(feature = "typescript")]
+            {
+                let size = FunctionCallContext::new(Language::Unknown)
+                    .world()?
+                    .with_world(|world| {
+                        world.iter_entities().find_map(|entity| {
+                            entity.get::<PrimaryWindow>()?;
+                            let window = entity.get::<Window>()?;
+                            Some((window.width(), window.height()))
+                        })
+                    })?;
+                assert_eq!(size, Some((540.0, 960.0)));
+            }
             assert!(window_set_size(
                 FunctionCallContext::new(Language::Unknown),
                 200.0,

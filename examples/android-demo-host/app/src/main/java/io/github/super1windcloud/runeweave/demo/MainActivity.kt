@@ -5,10 +5,12 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -56,8 +58,10 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        configureEdgeToEdgeLayout()
         darkMode = getSharedPreferences(PREFERENCES, MODE_PRIVATE).getBoolean(DARK_MODE, false)
         setContentView(createContent())
+        applyBottomNavigationInsets()
         applyTheme()
         updateInstalledState()
     }
@@ -104,14 +108,60 @@ class MainActivity : Activity() {
             android.R.drawable.ic_menu_preferences,
             Page.SETTINGS,
         )
-        bottomNavigation.addView(homeNavigation, LinearLayout.LayoutParams(0, dp(72), 1f))
-        bottomNavigation.addView(settingsNavigation, LinearLayout.LayoutParams(0, dp(72), 1f))
+        bottomNavigation.addView(
+            homeNavigation,
+            LinearLayout.LayoutParams(0, dp(BOTTOM_NAVIGATION_HEIGHT_DP), 1f),
+        )
+        bottomNavigation.addView(
+            settingsNavigation,
+            LinearLayout.LayoutParams(0, dp(BOTTOM_NAVIGATION_HEIGHT_DP), 1f),
+        )
         rootView.addView(bottomNavigation, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            dp(72),
+            dp(BOTTOM_NAVIGATION_HEIGHT_DP),
         ))
         return rootView
     }
+
+    private fun applyBottomNavigationInsets() {
+        rootView.setOnApplyWindowInsetsListener { _, insets ->
+            val safeInsets = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val values = insets.getInsets(
+                    WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+                )
+                intArrayOf(values.left, values.top, values.right, values.bottom)
+            } else {
+                @Suppress("DEPRECATION")
+                intArrayOf(
+                    insets.systemWindowInsetLeft,
+                    insets.systemWindowInsetTop,
+                    insets.systemWindowInsetRight,
+                    insets.systemWindowInsetBottom,
+                )
+            }
+            rootView.setPadding(safeInsets[0], safeInsets[1], safeInsets[2], 0)
+            bottomNavigation.setPadding(0, 0, 0, safeInsets[3])
+            bottomNavigation.layoutParams = bottomNavigation.layoutParams.apply {
+                height = dp(BOTTOM_NAVIGATION_HEIGHT_DP) + safeInsets[3]
+            }
+            insets
+        }
+        rootView.requestApplyInsets()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun configureEdgeToEdgeLayout() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+        }
+        window.decorView.systemUiVisibility = edgeToEdgeSystemUiFlags()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun edgeToEdgeSystemUiFlags() =
+        View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
 
     private fun createHomeContent() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
@@ -250,7 +300,7 @@ class MainActivity : Activity() {
 
         window.statusBarColor = background
         window.navigationBarColor = surface
-        window.decorView.systemUiVisibility = if (darkMode) 0 else
+        window.decorView.systemUiVisibility = edgeToEdgeSystemUiFlags() or if (darkMode) 0 else
             View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         applyNavigationTheme()
     }
@@ -456,6 +506,7 @@ class MainActivity : Activity() {
         private const val MAX_UNPACKED_BYTES = 256L * 1024L * 1024L
         private const val PREFERENCES = "host_settings"
         private const val DARK_MODE = "dark_mode"
+        private const val BOTTOM_NAVIGATION_HEIGHT_DP = 72
     }
 
     private enum class Page { HOME, SETTINGS }

@@ -738,12 +738,24 @@ static void presentHostLauncher(NSString *installed, NSUInteger attempts) {
             initWithTitle:@"Settings" image:[UIImage systemImageNamed:@"gearshape"] tag:1];
         UITabBarController *tabs = [[UITabBarController alloc] init];
         tabs.viewControllers = @[controller, settings];
+        UIViewController *root = [[UIViewController alloc] init];
+        root.view.backgroundColor = UIColor.systemBackgroundColor;
+        [root addChildViewController:tabs];
+        tabs.view.translatesAutoresizingMaskIntoConstraints = NO;
+        [root.view addSubview:tabs.view];
+        [NSLayoutConstraint activateConstraints:@[
+            [tabs.view.topAnchor constraintEqualToAnchor:root.view.topAnchor],
+            [tabs.view.leadingAnchor constraintEqualToAnchor:root.view.leadingAnchor],
+            [tabs.view.trailingAnchor constraintEqualToAnchor:root.view.trailingAnchor],
+            [tabs.view.bottomAnchor constraintEqualToAnchor:root.view.safeAreaLayoutGuide.bottomAnchor],
+        ]];
+        [tabs didMoveToParentViewController:root];
         if (@available(iOS 13.0, *)) {
             HostLauncherWindow = [[UIWindow alloc] initWithWindowScene:runtimeWindow.windowScene];
         } else {
             HostLauncherWindow = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
         }
-        HostLauncherWindow.rootViewController = tabs;
+        HostLauncherWindow.rootViewController = root;
         HostLauncherWindow.windowLevel = UIWindowLevelAlert + 1;
         applyHostInterfaceStyle();
         [HostLauncherWindow makeKeyAndVisible];

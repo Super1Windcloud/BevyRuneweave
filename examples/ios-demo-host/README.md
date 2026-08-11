@@ -48,3 +48,6 @@ mobile surface geometry, so script calls to `window_set_size` return `false`; re
 uses the viewport dimensions returned by `input_primary_pointer()` instead. `window_safe_area()`
 converts UIKit's safe-area rectangle to those same world coordinates. Full-screen backgrounds may
 extend to every edge, while foreground text, sprites, and controls remain inside the safe region.
+
+The native launcher's tab container ends at the bottom safe-area boundary, keeping the complete
+Home and Settings navigation bar above the Home Indicator area.

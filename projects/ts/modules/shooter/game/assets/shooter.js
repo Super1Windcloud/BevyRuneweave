@@ -58,7 +58,9 @@
 
   // modules/shooter/game/src/shooter.ts
   var PLAYER_SPEED = 330;
-  var DESIGN_WIDTH = 600;
+  var DESKTOP_WINDOW_WIDTH = 540;
+  var DESKTOP_WINDOW_HEIGHT = 960;
+  var DESIGN_WIDTH = 450;
   var DESIGN_HEIGHT = 800;
   var BULLET_SPEED = 570;
   var ENEMY_SPEED = 145;
@@ -494,12 +496,14 @@ ${message}` : status,
   }
   var callbacks = globalThis;
   callbacks.on_script_loaded = function() {
-    setWindowSize(DESIGN_WIDTH, DESIGN_HEIGHT);
-    resetGame(false, DESIGN_WIDTH, windowSafeArea());
+    setWindowSize(DESKTOP_WINDOW_WIDTH, DESKTOP_WINDOW_HEIGHT);
+    const safeArea = windowSafeArea();
+    resetGame(false, safeArea.width, safeArea);
   };
   callbacks.on_script_reloaded = function() {
-    setWindowSize(DESIGN_WIDTH, DESIGN_HEIGHT);
-    resetGame(false, DESIGN_WIDTH, windowSafeArea());
+    setWindowSize(DESKTOP_WINDOW_WIDTH, DESKTOP_WINDOW_HEIGHT);
+    const safeArea = windowSafeArea();
+    resetGame(false, safeArea.width, safeArea);
   };
   callbacks.on_update = function(dt) {
     const pointer = primaryPointer();

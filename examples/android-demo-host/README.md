@@ -52,3 +52,7 @@ out through display cutouts where the Android version supports it. Script calls 
 reported by `input_primary_pointer()`. `window_safe_area()` exposes the activity's native content
 rectangle in the same world coordinates, allowing backgrounds to extend behind cutouts and system
 bars while foreground text, sprites, and controls stay within safe bounds.
+
+The native launcher's bottom navigation adds the current navigation-bar or display-cutout inset
+below its fixed-height controls, so neither gesture navigation nor three-button navigation covers
+the Home and Settings actions.

@@ -91,7 +91,9 @@ interface FrameContext {
 type GameSystem = (frame: FrameContext) => void;
 
 const PLAYER_SPEED = 330;
-const DESIGN_WIDTH = 600;
+const DESKTOP_WINDOW_WIDTH = 540;
+const DESKTOP_WINDOW_HEIGHT = 960;
+const DESIGN_WIDTH = 450;
 const DESIGN_HEIGHT = 800;
 const BULLET_SPEED = 570;
 const ENEMY_SPEED = 145;
@@ -586,13 +588,15 @@ function resetGame(
 const callbacks = globalThis as typeof globalThis & RuneweaveCallbacks;
 
 callbacks.on_script_loaded = function (): void {
-  setWindowSize(DESIGN_WIDTH, DESIGN_HEIGHT);
-  resetGame(false, DESIGN_WIDTH, windowSafeArea());
+  setWindowSize(DESKTOP_WINDOW_WIDTH, DESKTOP_WINDOW_HEIGHT);
+  const safeArea = windowSafeArea();
+  resetGame(false, safeArea.width, safeArea);
 };
 
 callbacks.on_script_reloaded = function (): void {
-  setWindowSize(DESIGN_WIDTH, DESIGN_HEIGHT);
-  resetGame(false, DESIGN_WIDTH, windowSafeArea());
+  setWindowSize(DESKTOP_WINDOW_WIDTH, DESKTOP_WINDOW_HEIGHT);
+  const safeArea = windowSafeArea();
+  resetGame(false, safeArea.width, safeArea);
 };
 
 callbacks.on_update = function (dt: number): void {
