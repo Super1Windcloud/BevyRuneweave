@@ -70,6 +70,15 @@ function crc32(data: Uint8Array) {
 async function prepareAssets(source: string, destination: string, language: "js" | "ts" | "lua") {
   cpSync(source, destination, { recursive: true });
   const script = join(destination, language === "lua" ? "shooter.lua" : "shooter.js");
+  if (language === "ts") {
+    await build({
+      entryPoints: [join(root, "projects", "ts", "modules", "shooter", "game", "src", "shooter.ts")],
+      outfile: script,
+      bundle: true,
+      format: "iife",
+      target: "es2023",
+    });
+  }
   if (!existsSync(script)) return;
   const sourceCode = readFileSync(script, "utf8");
   if (language === "lua") {
@@ -113,15 +122,6 @@ async function main() {
   mkdirSync(output, { recursive: true });
   const archives: string[] = [];
   const selectedProjects = projects.filter(([directory]) => language === "all" || directory === language || (language === "typescript" && directory === "ts"));
-  if (selectedProjects.some(([directory]) => directory === "ts")) {
-    await build({
-      entryPoints: [join(root, "projects", "ts", "modules", "shooter", "game", "src", "shooter.ts")],
-      outfile: join(root, "projects", "ts", "modules", "shooter", "game", "assets", "shooter.js"),
-      bundle: true,
-      format: "iife",
-      target: "es2023",
-    });
-  }
   for (const [directory, packageName] of selectedProjects) {
     const assets = join(root, "projects", directory, "modules", "shooter", "game", "assets");
     const archive = join(output, `${packageName}.zip`);
