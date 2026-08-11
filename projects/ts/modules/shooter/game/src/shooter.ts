@@ -11,8 +11,8 @@ import { requestExit } from "../../api/app.js";
 import {
   keyJustPressed,
   keyPressed,
-  primaryTouch,
-  type PrimaryTouch,
+  primaryPointer,
+  type PrimaryPointer,
 } from "../../api/input.js";
 
 type EntityId = string;
@@ -65,20 +65,26 @@ interface GameResources {
   restartWasPressed: boolean;
   started: boolean;
   settingsOpen: boolean;
+  pointerWasPressed: boolean;
+  pointerX: number;
+  pointerY: number;
+  playWidth: number;
 }
 
 interface FrameContext {
   dt: number;
   inputX: number;
   inputY: number;
-  touch: PrimaryTouch;
+  pointer: PrimaryPointer;
+  pointerDeltaX: number;
+  pointerDeltaY: number;
 }
 
 type GameSystem = (frame: FrameContext) => void;
 
 const PLAYER_SPEED = 330;
-const TOUCH_WIDTH = 600;
-const TOUCH_HEIGHT = 800;
+const DESIGN_WIDTH = 600;
+const DESIGN_HEIGHT = 800;
 const BULLET_SPEED = 570;
 const ENEMY_SPEED = 145;
 const FIRE_DELAY = 0.18;
@@ -122,6 +128,10 @@ function createResources(): GameResources {
     restartWasPressed: false,
     started: false,
     settingsOpen: false,
+    pointerWasPressed: false,
+    pointerX: 0,
+    pointerY: 0,
+    playWidth: DESIGN_WIDTH,
   };
 }
 
@@ -180,10 +190,11 @@ function spawnPlayer(): void {
 }
 
 function spawnEnemy(): void {
+  const horizontalLimit = Math.max(0, resources.playWidth * 0.5 - 50);
   spawnEntity(`enemy_${resources.nextId++}`, {
     role: "enemy",
     sprite: sprites.enemy,
-    transform: { x: -250 + random01() * 500, y: 350, z: 2 },
+    transform: { x: -horizontalLimit + random01() * horizontalLimit * 2, y: 350, z: 2 },
     velocity: { x: 0, y: -ENEMY_SPEED },
     collider: { x: 30, y: 30 },
   });
@@ -203,13 +214,14 @@ function playerMovementSystem(frame: FrameContext): void {
   for (const id of world.players) {
     const transform = world.transforms.get(id);
     if (!transform || !isActive(id)) continue;
-    const movementX = frame.touch.pressed
-      ? frame.touch.deltaX * TOUCH_WIDTH
+    const movementX = frame.pointer.pressed
+      ? frame.pointerDeltaX
       : frame.inputX * PLAYER_SPEED * frame.dt;
-    const movementY = frame.touch.pressed
-      ? frame.touch.deltaY * TOUCH_HEIGHT
+    const movementY = frame.pointer.pressed
+      ? frame.pointerDeltaY
       : frame.inputY * PLAYER_SPEED * frame.dt;
-    transform.x = Math.max(-260, Math.min(260, transform.x + movementX));
+    const horizontalLimit = Math.max(0, resources.playWidth * 0.5 - 40);
+    transform.x = Math.max(-horizontalLimit, Math.min(horizontalLimit, transform.x + movementX));
     transform.y = Math.max(-335, Math.min(300, transform.y + movementY));
   }
 }
@@ -303,12 +315,12 @@ function updateGameState(message: string): void {
   const status = `SCORE ${(`00000${resources.score}`).slice(-5)}    LIVES ${resources.lives}`;
   setText("hud", {
     value: message ? `${status}\n${message}` : status,
-    fontSize: 25,
+    fontSize: Math.max(18, Math.min(25, resources.playWidth / 18)),
     red: 0.82,
     green: 0.94,
     blue: 1.0,
     alpha: 1.0,
-    anchor: "top_center",
+    anchor: "top_left",
   });
 }
 
@@ -316,7 +328,7 @@ function gameStateSystem(): void {
   if (resources.lives <= 0) {
     resources.lives = 0;
     resources.gameOver = true;
-    updateGameState("GAME OVER - TOUCH OR PRESS SPACE");
+    updateGameState("CLICK / TOUCH / SPACE TO RESTART");
   } else {
     updateGameState("");
   }
@@ -326,8 +338,85 @@ function spawnScene(): void {
   spawnSceneEntity("background", { x: 0, y: 0, z: -10 });
   setSprite("background", sprites.background);
   spawnSceneEntity("hud", { x: 0, y: 382, z: 20 });
-  spawnSceneEntity(SETTINGS_ICON_ID, { x: 260, y: 350, z: 50 });
+  spawnSceneEntity(SETTINGS_ICON_ID, { x: 0, y: 350, z: 50 });
   setSprite(SETTINGS_ICON_ID, sprites.settingsIcon);
+  applyResponsiveLayout();
+}
+
+function responsiveLayout() {
+  const iconSize = Math.max(44, Math.min(64, resources.playWidth * 0.17));
+  const iconX = resources.playWidth * 0.5 - iconSize * 0.5 - 12;
+  const menuWidth = Math.max(1, Math.min(440, resources.playWidth - 24));
+  const menuScale = menuWidth / 440;
+  return {
+    iconSize,
+    iconX,
+    menuWidth,
+    menuHeight: 320 * menuScale,
+    menuScale,
+    buttonWidth: 356 * menuScale,
+    buttonHeight: 72 * menuScale,
+    restartY: 20 * menuScale,
+    exitY: -86 * menuScale,
+  };
+}
+
+function applyResponsiveLayout(): void {
+  const layout = responsiveLayout();
+  setTransform("hud", { x: -resources.playWidth * 0.5 + 12, y: 382, z: 20 });
+  setTransform(SETTINGS_ICON_ID, { x: layout.iconX, y: 350, z: 50 });
+  setSprite(SETTINGS_ICON_ID, {
+    path: sprites.settingsIcon.path,
+    width: layout.iconSize,
+    height: layout.iconSize,
+  });
+  if (!resources.settingsOpen) return;
+
+  setSprite("settings_panel", {
+    path: sprites.settingsPanel.path,
+    width: layout.menuWidth,
+    height: layout.menuHeight,
+  });
+  setTransform("settings_title", { x: 0, y: 125 * layout.menuScale, z: 41 });
+  setTransform("settings_restart", { x: 0, y: layout.restartY, z: 41 });
+  setTransform("settings_exit", { x: 0, y: layout.exitY, z: 41 });
+  const titleSize = Math.max(16, 28 * layout.menuScale);
+  const buttonSize = Math.max(15, 25 * layout.menuScale);
+  setText("settings_title", {
+    value: "SETTINGS",
+    fontSize: titleSize,
+    red: 0.91,
+    green: 0.97,
+    blue: 0.98,
+    alpha: 1,
+    anchor: "center",
+  });
+  setText("settings_restart", {
+    value: "RESTART",
+    fontSize: buttonSize,
+    red: 0.91,
+    green: 0.97,
+    blue: 0.98,
+    alpha: 1,
+    anchor: "center",
+  });
+  setText("settings_exit", {
+    value: "EXIT GAME",
+    fontSize: buttonSize,
+    red: 1,
+    green: 0.72,
+    blue: 0.74,
+    alpha: 1,
+    anchor: "center",
+  });
+}
+
+function syncResponsiveLayout(viewportWidth: number): void {
+  const nextWidth = Math.min(DESIGN_WIDTH, Math.max(1, viewportWidth));
+  if (Math.abs(resources.playWidth - nextWidth) < 0.5) return;
+  resources.playWidth = nextWidth;
+  applyResponsiveLayout();
+  if (resources.settingsOpen) updateGameState("PAUSED");
 }
 
 function setSettingsOpen(open: boolean): void {
@@ -340,61 +429,50 @@ function setSettingsOpen(open: boolean): void {
 
   spawnSceneEntity("settings_panel", { x: 0, y: 0, z: 40 });
   setSprite("settings_panel", sprites.settingsPanel);
-  spawnSceneEntity("settings_title", { x: 0, y: 125, z: 41 });
-  setText("settings_title", {
-    value: "SETTINGS",
-    fontSize: 28,
-    red: 0.91,
-    green: 0.97,
-    blue: 0.98,
-    alpha: 1,
-    anchor: "center",
-  });
-  spawnSceneEntity("settings_restart", { x: 0, y: 20, z: 41 });
-  setText("settings_restart", {
-    value: "RESTART",
-    fontSize: 25,
-    red: 0.91,
-    green: 0.97,
-    blue: 0.98,
-    alpha: 1,
-    anchor: "center",
-  });
-  spawnSceneEntity("settings_exit", { x: 0, y: -86, z: 41 });
-  setText("settings_exit", {
-    value: "EXIT GAME",
-    fontSize: 25,
-    red: 1,
-    green: 0.72,
-    blue: 0.74,
-    alpha: 1,
-    anchor: "center",
-  });
+  spawnSceneEntity("settings_title", { x: 0, y: 0, z: 41 });
+  spawnSceneEntity("settings_restart", { x: 0, y: 0, z: 41 });
+  spawnSceneEntity("settings_exit", { x: 0, y: 0, z: 41 });
+  applyResponsiveLayout();
   updateGameState("PAUSED");
 }
 
-function touchInside(
-  touch: PrimaryTouch,
-  left: number,
-  right: number,
-  bottom: number,
-  top: number,
+function pointerInside(
+  pointer: PrimaryPointer,
+  centerX: number,
+  centerY: number,
+  width: number,
+  height: number,
 ): boolean {
-  return touch.x >= left && touch.x <= right && touch.y >= bottom && touch.y <= top;
+  return Math.abs(pointer.x - centerX) <= width * 0.5
+    && Math.abs(pointer.y - centerY) <= height * 0.5;
 }
 
-function handleSettingsInput(touch: PrimaryTouch): boolean {
+function handleSettingsInput(pointer: PrimaryPointer): boolean {
+  const layout = responsiveLayout();
   const togglePressed = keyJustPressed("Escape")
-    || (touch.justPressed && touchInside(touch, 0.84, 1, 0.84, 1));
+    || (pointer.justPressed
+      && pointerInside(pointer, layout.iconX, 350, layout.iconSize, layout.iconSize));
   if (togglePressed) {
     setSettingsOpen(!resources.settingsOpen);
     return true;
   }
   if (!resources.settingsOpen) return false;
-  if (!touch.justPressed) return true;
-  if (touchInside(touch, 0.16, 0.84, 0.50, 0.62)) {
-    resetGame(true);
-  } else if (touchInside(touch, 0.16, 0.84, 0.34, 0.46)) {
+  if (!pointer.justPressed) return true;
+  if (pointerInside(
+    pointer,
+    0,
+    layout.restartY,
+    layout.buttonWidth,
+    layout.buttonHeight,
+  )) {
+    resetGame(true, pointer.viewportWidth);
+  } else if (pointerInside(
+    pointer,
+    0,
+    layout.exitY,
+    layout.buttonWidth,
+    layout.buttonHeight,
+  )) {
     requestExit();
   }
   return true;
@@ -409,14 +487,15 @@ const updateSchedule: GameSystem[] = [
   collisionSystem,
 ];
 
-function resetGame(started = false): void {
+function resetGame(started = false, viewportWidth = DESIGN_WIDTH): void {
   clearScene();
   world = createWorld();
   resources = createResources();
   resources.started = started;
+  resources.playWidth = Math.min(DESIGN_WIDTH, Math.max(1, viewportWidth));
   spawnScene();
   spawnPlayer();
-  updateGameState(started ? "DRAG OR ARROWS/WASD - AUTO FIRE" : "TOUCH OR PRESS SPACE TO START");
+  updateGameState(started ? "DRAG OR ARROWS/WASD - AUTO FIRE" : "CLICK / TOUCH / SPACE TO START");
 }
 
 const callbacks = globalThis as typeof globalThis & RuneweaveCallbacks;
@@ -430,30 +509,47 @@ callbacks.on_script_reloaded = function (): void {
 };
 
 callbacks.on_update = function (dt: number): void {
-  const touch = primaryTouch();
-  if (handleSettingsInput(touch)) return;
+  const pointer = primaryPointer();
+  syncResponsiveLayout(pointer.viewportWidth);
+  if (handleSettingsInput(pointer)) {
+    resources.pointerWasPressed = false;
+    return;
+  }
+  let pointerDeltaX = 0;
+  let pointerDeltaY = 0;
+  if (pointer.pressed && resources.pointerWasPressed) {
+    pointerDeltaX = pointer.x - resources.pointerX;
+    pointerDeltaY = pointer.y - resources.pointerY;
+  }
+  resources.pointerWasPressed = pointer.pressed;
+  if (pointer.pressed) {
+    resources.pointerX = pointer.x;
+    resources.pointerY = pointer.y;
+  }
   const inputX = Number(keyPressed("ArrowRight") || keyPressed("KeyD"))
     - Number(keyPressed("ArrowLeft") || keyPressed("KeyA"));
   const inputY = Number(keyPressed("ArrowUp") || keyPressed("KeyW"))
     - Number(keyPressed("ArrowDown") || keyPressed("KeyS"));
-  const restartPressed = keyPressed("Space") || touch.justPressed;
+  const pointerInPlayfield = Math.abs(pointer.x) <= resources.playWidth * 0.5
+    && Math.abs(pointer.y) <= DESIGN_HEIGHT * 0.5;
+  const restartPressed = keyPressed("Space") || (pointer.justPressed && pointerInPlayfield);
   if (!resources.started) {
     if (restartPressed && !resources.restartWasPressed) {
       resources.started = true;
       updateGameState("DRAG OR ARROWS/WASD - AUTO FIRE");
     } else {
       resources.restartWasPressed = restartPressed;
-      updateGameState("TOUCH OR PRESS SPACE TO START");
+      updateGameState("CLICK / TOUCH / SPACE TO START");
       return;
     }
   }
   if (resources.gameOver) {
-    if (restartPressed && !resources.restartWasPressed) resetGame(true);
+    if (restartPressed && !resources.restartWasPressed) resetGame(true, pointer.viewportWidth);
     resources.restartWasPressed = restartPressed;
     return;
   }
 
-  const frame = { dt, inputX, inputY, touch };
+  const frame = { dt, inputX, inputY, pointer, pointerDeltaX, pointerDeltaY };
   for (const system of updateSchedule) system(frame);
   flushEntityCommands();
   gameStateSystem();

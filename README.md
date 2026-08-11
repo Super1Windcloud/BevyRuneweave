@@ -31,9 +31,9 @@ TypeScript package is `@superwindcloud/bevy-runeweave`. The Script Squadron exec
 `script-squadron-lua`, `script-squadron-js`, and `script-squadron-typescript`.
 
 Runeweave exposes the same Entity, Component, Resource, and Query API to all three languages. The
-shooter runtime provides the window plus live keyboard and normalized touch input, while scene APIs
-write Bevy sprite/text components directly. Scripts select input behavior, asset paths, dimensions,
-render layers, and HUD content alongside the gameplay itself.
+shooter runtime provides a responsive virtual viewport plus live keyboard, mouse, and touch input,
+while scene APIs write Bevy sprite/text components directly. Scripts select input behavior, asset
+paths, dimensions, render layers, and HUD content alongside the gameplay itself.
 
 ## Project Layout
 
@@ -102,9 +102,9 @@ just run-js
 just run-ts
 ```
 
-Drag on Android or iOS, or move with the arrow keys or `WASD`; weapons fire automatically. Tap the
-top-right settings icon to pause, restart, or exit the game. Touch or Space starts and restarts a
-run. Scores continue increasing without a cap.
+Drag with a mouse or on Android/iOS, or move with the arrow keys or `WASD`; weapons fire
+automatically. Click or tap the top-right settings icon to pause, restart, or exit the game. A
+click, touch, or Space starts and restarts a run. Scores continue increasing without a cap.
 All three versions use equivalent parameters and random seeds for comparison.
 
 ## ECS Data Model

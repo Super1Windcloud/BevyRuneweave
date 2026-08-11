@@ -31,8 +31,8 @@ Script Squadron 的三个可执行示例分别为 `script-squadron-lua`、`scrip
 `script-squadron-typescript`。
 
 Runeweave 核心提供三种语言一致的 Entity、Component、Resource 与 Query API；
-飞机大战 runtime 提供窗口、实时键盘和归一化触控输入，场景 API 直接写入 Bevy
-精灵/文本组件。输入行为、资源路径、尺寸、层级、HUD 内容和具体玩法均由脚本实现。
+飞机大战 runtime 提供响应式虚拟视口以及实时键盘、鼠标和触控输入，场景 API 直接写入
+Bevy 精灵/文本组件。输入行为、资源路径、尺寸、层级、HUD 内容和具体玩法均由脚本实现。
 
 ## 项目结构
 
@@ -93,8 +93,8 @@ just run-js
 just run-ts
 ```
 
-操作方式：Android/iOS 上拖动飞机，桌面端使用方向键或 `WASD`，子弹会自动连续发射。
-点击右上角设置图标可暂停并选择重新开始或退出游戏；触摸屏幕或按空格可开始及重开。
+操作方式：Android/iOS 上触控拖动，PC 上鼠标拖动或使用方向键/`WASD`，子弹会自动发射。
+点击右上角设置图标可暂停并选择重新开始或退出游戏；鼠标点击、触摸或空格可开始及重开。
 击毁敌机获得的积分会持续累加，没有玩法上限。三个版本使用相同参数和随机种子，便于
 对比语言实现。
 

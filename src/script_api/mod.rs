@@ -14,7 +14,8 @@ use bevy_mod_scripting::{
 };
 
 use input::{
-    input_key_just_pressed, input_key_just_released, input_key_pressed, input_primary_touch,
+    input_key_just_pressed, input_key_just_released, input_key_pressed, input_primary_pointer,
+    input_primary_touch,
 };
 use network::ScriptNetwork;
 
@@ -302,6 +303,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("input_key_just_pressed", input_key_just_pressed)
             .register("input_key_just_released", input_key_just_released)
             .register("input_primary_touch", input_primary_touch)
+            .register("input_primary_pointer", input_primary_pointer)
             .register("http_get", {
                 let network = network.clone();
                 move |url: String| network.get(url)
@@ -323,7 +325,10 @@ mod tests {
     use bevy::asset::{AssetApp, AssetPlugin};
     use bevy::ecs::message::Messages;
     use bevy::image::Image;
-    use bevy::input::touch::{TouchInput, TouchPhase, touch_screen_input_system};
+    use bevy::input::{
+        mouse::MouseButton,
+        touch::{TouchInput, TouchPhase, touch_screen_input_system},
+    };
     use bevy::window::{PrimaryWindow, WindowResolution};
     use bevy_mod_scripting::{
         asset::{Language, ScriptAsset},
@@ -427,6 +432,18 @@ mod tests {
         Ok(())
     }
 
+    fn install_settings_mouse(world: &mut World) {
+        let mut window = Window {
+            resolution: WindowResolution::new(200, 400),
+            ..default()
+        };
+        window.set_cursor_position(Some(Vec2::new(190.0, 20.0)));
+        world.spawn((window, PrimaryWindow));
+        let mut buttons = ButtonInput::default();
+        buttons.press(MouseButton::Left);
+        world.insert_resource(buttons);
+    }
+
     fn assert_loaded_settings_scene(world: &mut World) {
         let mut query = world.query::<(&ScriptEntityId, &Transform)>();
         let ids = query
@@ -452,6 +469,26 @@ mod tests {
         assert_eq!(world.query::<&Text2d>().iter(world).count(), 4);
         assert_eq!(world.resource::<ScriptGameState>().lives, 3);
         assert_eq!(world.resource::<ScriptGameState>().message, "PAUSED");
+
+        let mut query = world.query::<(&ScriptEntityId, &Transform, Option<&Sprite>)>();
+        let (_, icon_transform, icon_sprite) = query
+            .iter(world)
+            .find(|(id, _, _)| id.0 == "settings_icon")
+            .expect("settings icon must exist");
+        assert_eq!(icon_transform.translation.x, 156.0);
+        assert_eq!(
+            icon_sprite.and_then(|sprite| sprite.custom_size),
+            Some(Vec2::splat(64.0))
+        );
+        let (_, _, panel_sprite) = query
+            .iter(world)
+            .find(|(id, _, _)| id.0 == "settings_panel")
+            .expect("settings panel must exist");
+        let panel_size = panel_sprite
+            .and_then(|sprite| sprite.custom_size)
+            .expect("settings panel must have a responsive size");
+        assert_eq!(panel_size.x, 376.0);
+        assert!((panel_size.y - 273.454_56).abs() < 0.001);
     }
 
     #[cfg(any(feature = "js", feature = "typescript"))]
@@ -472,7 +509,7 @@ mod tests {
         ))
         .init_asset::<Image>();
         app.finish();
-        install_settings_touch(app.world_mut())?;
+        install_settings_mouse(app.world_mut());
         let world_id = app.world().id();
         let attachment = ScriptAttachment::StaticScript(Handle::default());
         let cache = WorldGuard::setup_cache(

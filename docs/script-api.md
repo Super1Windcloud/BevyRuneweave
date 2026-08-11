@@ -30,9 +30,15 @@ resource and returns `pressed`, `justPressed`, `x`, `y`, `deltaX`, and `deltaY`.
 are normalized against the primary window; X runs left-to-right and Y runs bottom-to-top. On systems
 without an active touch it returns the same object with `pressed: false` and zero coordinates.
 
-The shooter uses the primary touch for drag movement and normalized hit testing. Its top-right
-settings icon pauses gameplay and opens `RESTART` and `EXIT GAME`; exit is routed through
-`app_request_exit()` on Windows, macOS, Linux, Android, and iOS.
+`input_primary_pointer()` is the cross-platform click and drag API used by gameplay. It prioritizes
+the lowest-ID active touch, then falls back to the primary mouse cursor and left button. It returns
+`pressed`, `justPressed`, `x`, `y`, `viewportWidth`, and `viewportHeight`. Position and viewport
+values use the same centered world-unit coordinate system as the responsive 2D camera, whose
+virtual height is fixed at 800 while its width follows the actual window aspect ratio.
+
+The shooter uses the primary pointer for mouse/touch drag movement and geometry-based hit testing.
+Its top-right settings icon and menu scale with the visible playfield. The menu opens `RESTART` and
+`EXIT GAME`; exit is routed through `app_request_exit()` on all five platforms.
 
 HTTP functions are `http_get`, `http_post`, and `http_poll`. These services are also registered once
 through BMS; the Lua and QuickJS runtimes contain no Runeweave-specific service bindings.

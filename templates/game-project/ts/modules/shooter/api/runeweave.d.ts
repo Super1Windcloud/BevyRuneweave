@@ -26,6 +26,7 @@ declare function input_key_pressed(key: string): boolean;
 declare function input_key_just_pressed(key: string): boolean;
 declare function input_key_just_released(key: string): boolean;
 declare function input_primary_touch(): RuneweaveTouchState;
+declare function input_primary_pointer(): RuneweavePointerState;
 
 interface RuneweaveTouchState {
   pressed: boolean;
@@ -34,6 +35,15 @@ interface RuneweaveTouchState {
   y: number;
   deltaX: number;
   deltaY: number;
+}
+
+interface RuneweavePointerState {
+  pressed: boolean;
+  justPressed: boolean;
+  x: number;
+  y: number;
+  viewportWidth: number;
+  viewportHeight: number;
 }
 declare function http_get(url: string): number;
 declare function http_post(url: string, body: string, contentType: string): number;

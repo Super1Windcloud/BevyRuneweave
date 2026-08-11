@@ -12,3 +12,14 @@ export interface PrimaryTouch {
 }
 
 export function primaryTouch(): PrimaryTouch { return input_primary_touch(); }
+
+export interface PrimaryPointer {
+  pressed: boolean;
+  justPressed: boolean;
+  x: number;
+  y: number;
+  viewportWidth: number;
+  viewportHeight: number;
+}
+
+export function primaryPointer(): PrimaryPointer { return input_primary_pointer(); }

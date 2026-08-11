@@ -85,7 +85,15 @@ fn attach_script(
 }
 
 fn spawn_scene_camera(mut commands: Commands) {
-    commands.spawn(Camera2d);
+    commands.spawn((
+        Camera2d,
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: bevy::camera::ScalingMode::FixedVertical {
+                viewport_height: crate::GAME_VIEWPORT_HEIGHT,
+            },
+            ..OrthographicProjection::default_2d()
+        }),
+    ));
 }
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -541,6 +549,27 @@ mod tests {
         assert!(source_has_changed(Some(first), Some(second)));
         assert!(source_has_changed(None, Some(first)));
         assert!(!source_has_changed(Some(first), None));
+    }
+
+    #[test]
+    fn scene_camera_keeps_a_responsive_virtual_height() {
+        let mut world = World::new();
+        world
+            .run_system_cached(spawn_scene_camera)
+            .expect("camera startup system must run");
+        let projection = world
+            .query::<&Projection>()
+            .single(&world)
+            .expect("one camera projection must be spawned");
+        let Projection::Orthographic(projection) = projection else {
+            panic!("scene camera must be orthographic");
+        };
+        assert_eq!(
+            projection.scaling_mode,
+            bevy::camera::ScalingMode::FixedVertical {
+                viewport_height: crate::GAME_VIEWPORT_HEIGHT,
+            }
+        );
     }
 
     #[cfg(feature = "unified")]

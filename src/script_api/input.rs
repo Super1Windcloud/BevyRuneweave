@@ -1,5 +1,5 @@
 use bevy::{
-    prelude::{ButtonInput, KeyCode, Touches, Window},
+    prelude::{ButtonInput, KeyCode, MouseButton, Touches, Window},
     window::PrimaryWindow,
 };
 use bevy_mod_scripting::{
@@ -73,6 +73,49 @@ fn touch_state_value(
     ScriptValue::Map(state)
 }
 
+fn pointer_state_value(
+    pressed: bool,
+    just_pressed: bool,
+    position: bevy::math::Vec2,
+    viewport: bevy::math::Vec2,
+) -> ScriptValue {
+    let mut state = bevy::platform::collections::HashMap::default();
+    state.insert("pressed".into(), ScriptValue::Bool(pressed));
+    state.insert("justPressed".into(), ScriptValue::Bool(just_pressed));
+    state.insert("x".into(), ScriptValue::Float(f64::from(position.x)));
+    state.insert("y".into(), ScriptValue::Float(f64::from(position.y)));
+    state.insert(
+        "viewportWidth".into(),
+        ScriptValue::Float(f64::from(viewport.x)),
+    );
+    state.insert(
+        "viewportHeight".into(),
+        ScriptValue::Float(f64::from(viewport.y)),
+    );
+    ScriptValue::Map(state)
+}
+
+fn pointer_viewport(window: &Window) -> Option<(bevy::math::Vec2, f32)> {
+    let size = bevy::math::Vec2::new(window.width(), window.height());
+    if size.x <= 0.0 || size.y <= 0.0 {
+        return None;
+    }
+    let scale = size.y / crate::GAME_VIEWPORT_HEIGHT;
+    Some((size / scale, scale))
+}
+
+fn pointer_position(
+    window: &Window,
+    position: bevy::math::Vec2,
+) -> Option<(bevy::math::Vec2, bevy::math::Vec2)> {
+    let (viewport, scale) = pointer_viewport(window)?;
+    let world_position = bevy::math::Vec2::new(
+        (position.x - window.width() * 0.5) / scale,
+        (window.height() * 0.5 - position.y) / scale,
+    );
+    Some((world_position, viewport))
+}
+
 pub(super) fn input_primary_touch(
     context: FunctionCallContext,
 ) -> Result<ScriptValue, InteropError> {
@@ -99,6 +142,50 @@ pub(super) fn input_primary_touch(
         );
         let delta = bevy::math::Vec2::new(touch.delta().x / size.x, -touch.delta().y / size.y);
         touch_state_value(true, touches.just_pressed(touch.id()), position, delta)
+    })
+}
+
+pub(super) fn input_primary_pointer(
+    context: FunctionCallContext,
+) -> Result<ScriptValue, InteropError> {
+    context.world()?.with_world(|world| {
+        let Some(window) = world.iter_entities().find_map(|entity| {
+            entity.get::<PrimaryWindow>()?;
+            entity.get::<Window>()
+        }) else {
+            return pointer_state_value(
+                false,
+                false,
+                bevy::math::Vec2::ZERO,
+                bevy::math::Vec2::new(600.0, crate::GAME_VIEWPORT_HEIGHT),
+            );
+        };
+        let viewport = pointer_viewport(window)
+            .map(|(viewport, _)| viewport)
+            .unwrap_or(bevy::math::Vec2::new(600.0, crate::GAME_VIEWPORT_HEIGHT));
+
+        if let Some(touches) = world.get_resource::<Touches>()
+            && let Some(touch) = touches.iter().min_by_key(|touch| touch.id())
+            && let Some((position, viewport)) = pointer_position(window, touch.position())
+        {
+            return pointer_state_value(true, touches.just_pressed(touch.id()), position, viewport);
+        }
+
+        let Some(position) = window.cursor_position() else {
+            return pointer_state_value(false, false, bevy::math::Vec2::ZERO, viewport);
+        };
+        let Some((position, viewport)) = pointer_position(window, position) else {
+            return pointer_state_value(false, false, bevy::math::Vec2::ZERO, viewport);
+        };
+        let Some(buttons) = world.get_resource::<ButtonInput<MouseButton>>() else {
+            return pointer_state_value(false, false, position, viewport);
+        };
+        pointer_state_value(
+            buttons.pressed(MouseButton::Left),
+            buttons.just_pressed(MouseButton::Left),
+            position,
+            viewport,
+        )
     })
 }
 
@@ -165,7 +252,7 @@ mod tests {
 
         WorldGuard::with_static_guard(app.world_mut(), cache, |_guard| {
             let context = FunctionCallContext::new(Language::Unknown);
-            let ScriptValue::Map(state) = input_primary_touch(context)? else {
+            let ScriptValue::Map(state) = input_primary_touch(context.clone())? else {
                 return Err(InteropError::string("touch state must be a map".to_owned()));
             };
             assert_eq!(state.get("pressed"), Some(&ScriptValue::Bool(true)));
@@ -174,6 +261,64 @@ mod tests {
             assert_eq!(state.get("y"), Some(&ScriptValue::Float(0.75)));
             assert_eq!(state.get("deltaX"), Some(&ScriptValue::Float(0.0)));
             assert_eq!(state.get("deltaY"), Some(&ScriptValue::Float(0.0)));
+
+            let ScriptValue::Map(pointer) = input_primary_pointer(context)? else {
+                return Err(InteropError::string(
+                    "pointer state must be a map".to_owned(),
+                ));
+            };
+            assert_eq!(pointer.get("pressed"), Some(&ScriptValue::Bool(true)));
+            assert_eq!(pointer.get("justPressed"), Some(&ScriptValue::Bool(true)));
+            assert_eq!(pointer.get("x"), Some(&ScriptValue::Float(-100.0)));
+            assert_eq!(pointer.get("y"), Some(&ScriptValue::Float(200.0)));
+            assert_eq!(
+                pointer.get("viewportWidth"),
+                Some(&ScriptValue::Float(400.0))
+            );
+            assert_eq!(
+                pointer.get("viewportHeight"),
+                Some(&ScriptValue::Float(800.0))
+            );
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn returns_mouse_clicks_in_the_same_virtual_coordinates() -> Result<(), InteropError> {
+        let mut world = World::new();
+        world.init_resource::<AppScriptFunctionRegistry>();
+        world.init_resource::<AppTypeRegistry>();
+        let mut window = Window {
+            resolution: WindowResolution::new(1000, 500),
+            ..Default::default()
+        };
+        window.set_cursor_position(Some(Vec2::new(750.0, 125.0)));
+        world.spawn((window, PrimaryWindow));
+        let mut buttons = ButtonInput::default();
+        buttons.press(MouseButton::Left);
+        world.insert_resource(buttons);
+        let cache = WorldGuard::setup_cache(&world, CurrentScriptAttachment::default());
+
+        WorldGuard::with_static_guard(&mut world, cache, |_guard| {
+            let ScriptValue::Map(pointer) =
+                input_primary_pointer(FunctionCallContext::new(Language::Unknown))?
+            else {
+                return Err(InteropError::string(
+                    "pointer state must be a map".to_owned(),
+                ));
+            };
+            assert_eq!(pointer.get("pressed"), Some(&ScriptValue::Bool(true)));
+            assert_eq!(pointer.get("justPressed"), Some(&ScriptValue::Bool(true)));
+            assert_eq!(pointer.get("x"), Some(&ScriptValue::Float(400.0)));
+            assert_eq!(pointer.get("y"), Some(&ScriptValue::Float(200.0)));
+            assert_eq!(
+                pointer.get("viewportWidth"),
+                Some(&ScriptValue::Float(1600.0))
+            );
+            assert_eq!(
+                pointer.get("viewportHeight"),
+                Some(&ScriptValue::Float(800.0))
+            );
             Ok(())
         })
     }

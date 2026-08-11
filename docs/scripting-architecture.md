@@ -10,8 +10,9 @@ The Bevy `World` is authoritative. A script component is a real registered Bevy 
 script resource is a real registered Bevy resource. Rust systems and scripts observe the same state.
 Runtime APIs must not maintain a second ECS snapshot that later materializes into Bevy components.
 Runeweave scene functions therefore insert Bevy `Transform`, `Sprite`, and text components directly,
-while input functions read the live `ButtonInput<KeyCode>` and `Touches` resources through
-`WorldGuard`.
+while input functions read live keyboard, mouse, window, and touch resources through `WorldGuard`.
+The unified pointer is derived from those resources in the same responsive world coordinates used
+by the Bevy camera; it does not maintain a second input snapshot.
 Application exit requests likewise enter Bevy through the BMS-registered `app_request_exit`
 function and its portable `AppExit` message, rather than calling a platform process API from a
 script.
