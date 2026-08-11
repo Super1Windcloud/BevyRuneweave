@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "preserve",
+    "rootDir": "modules/clash",
+    "outDir": "modules/clash/game/assets",
+    "strict": true,
+    "noEmit": true,
+    "noEmitOnError": true,
+    "removeComments": true,
+    "skipLibCheck": true
+  },
+  "include": ["modules/clash/game/src/**/*.ts", "modules/clash/api/**/*.ts", "modules/clash/api/**/*.d.ts"]
+}

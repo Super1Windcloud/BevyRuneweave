@@ -1,0 +1,8 @@
+{
+    "schemaVersion": 1,
+    "name": "clash",
+    "language": "ts",
+    "sourceDirectory": "game/src",
+    "assetDirectory": "game/assets",
+    "scriptEntry": "clash.js"
+}

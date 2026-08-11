@@ -1,0 +1,12 @@
+[package]
+name = "clash-ts"
+version = "0.1.0"
+edition = "2024"
+authors.workspace = true
+build = "../../build-support/embed-windows-icon.rs"
+
+[dependencies]
+bevy-runeweave = { path = "../..", default-features = false, features = ["typescript"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1.12"

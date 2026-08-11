@@ -81,13 +81,16 @@ Android runtime 只支持并默认构建 `arm64-v8a` 和 `x86_64`。`ANDROID_ABI
 
 ```bash
 just ts-build
+just package-assets all 0.0.1
 just package-assets-typescript 0.0.1
 just package-assets-js 0.0.1
 just package-assets-lua 0.0.1
 ```
 
-`package-assets-typescript` 会先编译 TypeScript。Lua Release 资源会经过 `luamin`，但这些
-处理均不会改变 runtime library。
+`package-assets all` 会通过 Cargo workspace 和各项目的 `modules/*/module.json` 自动扫描
+所有 `projects/*`，并以 Cargo package name 作为 ZIP 名称。语言专用命令会筛选所有对应
+语言的项目，而不是只处理一个固定示例；每个 TypeScript 项目都会从自己的源码入口编译。
+Lua Release 资源会经过 `luamin`，但这些处理均不会改变 runtime library。
 
 ### Host 与安装包
 

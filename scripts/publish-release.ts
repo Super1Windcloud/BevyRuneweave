@@ -1,6 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { join, relative, resolve, sep } from "node:path";
+import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { deflateRawSync } from "node:zlib";
 import { build, transform } from "esbuild";
 
@@ -14,11 +15,98 @@ const upload = !process.argv.includes("--no-upload");
 const language = process.argv.find((arg) => arg.startsWith("--language="))?.slice(11) ?? "all";
 const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
 const output = join(root, "dist", "releases", tag);
-const projects = [
-  ["js", "script-squadron-js"],
-  ["ts", "script-squadron-typescript"],
-  ["lua", "script-squadron-lua"],
-] as const;
+
+type ProjectLanguage = "js" | "ts" | "lua";
+
+interface CargoMetadata {
+  packages: { manifest_path: string; name: string }[];
+}
+
+interface ModuleConfig {
+  schemaVersion: number;
+  language: ProjectLanguage;
+  sourceDirectory: string;
+  assetDirectory: string;
+  scriptEntry: string;
+}
+
+interface ReleaseProject {
+  directory: string;
+  packageName: string;
+  language: ProjectLanguage;
+  assets: string;
+  sourceEntry?: string;
+  scriptEntry: string;
+}
+
+function safeRelativePath(path: string) {
+  return path.length > 0 && !path.startsWith("/") && !path.startsWith("\\") &&
+    path.split(/[\\/]/).every((part) => part.length > 0 && part !== "." && part !== "..");
+}
+
+function discoverProjects(): ReleaseProject[] {
+  const projectsRoot = join(root, "projects");
+  const metadata = JSON.parse(execFileSync(
+    "cargo",
+    ["metadata", "--format-version", "1", "--no-deps"],
+    { cwd: root, encoding: "utf8" },
+  )) as CargoMetadata;
+  const packageByDirectory = new Map(
+    metadata.packages.map((cargoPackage) => [resolve(dirname(cargoPackage.manifest_path)), cargoPackage.name]),
+  );
+
+  return readdirSync(projectsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map((entry) => {
+      const projectRoot = join(projectsRoot, entry.name);
+      const packageName = packageByDirectory.get(resolve(projectRoot));
+      if (!packageName) throw new Error(`Project is not a Cargo workspace package: ${projectRoot}`);
+
+      const modulesRoot = join(projectRoot, "modules");
+      if (!existsSync(modulesRoot)) throw new Error(`Project has no modules directory: ${projectRoot}`);
+      const moduleFiles = readdirSync(modulesRoot, { withFileTypes: true })
+        .filter((module) => module.isDirectory() && existsSync(join(modulesRoot, module.name, "module.json")))
+        .map((module) => join(modulesRoot, module.name, "module.json"));
+      if (moduleFiles.length !== 1) {
+        throw new Error(`Project must contain exactly one publishable module.json: ${projectRoot}`);
+      }
+
+      const moduleFile = moduleFiles[0]!;
+      const moduleRoot = dirname(moduleFile);
+      const config = JSON.parse(readFileSync(moduleFile, "utf8")) as ModuleConfig;
+      if (config.schemaVersion !== 1 || !["js", "ts", "lua"].includes(config.language)) {
+        throw new Error(`Unsupported module configuration: ${moduleFile}`);
+      }
+      for (const [field, value] of [
+        ["sourceDirectory", config.sourceDirectory],
+        ["assetDirectory", config.assetDirectory],
+        ["scriptEntry", config.scriptEntry],
+      ] as const) {
+        if (!safeRelativePath(value)) throw new Error(`${field} must be a safe relative path: ${moduleFile}`);
+      }
+
+      const assets = join(moduleRoot, config.assetDirectory);
+      if (!existsSync(assets)) throw new Error(`Missing assets directory: ${assets}`);
+      const expectedExtension = config.language === "lua" ? ".lua" : ".js";
+      if (extname(config.scriptEntry) !== expectedExtension) {
+        throw new Error(`scriptEntry does not match module language in ${moduleFile}`);
+      }
+      const sourceEntry = config.language === "ts"
+        ? join(moduleRoot, config.sourceDirectory, config.scriptEntry.slice(0, -expectedExtension.length) + ".ts")
+        : undefined;
+      if (sourceEntry && !existsSync(sourceEntry)) throw new Error(`Missing TypeScript entry: ${sourceEntry}`);
+
+      return {
+        directory: entry.name,
+        packageName,
+        language: config.language,
+        assets,
+        sourceEntry,
+        scriptEntry: config.scriptEntry,
+      };
+    });
+}
 
 function api(path: string, init: RequestInit = {}) {
   if (!token) throw new Error("GITHUB_TOKEN or GH_TOKEN is required; put it in .env");
@@ -67,12 +155,12 @@ function crc32(data: Uint8Array) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-async function prepareAssets(source: string, destination: string, language: "js" | "ts" | "lua") {
-  cpSync(source, destination, { recursive: true });
-  const script = join(destination, language === "lua" ? "shooter.lua" : "shooter.js");
-  if (language === "ts") {
+async function prepareAssets(project: ReleaseProject, destination: string) {
+  cpSync(project.assets, destination, { recursive: true });
+  const script = join(destination, project.scriptEntry);
+  if (project.language === "ts") {
     await build({
-      entryPoints: [join(root, "projects", "ts", "modules", "shooter", "game", "src", "shooter.ts")],
+      entryPoints: [project.sourceEntry!],
       outfile: script,
       bundle: true,
       format: "iife",
@@ -81,7 +169,7 @@ async function prepareAssets(source: string, destination: string, language: "js"
   }
   if (!existsSync(script)) return;
   const sourceCode = readFileSync(script, "utf8");
-  if (language === "lua") {
+  if (project.language === "lua") {
     writeFileSync(script, compressLua(sourceCode), "utf8");
     return;
   }
@@ -121,14 +209,17 @@ function compressLua(source: string) {
 async function main() {
   mkdirSync(output, { recursive: true });
   const archives: string[] = [];
-  const selectedProjects = projects.filter(([directory]) => language === "all" || directory === language || (language === "typescript" && directory === "ts"));
-  for (const [directory, packageName] of selectedProjects) {
-    const assets = join(root, "projects", directory, "modules", "shooter", "game", "assets");
-    const archive = join(output, `${packageName}.zip`);
-    if (!existsSync(assets)) throw new Error(`Missing assets directory: ${assets}`);
-    const staging = join(output, `.staging-${directory}-${process.pid}`);
+  const projects = discoverProjects();
+  const selectedProjects = projects.filter((project) =>
+    language === "all" || project.language === language ||
+    (language === "typescript" && project.language === "ts"),
+  );
+  if (selectedProjects.length === 0) throw new Error(`No projects match language: ${language}`);
+  for (const project of selectedProjects) {
+    const archive = join(output, `${project.packageName}.zip`);
+    const staging = join(output, `.staging-${project.directory}-${process.pid}`);
     rmSync(staging, { recursive: true, force: true });
-    await prepareAssets(assets, staging, directory);
+    await prepareAssets(project, staging);
     const replacing = existsSync(archive);
     rmSync(archive, { force: true });
     createZip(staging, archive);

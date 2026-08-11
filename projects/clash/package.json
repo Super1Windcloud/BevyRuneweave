@@ -1,0 +1,15 @@
+{
+  "name": "@runeweave/clash",
+  "version": "0.1.0",
+  "author": "superwindcloud",
+  "private": true,
+  "scripts": {
+    "build": "esbuild modules/clash/game/src/clash.ts --bundle --format=iife --target=es2023 --outfile=modules/clash/game/assets/clash.js",
+    "watch": "esbuild modules/clash/game/src/clash.ts --bundle --format=iife --target=es2023 --outfile=modules/clash/game/assets/clash.js --watch=forever",
+    "check": "tsc --project tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "typescript": "7.0.2"
+  }
+}

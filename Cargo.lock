@@ -2168,6 +2168,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "clash-ts"
+version = "0.1.0"
+dependencies = [
+ "bevy-runeweave",
+ "winres",
+]
+
+[[package]]
 name = "cmake"
 version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"

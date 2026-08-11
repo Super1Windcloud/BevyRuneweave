@@ -77,10 +77,12 @@ just create-game my-lua-game lua
 ```
 
 模板只从 `templates/game-project/<language>` 读取，新项目生成到 `projects/<name>`。
-TypeScript 会额外复制独立 `api/` 层并立即打包 `game/assets/shooter.js`；
-JavaScript 和 Lua 直接编辑 `game/assets` 内的唯一入口脚本。未指定语言时默认使用
-TypeScript，同时接受 `typescript` 作为 `ts` 的别名。模板校验和 TypeScript 首次编译都在
-临时目录中完成，创建失败不会在 `projects/` 中留下不完整项目。
+模块目录会同步重命名为 `modules/<name>`，Rust launcher、模块配置、引擎配置、Node 与
+TypeScript 配置中的路径也会一起更新。TypeScript 源入口为 `game/src/<name>.ts`，并立即
+打包到 `game/assets/<name>.js`；JavaScript 和 Lua 分别使用 `<name>.js`、`<name>.lua`
+作为唯一运行入口。未指定语言时默认使用 TypeScript，同时接受 `typescript` 作为 `ts`
+的别名。模板校验和 TypeScript 首次编译都在临时目录中完成，创建失败不会在
+`projects/` 中留下不完整项目。
 
 ## 运行
 

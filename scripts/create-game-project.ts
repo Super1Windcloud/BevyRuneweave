@@ -107,9 +107,31 @@ async function main() {
 
   try {
     cpSync(template, staging, { recursive: true });
-    const module = join(staging, "modules", "shooter");
+    const templateModule = join(staging, "modules", "shooter");
+    const module = join(staging, "modules", name);
+    if (templateModule !== module) renameSync(templateModule, module);
+    const assetRoot = join(module, "game", "assets");
+    const scriptEntry = `${name}.${language === "lua" ? "lua" : "js"}`;
+    const templateScript = join(assetRoot, templateConfig.script.entry);
+    const runtimeScript = join(assetRoot, scriptEntry);
+    let sourceEntry: string | undefined;
+
+    if (language === "ts") {
+      const templateSource = join(module, "game", "src", "shooter.ts");
+      sourceEntry = join(module, "game", "src", `${name}.ts`);
+      if (templateSource !== sourceEntry) renameSync(templateSource, sourceEntry);
+      if (templateScript !== runtimeScript) rmSync(templateScript, { force: true });
+    } else if (templateScript !== runtimeScript) {
+      renameSync(templateScript, runtimeScript);
+    }
+
     const configPath = join(module, "game", "assets", "engineConfig.json");
-    const config = { ...templateConfig, name };
+    const config = {
+      ...templateConfig,
+      name,
+      appName: name,
+      script: { ...templateConfig.script, entry: scriptEntry },
+    };
     writeFileSync(configPath, `${JSON.stringify(config, null, 4)}\n`, "utf8");
 
     const moduleInfo = {
@@ -118,7 +140,7 @@ async function main() {
       language,
       sourceDirectory: language === "ts" ? "game/src" : "game/assets",
       assetDirectory: "game/assets",
-      scriptEntry: config.script.entry,
+      scriptEntry,
     };
     writeFileSync(join(module, "module.json"), `${JSON.stringify(moduleInfo, null, 4)}\n`, "utf8");
 
@@ -128,10 +150,26 @@ async function main() {
     if (cargo === originalCargo) throw new Error("Template Cargo.toml is missing package.name");
     writeFileSync(cargoPath, cargo, "utf8");
 
+    const launcherPath = join(staging, "src", "main.rs");
+    const launcher = readFileSync(launcherPath, "utf8")
+      .replaceAll("modules/shooter", `modules/${name}`)
+      .replaceAll(`PathBuf::from("${templateConfig.script.entry}")`, `PathBuf::from("${scriptEntry}")`);
+    writeFileSync(launcherPath, launcher, "utf8");
+
     if (language === "ts") {
       const packagePath = join(staging, "package.json");
       const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as Record<string, unknown>;
       packageJson.name = `@runeweave/${name}`;
+      const scripts = packageJson.scripts as Record<string, unknown> | undefined;
+      if (!scripts || typeof scripts.build !== "string" || typeof scripts.watch !== "string") {
+        throw new Error("Template package.json is missing TypeScript build/watch scripts");
+      }
+      for (const key of ["build", "watch"] as const) {
+        scripts[key] = (scripts[key] as string)
+          .replaceAll("modules/shooter", `modules/${name}`)
+          .replaceAll("shooter.ts", `${name}.ts`)
+          .replaceAll("shooter.js", scriptEntry);
+      }
       writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
 
       const lockPath = join(staging, "package-lock.json");
@@ -143,15 +181,37 @@ async function main() {
       if (lock.packages?.[""]) lock.packages[""].name = `@runeweave/${name}`;
       writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
 
+      const tsconfigPath = join(staging, "tsconfig.json");
+      const tsconfig = JSON.parse(readFileSync(tsconfigPath, "utf8")) as {
+        compilerOptions?: { rootDir?: string; outDir?: string };
+        include?: string[];
+      };
+      if (!tsconfig.compilerOptions || !Array.isArray(tsconfig.include)) {
+        throw new Error("Template tsconfig.json is missing compilerOptions/include");
+      }
+      tsconfig.compilerOptions.rootDir = `modules/${name}`;
+      tsconfig.compilerOptions.outDir = `modules/${name}/game/assets`;
+      tsconfig.include = [
+        `modules/${name}/game/src/**/*.ts`,
+        `modules/${name}/api/**/*.ts`,
+        `modules/${name}/api/**/*.d.ts`,
+      ];
+      writeFileSync(tsconfigPath, `${JSON.stringify(tsconfig, null, 2)}\n`, "utf8");
+
       await build({
         absWorkingDir: staging,
-        entryPoints: [join(module, "game", "src", "shooter.ts")],
-        outfile: join(module, "game", "assets", "shooter.js"),
+        entryPoints: [sourceEntry!],
+        outfile: runtimeScript,
         bundle: true,
         format: "iife",
         target: "es2023",
       });
     }
+
+    requireFile(join(staging, "src", "main.rs"), "generated Rust launcher");
+    requireFile(configPath, "generated engineConfig.json");
+    requireFile(runtimeScript, "generated runtime script entry");
+    if (sourceEntry) requireFile(sourceEntry, "generated TypeScript source entry");
 
     renameSync(staging, destination);
     console.log(`Created independent ${language} game project: ${destination}`);

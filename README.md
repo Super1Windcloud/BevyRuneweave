@@ -85,9 +85,10 @@ just create-game my-lua-game lua
 
 Templates are stored independently under `templates/game-project/<language>`; active projects are
 never used as template sources. Each command creates a complete standalone project at
-`projects/<name>`. TypeScript projects receive a separate typed `modules/shooter/api/` layer and are
-bundled immediately into `modules/shooter/game/assets/shooter.js`. JavaScript and Lua use the script
-in `modules/shooter/game/assets` as their single editable runtime entry. The language defaults to
+`projects/<name>`. The module directory is renamed to `modules/<name>`, and every launcher, module,
+engine, Node, and TypeScript configuration is rewritten to that path. TypeScript source
+`game/src/<name>.ts` is bundled immediately into `game/assets/<name>.js`; JavaScript and Lua use
+`game/assets/<name>.js` or `<name>.lua` as their editable runtime entry. The language defaults to
 TypeScript; `typescript` is also accepted as an alias for `ts`. Template validation and the initial
 TypeScript build finish in a temporary directory, so a failed creation does not leave a partial
 project behind.
