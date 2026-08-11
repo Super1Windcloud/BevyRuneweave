@@ -383,6 +383,22 @@ static BOOL installBundledAssetsIfNeeded(NSString *installed, NSError **error) {
 }
 
 static UIWindow *HostLauncherWindow;
+static NSString *HostInstalledAssetsPath;
+
+static void presentHostLauncher(NSString *installed, NSUInteger attempts);
+
+static void returnToHostLauncher(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (HostLauncherWindow != nil) {
+            HostLauncherWindow.hidden = NO;
+            [HostLauncherWindow makeKeyAndVisible];
+            return;
+        }
+        if (HostInstalledAssetsPath != nil) {
+            presentHostLauncher(HostInstalledAssetsPath, 40);
+        }
+    });
+}
 
 static void applyHostInterfaceStyle(void) {
     if (@available(iOS 13.0, *)) {
@@ -751,6 +767,8 @@ int main(int argc, char *argv[]) {
         }
         if (validateAssets(installed, &error) == nil) return fail(error.localizedDescription, 11);
 
+        HostInstalledAssetsPath = [installed copy];
+        game_runtime_set_exit_callback(returnToHostLauncher);
         presentHostLauncher(installed, 40);
         return game_runtime_run_with_assets(installed.fileSystemRepresentation,
                                             BootstrapScriptName.fileSystemRepresentation);

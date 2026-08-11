@@ -43,6 +43,10 @@ use bevy_mod_scripting::quickjs::QuickJsScriptingPlugin;
 
 static RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
 static SCRIPT_SWITCH_REQUESTED: Mutex<Option<PathBuf>> = Mutex::new(None);
+static EXIT_CALLBACK: Mutex<Option<RuntimeExitCallback>> = Mutex::new(None);
+
+/// Host callback invoked when a script requests leaving the current game session.
+pub type RuntimeExitCallback = extern "C" fn();
 
 const WINDOW_WIDTH: u32 = 600;
 const WINDOW_HEIGHT: u32 = 800;
@@ -441,6 +445,31 @@ pub extern "C" fn game_runtime_request_reload() {
     RELOAD_REQUESTED.store(true, Ordering::Release);
 }
 
+/// Installs or clears the host callback used for script exit requests.
+///
+/// Embedding hosts use this to return to their launcher without terminating the
+/// process-owned platform event loop. Without a callback, exit requests retain
+/// the standalone behavior and emit Bevy's portable [`AppExit::Success`].
+pub extern "C" fn game_runtime_set_exit_callback(callback: Option<RuntimeExitCallback>) {
+    if let Ok(mut registered) = EXIT_CALLBACK.lock() {
+        *registered = callback;
+    }
+}
+
+pub(crate) fn request_runtime_exit(world: &mut World) -> bool {
+    let callback = EXIT_CALLBACK.lock().ok().and_then(|registered| *registered);
+    dispatch_exit_request(world, callback)
+}
+
+fn dispatch_exit_request(world: &mut World, callback: Option<RuntimeExitCallback>) -> bool {
+    if let Some(callback) = callback {
+        callback();
+        true
+    } else {
+        world.write_message(AppExit::Success).is_some()
+    }
+}
+
 /// Switches the active script to another relative path inside the current asset directory.
 ///
 /// # Safety
@@ -526,6 +555,12 @@ mod tests {
 
     use super::*;
 
+    static EXIT_CALLBACK_CALLED: AtomicBool = AtomicBool::new(false);
+
+    extern "C" fn record_exit_callback() {
+        EXIT_CALLBACK_CALLED.store(true, Ordering::Release);
+    }
+
     #[test]
     fn normalizes_paths_under_assets() {
         assert_eq!(
@@ -553,6 +588,18 @@ mod tests {
         assert!(source_has_changed(Some(first), Some(second)));
         assert!(source_has_changed(None, Some(first)));
         assert!(!source_has_changed(Some(first), None));
+    }
+
+    #[test]
+    fn host_exit_callback_handles_request_without_stopping_bevy() {
+        EXIT_CALLBACK_CALLED.store(false, Ordering::Release);
+        let mut world = World::new();
+
+        assert!(dispatch_exit_request(
+            &mut world,
+            Some(record_exit_callback)
+        ));
+        assert!(EXIT_CALLBACK_CALLED.load(Ordering::Acquire));
     }
 
     #[test]

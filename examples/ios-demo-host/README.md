@@ -39,6 +39,12 @@ is extracted into staging, validated through `engineConfig.json`, atomically pro
 Application Support, and then activated in the running runtime. A previously installed package can
 be started explicitly with **Start installed game**.
 
+Script exit requests restore the native launcher window. The Bevy runtime remains alive behind it
+because winit owns the application's single `UIApplicationMain` event loop; starting another game
+switches the script in that existing runtime.
+
 The game window is full-screen on iPhone and iPad and hides the status bar. The native host owns
 mobile surface geometry, so script calls to `window_set_size` return `false`; responsive gameplay
-uses the viewport dimensions returned by `input_primary_pointer()` instead.
+uses the viewport dimensions returned by `input_primary_pointer()` instead. `window_safe_area()`
+converts UIKit's safe-area rectangle to those same world coordinates. Full-screen backgrounds may
+extend to every edge, while foreground text, sprites, and controls remain inside the safe region.

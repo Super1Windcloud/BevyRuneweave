@@ -23,6 +23,7 @@ declare function scene_transform(id: string): BmsReflectReference | null;
 declare function game_state_set(score: number, lives: number, message: string): void;
 declare function app_request_exit(): boolean;
 declare function window_set_size(width: number, height: number): boolean;
+declare function window_safe_area(): RuneweaveWindowSafeArea;
 declare function input_key_pressed(key: string): boolean;
 declare function input_key_just_pressed(key: string): boolean;
 declare function input_key_just_released(key: string): boolean;
@@ -45,6 +46,18 @@ interface RuneweavePointerState {
   y: number;
   viewportWidth: number;
   viewportHeight: number;
+}
+interface RuneweaveWindowSafeArea {
+  left: number;
+  right: number;
+  bottom: number;
+  top: number;
+  width: number;
+  height: number;
+  leftInset: number;
+  rightInset: number;
+  bottomInset: number;
+  topInset: number;
 }
 declare function http_get(url: string): number;
 declare function http_post(url: string, body: string, contentType: string): number;

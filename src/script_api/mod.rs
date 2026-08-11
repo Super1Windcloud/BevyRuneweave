@@ -7,7 +7,10 @@ use std::path::{Component as PathComponent, Path};
 
 use bevy::{prelude::*, sprite::Anchor};
 use bevy_mod_scripting::{
-    bindings::{FunctionCallContext, InteropError, ReflectReference, WorldExtensions, WorldGuard},
+    bindings::{
+        FunctionCallContext, InteropError, ReflectReference, ScriptValue, WorldExtensions,
+        WorldGuard,
+    },
     core::event::ScriptDetachedEvent,
     prelude::{GlobalNamespace, NamespaceBuilder},
     script::ScriptAttachment,
@@ -243,7 +246,7 @@ fn game_state_set(
 fn app_request_exit(context: FunctionCallContext) -> Result<bool, InteropError> {
     context
         .world()?
-        .with_world_mut(|world| world.write_message(AppExit::Success).is_some())
+        .with_world_mut(crate::runtime::request_runtime_exit)
 }
 
 fn window_set_size(
@@ -280,6 +283,104 @@ fn window_set_size(
         let _ = world;
         Ok(false)
     }
+}
+
+#[cfg(target_os = "android")]
+fn native_safe_area_insets(entity: Entity) -> Option<[f32; 4]> {
+    use bevy::winit::WINIT_WINDOWS;
+    use winit::platform::android::WindowExtAndroid;
+
+    WINIT_WINDOWS.with_borrow(|windows| {
+        let window = windows.get_window(entity)?;
+        let size = window.inner_size();
+        let rect = window.content_rect();
+        if size.width == 0 || size.height == 0 || rect.right <= rect.left || rect.bottom <= rect.top
+        {
+            return None;
+        }
+        Some([
+            rect.left.max(0) as f32,
+            rect.top.max(0) as f32,
+            (size.width as i32 - rect.right).max(0) as f32,
+            (size.height as i32 - rect.bottom).max(0) as f32,
+        ])
+    })
+}
+
+#[cfg(target_os = "ios")]
+fn native_safe_area_insets(entity: Entity) -> Option<[f32; 4]> {
+    use bevy::winit::WINIT_WINDOWS;
+
+    WINIT_WINDOWS.with_borrow(|windows| {
+        let window = windows.get_window(entity)?;
+        let outer_size = window.outer_size();
+        let outer_position = window.outer_position().ok()?;
+        let inner_size = window.inner_size();
+        let inner_position = window.inner_position().ok()?;
+        if outer_size.width == 0 || outer_size.height == 0 {
+            return None;
+        }
+        let left = (inner_position.x - outer_position.x).max(0) as f32;
+        let top = (inner_position.y - outer_position.y).max(0) as f32;
+        Some([
+            left,
+            top,
+            (outer_size.width as f32 - left - inner_size.width as f32).max(0.0),
+            (outer_size.height as f32 - top - inner_size.height as f32).max(0.0),
+        ])
+    })
+}
+
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+fn native_safe_area_insets(_entity: Entity) -> Option<[f32; 4]> {
+    Some([0.0; 4])
+}
+
+fn window_safe_area(context: FunctionCallContext) -> Result<ScriptValue, InteropError> {
+    context.world()?.with_world(|world| {
+        let Some((entity, window)) = world.iter_entities().find_map(|entity| {
+            entity.get::<bevy::window::PrimaryWindow>()?;
+            Some((entity.id(), entity.get::<Window>()?))
+        }) else {
+            return safe_area_value(600.0, crate::GAME_VIEWPORT_HEIGHT, [0.0; 4]);
+        };
+        let viewport_height = crate::GAME_VIEWPORT_HEIGHT;
+        let viewport_width = if window.height() > 0.0 {
+            window.width() / window.height() * viewport_height
+        } else {
+            600.0
+        };
+        let physical_height = window.physical_height().max(1) as f32;
+        let world_per_pixel = viewport_height / physical_height;
+        let insets = native_safe_area_insets(entity)
+            .unwrap_or([0.0; 4])
+            .map(|value| value * world_per_pixel);
+        safe_area_value(viewport_width, viewport_height, insets)
+    })
+}
+
+fn safe_area_value(viewport_width: f32, viewport_height: f32, insets: [f32; 4]) -> ScriptValue {
+    let [left_inset, top_inset, right_inset, bottom_inset] = insets;
+    let left = -viewport_width * 0.5 + left_inset;
+    let right = viewport_width * 0.5 - right_inset;
+    let bottom = -viewport_height * 0.5 + bottom_inset;
+    let top = viewport_height * 0.5 - top_inset;
+    let mut value = bevy::platform::collections::HashMap::default();
+    for (key, number) in [
+        ("left", left),
+        ("right", right),
+        ("bottom", bottom),
+        ("top", top),
+        ("width", (right - left).max(0.0)),
+        ("height", (top - bottom).max(0.0)),
+        ("leftInset", left_inset),
+        ("rightInset", right_inset),
+        ("bottomInset", bottom_inset),
+        ("topInset", top_inset),
+    ] {
+        value.insert(key.into(), ScriptValue::Float(f64::from(number)));
+    }
+    ScriptValue::Map(value)
 }
 
 fn clear_owned_entities(world: &mut World, owner: &ScriptAttachment) {
@@ -336,6 +437,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("game_state_set", game_state_set)
             .register("app_request_exit", app_request_exit)
             .register("window_set_size", window_set_size)
+            .register("window_safe_area", window_safe_area)
             .register("input_key_pressed", input_key_pressed)
             .register("input_key_just_pressed", input_key_just_pressed)
             .register("input_key_just_released", input_key_just_released)
@@ -465,6 +567,15 @@ mod tests {
                 960.0,
                 540.0,
             )?);
+            let ScriptValue::Map(area) =
+                window_safe_area(FunctionCallContext::new(Language::Unknown))?
+            else {
+                panic!("window safe area must be returned as a map");
+            };
+            assert_eq!(area.get("top"), Some(&ScriptValue::Float(400.0)));
+            assert_eq!(area.get("bottom"), Some(&ScriptValue::Float(-400.0)));
+            assert_eq!(area.get("topInset"), Some(&ScriptValue::Float(0.0)));
+            assert_eq!(area.get("bottomInset"), Some(&ScriptValue::Float(0.0)));
             Ok::<(), InteropError>(())
         })?;
 
@@ -474,6 +585,19 @@ mod tests {
             .expect("one primary window must exist");
         assert_eq!((window.width(), window.height()), (960.0, 540.0));
         Ok(())
+    }
+
+    #[test]
+    fn safe_area_insets_map_to_centered_virtual_coordinates() {
+        let ScriptValue::Map(area) = safe_area_value(600.0, 800.0, [10.0, 60.0, 20.0, 40.0]) else {
+            panic!("window safe area must be returned as a map");
+        };
+        assert_eq!(area.get("left"), Some(&ScriptValue::Float(-290.0)));
+        assert_eq!(area.get("right"), Some(&ScriptValue::Float(280.0)));
+        assert_eq!(area.get("bottom"), Some(&ScriptValue::Float(-360.0)));
+        assert_eq!(area.get("top"), Some(&ScriptValue::Float(340.0)));
+        assert_eq!(area.get("width"), Some(&ScriptValue::Float(570.0)));
+        assert_eq!(area.get("height"), Some(&ScriptValue::Float(700.0)));
     }
 
     #[cfg(feature = "lua")]

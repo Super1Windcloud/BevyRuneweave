@@ -12,6 +12,33 @@ use bevy::prelude::bevy_main;
 use serde::Deserialize;
 
 #[cfg(target_os = "android")]
+extern "C" fn return_to_android_launcher() {
+    let Some(app) = bevy::android::ANDROID_APP.get() else {
+        eprintln!("Bevy Runeweave: Android host is unavailable for exit request");
+        return;
+    };
+    // SAFETY: AndroidApp owns both JNI references for the duration of android_main.
+    let vm = unsafe { jni::JavaVM::from_raw(app.vm_as_ptr().cast()) };
+    let result = vm.attach_current_thread(|env| -> jni::errors::Result<()> {
+        let raw_activity = app.activity_as_ptr() as jni::sys::jobject;
+        // SAFETY: AndroidApp exposes an unowned global reference. as_cast_raw
+        // borrows it without deleting the reference when this scope ends.
+        let activity =
+            unsafe { env.as_cast_raw::<jni::refs::Global<jni::objects::JObject>>(&raw_activity)? };
+        env.call_method(
+            activity,
+            jni::jni_str!("returnToLauncherFromNative"),
+            jni::jni_sig!("()V"),
+            &[],
+        )?;
+        Ok(())
+    });
+    if let Err(error) = result {
+        eprintln!("Bevy Runeweave: could not return to Android launcher: {error}");
+    }
+}
+
+#[cfg(target_os = "android")]
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EngineConfig {
@@ -55,12 +82,20 @@ fn main() {
         ),
         "asset language does not match the script entry extension"
     );
+    bevy_runeweave::game_runtime_set_exit_callback(Some(return_to_android_launcher));
     bevy_runeweave::run_with_assets(assets, config.script.entry);
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn game_runtime_request_reload() {
     bevy_runeweave::game_runtime_request_reload();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn game_runtime_set_exit_callback(
+    callback: Option<bevy_runeweave::RuntimeExitCallback>,
+) {
+    bevy_runeweave::game_runtime_set_exit_callback(callback);
 }
 
 /// # Safety

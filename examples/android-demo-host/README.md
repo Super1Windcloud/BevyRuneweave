@@ -40,11 +40,15 @@ ZIP packages only.
 The Android launcher accepts an HTTPS ZIP URL, extracts it into staging, validates
 `engineConfig.json`, atomically replaces the installed assets, and starts or reuses the shared
 `RuntimeActivity` runtime. This is the same resource lifecycle used by the desktop and iOS hosts;
-the presentation and remote asset selection remain platform-specific. When the runtime activity is
-actually finished, its process is terminated so a future launch gets a fresh winit event loop.
+the presentation and remote asset selection remain platform-specific. Script exit requests bring
+`MainActivity` back to the front while the shared runtime and its winit event loop remain alive.
+When the runtime activity is actually finished by Android, its process is terminated so a future
+launch gets a fresh winit event loop.
 
 `RuntimeActivity` always presents the game as an immersive full-screen surface. It hides status and
 navigation bars again after resume or focus changes, allows transient bars by edge swipe, and lays
 out through display cutouts where the Android version supports it. Script calls to
 `window_set_size` return `false` on Android; viewport-dependent gameplay must use the dimensions
-reported by `input_primary_pointer()`.
+reported by `input_primary_pointer()`. `window_safe_area()` exposes the activity's native content
+rectangle in the same world coordinates, allowing backgrounds to extend behind cutouts and system
+bars while foreground text, sprites, and controls stay within safe bounds.

@@ -8,6 +8,18 @@ local SPAWN_DELAY = 0.72
 local DAMAGE_DELAY = 1.0
 local SETTINGS_ICON_ID = "settings_icon"
 local SETTINGS_MENU_IDS = { "settings_panel", "settings_title", "settings_restart", "settings_exit" }
+local FULL_SAFE_AREA = {
+    left = -DESIGN_WIDTH * 0.5,
+    right = DESIGN_WIDTH * 0.5,
+    bottom = -DESIGN_HEIGHT * 0.5,
+    top = DESIGN_HEIGHT * 0.5,
+    width = DESIGN_WIDTH,
+    height = DESIGN_HEIGHT,
+    leftInset = 0,
+    rightInset = 0,
+    bottomInset = 0,
+    topInset = 0,
+}
 local SPRITES = {
     background = { path = "sprites/background.png", width = 600, height = 800 },
     player = { path = "sprites/player.png", width = 72, height = 88 },
@@ -47,7 +59,10 @@ local function create_resources()
         pointer_was_pressed = false,
         pointer_x = 0,
         pointer_y = 0,
+        play_left = FULL_SAFE_AREA.left,
+        play_right = FULL_SAFE_AREA.right,
         play_width = DESIGN_WIDTH,
+        safe_area = FULL_SAFE_AREA,
     }
 end
 
@@ -97,10 +112,12 @@ local function random01()
 end
 
 local function spawn_player()
+    local min_y = resources.safe_area.bottom + SPRITES.player.height * 0.5 + 8
+    local max_y = resources.safe_area.top - SPRITES.player.height * 0.5 - 8
     spawn_entity("player", {
         role = "player",
         sprite = SPRITES.player,
-        transform = { x = 0, y = -300, z = 3 },
+        transform = { x = 0, y = math.max(min_y, math.min(max_y, -300)), z = 3 },
         collider = { x = 25, y = 35 },
     })
 end
@@ -108,11 +125,16 @@ end
 local function spawn_enemy()
     local id = "enemy_" .. resources.next_id
     resources.next_id = resources.next_id + 1
-    local horizontal_limit = math.max(0, resources.play_width * 0.5 - 50)
+    local min_x = resources.play_left + 50
+    local max_x = resources.play_right - 50
     spawn_entity(id, {
         role = "enemy",
         sprite = SPRITES.enemy,
-        transform = { x = -horizontal_limit + random01() * horizontal_limit * 2, y = 350, z = 2 },
+        transform = {
+            x = min_x + random01() * math.max(0, max_x - min_x),
+            y = resources.safe_area.top - SPRITES.enemy.height * 0.5 - 8,
+            z = 2,
+        },
         velocity = { x = 0, y = -ENEMY_SPEED },
         collider = { x = 30, y = 30 },
     })
@@ -138,9 +160,12 @@ local function player_movement_system(frame)
                 or frame.input_x * PLAYER_SPEED * frame.dt
             local movement_y = frame.pointer.pressed and frame.pointer_delta_y
                 or frame.input_y * PLAYER_SPEED * frame.dt
-            local horizontal_limit = math.max(0, resources.play_width * 0.5 - 40)
-            transform.x = math.max(-horizontal_limit, math.min(horizontal_limit, transform.x + movement_x))
-            transform.y = math.max(-335, math.min(300, transform.y + movement_y))
+            local min_x = resources.play_left + SPRITES.player.width * 0.5
+            local max_x = resources.play_right - SPRITES.player.width * 0.5
+            local min_y = resources.safe_area.bottom + SPRITES.player.height * 0.5 + 8
+            local max_y = resources.safe_area.top - SPRITES.player.height * 0.5 - 8
+            transform.x = math.max(min_x, math.min(max_x, transform.x + movement_x))
+            transform.y = math.max(min_y, math.min(max_y, transform.y + movement_y))
         end
     end
 end
@@ -176,11 +201,15 @@ end
 local function bounds_system()
     for id in pairs(world.bullets) do
         local transform = world.transforms[id]
-        if transform and transform.y > 420 then queue_despawn(id) end
+        if transform and transform.y + SPRITES.bullet.height * 0.5 >= resources.safe_area.top then
+            queue_despawn(id)
+        end
     end
     for id in pairs(world.enemies) do
         local transform = world.transforms[id]
-        if transform and transform.y < -420 then queue_despawn(id) end
+        if transform and transform.y - SPRITES.enemy.height * 0.5 <= resources.safe_area.bottom then
+            queue_despawn(id)
+        end
     end
 end
 
@@ -248,26 +277,35 @@ end
 
 local function responsive_layout()
     local icon_size = math.max(44, math.min(64, resources.play_width * 0.17))
-    local icon_x = resources.play_width * 0.5 - icon_size * 0.5 - 12
-    local menu_width = math.max(1, math.min(440, resources.play_width - 24))
-    local menu_scale = menu_width / 440
+    local icon_x = resources.play_right - icon_size * 0.5 - 12
+    local icon_y = resources.safe_area.top - icon_size * 0.5 - 12
+    local menu_scale = math.max(0.1, math.min(
+        1,
+        (resources.play_width - 24) / 440,
+        (resources.safe_area.height - 24) / 320
+    ))
+    local menu_center_x = (resources.play_left + resources.play_right) * 0.5
+    local menu_center_y = (resources.safe_area.top + resources.safe_area.bottom) * 0.5
     return {
         icon_size = icon_size,
         icon_x = icon_x,
-        menu_width = menu_width,
+        icon_y = icon_y,
+        menu_center_x = menu_center_x,
+        menu_center_y = menu_center_y,
+        menu_width = 440 * menu_scale,
         menu_height = 320 * menu_scale,
         menu_scale = menu_scale,
         button_width = 356 * menu_scale,
         button_height = 72 * menu_scale,
-        restart_y = 20 * menu_scale,
-        exit_y = -86 * menu_scale,
+        restart_y = menu_center_y + 20 * menu_scale,
+        exit_y = menu_center_y - 86 * menu_scale,
     }
 end
 
 local function apply_responsive_layout()
     local layout = responsive_layout()
-    scene_set_transform("hud", -resources.play_width * 0.5 + 12, 382, 20)
-    scene_set_transform(SETTINGS_ICON_ID, layout.icon_x, 350, 50)
+    scene_set_transform("hud", resources.play_left + 12, resources.safe_area.top - 12, 20)
+    scene_set_transform(SETTINGS_ICON_ID, layout.icon_x, layout.icon_y, 50)
     scene_set_sprite(
         SETTINGS_ICON_ID,
         SPRITES.settings_icon.path,
@@ -281,9 +319,15 @@ local function apply_responsive_layout()
         layout.menu_width,
         layout.menu_height
     )
-    scene_set_transform("settings_title", 0, 125 * layout.menu_scale, 41)
-    scene_set_transform("settings_restart", 0, layout.restart_y, 41)
-    scene_set_transform("settings_exit", 0, layout.exit_y, 41)
+    scene_set_transform("settings_panel", layout.menu_center_x, layout.menu_center_y, 40)
+    scene_set_transform(
+        "settings_title",
+        layout.menu_center_x,
+        layout.menu_center_y + 125 * layout.menu_scale,
+        41
+    )
+    scene_set_transform("settings_restart", layout.menu_center_x, layout.restart_y, 41)
+    scene_set_transform("settings_exit", layout.menu_center_x, layout.exit_y, 41)
     local title_size = math.max(16, 28 * layout.menu_scale)
     local button_size = math.max(15, 25 * layout.menu_scale)
     scene_set_text("settings_title", "SETTINGS", title_size, 0.91, 0.97, 0.98, 1, "center")
@@ -291,10 +335,36 @@ local function apply_responsive_layout()
     scene_set_text("settings_exit", "EXIT GAME", button_size, 1, 0.72, 0.74, 1, "center")
 end
 
-local function sync_responsive_layout(viewport_width)
-    local next_width = math.min(DESIGN_WIDTH, math.max(1, viewport_width))
-    if math.abs(resources.play_width - next_width) < 0.5 then return end
-    resources.play_width = next_width
+local function constrain_foreground_to_safe_area()
+    for id, transform in pairs(world.transforms) do
+        local sprite = world.sprites[id]
+        if sprite then
+            transform.x = math.max(
+                resources.play_left + sprite.width * 0.5,
+                math.min(resources.play_right - sprite.width * 0.5, transform.x)
+            )
+            transform.y = math.max(
+                resources.safe_area.bottom + sprite.height * 0.5,
+                math.min(resources.safe_area.top - sprite.height * 0.5, transform.y)
+            )
+        end
+    end
+end
+
+local function sync_responsive_layout(viewport_width, safe_area)
+    local half_width = math.min(DESIGN_WIDTH, viewport_width) * 0.5
+    local next_left = math.max(-half_width, safe_area.left)
+    local next_right = math.min(half_width, safe_area.right)
+    local unchanged = math.abs(resources.play_left - next_left) < 0.5
+        and math.abs(resources.play_right - next_right) < 0.5
+        and math.abs(resources.safe_area.top - safe_area.top) < 0.5
+        and math.abs(resources.safe_area.bottom - safe_area.bottom) < 0.5
+    if unchanged then return end
+    resources.play_left = next_left
+    resources.play_right = math.max(next_left + 1, next_right)
+    resources.play_width = resources.play_right - resources.play_left
+    resources.safe_area = safe_area
+    constrain_foreground_to_safe_area()
     apply_responsive_layout()
     if resources.settings_open then update_game_state("PAUSED") end
 end
@@ -363,12 +433,21 @@ local update_schedule = {
     collision_system,
 }
 
-local function reset_game(started, viewport_width)
+local function reset_game(started, viewport_width, safe_area)
     scene_clear()
     world = create_world()
     resources = create_resources()
     resources.started = started or false
-    resources.play_width = math.min(DESIGN_WIDTH, math.max(1, viewport_width or DESIGN_WIDTH))
+    safe_area = safe_area or FULL_SAFE_AREA
+    viewport_width = viewport_width or DESIGN_WIDTH
+    local half_width = math.min(DESIGN_WIDTH, viewport_width) * 0.5
+    resources.safe_area = safe_area
+    resources.play_left = math.max(-half_width, safe_area.left)
+    resources.play_right = math.max(
+        resources.play_left + 1,
+        math.min(half_width, safe_area.right)
+    )
+    resources.play_width = resources.play_right - resources.play_left
     spawn_scene()
     spawn_player()
     update_game_state(resources.started and "DRAG OR ARROWS/WASD - AUTO FIRE"
@@ -379,16 +458,28 @@ local function handle_settings_input(pointer)
     local layout = responsive_layout()
     local toggle_pressed = input_key_just_pressed("Escape")
         or (pointer.justPressed
-            and pointer_inside(pointer, layout.icon_x, 350, layout.icon_size, layout.icon_size))
+            and pointer_inside(pointer, layout.icon_x, layout.icon_y, layout.icon_size, layout.icon_size))
     if toggle_pressed then
         set_settings_open(not resources.settings_open)
         return true
     end
     if not resources.settings_open then return false end
     if not pointer.justPressed then return true end
-    if pointer_inside(pointer, 0, layout.restart_y, layout.button_width, layout.button_height) then
-        reset_game(true, pointer.viewportWidth)
-    elseif pointer_inside(pointer, 0, layout.exit_y, layout.button_width, layout.button_height) then
+    if pointer_inside(
+        pointer,
+        layout.menu_center_x,
+        layout.restart_y,
+        layout.button_width,
+        layout.button_height
+    ) then
+        reset_game(true, pointer.viewportWidth, resources.safe_area)
+    elseif pointer_inside(
+        pointer,
+        layout.menu_center_x,
+        layout.exit_y,
+        layout.button_width,
+        layout.button_height
+    ) then
         app_request_exit()
     end
     return true
@@ -396,17 +487,18 @@ end
 
 function on_script_loaded()
     window_set_size(DESIGN_WIDTH, DESIGN_HEIGHT)
-    reset_game()
+    reset_game(false, DESIGN_WIDTH, window_safe_area())
 end
 
 function on_script_reloaded()
     window_set_size(DESIGN_WIDTH, DESIGN_HEIGHT)
-    reset_game()
+    reset_game(false, DESIGN_WIDTH, window_safe_area())
 end
 
 function on_update(dt)
     local pointer = input_primary_pointer()
-    sync_responsive_layout(pointer.viewportWidth)
+    local safe_area = window_safe_area()
+    sync_responsive_layout(pointer.viewportWidth, safe_area)
     if handle_settings_input(pointer) then
         resources.pointer_was_pressed = false
         return
@@ -426,8 +518,10 @@ function on_update(dt)
     input_x = input_x - ((input_key_pressed("ArrowLeft") or input_key_pressed("KeyA")) and 1 or 0)
     local input_y = (input_key_pressed("ArrowUp") or input_key_pressed("KeyW")) and 1 or 0
     input_y = input_y - ((input_key_pressed("ArrowDown") or input_key_pressed("KeyS")) and 1 or 0)
-    local pointer_in_playfield = math.abs(pointer.x) <= resources.play_width * 0.5
-        and math.abs(pointer.y) <= DESIGN_HEIGHT * 0.5
+    local pointer_in_playfield = pointer.x >= resources.play_left
+        and pointer.x <= resources.play_right
+        and pointer.y >= resources.safe_area.bottom
+        and pointer.y <= resources.safe_area.top
     local restart_pressed = input_key_pressed("Space")
         or (pointer.justPressed and pointer_in_playfield)
     if not resources.started then
@@ -442,7 +536,7 @@ function on_update(dt)
     end
     if resources.game_over then
         if restart_pressed and not resources.restart_was_pressed then
-            reset_game(true, pointer.viewportWidth)
+            reset_game(true, pointer.viewportWidth, resources.safe_area)
         end
         resources.restart_was_pressed = restart_pressed
         return

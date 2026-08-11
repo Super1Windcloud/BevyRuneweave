@@ -38,6 +38,15 @@ class RuntimeActivity : NativeActivity() {
     }
 
     override fun onBackPressed() {
+        returnToLauncher()
+    }
+
+    @Suppress("unused")
+    fun returnToLauncherFromNative() {
+        runOnUiThread { returnToLauncher() }
+    }
+
+    private fun returnToLauncher() {
         startActivity(
             Intent(this, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),

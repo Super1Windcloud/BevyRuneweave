@@ -8,7 +8,11 @@ import {
   spawnSceneEntity,
 } from "../../api/scene.js";
 import { requestExit } from "../../api/app.js";
-import { setWindowSize } from "../../api/window.js";
+import {
+  setWindowSize,
+  windowSafeArea,
+  type WindowSafeArea,
+} from "../../api/window.js";
 import {
   keyJustPressed,
   keyPressed,
@@ -69,7 +73,10 @@ interface GameResources {
   pointerWasPressed: boolean;
   pointerX: number;
   pointerY: number;
+  playLeft: number;
+  playRight: number;
   playWidth: number;
+  safeArea: WindowSafeArea;
 }
 
 interface FrameContext {
@@ -93,6 +100,18 @@ const SPAWN_DELAY = 0.72;
 const DAMAGE_DELAY = 1.0;
 const SETTINGS_ICON_ID = "settings_icon";
 const SETTINGS_MENU_IDS = ["settings_panel", "settings_title", "settings_restart", "settings_exit"];
+const FULL_SAFE_AREA: WindowSafeArea = {
+  left: -DESIGN_WIDTH * 0.5,
+  right: DESIGN_WIDTH * 0.5,
+  bottom: -DESIGN_HEIGHT * 0.5,
+  top: DESIGN_HEIGHT * 0.5,
+  width: DESIGN_WIDTH,
+  height: DESIGN_HEIGHT,
+  leftInset: 0,
+  rightInset: 0,
+  bottomInset: 0,
+  topInset: 0,
+};
 const sprites = {
   background: { path: "sprites/background.png", width: 600, height: 800 },
   player: { path: "sprites/player.png", width: 72, height: 88 },
@@ -132,7 +151,10 @@ function createResources(): GameResources {
     pointerWasPressed: false,
     pointerX: 0,
     pointerY: 0,
+    playLeft: FULL_SAFE_AREA.left,
+    playRight: FULL_SAFE_AREA.right,
     playWidth: DESIGN_WIDTH,
+    safeArea: FULL_SAFE_AREA,
   };
 }
 
@@ -182,20 +204,27 @@ function random01(): number {
 }
 
 function spawnPlayer(): void {
+  const minY = resources.safeArea.bottom + sprites.player.height * 0.5 + 8;
+  const maxY = resources.safeArea.top - sprites.player.height * 0.5 - 8;
   spawnEntity("player", {
     role: "player",
     sprite: sprites.player,
-    transform: { x: 0, y: -300, z: 3 },
+    transform: { x: 0, y: Math.max(minY, Math.min(maxY, -300)), z: 3 },
     collider: { x: 25, y: 35 },
   });
 }
 
 function spawnEnemy(): void {
-  const horizontalLimit = Math.max(0, resources.playWidth * 0.5 - 50);
+  const minX = resources.playLeft + 50;
+  const maxX = resources.playRight - 50;
   spawnEntity(`enemy_${resources.nextId++}`, {
     role: "enemy",
     sprite: sprites.enemy,
-    transform: { x: -horizontalLimit + random01() * horizontalLimit * 2, y: 350, z: 2 },
+    transform: {
+      x: minX + random01() * Math.max(0, maxX - minX),
+      y: resources.safeArea.top - sprites.enemy.height * 0.5 - 8,
+      z: 2,
+    },
     velocity: { x: 0, y: -ENEMY_SPEED },
     collider: { x: 30, y: 30 },
   });
@@ -221,9 +250,12 @@ function playerMovementSystem(frame: FrameContext): void {
     const movementY = frame.pointer.pressed
       ? frame.pointerDeltaY
       : frame.inputY * PLAYER_SPEED * frame.dt;
-    const horizontalLimit = Math.max(0, resources.playWidth * 0.5 - 40);
-    transform.x = Math.max(-horizontalLimit, Math.min(horizontalLimit, transform.x + movementX));
-    transform.y = Math.max(-335, Math.min(300, transform.y + movementY));
+    const minX = resources.playLeft + sprites.player.width * 0.5;
+    const maxX = resources.playRight - sprites.player.width * 0.5;
+    const minY = resources.safeArea.bottom + sprites.player.height * 0.5 + 8;
+    const maxY = resources.safeArea.top - sprites.player.height * 0.5 - 8;
+    transform.x = Math.max(minX, Math.min(maxX, transform.x + movementX));
+    transform.y = Math.max(minY, Math.min(maxY, transform.y + movementY));
   }
 }
 
@@ -257,11 +289,15 @@ function movementSystem(frame: FrameContext): void {
 function boundsSystem(): void {
   for (const id of world.bullets) {
     const transform = world.transforms.get(id);
-    if (transform && transform.y > 420) queueDespawn(id);
+    if (transform && transform.y + sprites.bullet.height * 0.5 >= resources.safeArea.top) {
+      queueDespawn(id);
+    }
   }
   for (const id of world.enemies) {
     const transform = world.transforms.get(id);
-    if (transform && transform.y < -420) queueDespawn(id);
+    if (transform && transform.y - sprites.enemy.height * 0.5 <= resources.safeArea.bottom) {
+      queueDespawn(id);
+    }
   }
 }
 
@@ -346,26 +382,35 @@ function spawnScene(): void {
 
 function responsiveLayout() {
   const iconSize = Math.max(44, Math.min(64, resources.playWidth * 0.17));
-  const iconX = resources.playWidth * 0.5 - iconSize * 0.5 - 12;
-  const menuWidth = Math.max(1, Math.min(440, resources.playWidth - 24));
-  const menuScale = menuWidth / 440;
+  const iconX = resources.playRight - iconSize * 0.5 - 12;
+  const iconY = resources.safeArea.top - iconSize * 0.5 - 12;
+  const menuScale = Math.max(0.1, Math.min(
+    1,
+    (resources.playWidth - 24) / 440,
+    (resources.safeArea.height - 24) / 320,
+  ));
+  const menuCenterX = (resources.playLeft + resources.playRight) * 0.5;
+  const menuCenterY = (resources.safeArea.top + resources.safeArea.bottom) * 0.5;
   return {
     iconSize,
     iconX,
-    menuWidth,
+    iconY,
+    menuCenterX,
+    menuCenterY,
+    menuWidth: 440 * menuScale,
     menuHeight: 320 * menuScale,
     menuScale,
     buttonWidth: 356 * menuScale,
     buttonHeight: 72 * menuScale,
-    restartY: 20 * menuScale,
-    exitY: -86 * menuScale,
+    restartY: menuCenterY + 20 * menuScale,
+    exitY: menuCenterY - 86 * menuScale,
   };
 }
 
 function applyResponsiveLayout(): void {
   const layout = responsiveLayout();
-  setTransform("hud", { x: -resources.playWidth * 0.5 + 12, y: 382, z: 20 });
-  setTransform(SETTINGS_ICON_ID, { x: layout.iconX, y: 350, z: 50 });
+  setTransform("hud", { x: resources.playLeft + 12, y: resources.safeArea.top - 12, z: 20 });
+  setTransform(SETTINGS_ICON_ID, { x: layout.iconX, y: layout.iconY, z: 50 });
   setSprite(SETTINGS_ICON_ID, {
     path: sprites.settingsIcon.path,
     width: layout.iconSize,
@@ -378,9 +423,14 @@ function applyResponsiveLayout(): void {
     width: layout.menuWidth,
     height: layout.menuHeight,
   });
-  setTransform("settings_title", { x: 0, y: 125 * layout.menuScale, z: 41 });
-  setTransform("settings_restart", { x: 0, y: layout.restartY, z: 41 });
-  setTransform("settings_exit", { x: 0, y: layout.exitY, z: 41 });
+  setTransform("settings_panel", { x: layout.menuCenterX, y: layout.menuCenterY, z: 40 });
+  setTransform("settings_title", {
+    x: layout.menuCenterX,
+    y: layout.menuCenterY + 125 * layout.menuScale,
+    z: 41,
+  });
+  setTransform("settings_restart", { x: layout.menuCenterX, y: layout.restartY, z: 41 });
+  setTransform("settings_exit", { x: layout.menuCenterX, y: layout.exitY, z: 41 });
   const titleSize = Math.max(16, 28 * layout.menuScale);
   const buttonSize = Math.max(15, 25 * layout.menuScale);
   setText("settings_title", {
@@ -412,12 +462,36 @@ function applyResponsiveLayout(): void {
   });
 }
 
-function syncResponsiveLayout(viewportWidth: number): void {
-  const nextWidth = Math.min(DESIGN_WIDTH, Math.max(1, viewportWidth));
-  if (Math.abs(resources.playWidth - nextWidth) < 0.5) return;
-  resources.playWidth = nextWidth;
+function syncResponsiveLayout(viewportWidth: number, safeArea: WindowSafeArea): void {
+  const nextLeft = Math.max(-Math.min(DESIGN_WIDTH, viewportWidth) * 0.5, safeArea.left);
+  const nextRight = Math.min(Math.min(DESIGN_WIDTH, viewportWidth) * 0.5, safeArea.right);
+  const unchanged = Math.abs(resources.playLeft - nextLeft) < 0.5
+    && Math.abs(resources.playRight - nextRight) < 0.5
+    && Math.abs(resources.safeArea.top - safeArea.top) < 0.5
+    && Math.abs(resources.safeArea.bottom - safeArea.bottom) < 0.5;
+  if (unchanged) return;
+  resources.playLeft = nextLeft;
+  resources.playRight = Math.max(nextLeft + 1, nextRight);
+  resources.playWidth = resources.playRight - resources.playLeft;
+  resources.safeArea = safeArea;
+  constrainForegroundToSafeArea();
   applyResponsiveLayout();
   if (resources.settingsOpen) updateGameState("PAUSED");
+}
+
+function constrainForegroundToSafeArea(): void {
+  for (const [id, transform] of world.transforms) {
+    const sprite = world.sprites.get(id);
+    if (!sprite) continue;
+    transform.x = Math.max(
+      resources.playLeft + sprite.width * 0.5,
+      Math.min(resources.playRight - sprite.width * 0.5, transform.x),
+    );
+    transform.y = Math.max(
+      resources.safeArea.bottom + sprite.height * 0.5,
+      Math.min(resources.safeArea.top - sprite.height * 0.5, transform.y),
+    );
+  }
 }
 
 function setSettingsOpen(open: boolean): void {
@@ -452,7 +526,7 @@ function handleSettingsInput(pointer: PrimaryPointer): boolean {
   const layout = responsiveLayout();
   const togglePressed = keyJustPressed("Escape")
     || (pointer.justPressed
-      && pointerInside(pointer, layout.iconX, 350, layout.iconSize, layout.iconSize));
+      && pointerInside(pointer, layout.iconX, layout.iconY, layout.iconSize, layout.iconSize));
   if (togglePressed) {
     setSettingsOpen(!resources.settingsOpen);
     return true;
@@ -461,15 +535,15 @@ function handleSettingsInput(pointer: PrimaryPointer): boolean {
   if (!pointer.justPressed) return true;
   if (pointerInside(
     pointer,
-    0,
+    layout.menuCenterX,
     layout.restartY,
     layout.buttonWidth,
     layout.buttonHeight,
   )) {
-    resetGame(true, pointer.viewportWidth);
+    resetGame(true, pointer.viewportWidth, resources.safeArea);
   } else if (pointerInside(
     pointer,
-    0,
+    layout.menuCenterX,
     layout.exitY,
     layout.buttonWidth,
     layout.buttonHeight,
@@ -488,12 +562,22 @@ const updateSchedule: GameSystem[] = [
   collisionSystem,
 ];
 
-function resetGame(started = false, viewportWidth = DESIGN_WIDTH): void {
+function resetGame(
+  started = false,
+  viewportWidth = DESIGN_WIDTH,
+  safeArea = FULL_SAFE_AREA,
+): void {
   clearScene();
   world = createWorld();
   resources = createResources();
   resources.started = started;
-  resources.playWidth = Math.min(DESIGN_WIDTH, Math.max(1, viewportWidth));
+  resources.safeArea = safeArea;
+  resources.playLeft = Math.max(-Math.min(DESIGN_WIDTH, viewportWidth) * 0.5, safeArea.left);
+  resources.playRight = Math.max(
+    resources.playLeft + 1,
+    Math.min(Math.min(DESIGN_WIDTH, viewportWidth) * 0.5, safeArea.right),
+  );
+  resources.playWidth = resources.playRight - resources.playLeft;
   spawnScene();
   spawnPlayer();
   updateGameState(started ? "DRAG OR ARROWS/WASD - AUTO FIRE" : "CLICK / TOUCH / SPACE TO START");
@@ -503,17 +587,18 @@ const callbacks = globalThis as typeof globalThis & RuneweaveCallbacks;
 
 callbacks.on_script_loaded = function (): void {
   setWindowSize(DESIGN_WIDTH, DESIGN_HEIGHT);
-  resetGame();
+  resetGame(false, DESIGN_WIDTH, windowSafeArea());
 };
 
 callbacks.on_script_reloaded = function (): void {
   setWindowSize(DESIGN_WIDTH, DESIGN_HEIGHT);
-  resetGame();
+  resetGame(false, DESIGN_WIDTH, windowSafeArea());
 };
 
 callbacks.on_update = function (dt: number): void {
   const pointer = primaryPointer();
-  syncResponsiveLayout(pointer.viewportWidth);
+  const safeArea = windowSafeArea();
+  syncResponsiveLayout(pointer.viewportWidth, safeArea);
   if (handleSettingsInput(pointer)) {
     resources.pointerWasPressed = false;
     return;
@@ -533,8 +618,10 @@ callbacks.on_update = function (dt: number): void {
     - Number(keyPressed("ArrowLeft") || keyPressed("KeyA"));
   const inputY = Number(keyPressed("ArrowUp") || keyPressed("KeyW"))
     - Number(keyPressed("ArrowDown") || keyPressed("KeyS"));
-  const pointerInPlayfield = Math.abs(pointer.x) <= resources.playWidth * 0.5
-    && Math.abs(pointer.y) <= DESIGN_HEIGHT * 0.5;
+  const pointerInPlayfield = pointer.x >= resources.playLeft
+    && pointer.x <= resources.playRight
+    && pointer.y >= resources.safeArea.bottom
+    && pointer.y <= resources.safeArea.top;
   const restartPressed = keyPressed("Space") || (pointer.justPressed && pointerInPlayfield);
   if (!resources.started) {
     if (restartPressed && !resources.restartWasPressed) {
@@ -547,7 +634,9 @@ callbacks.on_update = function (dt: number): void {
     }
   }
   if (resources.gameOver) {
-    if (restartPressed && !resources.restartWasPressed) resetGame(true, pointer.viewportWidth);
+    if (restartPressed && !resources.restartWasPressed) {
+      resetGame(true, pointer.viewportWidth, resources.safeArea);
+    }
     resources.restartWasPressed = restartPressed;
     return;
   }
