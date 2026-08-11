@@ -3,7 +3,7 @@
     "name": "clash",
     "version": "0.1.0",
     "appName": "clash",
-    "icon": "https://raw.githubusercontent.com/Super1Windcloud/bevy-script-squadron-runtime/main/assets/branding/bevy_icon.png",
+    "icon": ".runtime-icon.png",
     "script": {
         "language": "typescript",
         "entry": "clash.js"

@@ -141,12 +141,14 @@ fn set_default_window_icon(
 }
 
 #[cfg(target_os = "macos")]
-fn set_default_window_icon() {
+fn set_default_window_icon(asset_root: Res<RuntimeAssetRoot>) {
     use objc2::AnyThread as _;
     use objc2_app_kit::{NSApplication, NSBitmapImageRep, NSDeviceRGBColorSpace, NSImage};
     use objc2_foundation::NSSize;
 
-    let image = match image::load_from_memory(DEFAULT_WINDOW_ICON) {
+    let bytes = fs::read(asset_root.0.join(".runtime-icon.png"))
+        .unwrap_or_else(|_| DEFAULT_WINDOW_ICON.to_vec());
+    let image = match image::load_from_memory(&bytes) {
         Ok(image) => image.into_rgba8(),
         Err(error) => {
             warn!("Failed to decode the embedded Bevy application icon: {error}");
