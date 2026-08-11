@@ -38,3 +38,7 @@ custom HTTPS URL field. Downloading and starting a game are always user initiate
 is extracted into staging, validated through `engineConfig.json`, atomically promoted under
 Application Support, and then activated in the running runtime. A previously installed package can
 be started explicitly with **Start installed game**.
+
+The game window is full-screen on iPhone and iPad and hides the status bar. The native host owns
+mobile surface geometry, so script calls to `window_set_size` return `false`; responsive gameplay
+uses the viewport dimensions returned by `input_primary_pointer()` instead.

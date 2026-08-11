@@ -387,8 +387,14 @@ function resetGame(started = false, viewportWidth = DESIGN_WIDTH) {
   updateGameState(started ? "DRAG OR ARROWS/WASD - AUTO FIRE" : "CLICK / TOUCH / SPACE TO START");
 }
 
-globalThis.on_script_loaded = resetGame;
-globalThis.on_script_reloaded = resetGame;
+globalThis.on_script_loaded = function () {
+  window_set_size(DESIGN_WIDTH, DESIGN_HEIGHT);
+  resetGame();
+};
+globalThis.on_script_reloaded = function () {
+  window_set_size(DESIGN_WIDTH, DESIGN_HEIGHT);
+  resetGame();
+};
 globalThis.on_update = function (dt) {
   const pointer = input_primary_pointer();
   syncResponsiveLayout(pointer.viewportWidth);

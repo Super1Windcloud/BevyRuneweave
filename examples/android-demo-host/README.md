@@ -42,3 +42,9 @@ The Android launcher accepts an HTTPS ZIP URL, extracts it into staging, validat
 `RuntimeActivity` runtime. This is the same resource lifecycle used by the desktop and iOS hosts;
 the presentation and remote asset selection remain platform-specific. When the runtime activity is
 actually finished, its process is terminated so a future launch gets a fresh winit event loop.
+
+`RuntimeActivity` always presents the game as an immersive full-screen surface. It hides status and
+navigation bars again after resume or focus changes, allows transient bars by edge swipe, and lays
+out through display cutouts where the Android version supports it. Script calls to
+`window_set_size` return `false` on Android; viewport-dependent gameplay must use the dimensions
+reported by `input_primary_pointer()`.

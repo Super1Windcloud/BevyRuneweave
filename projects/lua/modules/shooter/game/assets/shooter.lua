@@ -395,10 +395,12 @@ local function handle_settings_input(pointer)
 end
 
 function on_script_loaded()
+    window_set_size(DESIGN_WIDTH, DESIGN_HEIGHT)
     reset_game()
 end
 
 function on_script_reloaded()
+    window_set_size(DESIGN_WIDTH, DESIGN_HEIGHT)
     reset_game()
 end
 

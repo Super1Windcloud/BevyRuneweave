@@ -246,6 +246,42 @@ fn app_request_exit(context: FunctionCallContext) -> Result<bool, InteropError> 
         .with_world_mut(|world| world.write_message(AppExit::Success).is_some())
 }
 
+fn window_set_size(
+    context: FunctionCallContext,
+    width: f32,
+    height: f32,
+) -> Result<bool, InteropError> {
+    if !width.is_finite()
+        || !height.is_finite()
+        || width < 1.0
+        || height < 1.0
+        || width > 16_384.0
+        || height > 16_384.0
+    {
+        return Ok(false);
+    }
+
+    let world = context.world()?;
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    return world.with_world_mut(|world| {
+        let Some(mut window) = world
+            .query_filtered::<&mut Window, With<bevy::window::PrimaryWindow>>()
+            .iter_mut(world)
+            .next()
+        else {
+            return false;
+        };
+        window.resolution.set(width, height);
+        true
+    });
+
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let _ = world;
+        Ok(false)
+    }
+}
+
 fn clear_owned_entities(world: &mut World, owner: &ScriptAttachment) {
     let mut query = world.query::<(Entity, &ScriptOwnedBy)>();
     let entities = query
@@ -299,6 +335,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("scene_transform", scene_transform)
             .register("game_state_set", game_state_set)
             .register("app_request_exit", app_request_exit)
+            .register("window_set_size", window_set_size)
             .register("input_key_pressed", input_key_pressed)
             .register("input_key_just_pressed", input_key_just_pressed)
             .register("input_key_just_released", input_key_just_released)
@@ -325,10 +362,10 @@ mod tests {
     use bevy::asset::{AssetApp, AssetPlugin};
     use bevy::ecs::message::Messages;
     use bevy::image::Image;
-    use bevy::input::{
-        mouse::MouseButton,
-        touch::{TouchInput, TouchPhase, touch_screen_input_system},
-    };
+    #[cfg(any(feature = "js", feature = "typescript"))]
+    use bevy::input::mouse::MouseButton;
+    #[cfg(feature = "lua")]
+    use bevy::input::touch::{TouchInput, TouchPhase, touch_screen_input_system};
     use bevy::window::{PrimaryWindow, WindowResolution};
     use bevy_mod_scripting::{
         asset::{Language, ScriptAsset},
@@ -345,9 +382,9 @@ mod tests {
     fn scene_api_mutates_real_bevy_components() -> Result<(), InteropError> {
         let mut world = World::new();
         world.init_resource::<AppScriptFunctionRegistry>();
-        world.init_resource::<bevy::ecs::reflect::AppTypeRegistry>();
+        world.init_resource::<AppTypeRegistry>();
         world
-            .resource::<bevy::ecs::reflect::AppTypeRegistry>()
+            .resource::<AppTypeRegistry>()
             .write()
             .register::<Transform>();
         let attachment = ScriptAttachment::StaticScript(Handle::<ScriptAsset>::default());
@@ -388,8 +425,8 @@ mod tests {
     fn app_exit_api_writes_the_portable_bevy_exit_message() -> Result<(), InteropError> {
         let mut world = World::new();
         world.init_resource::<AppScriptFunctionRegistry>();
-        world.init_resource::<bevy::ecs::reflect::AppTypeRegistry>();
-        world.init_resource::<bevy::ecs::message::Messages<AppExit>>();
+        world.init_resource::<AppTypeRegistry>();
+        world.init_resource::<Messages<AppExit>>();
         let cache = WorldGuard::setup_cache(&world, CurrentScriptAttachment::default());
 
         WorldGuard::with_static_guard(&mut world, cache, |_guard| {
@@ -400,20 +437,53 @@ mod tests {
         })?;
 
         let exits = world
-            .resource_mut::<bevy::ecs::message::Messages<AppExit>>()
+            .resource_mut::<Messages<AppExit>>()
             .drain()
             .collect::<Vec<_>>();
         assert_eq!(exits, vec![AppExit::Success]);
         Ok(())
     }
 
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn desktop_window_size_api_updates_the_primary_window() -> Result<(), InteropError> {
+        let mut world = World::new();
+        world.init_resource::<AppScriptFunctionRegistry>();
+        world.init_resource::<AppTypeRegistry>();
+        world.spawn((
+            Window {
+                resolution: WindowResolution::new(600, 800),
+                ..default()
+            },
+            PrimaryWindow,
+        ));
+        let cache = WorldGuard::setup_cache(&world, CurrentScriptAttachment::default());
+
+        WorldGuard::with_static_guard(&mut world, cache, |_guard| {
+            assert!(window_set_size(
+                FunctionCallContext::new(Language::Unknown),
+                960.0,
+                540.0,
+            )?);
+            Ok::<(), InteropError>(())
+        })?;
+
+        let window = world
+            .query_filtered::<&Window, With<PrimaryWindow>>()
+            .single(&world)
+            .expect("one primary window must exist");
+        assert_eq!((window.width(), window.height()), (960.0, 540.0));
+        Ok(())
+    }
+
+    #[cfg(feature = "lua")]
     fn install_settings_touch(world: &mut World) -> Result<(), InteropError> {
         world.init_resource::<Messages<TouchInput>>();
         world.init_resource::<Touches>();
         let window = world
             .spawn((
                 Window {
-                    resolution: WindowResolution::new(200, 400),
+                    resolution: WindowResolution::new(600, 800),
                     ..default()
                 },
                 PrimaryWindow,
@@ -432,9 +502,10 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(any(feature = "js", feature = "typescript"))]
     fn install_settings_mouse(world: &mut World) {
         let mut window = Window {
-            resolution: WindowResolution::new(200, 400),
+            resolution: WindowResolution::new(600, 800),
             ..default()
         };
         window.set_cursor_position(Some(Vec2::new(190.0, 20.0)));
@@ -531,6 +602,11 @@ mod tests {
                 &mut context,
                 world_id,
             )?;
+            assert!(window_set_size(
+                FunctionCallContext::new(Language::Unknown),
+                200.0,
+                400.0,
+            )?);
             quickjs_handler(
                 vec![ScriptValue::Float(1.0 / 60.0)],
                 &attachment,
@@ -580,6 +656,11 @@ mod tests {
                 &mut context,
                 world_id,
             )?;
+            assert!(window_set_size(
+                FunctionCallContext::new(Language::Unknown),
+                200.0,
+                400.0,
+            )?);
             lua_handler(
                 vec![ScriptValue::Float(1.0 / 60.0)],
                 &attachment,

@@ -37,6 +37,11 @@
     return app_request_exit();
   }
 
+  // modules/shooter/api/window.ts
+  function setWindowSize(width, height) {
+    return window_set_size(width, height);
+  }
+
   // modules/shooter/api/input.ts
   function keyPressed(key) {
     return input_key_pressed(key);
@@ -417,9 +422,11 @@ ${message}` : status,
   }
   var callbacks = globalThis;
   callbacks.on_script_loaded = function() {
+    setWindowSize(DESIGN_WIDTH, DESIGN_HEIGHT);
     resetGame();
   };
   callbacks.on_script_reloaded = function() {
+    setWindowSize(DESIGN_WIDTH, DESIGN_HEIGHT);
     resetGame();
   };
   callbacks.on_update = function(dt) {

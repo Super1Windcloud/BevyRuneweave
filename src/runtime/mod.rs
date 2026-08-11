@@ -16,14 +16,16 @@ use bevy::asset::{
 };
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use bevy::window::PrimaryWindow;
+#[cfg(any(target_os = "android", target_os = "ios"))]
+use bevy::window::WindowMode;
 #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
-use bevy::window::{MonitorSelection, WindowPosition};
+use bevy::window::WindowPosition;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use bevy::winit::WINIT_WINDOWS;
 use bevy::{
     asset::AssetPlugin,
     prelude::*,
-    window::{PresentMode, WindowResolution},
+    window::{MonitorSelection, PresentMode, WindowResolution},
 };
 use bevy_mod_scripting::prelude::{
     BMSPlugin, ScriptAsset, ScriptCallbackEvent, ScriptComponent, ScriptValue, callback_labels,
@@ -346,6 +348,8 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
                 primary_window: Some(Window {
                     title,
                     resolution: WindowResolution::new(WINDOW_WIDTH, WINDOW_HEIGHT),
+                    #[cfg(any(target_os = "android", target_os = "ios"))]
+                    mode: WindowMode::BorderlessFullscreen(MonitorSelection::Primary),
                     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
                     position: WindowPosition::Centered(MonitorSelection::Primary),
                     present_mode: PresentMode::AutoVsync,
@@ -564,12 +568,11 @@ mod tests {
         let Projection::Orthographic(projection) = projection else {
             panic!("scene camera must be orthographic");
         };
-        assert_eq!(
-            projection.scaling_mode,
-            bevy::camera::ScalingMode::FixedVertical {
-                viewport_height: crate::GAME_VIEWPORT_HEIGHT,
-            }
-        );
+        let bevy::camera::ScalingMode::FixedVertical { viewport_height } = projection.scaling_mode
+        else {
+            panic!("scene camera must keep a fixed virtual height");
+        };
+        assert_eq!(viewport_height, crate::GAME_VIEWPORT_HEIGHT);
     }
 
     #[cfg(feature = "unified")]

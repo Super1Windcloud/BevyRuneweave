@@ -34,6 +34,10 @@ Runeweave 核心提供三种语言一致的 Entity、Component、Resource 与 Qu
 飞机大战 runtime 提供响应式虚拟视口以及实时键盘、鼠标和触控输入，场景 API 直接写入
 Bevy 精灵/文本组件。输入行为、资源路径、尺寸、层级、HUD 内容和具体玩法均由脚本实现。
 
+Windows、macOS 和 Linux 的主窗口尺寸由脚本通过统一 BMS API 指定；Android 与 iOS
+则始终使用原生沉浸式全屏，并拒绝脚本改变窗口尺寸。脚本通过实时视口尺寸完成移动端
+输入坐标和界面布局适配。
+
 ## 项目结构
 
 ```text

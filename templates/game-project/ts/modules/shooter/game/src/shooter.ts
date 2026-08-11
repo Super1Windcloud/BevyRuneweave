@@ -8,6 +8,7 @@ import {
   spawnSceneEntity,
 } from "../../api/scene.js";
 import { requestExit } from "../../api/app.js";
+import { setWindowSize } from "../../api/window.js";
 import {
   keyJustPressed,
   keyPressed,
@@ -501,10 +502,12 @@ function resetGame(started = false, viewportWidth = DESIGN_WIDTH): void {
 const callbacks = globalThis as typeof globalThis & RuneweaveCallbacks;
 
 callbacks.on_script_loaded = function (): void {
+  setWindowSize(DESIGN_WIDTH, DESIGN_HEIGHT);
   resetGame();
 };
 
 callbacks.on_script_reloaded = function (): void {
+  setWindowSize(DESIGN_WIDTH, DESIGN_HEIGHT);
   resetGame();
 };
 

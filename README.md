@@ -35,6 +35,10 @@ shooter runtime provides a responsive virtual viewport plus live keyboard, mouse
 while scene APIs write Bevy sprite/text components directly. Scripts select input behavior, asset
 paths, dimensions, render layers, and HUD content alongside the gameplay itself.
 
+On Windows, macOS, and Linux, scripts select the primary window size through the shared BMS API.
+Android and iOS instead use native immersive full-screen surfaces and ignore script resize requests;
+scripts read the live viewport dimensions to keep input and layout responsive.
+
 ## Project Layout
 
 ```text

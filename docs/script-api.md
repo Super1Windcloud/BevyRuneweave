@@ -17,6 +17,7 @@ as real reflected Bevy components and resources; there is no script-side ECS sna
 | `scene_clear()` | Despawns every entity owned by the current script. |
 | `game_state_set(score, lives, message)` | Replaces the reflected `ScriptGameState` resource. |
 | `app_request_exit()` | Sends Bevy's portable `AppExit::Success` message and reports whether it was accepted. |
+| `window_set_size(width, height)` | Sets the primary window size on desktop; returns `false` without resizing on Android and iOS. |
 
 Entity ownership is derived from BMS `CurrentScriptAttachment`. Detaching or reloading a script
 removes only the entities owned by that attachment.
@@ -39,6 +40,12 @@ virtual height is fixed at 800 while its width follows the actual window aspect 
 The shooter uses the primary pointer for mouse/touch drag movement and geometry-based hit testing.
 Its top-right settings icon and menu scale with the visible playfield. The menu opens `RESTART` and
 `EXIT GAME`; exit is routed through `app_request_exit()` on all five platforms.
+
+`window_set_size(width, height)` lets scripts choose their desktop window dimensions on Windows,
+macOS, and Linux. It returns `true` when the primary window accepts a finite size between 1 and
+16384 logical pixels. Android and iOS own their window geometry through the native host, run the
+game in immersive full-screen mode, and return `false` for every script resize request. This keeps
+one portable script contract without allowing gameplay code to break mobile full-screen behavior.
 
 HTTP functions are `http_get`, `http_post`, and `http_poll`. These services are also registered once
 through BMS; the Lua and QuickJS runtimes contain no Runeweave-specific service bindings.

@@ -16,6 +16,9 @@ by the Bevy camera; it does not maintain a second input snapshot.
 Application exit requests likewise enter Bevy through the BMS-registered `app_request_exit`
 function and its portable `AppExit` message, rather than calling a platform process API from a
 script.
+Window size requests use the same registry path. Desktop hosts apply valid script-selected sizes to
+the primary Bevy window, while Android and iOS reject resize requests because native mobile hosts
+own an immersive full-screen surface. The boolean result is portable across all five platforms.
 
 ## API Registration
 
