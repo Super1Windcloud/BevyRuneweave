@@ -6,3 +6,4 @@
 node_modules
 /examples/android-demo-host/.gradle
 /examples/android-demo-host/**/build
+assets/clash
