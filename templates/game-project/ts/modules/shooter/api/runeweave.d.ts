@@ -6,6 +6,19 @@ interface BmsReflectReference {
 
 declare function scene_spawn(id: string, x: number, y: number, z: number): boolean;
 declare function scene_set_sprite(id: string, path: string, width: number, height: number): boolean;
+declare function scene_set_model(id: string, path: string): boolean;
+declare function scene_set_transform_3d(
+  id: string,
+  x: number,
+  y: number,
+  z: number,
+  rotationX: number,
+  rotationY: number,
+  rotationZ: number,
+  scale: number,
+): boolean;
+declare function scene_play_animation(id: string, path: string, repeat: boolean): boolean;
+declare function scene_set_3d_enabled(enabled: boolean): boolean;
 declare function scene_set_transform(id: string, x: number, y: number, z: number): boolean;
 declare function scene_set_text(
   id: string,

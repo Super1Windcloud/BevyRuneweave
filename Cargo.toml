@@ -116,6 +116,7 @@ full_scripting = ["documentation", "dynamic_components", "script_systems"]
 bevy = { version = "0.19.0", default-features = false, features = [
     "default_app",
     "2d_bevy_render",
+    "3d_bevy_render",
     "scene",
     "picking",
     "std",

@@ -2,6 +2,7 @@
   "name": "@superwindcloud/bevy-runeweave",
   "version": "0.1.0",
   "author": "superwindcloud",
+  "type": "module",
   "private": true,
   "scripts": {
     "build": "esbuild modules/shooter/game/src/shooter.ts --bundle --format=iife --target=es2023 --outfile=modules/shooter/game/assets/shooter.js",

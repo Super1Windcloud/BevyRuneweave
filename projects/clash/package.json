@@ -3,13 +3,18 @@
   "version": "0.1.0",
   "author": "superwindcloud",
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "esbuild modules/clash/game/src/clash.ts --bundle --format=iife --target=es2023 --outfile=modules/clash/game/assets/clash.js",
+    "prepare:assets": "node --import tsx scripts/prepare-assets.ts",
+    "build": "npm run prepare:assets && esbuild modules/clash/game/src/clash.ts --bundle --format=iife --target=es2023 --outfile=modules/clash/game/assets/clash.js",
+    "test": "npm run build && node --import tsx scripts/smoke.ts",
     "watch": "esbuild modules/clash/game/src/clash.ts --bundle --format=iife --target=es2023 --outfile=modules/clash/game/assets/clash.js --watch=forever",
-    "check": "tsc --project tsconfig.json --noEmit"
+    "check": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.scripts.json --noEmit"
   },
   "devDependencies": {
+    "@types/node": "^26.1.2",
     "esbuild": "^0.28.1",
+    "tsx": "^4.20.6",
     "typescript": "7.0.2"
   }
 }

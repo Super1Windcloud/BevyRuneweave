@@ -44,6 +44,13 @@ pub struct ScriptGameState {
 #[derive(Component, Clone)]
 struct ScriptOwnedBy(ScriptAttachment);
 
+#[derive(Component, Clone)]
+struct PendingScriptAnimation {
+    graph: Handle<AnimationGraph>,
+    node: AnimationNodeIndex,
+    repeat: bool,
+}
+
 fn valid_entity_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= MAX_ENTITY_ID_LENGTH && !id.chars().any(char::is_control)
 }
@@ -143,6 +150,107 @@ fn scene_set_sprite(
             custom_size: Some(Vec2::new(width, height)),
             ..default()
         });
+        true
+    })
+}
+
+fn scene_set_model(
+    context: FunctionCallContext,
+    id: String,
+    path: String,
+) -> Result<bool, InteropError> {
+    if !valid_asset_path(&path) || !path.to_ascii_lowercase().ends_with(".glb") {
+        return Ok(false);
+    }
+    let (world, owner) = current_script(&context)?;
+    let asset_server = world
+        .with_world(|raw_world| raw_world.get_resource::<AssetServer>().cloned())?
+        .ok_or_else(|| InteropError::invariant("scene model API requires Bevy AssetPlugin"))?;
+    let scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset(path));
+    world.with_world_mut(|world| {
+        let Some(entity) = find_owned_entity(world, &owner, &id) else {
+            return false;
+        };
+        world
+            .entity_mut(entity)
+            .remove::<Sprite>()
+            .insert(WorldAssetRoot(scene));
+        true
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn scene_set_transform_3d(
+    context: FunctionCallContext,
+    id: String,
+    x: f32,
+    y: f32,
+    z: f32,
+    rotation_x: f32,
+    rotation_y: f32,
+    rotation_z: f32,
+    scale: f32,
+) -> Result<bool, InteropError> {
+    if !scale.is_finite() || scale <= 0.0 {
+        return Ok(false);
+    }
+    let values = [x, y, z, rotation_x, rotation_y, rotation_z];
+    if values.iter().any(|value| !value.is_finite()) {
+        return Ok(false);
+    }
+    let (world, owner) = current_script(&context)?;
+    world.with_world_mut(|world| {
+        let Some(entity) = find_owned_entity(world, &owner, &id) else {
+            return false;
+        };
+        world.entity_mut(entity).insert(Transform {
+            translation: Vec3::new(x, y, z),
+            rotation: Quat::from_euler(EulerRot::XYZ, rotation_x, rotation_y, rotation_z),
+            scale: Vec3::splat(scale),
+        });
+        true
+    })
+}
+
+fn scene_play_animation(
+    context: FunctionCallContext,
+    id: String,
+    path: String,
+    repeat: bool,
+) -> Result<bool, InteropError> {
+    if !valid_asset_path(&path) || !path.to_ascii_lowercase().ends_with(".glb") {
+        return Ok(false);
+    }
+    let (world, owner) = current_script(&context)?;
+    let asset_server = world
+        .with_world(|raw_world| raw_world.get_resource::<AssetServer>().cloned())?
+        .ok_or_else(|| InteropError::invariant("scene animation API requires Bevy AssetPlugin"))?;
+    let clip = asset_server.load(GltfAssetLabel::Animation(0).from_asset(path));
+    world.with_world_mut(|world| {
+        let Some(entity) = find_owned_entity(world, &owner, &id) else {
+            return false;
+        };
+        let Some(mut graphs) = world.get_resource_mut::<Assets<AnimationGraph>>() else {
+            return false;
+        };
+        let (graph, node) = AnimationGraph::from_clip(clip);
+        let graph = graphs.add(graph);
+        world.entity_mut(entity).insert(PendingScriptAnimation {
+            graph,
+            node,
+            repeat,
+        });
+        true
+    })
+}
+
+fn scene_set_3d_enabled(context: FunctionCallContext, enabled: bool) -> Result<bool, InteropError> {
+    context.world()?.with_world_mut(|world| {
+        let mut query = world.query_filtered::<&mut Camera, With<Camera3d>>();
+        let Some(mut camera) = query.iter_mut(world).next() else {
+            return false;
+        };
+        camera.is_active = enabled;
         true
     })
 }
@@ -409,6 +517,33 @@ fn clear_detached_script_entities(
     }
 }
 
+fn bind_pending_script_animations(
+    mut commands: Commands,
+    pending: Query<(Entity, &PendingScriptAnimation)>,
+    children: Query<&Children>,
+    mut players: Query<&mut AnimationPlayer>,
+) {
+    for (root, animation) in &pending {
+        let Some(player_entity) = children
+            .iter_descendants(root)
+            .find(|entity| players.contains(*entity))
+        else {
+            continue;
+        };
+        let Ok(mut player) = players.get_mut(player_entity) else {
+            continue;
+        };
+        let active = player.play(animation.node);
+        if animation.repeat {
+            active.repeat();
+        }
+        commands
+            .entity(player_entity)
+            .insert(AnimationGraphHandle(animation.graph.clone()));
+        commands.entity(root).remove::<PendingScriptAnimation>();
+    }
+}
+
 /// Registers Runeweave's reflected game types and BMS functions.
 pub(crate) struct RuneweaveScriptApiPlugin;
 
@@ -420,15 +555,26 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register_type::<Text2d>()
             .register_type::<TextFont>()
             .register_type::<TextColor>()
+            .register_type::<WorldAssetRoot>()
             .register_type::<ScriptGameState>()
             .init_resource::<ScriptNetwork>()
             .init_resource::<ScriptGameState>()
-            .add_systems(Update, clear_detached_script_entities);
+            .add_systems(
+                Update,
+                (
+                    clear_detached_script_entities,
+                    bind_pending_script_animations,
+                ),
+            );
 
         let network = app.world().resource::<ScriptNetwork>().clone();
         NamespaceBuilder::<GlobalNamespace>::new_unregistered(app.world_mut())
             .register("scene_spawn", scene_spawn)
             .register("scene_set_sprite", scene_set_sprite)
+            .register("scene_set_model", scene_set_model)
+            .register("scene_set_transform_3d", scene_set_transform_3d)
+            .register("scene_play_animation", scene_play_animation)
+            .register("scene_set_3d_enabled", scene_set_3d_enabled)
             .register("scene_set_transform", scene_set_transform)
             .register("scene_set_text", scene_set_text)
             .register("scene_despawn", scene_despawn)
@@ -509,6 +655,39 @@ mod tests {
                 5.0,
                 6.0,
             )?);
+            assert!(scene_set_transform_3d(
+                context.clone(),
+                "player".to_owned(),
+                7.0,
+                8.0,
+                9.0,
+                0.1,
+                0.2,
+                0.3,
+                1.5,
+            )?);
+            assert!(!scene_set_transform_3d(
+                context.clone(),
+                "player".to_owned(),
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            )?);
+            assert!(!scene_set_model(
+                context.clone(),
+                "player".to_owned(),
+                "sprites/player.png".to_owned(),
+            )?);
+            assert!(!scene_play_animation(
+                context.clone(),
+                "player".to_owned(),
+                "../walk.glb".to_owned(),
+                true,
+            )?);
             assert!(scene_transform(context, "player".to_owned())?.is_some());
             Ok::<(), InteropError>(())
         })?;
@@ -519,7 +698,32 @@ mod tests {
         })?;
         assert_eq!(owner.0, attachment);
         assert_eq!(id.0, "player");
-        assert_eq!(transform.translation, Vec3::new(4.0, 5.0, 6.0));
+        assert_eq!(transform.translation, Vec3::new(7.0, 8.0, 9.0));
+        assert_eq!(transform.scale, Vec3::splat(1.5));
+        Ok(())
+    }
+
+    #[test]
+    fn scene_3d_camera_api_toggles_the_runtime_camera() -> Result<(), InteropError> {
+        let mut world = World::new();
+        world.init_resource::<AppScriptFunctionRegistry>();
+        world.init_resource::<AppTypeRegistry>();
+        world.spawn((Camera3d::default(), Camera::default()));
+        let cache = WorldGuard::setup_cache(&world, CurrentScriptAttachment::default());
+
+        WorldGuard::with_static_guard(&mut world, cache, |_guard| {
+            assert!(scene_set_3d_enabled(
+                FunctionCallContext::new(Language::Unknown),
+                false,
+            )?);
+            Ok::<(), InteropError>(())
+        })?;
+
+        let camera = world
+            .query_filtered::<&Camera, With<Camera3d>>()
+            .single(&world)
+            .map_err(|error| InteropError::string(format!("expected one 3D camera: {error}")))?;
+        assert!(!camera.is_active);
         Ok(())
     }
 

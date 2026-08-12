@@ -93,6 +93,10 @@ fn attach_script(
 fn spawn_scene_camera(mut commands: Commands) {
     commands.spawn((
         Camera2d,
+        Camera {
+            order: 0,
+            ..default()
+        },
         Projection::Orthographic(OrthographicProjection {
             scaling_mode: bevy::camera::ScalingMode::FixedVertical {
                 viewport_height: crate::GAME_VIEWPORT_HEIGHT,
@@ -100,6 +104,35 @@ fn spawn_scene_camera(mut commands: Commands) {
             ..OrthographicProjection::default_2d()
         }),
     ));
+    commands.spawn((
+        Camera3d::default(),
+        Camera {
+            is_active: false,
+            order: 1,
+            clear_color: bevy::camera::ClearColorConfig::None,
+            ..default()
+        },
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: bevy::camera::ScalingMode::FixedVertical {
+                viewport_height: 22.0,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+        Transform::from_xyz(0.0, 18.0, 16.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
+    commands.spawn((
+        DirectionalLight {
+            illuminance: 12_000.0,
+            shadow_maps_enabled: false,
+            ..default()
+        },
+        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.9, -0.55, 0.0)),
+    ));
+    commands.insert_resource(GlobalAmbientLight {
+        color: Color::WHITE,
+        brightness: 600.0,
+        ..default()
+    });
 }
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -611,7 +644,7 @@ mod tests {
             .run_system_cached(spawn_scene_camera)
             .expect("camera startup system must run");
         let projection = world
-            .query::<&Projection>()
+            .query_filtered::<&Projection, With<Camera2d>>()
             .single(&world)
             .expect("one camera projection must be spawned");
         let Projection::Orthographic(projection) = projection else {
@@ -622,6 +655,20 @@ mod tests {
             panic!("scene camera must keep a fixed virtual height");
         };
         assert_eq!(viewport_height, crate::GAME_VIEWPORT_HEIGHT);
+
+        let (camera, projection) = world
+            .query_filtered::<(&Camera, &Projection), With<Camera3d>>()
+            .single(&world)
+            .expect("one 3D camera projection must be spawned");
+        assert!(!camera.is_active);
+        let Projection::Orthographic(projection) = projection else {
+            panic!("3D scene camera must be orthographic");
+        };
+        let bevy::camera::ScalingMode::FixedVertical { viewport_height } = projection.scaling_mode
+        else {
+            panic!("3D scene camera must keep a fixed virtual height");
+        };
+        assert_eq!(viewport_height, 22.0);
     }
 
     #[cfg(feature = "unified")]

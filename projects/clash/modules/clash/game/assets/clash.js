@@ -10,6 +10,9 @@
   function setSprite(id, sprite) {
     return scene_set_sprite(id, sprite.path, sprite.width, sprite.height);
   }
+  function set3dEnabled(enabled) {
+    return scene_set_3d_enabled(enabled);
+  }
   function setTransform(id, transform) {
     return scene_set_transform(id, transform.x, transform.y, transform.z);
   }
@@ -32,9 +35,12 @@
     game_state_set(score, lives, message);
   }
 
-  // modules/clash/api/app.ts
-  function requestExit() {
-    return app_request_exit();
+  // modules/clash/api/input.ts
+  function keyJustPressed(key) {
+    return input_key_just_pressed(key);
+  }
+  function primaryPointer() {
+    return input_primary_pointer();
   }
 
   // modules/clash/api/window.ts
@@ -45,41 +51,16 @@
     return window_safe_area();
   }
 
-  // modules/clash/api/input.ts
-  function keyJustPressed(key) {
-    return input_key_just_pressed(key);
-  }
-  function primaryPointer() {
-    return input_primary_pointer();
+  // modules/clash/api/app.ts
+  function requestExit() {
+    return app_request_exit();
   }
 
-  // modules/clash/game/src/clash.ts
-  var DESKTOP_WINDOW_WIDTH = 540;
-  var DESKTOP_WINDOW_HEIGHT = 960;
+  // modules/clash/game/src/config.ts
   var DESIGN_WIDTH = 450;
   var DESIGN_HEIGHT = 800;
-  var MATCH_DURATION = 180;
-  var MAX_ELIXIR = 10;
-  var ELIXIR_PER_SECOND = 0.72;
-  var SETTINGS_ICON_ID = "settings_icon";
-  var SETTINGS_MENU_IDS = [
-    "settings_panel",
-    "settings_title",
-    "settings_restart",
-    "settings_exit"
-  ];
-  var FULL_SAFE_AREA = {
-    left: -DESIGN_WIDTH * 0.5,
-    right: DESIGN_WIDTH * 0.5,
-    bottom: -DESIGN_HEIGHT * 0.5,
-    top: DESIGN_HEIGHT * 0.5,
-    width: DESIGN_WIDTH,
-    height: DESIGN_HEIGHT,
-    leftInset: 0,
-    rightInset: 0,
-    bottomInset: 0,
-    topInset: 0
-  };
+  var DESKTOP_WINDOW_WIDTH = 540;
+  var DESKTOP_WINDOW_HEIGHT = 960;
   var sprites = {
     arena: { path: "sprites/royale/arena.png", width: DESIGN_WIDTH, height: DESIGN_HEIGHT },
     towerBlue: { path: "sprites/royale/tower-blue.png", width: 86, height: 94 },
@@ -91,7 +72,13 @@
     teamBlue: { path: "sprites/royale/team-blue.png", width: 26, height: 14 },
     teamRed: { path: "sprites/royale/team-red.png", width: 26, height: 14 },
     settingsIcon: { path: "sprites/settings-icon.png", width: 54, height: 54 },
-    settingsPanel: { path: "sprites/settings-panel.png", width: 440, height: 320 }
+    settingsPanel: { path: "sprites/settings-panel.png", width: 440, height: 320 },
+    homeBackground: { path: "sprites/royale/home-bg.png", width: DESIGN_WIDTH, height: DESIGN_HEIGHT },
+    homePlatform: { path: "sprites/royale/home-platform.png", width: 360, height: 260 },
+    homeBattleButton: { path: "sprites/royale/home-battle-button.png", width: 310, height: 92 },
+    homeResource: { path: "sprites/royale/home-resource.png", width: 136, height: 46 },
+    homeDeck: { path: "sprites/royale/home-deck.png", width: 326, height: 82 },
+    homeNav: { path: "sprites/royale/home-nav.png", width: DESIGN_WIDTH, height: 84 }
   };
   var cards = [
     {
@@ -123,712 +110,878 @@
       unit: { hp: 210, damage: 46, speed: 61, range: 29, attackDelay: 0.72, width: 51, height: 47 }
     }
   ];
-  var units = /* @__PURE__ */ new Map();
-  var towers = /* @__PURE__ */ new Map();
-  var resources = createResources();
-  function createResources() {
-    return {
-      safeArea: FULL_SAFE_AREA,
-      playLeft: FULL_SAFE_AREA.left,
-      playRight: FULL_SAFE_AREA.right,
-      playWidth: DESIGN_WIDTH,
-      selectedCard: 0,
-      elixir: 5,
-      enemyElixir: 5,
-      matchSeconds: MATCH_DURATION,
-      enemyDeployTimer: 2.25,
-      nextId: 1,
-      seed: 92317,
-      blueCrowns: 0,
-      redCrowns: 0,
-      settingsOpen: false,
-      outcome: null
-    };
-  }
+
+  // modules/clash/game/src/layout.ts
+  var FALLBACK_SAFE_AREA = {
+    left: -DESIGN_WIDTH * 0.5,
+    right: DESIGN_WIDTH * 0.5,
+    bottom: -DESIGN_HEIGHT * 0.5,
+    top: DESIGN_HEIGHT * 0.5,
+    width: DESIGN_WIDTH,
+    height: DESIGN_HEIGHT,
+    leftInset: 0,
+    rightInset: 0,
+    bottomInset: 0,
+    topInset: 0
+  };
   function clamp(value, minimum, maximum) {
     return Math.max(minimum, Math.min(maximum, value));
   }
-  function random01() {
-    resources.seed = resources.seed * 48271 % 2147483647;
-    return resources.seed / 2147483647;
-  }
-  function currentLayout() {
-    const scale = clamp(
-      Math.min(resources.playWidth / DESIGN_WIDTH, resources.safeArea.height / 740),
-      0.72,
-      1
-    );
-    const handHeight = 144 * scale;
-    const fieldLeft = resources.playLeft + 10 * scale;
-    const fieldRight = resources.playRight - 10 * scale;
-    const fieldTop = resources.safeArea.top - 52 * scale;
-    const fieldBottom = resources.safeArea.bottom + handHeight;
-    const cardWidth = Math.min(82 * scale, (resources.playWidth - 28 * scale) / 4);
+  function createScreenLayout(viewportWidth, safeArea) {
+    const contentWidth = Math.min(DESIGN_WIDTH, viewportWidth, safeArea.width);
+    const left = Math.max(-contentWidth * 0.5, safeArea.left);
+    const right = Math.min(contentWidth * 0.5, safeArea.right);
+    const width = Math.max(1, right - left);
+    const height = Math.max(1, safeArea.height);
     return {
-      scale,
-      fieldLeft,
-      fieldRight,
-      fieldTop,
-      fieldBottom,
-      riverY: fieldBottom + (fieldTop - fieldBottom) * 0.5,
-      cardWidth,
-      cardHeight: cardWidth * 1.22,
-      cardY: resources.safeArea.bottom + 74 * scale,
-      elixirY: resources.safeArea.bottom + 15 * scale,
-      settingsX: resources.playRight - 28 * scale,
-      settingsY: resources.safeArea.top - 27 * scale,
-      settingsSize: 48 * scale,
-      menuCenterX: (resources.playLeft + resources.playRight) * 0.5,
-      menuCenterY: (resources.safeArea.top + resources.safeArea.bottom) * 0.5,
-      menuScale: clamp(
-        Math.min((resources.playWidth - 24) / 440, (resources.safeArea.height - 24) / 320),
-        0.72,
-        1
-      )
+      viewportWidth,
+      safeArea,
+      left,
+      right,
+      top: safeArea.top,
+      bottom: safeArea.bottom,
+      width,
+      height,
+      centerX: (left + right) * 0.5,
+      centerY: (safeArea.top + safeArea.bottom) * 0.5,
+      scale: clamp(Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT), 0.68, 1)
     };
   }
-  function spawnText(id, x, y, z) {
+  function layoutKey(layout2) {
+    return [
+      layout2.viewportWidth,
+      layout2.left,
+      layout2.right,
+      layout2.top,
+      layout2.bottom
+    ].map((value) => value.toFixed(1)).join(":");
+  }
+
+  // modules/clash/game/src/ui.ts
+  function spawnSprite(id, sprite, x = 0, y = 0, z = 0) {
+    spawnSceneEntity(id, { x, y, z });
+    setSprite(id, sprite);
+  }
+  function spawnText(id, x = 0, y = 0, z = 0) {
     spawnSceneEntity(id, { x, y, z });
   }
-  function setCenteredText(id, value, fontSize, color) {
+  function placeSprite(id, sprite, x, y, z) {
+    setTransform(id, { x, y, z });
+    setSprite(id, sprite);
+  }
+  function placeText(id, value, x, y, z, fontSize, color) {
+    setTransform(id, { x, y, z });
     setText(id, { value, fontSize, ...color, alpha: 1, anchor: "center" });
-  }
-  function spawnStaticScene() {
-    spawnSceneEntity("arena", { x: 0, y: 0, z: -100 });
-    setSprite("arena", sprites.arena);
-    spawnText("enemy_name", 0, 0, 40);
-    spawnText("blue_name", 0, 0, 40);
-    spawnText("match_timer", 0, 0, 40);
-    spawnText("crown_score", 0, 0, 40);
-    spawnText("elixir_text", 0, 0, 42);
-    spawnSceneEntity(SETTINGS_ICON_ID, { x: 0, y: 0, z: 60 });
-    setSprite(SETTINGS_ICON_ID, sprites.settingsIcon);
-    for (let index = 0; index < cards.length; index += 1) {
-      spawnSceneEntity(`card_frame_${index}`, { x: 0, y: 0, z: 20 });
-      spawnSceneEntity(`card_art_${index}`, { x: 0, y: 0, z: 21 });
-      spawnText(`card_name_${index}`, 0, 0, 22);
-      spawnText(`card_cost_${index}`, 0, 0, 23);
-    }
-    for (let index = 0; index < MAX_ELIXIR; index += 1) {
-      spawnSceneEntity(`elixir_${index}`, { x: 0, y: 0, z: 20 });
-    }
-  }
-  function createTowers() {
-    const definitions = [
-      { id: "red_king", team: "red", kind: "king", maxHp: 2600 },
-      { id: "red_left", team: "red", kind: "princess", lane: "left", maxHp: 1600 },
-      { id: "red_right", team: "red", kind: "princess", lane: "right", maxHp: 1600 },
-      { id: "blue_king", team: "blue", kind: "king", maxHp: 2600 },
-      { id: "blue_left", team: "blue", kind: "princess", lane: "left", maxHp: 1600 },
-      { id: "blue_right", team: "blue", kind: "princess", lane: "right", maxHp: 1600 }
-    ];
-    for (const definition of definitions) {
-      const tower = {
-        ...definition,
-        x: 0,
-        y: 0,
-        hp: definition.maxHp,
-        attackTimer: 0,
-        alive: true
-      };
-      towers.set(tower.id, tower);
-      spawnSceneEntity(tower.id, { x: 0, y: 0, z: 10 });
-      setSprite(tower.id, tower.team === "blue" ? sprites.towerBlue : sprites.towerRed);
-      spawnText(`${tower.id}_hp`, 0, 0, 14);
-    }
-  }
-  function cardCenterX(index, layout) {
-    const gap = 6 * layout.scale;
-    const totalWidth = layout.cardWidth * cards.length + gap * (cards.length - 1);
-    return resources.playLeft + (resources.playWidth - totalWidth) * 0.5 + layout.cardWidth * 0.5 + index * (layout.cardWidth + gap);
-  }
-  function applyTowerLayout(layout) {
-    const laneInset = Math.min(102 * layout.scale, (layout.fieldRight - layout.fieldLeft) * 0.25);
-    const upperPrincessY = layout.riverY + (layout.fieldTop - layout.riverY) * 0.42;
-    const lowerPrincessY = layout.riverY - (layout.riverY - layout.fieldBottom) * 0.42;
-    const positions = {
-      red_king: { x: 0, y: layout.fieldTop - 47 * layout.scale },
-      red_left: { x: layout.fieldLeft + laneInset, y: upperPrincessY },
-      red_right: { x: layout.fieldRight - laneInset, y: upperPrincessY },
-      blue_king: { x: 0, y: layout.fieldBottom + 47 * layout.scale },
-      blue_left: { x: layout.fieldLeft + laneInset, y: lowerPrincessY },
-      blue_right: { x: layout.fieldRight - laneInset, y: lowerPrincessY }
-    };
-    for (const tower of towers.values()) {
-      const position = positions[tower.id];
-      tower.x = position.x;
-      tower.y = position.y;
-      if (!tower.alive) continue;
-      const width = (tower.kind === "king" ? 82 : 68) * layout.scale;
-      const height = (tower.kind === "king" ? 90 : 75) * layout.scale;
-      setTransform(tower.id, { x: tower.x, y: tower.y, z: tower.kind === "king" ? 11 : 10 });
-      setSprite(tower.id, {
-        path: tower.team === "blue" ? sprites.towerBlue.path : sprites.towerRed.path,
-        width,
-        height
-      });
-      setTransform(`${tower.id}_hp`, {
-        x: tower.x,
-        y: tower.y - (tower.team === "red" ? height * 0.58 : -height * 0.58),
-        z: 14
-      });
-    }
-  }
-  function applyCardLayout(layout) {
-    for (let index = 0; index < cards.length; index += 1) {
-      const card = cards[index];
-      const selectedOffset = index === resources.selectedCard ? 8 * layout.scale : 0;
-      const x = cardCenterX(index, layout);
-      const y = layout.cardY + selectedOffset;
-      setTransform(`card_frame_${index}`, { x, y, z: 20 });
-      setSprite(`card_frame_${index}`, {
-        path: index === resources.selectedCard ? sprites.cardSelected.path : sprites.cardFrame.path,
-        width: layout.cardWidth,
-        height: layout.cardHeight
-      });
-      setTransform(`card_art_${index}`, {
-        x,
-        y: y + layout.cardHeight * 0.1,
-        z: 21
-      });
-      setSprite(`card_art_${index}`, {
-        path: card.art.path,
-        width: layout.cardWidth * 0.78,
-        height: layout.cardHeight * 0.58
-      });
-      setTransform(`card_name_${index}`, {
-        x,
-        y: y - layout.cardHeight * 0.33,
-        z: 22
-      });
-      setCenteredText(
-        `card_name_${index}`,
-        card.name,
-        Math.max(9, 11 * layout.scale),
-        { red: 0.94, green: 0.96, blue: 1 }
-      );
-      setTransform(`card_cost_${index}`, {
-        x: x - layout.cardWidth * 0.34,
-        y: y + layout.cardHeight * 0.35,
-        z: 23
-      });
-      setCenteredText(
-        `card_cost_${index}`,
-        String(card.cost),
-        Math.max(13, 16 * layout.scale),
-        { red: 1, green: 0.84, blue: 1 }
-      );
-    }
-  }
-  function applyHudLayout(layout) {
-    setTransform(SETTINGS_ICON_ID, { x: layout.settingsX, y: layout.settingsY, z: 60 });
-    setSprite(SETTINGS_ICON_ID, {
-      path: sprites.settingsIcon.path,
-      width: layout.settingsSize,
-      height: layout.settingsSize
-    });
-    const topTextY = resources.safeArea.top - 17 * layout.scale;
-    setTransform("enemy_name", { x: resources.playLeft + 48 * layout.scale, y: topTextY, z: 40 });
-    setTransform("match_timer", { x: 0, y: topTextY, z: 40 });
-    setTransform("crown_score", { x: resources.playRight - 75 * layout.scale, y: topTextY, z: 40 });
-    setTransform("blue_name", {
-      x: resources.playLeft + 50 * layout.scale,
-      y: layout.fieldBottom + 20 * layout.scale,
-      z: 40
-    });
-    setCenteredText("enemy_name", "RED KING", 14 * layout.scale, {
-      red: 1,
-      green: 0.72,
-      blue: 0.72
-    });
-    setCenteredText("blue_name", "BLUE KING", 13 * layout.scale, {
-      red: 0.66,
-      green: 0.86,
-      blue: 1
-    });
-    const cellWidth = Math.min(31 * layout.scale, (resources.playWidth - 80 * layout.scale) / 10);
-    const cellGap = 3 * layout.scale;
-    const totalWidth = cellWidth * 10 + cellGap * 9;
-    const startX = -totalWidth * 0.5 + cellWidth * 0.5;
-    for (let index = 0; index < MAX_ELIXIR; index += 1) {
-      setTransform(`elixir_${index}`, {
-        x: startX + index * (cellWidth + cellGap),
-        y: layout.elixirY,
-        z: 20
-      });
-      setSprite(`elixir_${index}`, {
-        path: index < Math.floor(resources.elixir) ? sprites.elixirFull.path : sprites.elixirEmpty.path,
-        width: cellWidth,
-        height: 17 * layout.scale
-      });
-    }
-    setTransform("elixir_text", {
-      x: startX - cellWidth * 0.95,
-      y: layout.elixirY,
-      z: 42
-    });
-    setCenteredText("elixir_text", String(Math.floor(resources.elixir)), 15 * layout.scale, {
-      red: 0.96,
-      green: 0.7,
-      blue: 1
-    });
-  }
-  function applyResponsiveLayout() {
-    const layout = currentLayout();
-    setSprite("arena", {
-      path: sprites.arena.path,
-      width: Math.max(DESIGN_WIDTH, resources.safeArea.width),
-      height: DESIGN_HEIGHT
-    });
-    applyTowerLayout(layout);
-    applyCardLayout(layout);
-    applyHudLayout(layout);
-    if (resources.settingsOpen) applySettingsLayout(layout);
-    if (resources.outcome) applyResultLayout(layout);
-    for (const unit of units.values()) {
-      unit.x = clamp(unit.x, layout.fieldLeft + 18, layout.fieldRight - 18);
-      unit.y = clamp(unit.y, layout.fieldBottom + 22, layout.fieldTop - 22);
-    }
-  }
-  function syncResponsiveLayout(viewportWidth, safeArea) {
-    const width = Math.min(DESIGN_WIDTH, viewportWidth);
-    const nextLeft = Math.max(-width * 0.5, safeArea.left);
-    const nextRight = Math.min(width * 0.5, safeArea.right);
-    const unchanged = Math.abs(resources.playLeft - nextLeft) < 0.5 && Math.abs(resources.playRight - nextRight) < 0.5 && Math.abs(resources.safeArea.top - safeArea.top) < 0.5 && Math.abs(resources.safeArea.bottom - safeArea.bottom) < 0.5;
-    if (unchanged) return;
-    resources.safeArea = safeArea;
-    resources.playLeft = nextLeft;
-    resources.playRight = Math.max(nextLeft + 1, nextRight);
-    resources.playWidth = resources.playRight - resources.playLeft;
-    applyResponsiveLayout();
-  }
-  function updateTowerText() {
-    const layout = currentLayout();
-    for (const tower of towers.values()) {
-      if (!tower.alive) continue;
-      setCenteredText(
-        `${tower.id}_hp`,
-        `${Math.max(0, Math.ceil(tower.hp))}`,
-        Math.max(10, 12 * layout.scale),
-        { red: 1, green: 1, blue: 0.9 }
-      );
-    }
-  }
-  function updateHud() {
-    const minutes = Math.floor(resources.matchSeconds / 60);
-    const seconds = Math.max(0, Math.ceil(resources.matchSeconds) % 60);
-    setCenteredText(
-      "match_timer",
-      `${minutes}:${seconds.toString().padStart(2, "0")}`,
-      18 * currentLayout().scale,
-      { red: 1, green: 0.96, blue: 0.75 }
-    );
-    setCenteredText(
-      "crown_score",
-      `${resources.redCrowns}  -  ${resources.blueCrowns}`,
-      17 * currentLayout().scale,
-      { red: 1, green: 0.85, blue: 0.36 }
-    );
-    applyHudLayout(currentLayout());
-    updateTowerText();
-    setGameState(resources.blueCrowns, 3 - resources.redCrowns, resources.settingsOpen ? "PAUSED" : "");
-  }
-  function laneForX(x) {
-    return x < 0 ? "left" : "right";
-  }
-  function spawnUnit(team, card, x, y) {
-    const layout = currentLayout();
-    const id = `${team}_${card.id}_${resources.nextId++}`;
-    const unit = {
-      id,
-      team,
-      lane: laneForX(x),
-      card,
-      x: clamp(x, layout.fieldLeft + 24, layout.fieldRight - 24),
-      y: clamp(y, layout.fieldBottom + 25, layout.fieldTop - 25),
-      hp: card.unit.hp,
-      attackTimer: 0
-    };
-    units.set(id, unit);
-    spawnSceneEntity(id, { x: unit.x, y: unit.y, z: 7 });
-    setSprite(id, {
-      path: card.art.path,
-      width: card.unit.width * layout.scale,
-      height: card.unit.height * layout.scale
-    });
-    spawnSceneEntity(`${id}_team`, { x: unit.x, y: unit.y, z: 6 });
-    setSprite(`${id}_team`, unit.team === "blue" ? sprites.teamBlue : sprites.teamRed);
-  }
-  function despawnUnit(id) {
-    units.delete(id);
-    despawnSceneEntity(id);
-    despawnSceneEntity(`${id}_team`);
-  }
-  function distance(left, right) {
-    return Math.hypot(left.x - right.x, left.y - right.y);
-  }
-  function targetTower(unit) {
-    const laneTower = towers.get(`${unit.team === "blue" ? "red" : "blue"}_${unit.lane}`);
-    if (laneTower?.alive) return laneTower;
-    const kingTower = towers.get(`${unit.team === "blue" ? "red" : "blue"}_king`);
-    return kingTower?.alive ? kingTower : void 0;
-  }
-  function nearestEnemyUnit(unit, maximumDistance) {
-    let nearest;
-    let nearestDistance = maximumDistance;
-    for (const candidate of units.values()) {
-      if (candidate.team === unit.team || candidate.hp <= 0) continue;
-      const candidateDistance = distance(unit, candidate);
-      if (candidateDistance < nearestDistance) {
-        nearest = candidate;
-        nearestDistance = candidateDistance;
-      }
-    }
-    return nearest;
-  }
-  function moveToward(unit, target, speed, dt) {
-    const dx = target.x - unit.x;
-    const dy = target.y - unit.y;
-    const length = Math.max(1e-3, Math.hypot(dx, dy));
-    const step = Math.min(length, speed * dt);
-    unit.x += dx / length * step;
-    unit.y += dy / length * step;
-  }
-  function damageUnit(unit, amount) {
-    unit.hp -= amount;
-    if (unit.hp <= 0) despawnUnit(unit.id);
-  }
-  function damageTower(tower, amount, attackingTeam) {
-    if (!tower.alive) return;
-    tower.hp -= amount;
-    if (tower.hp > 0) return;
-    tower.alive = false;
-    tower.hp = 0;
-    despawnSceneEntity(tower.id);
-    despawnSceneEntity(`${tower.id}_hp`);
-    if (attackingTeam === "blue") resources.blueCrowns += 1;
-    else resources.redCrowns += 1;
-    if (tower.kind === "king") finishMatch(attackingTeam);
-  }
-  function unitSystem(dt) {
-    for (const unit of [...units.values()]) {
-      if (!units.has(unit.id)) continue;
-      unit.attackTimer = Math.max(0, unit.attackTimer - dt);
-      const nearbyEnemy = nearestEnemyUnit(unit, unit.card.unit.range + 34);
-      const target = nearbyEnemy ?? targetTower(unit);
-      if (!target) continue;
-      const attackDistance = unit.card.unit.range + (nearbyEnemy ? 10 : 32);
-      if (distance(unit, target) <= attackDistance) {
-        if (unit.attackTimer <= 0) {
-          if (nearbyEnemy) damageUnit(nearbyEnemy, unit.card.unit.damage);
-          else damageTower(target, unit.card.unit.damage, unit.team);
-          unit.attackTimer = unit.card.unit.attackDelay;
-        }
-      } else {
-        moveToward(unit, target, unit.card.unit.speed, dt);
-      }
-      if (!units.has(unit.id)) continue;
-      const scale = currentLayout().scale;
-      setTransform(unit.id, { x: unit.x, y: unit.y, z: 7 });
-      setTransform(`${unit.id}_team`, {
-        x: unit.x,
-        y: unit.y - unit.card.unit.height * scale * 0.42,
-        z: 6
-      });
-    }
-  }
-  function towerCombatSystem(dt) {
-    for (const tower of towers.values()) {
-      if (!tower.alive) continue;
-      tower.attackTimer = Math.max(0, tower.attackTimer - dt);
-      let target;
-      let targetDistance = tower.kind === "king" ? 138 : 152;
-      for (const unit of units.values()) {
-        if (unit.team === tower.team) continue;
-        const unitDistance = distance(tower, unit);
-        if (unitDistance < targetDistance) {
-          target = unit;
-          targetDistance = unitDistance;
-        }
-      }
-      if (target && tower.attackTimer <= 0) {
-        damageUnit(target, tower.kind === "king" ? 72 : 58);
-        tower.attackTimer = tower.kind === "king" ? 0.82 : 0.95;
-      }
-    }
-  }
-  function enemyAiSystem(dt) {
-    resources.enemyDeployTimer -= dt;
-    if (resources.enemyDeployTimer > 0) return;
-    const affordable = cards.filter((card2) => card2.cost <= resources.enemyElixir);
-    if (affordable.length === 0) {
-      resources.enemyDeployTimer = 0.6;
-      return;
-    }
-    const card = affordable[Math.floor(random01() * affordable.length)];
-    const layout = currentLayout();
-    const laneX = random01() < 0.5 ? layout.fieldLeft + (layout.fieldRight - layout.fieldLeft) * 0.27 : layout.fieldRight - (layout.fieldRight - layout.fieldLeft) * 0.27;
-    const y = layout.riverY + 50 * layout.scale + random01() * 42 * layout.scale;
-    spawnUnit("red", card, laneX, y);
-    resources.enemyElixir -= card.cost;
-    resources.enemyDeployTimer = 1.35 + random01() * 1.35;
-  }
-  function matchSystem(dt) {
-    resources.elixir = Math.min(MAX_ELIXIR, resources.elixir + ELIXIR_PER_SECOND * dt);
-    resources.enemyElixir = Math.min(MAX_ELIXIR, resources.enemyElixir + ELIXIR_PER_SECOND * dt);
-    resources.matchSeconds = Math.max(0, resources.matchSeconds - dt);
-    if (resources.matchSeconds > 0) return;
-    if (resources.blueCrowns !== resources.redCrowns) {
-      finishMatch(resources.blueCrowns > resources.redCrowns ? "blue" : "red");
-      return;
-    }
-    const blueHealth = [...towers.values()].filter((tower) => tower.team === "blue" && tower.alive).reduce((total, tower) => total + tower.hp, 0);
-    const redHealth = [...towers.values()].filter((tower) => tower.team === "red" && tower.alive).reduce((total, tower) => total + tower.hp, 0);
-    finishMatch(blueHealth === redHealth ? "draw" : blueHealth > redHealth ? "blue" : "red");
   }
   function pointerInside(pointer, centerX, centerY, width, height) {
     return Math.abs(pointer.x - centerX) <= width * 0.5 && Math.abs(pointer.y - centerY) <= height * 0.5;
   }
-  function setSelectedCard(index) {
-    if (resources.selectedCard === index) return;
-    resources.selectedCard = index;
-    applyCardLayout(currentLayout());
-  }
-  function handleCardInput(pointer) {
-    for (let index = 0; index < cards.length; index += 1) {
-      if (keyJustPressed(`Digit${index + 1}`)) {
-        setSelectedCard(index);
-        return true;
-      }
-    }
-    if (!pointer.justPressed) return false;
-    const layout = currentLayout();
-    for (let index = 0; index < cards.length; index += 1) {
-      if (pointerInside(
-        pointer,
-        cardCenterX(index, layout),
-        layout.cardY,
-        layout.cardWidth,
-        layout.cardHeight + 14 * layout.scale
-      )) {
-        setSelectedCard(index);
-        return true;
-      }
-    }
-    const inDeployZone = pointer.x >= layout.fieldLeft && pointer.x <= layout.fieldRight && pointer.y >= layout.fieldBottom + 24 * layout.scale && pointer.y <= layout.riverY - 24 * layout.scale;
-    const card = cards[resources.selectedCard];
-    if (inDeployZone && resources.elixir >= card.cost) {
-      spawnUnit("blue", card, pointer.x, pointer.y);
-      resources.elixir -= card.cost;
-      return true;
-    }
-    return false;
-  }
-  function setSettingsOpen(open) {
-    if (resources.settingsOpen === open) return;
-    resources.settingsOpen = open;
-    if (!open) {
-      for (const id of SETTINGS_MENU_IDS) despawnSceneEntity(id);
-      return;
-    }
-    spawnSceneEntity("settings_panel", { x: 0, y: 0, z: 70 });
-    setSprite("settings_panel", sprites.settingsPanel);
-    spawnText("settings_title", 0, 0, 71);
-    spawnText("settings_restart", 0, 0, 71);
-    spawnText("settings_exit", 0, 0, 71);
-    applySettingsLayout(currentLayout());
-  }
-  function applySettingsLayout(layout) {
-    const scale = layout.menuScale;
-    setTransform("settings_panel", {
-      x: layout.menuCenterX,
-      y: layout.menuCenterY,
-      z: 70
-    });
-    setSprite("settings_panel", {
-      path: sprites.settingsPanel.path,
-      width: 440 * scale,
-      height: 320 * scale
-    });
-    setTransform("settings_title", {
-      x: layout.menuCenterX,
-      y: layout.menuCenterY + 124 * scale,
-      z: 71
-    });
-    setTransform("settings_restart", {
-      x: layout.menuCenterX,
-      y: layout.menuCenterY + 20 * scale,
-      z: 71
-    });
-    setTransform("settings_exit", {
-      x: layout.menuCenterX,
-      y: layout.menuCenterY - 86 * scale,
-      z: 71
-    });
-    setCenteredText("settings_title", "BATTLE MENU", 27 * scale, {
-      red: 0.91,
-      green: 0.97,
-      blue: 1
-    });
-    setCenteredText("settings_restart", "RESTART", 25 * scale, {
-      red: 0.91,
-      green: 0.97,
-      blue: 1
-    });
-    setCenteredText("settings_exit", "EXIT GAME", 25 * scale, {
-      red: 1,
-      green: 0.72,
-      blue: 0.74
-    });
-  }
-  function handleSettingsInput(pointer) {
-    const layout = currentLayout();
-    const togglePressed = keyJustPressed("Escape") || pointer.justPressed && pointerInside(
-      pointer,
-      layout.settingsX,
-      layout.settingsY,
-      layout.settingsSize,
-      layout.settingsSize
-    );
-    if (togglePressed) {
-      setSettingsOpen(!resources.settingsOpen);
-      return true;
-    }
-    if (!resources.settingsOpen) return false;
-    if (!pointer.justPressed) return true;
-    const buttonWidth = 356 * layout.menuScale;
-    const buttonHeight = 72 * layout.menuScale;
-    if (pointerInside(
-      pointer,
-      layout.menuCenterX,
-      layout.menuCenterY + 20 * layout.menuScale,
-      buttonWidth,
-      buttonHeight
-    )) {
-      resetBattle(pointer.viewportWidth, resources.safeArea);
-    } else if (pointerInside(
-      pointer,
-      layout.menuCenterX,
-      layout.menuCenterY - 86 * layout.menuScale,
-      buttonWidth,
-      buttonHeight
-    )) {
-      requestExit();
-    }
-    return true;
-  }
-  function finishMatch(outcome) {
-    if (resources.outcome) return;
-    resources.outcome = outcome;
-    spawnSceneEntity("result_panel", { x: 0, y: 0, z: 65 });
-    setSprite("result_panel", sprites.settingsPanel);
-    spawnText("result_title", 0, 0, 66);
-    spawnText("result_score", 0, 0, 66);
-    spawnText("result_restart", 0, 0, 66);
-    applyResultLayout(currentLayout());
-  }
-  function applyResultLayout(layout) {
-    const scale = layout.menuScale;
-    const title = resources.outcome === "blue" ? "VICTORY" : resources.outcome === "red" ? "DEFEAT" : "DRAW";
-    setTransform("result_panel", { x: layout.menuCenterX, y: layout.menuCenterY, z: 65 });
-    setSprite("result_panel", {
-      path: sprites.settingsPanel.path,
-      width: 440 * scale,
-      height: 320 * scale
-    });
-    setTransform("result_title", {
-      x: layout.menuCenterX,
-      y: layout.menuCenterY + 96 * scale,
-      z: 66
-    });
-    setTransform("result_score", {
-      x: layout.menuCenterX,
-      y: layout.menuCenterY + 18 * scale,
-      z: 66
-    });
-    setTransform("result_restart", {
-      x: layout.menuCenterX,
-      y: layout.menuCenterY - 78 * scale,
-      z: 66
-    });
-    setCenteredText("result_title", title, 33 * scale, {
-      red: title === "DEFEAT" ? 1 : 1,
-      green: title === "DEFEAT" ? 0.63 : 0.88,
-      blue: title === "VICTORY" ? 0.38 : 0.58
-    });
-    setCenteredText(
-      "result_score",
-      `${resources.blueCrowns}  CROWNS  ${resources.redCrowns}`,
-      22 * scale,
-      { red: 1, green: 0.93, blue: 0.7 }
-    );
-    setCenteredText("result_restart", "PLAY AGAIN", 24 * scale, {
-      red: 0.85,
-      green: 0.96,
-      blue: 1
-    });
-  }
-  function handleResultInput(pointer) {
-    if (!resources.outcome) return false;
-    if (!pointer.justPressed) return true;
-    const layout = currentLayout();
-    if (pointerInside(
-      pointer,
-      layout.menuCenterX,
-      layout.menuCenterY - 78 * layout.menuScale,
-      356 * layout.menuScale,
-      72 * layout.menuScale
-    )) {
-      resetBattle(pointer.viewportWidth, resources.safeArea);
-    }
-    return true;
-  }
-  function resetBattle(viewportWidth = DESIGN_WIDTH, safeArea = FULL_SAFE_AREA) {
-    clearScene();
+  var colors = {
+    white: { red: 0.96, green: 0.98, blue: 1 },
+    muted: { red: 0.66, green: 0.78, blue: 0.87 },
+    gold: { red: 1, green: 0.82, blue: 0.22 },
+    dark: { red: 0.16, green: 0.11, blue: 0.03 },
+    blue: { red: 0.5, green: 0.83, blue: 1 },
+    red: { red: 1, green: 0.61, blue: 0.64 }
+  };
+
+  // modules/clash/game/src/battle.ts
+  var MATCH_DURATION = 180;
+  var MAX_ELIXIR = 10;
+  var SETTINGS_IDS = ["battle_menu_panel", "battle_menu_title", "battle_menu_restart", "battle_menu_exit"];
+  var BattleController = class {
+    screen = null;
     units = /* @__PURE__ */ new Map();
     towers = /* @__PURE__ */ new Map();
-    resources = createResources();
-    resources.safeArea = safeArea;
-    const width = Math.min(DESIGN_WIDTH, viewportWidth);
-    resources.playLeft = Math.max(-width * 0.5, safeArea.left);
-    resources.playRight = Math.max(
-      resources.playLeft + 1,
-      Math.min(width * 0.5, safeArea.right)
-    );
-    resources.playWidth = resources.playRight - resources.playLeft;
-    spawnStaticScene();
-    createTowers();
-    applyResponsiveLayout();
-    updateHud();
+    selectedCard = 0;
+    elixir = 5;
+    enemyElixir = 5;
+    seconds = MATCH_DURATION;
+    enemyTimer = 2.25;
+    nextId = 1;
+    seed = 92317;
+    blueCrowns = 0;
+    redCrowns = 0;
+    paused = false;
+    outcome = null;
+    show(layout2) {
+      clearScene();
+      this.screen = layout2;
+      this.units.clear();
+      this.towers.clear();
+      this.selectedCard = 0;
+      this.elixir = 5;
+      this.enemyElixir = 5;
+      this.seconds = MATCH_DURATION;
+      this.enemyTimer = 2.25;
+      this.nextId = 1;
+      this.blueCrowns = 0;
+      this.redCrowns = 0;
+      this.paused = false;
+      this.outcome = null;
+      this.spawnStaticScene();
+      this.createTowers();
+      this.resize(layout2);
+      this.updateHud();
+    }
+    resize(layout2) {
+      this.screen = layout2;
+      const battle2 = this.layout();
+      placeSprite("battle_arena", {
+        path: sprites.arena.path,
+        width: Math.max(DESIGN_WIDTH, layout2.viewportWidth),
+        height: DESIGN_HEIGHT
+      }, 0, 0, -100);
+      this.applyTowers(battle2);
+      this.applyCards(battle2);
+      this.applyHud(battle2);
+      if (this.paused) this.applyMenu(layout2);
+      if (this.outcome) this.applyResult(layout2);
+    }
+    update(dt, pointer) {
+      const screen = this.screen;
+      if (!screen) return "none";
+      const battle2 = this.layout();
+      if (this.handleMenu(pointer, screen, battle2)) {
+        this.updateHud();
+        return "none";
+      }
+      if (this.handleResult(pointer, screen)) {
+        this.updateHud();
+        return "none";
+      }
+      if (this.paused || this.outcome) {
+        this.updateHud();
+        return "none";
+      }
+      this.handleCards(pointer, battle2);
+      const frameTime = Math.min(Math.max(dt, 0), 0.05);
+      this.elixir = Math.min(MAX_ELIXIR, this.elixir + 0.72 * frameTime);
+      this.enemyElixir = Math.min(MAX_ELIXIR, this.enemyElixir + 0.72 * frameTime);
+      this.seconds = Math.max(0, this.seconds - frameTime);
+      this.enemyAi(frameTime, battle2);
+      this.updateUnits(frameTime);
+      this.updateTowers(frameTime);
+      this.checkTimeLimit();
+      this.updateHud();
+      return "none";
+    }
+    spawnStaticScene() {
+      spawnSprite("battle_arena", sprites.arena, 0, 0, -100);
+      for (const id of ["battle_enemy", "battle_player", "battle_timer", "battle_score", "battle_elixir_text"]) spawnText(id);
+      spawnSprite("battle_settings", sprites.settingsIcon, 0, 0, 60);
+      for (let index = 0; index < cards.length; index += 1) {
+        spawnSprite(`battle_card_frame_${index}`, sprites.cardFrame);
+        spawnSprite(`battle_card_art_${index}`, cards[index].art);
+        spawnText(`battle_card_name_${index}`);
+        spawnText(`battle_card_cost_${index}`);
+      }
+      for (let index = 0; index < MAX_ELIXIR; index += 1) spawnSprite(`battle_elixir_${index}`, sprites.elixirEmpty);
+    }
+    createTowers() {
+      const definitions = [
+        { id: "red_king", team: "red", kind: "king", maxHp: 2600 },
+        { id: "red_left", team: "red", kind: "princess", lane: "left", maxHp: 1600 },
+        { id: "red_right", team: "red", kind: "princess", lane: "right", maxHp: 1600 },
+        { id: "blue_king", team: "blue", kind: "king", maxHp: 2600 },
+        { id: "blue_left", team: "blue", kind: "princess", lane: "left", maxHp: 1600 },
+        { id: "blue_right", team: "blue", kind: "princess", lane: "right", maxHp: 1600 }
+      ];
+      for (const definition of definitions) {
+        const tower = { ...definition, x: 0, y: 0, hp: definition.maxHp, attackTimer: 0, alive: true };
+        this.towers.set(tower.id, tower);
+        spawnSprite(tower.id, tower.team === "blue" ? sprites.towerBlue : sprites.towerRed);
+        spawnText(`${tower.id}_hp`);
+      }
+    }
+    layout() {
+      const screen = this.screen;
+      const scale = clamp(Math.min(screen.width / DESIGN_WIDTH, screen.height / 740), 0.68, 1);
+      const fieldLeft = screen.left + 10 * scale;
+      const fieldRight = screen.right - 10 * scale;
+      const fieldTop = screen.top - 52 * scale;
+      const fieldBottom = screen.bottom + 144 * scale;
+      const cardWidth = Math.min(82 * scale, (screen.width - 28 * scale) / 4);
+      return {
+        scale,
+        fieldLeft,
+        fieldRight,
+        fieldTop,
+        fieldBottom,
+        riverY: fieldBottom + (fieldTop - fieldBottom) * 0.5,
+        cardWidth,
+        cardHeight: cardWidth * 1.22,
+        cardY: screen.bottom + 74 * scale,
+        elixirY: screen.bottom + 15 * scale,
+        settingsX: screen.right - 28 * scale,
+        settingsY: screen.top - 27 * scale
+      };
+    }
+    cardX(index, layout2) {
+      const screen = this.screen;
+      const gap = 6 * layout2.scale;
+      const total = layout2.cardWidth * cards.length + gap * (cards.length - 1);
+      return screen.left + (screen.width - total) * 0.5 + layout2.cardWidth * 0.5 + index * (layout2.cardWidth + gap);
+    }
+    applyTowers(layout2) {
+      const laneInset = Math.min(102 * layout2.scale, (layout2.fieldRight - layout2.fieldLeft) * 0.25);
+      const positions = {
+        red_king: { x: 0, y: layout2.fieldTop - 47 * layout2.scale },
+        red_left: { x: layout2.fieldLeft + laneInset, y: layout2.riverY + (layout2.fieldTop - layout2.riverY) * 0.42 },
+        red_right: { x: layout2.fieldRight - laneInset, y: layout2.riverY + (layout2.fieldTop - layout2.riverY) * 0.42 },
+        blue_king: { x: 0, y: layout2.fieldBottom + 47 * layout2.scale },
+        blue_left: { x: layout2.fieldLeft + laneInset, y: layout2.riverY - (layout2.riverY - layout2.fieldBottom) * 0.42 },
+        blue_right: { x: layout2.fieldRight - laneInset, y: layout2.riverY - (layout2.riverY - layout2.fieldBottom) * 0.42 }
+      };
+      for (const tower of this.towers.values()) {
+        Object.assign(tower, positions[tower.id]);
+        if (!tower.alive) continue;
+        const width = (tower.kind === "king" ? 82 : 68) * layout2.scale;
+        const height = (tower.kind === "king" ? 90 : 75) * layout2.scale;
+        placeSprite(tower.id, {
+          path: tower.team === "blue" ? sprites.towerBlue.path : sprites.towerRed.path,
+          width,
+          height
+        }, tower.x, tower.y, 10);
+        setTransform(`${tower.id}_hp`, { x: tower.x, y: tower.y + (tower.team === "red" ? -1 : 1) * height * 0.58, z: 14 });
+      }
+    }
+    applyCards(layout2) {
+      for (let index = 0; index < cards.length; index += 1) {
+        const card = cards[index];
+        const x = this.cardX(index, layout2);
+        const y = layout2.cardY + (index === this.selectedCard ? 8 * layout2.scale : 0);
+        placeSprite(`battle_card_frame_${index}`, {
+          path: index === this.selectedCard ? sprites.cardSelected.path : sprites.cardFrame.path,
+          width: layout2.cardWidth,
+          height: layout2.cardHeight
+        }, x, y, 20);
+        placeSprite(`battle_card_art_${index}`, {
+          path: card.art.path,
+          width: layout2.cardWidth * 0.78,
+          height: layout2.cardHeight * 0.58
+        }, x, y + layout2.cardHeight * 0.1, 21);
+        placeText(`battle_card_name_${index}`, card.name, x, y - layout2.cardHeight * 0.33, 22, Math.max(9, 11 * layout2.scale), colors.white);
+        placeText(`battle_card_cost_${index}`, String(card.cost), x - layout2.cardWidth * 0.34, y + layout2.cardHeight * 0.35, 23, 16 * layout2.scale, colors.white);
+      }
+    }
+    applyHud(layout2) {
+      const screen = this.screen;
+      placeSprite("battle_settings", { path: sprites.settingsIcon.path, width: 48 * layout2.scale, height: 48 * layout2.scale }, layout2.settingsX, layout2.settingsY, 60);
+      placeText("battle_enemy", "TRAINING BOT", screen.left + 63 * layout2.scale, screen.top - 18 * layout2.scale, 40, 13 * layout2.scale, colors.red);
+      placeText("battle_player", "BLUE KING", screen.left + 52 * layout2.scale, layout2.fieldBottom + 20 * layout2.scale, 40, 13 * layout2.scale, colors.blue);
+      const cellWidth = Math.min(31 * layout2.scale, (screen.width - 80 * layout2.scale) / 10);
+      const gap = 3 * layout2.scale;
+      const total = cellWidth * 10 + gap * 9;
+      const start = screen.centerX - total * 0.5 + cellWidth * 0.5;
+      for (let index = 0; index < MAX_ELIXIR; index += 1) {
+        placeSprite(`battle_elixir_${index}`, {
+          path: index < Math.floor(this.elixir) ? sprites.elixirFull.path : sprites.elixirEmpty.path,
+          width: cellWidth,
+          height: 17 * layout2.scale
+        }, start + index * (cellWidth + gap), layout2.elixirY, 20);
+      }
+      placeText("battle_elixir_text", String(Math.floor(this.elixir)), start - cellWidth, layout2.elixirY, 42, 15 * layout2.scale, colors.white);
+    }
+    updateHud() {
+      const layout2 = this.layout();
+      const minutes = Math.floor(this.seconds / 60);
+      const seconds = Math.max(0, Math.ceil(this.seconds) % 60).toString().padStart(2, "0");
+      placeText("battle_timer", `${minutes}:${seconds}`, this.screen.centerX, this.screen.top - 18 * layout2.scale, 40, 18 * layout2.scale, colors.gold);
+      placeText("battle_score", `${this.redCrowns} - ${this.blueCrowns}`, this.screen.right - 76 * layout2.scale, this.screen.top - 18 * layout2.scale, 40, 17 * layout2.scale, colors.gold);
+      this.applyHud(layout2);
+      for (const tower of this.towers.values()) if (tower.alive) placeText(`${tower.id}_hp`, String(Math.max(0, Math.ceil(tower.hp))), tower.x, tower.y + (tower.team === "red" ? -1 : 1) * 46 * layout2.scale, 14, 11 * layout2.scale, colors.white);
+      setGameState(this.blueCrowns, 3 - this.redCrowns, this.paused ? "PAUSED" : this.outcome ? "RESULT" : "BATTLE");
+    }
+    handleCards(pointer, layout2) {
+      for (let index = 0; index < cards.length; index += 1) {
+        if (keyJustPressed(`Digit${index + 1}`)) {
+          this.selectedCard = index;
+          this.applyCards(layout2);
+          return;
+        }
+      }
+      if (!pointer.justPressed) return;
+      for (let index = 0; index < cards.length; index += 1) {
+        if (pointerInside(pointer, this.cardX(index, layout2), layout2.cardY, layout2.cardWidth, layout2.cardHeight + 14 * layout2.scale)) {
+          this.selectedCard = index;
+          this.applyCards(layout2);
+          return;
+        }
+      }
+      const card = cards[this.selectedCard];
+      if (pointer.x >= layout2.fieldLeft && pointer.x <= layout2.fieldRight && pointer.y >= layout2.fieldBottom + 24 * layout2.scale && pointer.y <= layout2.riverY - 24 * layout2.scale && this.elixir >= card.cost) {
+        this.spawnUnit("blue", card, pointer.x, pointer.y, layout2);
+        this.elixir -= card.cost;
+      }
+    }
+    spawnUnit(team, card, x, y, layout2) {
+      const id = `${team}_${card.id}_${this.nextId++}`;
+      const unit = {
+        id,
+        team,
+        lane: x < 0 ? "left" : "right",
+        card,
+        x: clamp(x, layout2.fieldLeft + 24, layout2.fieldRight - 24),
+        y: clamp(y, layout2.fieldBottom + 25, layout2.fieldTop - 25),
+        hp: card.unit.hp,
+        attackTimer: 0
+      };
+      this.units.set(id, unit);
+      spawnSprite(id, { path: card.art.path, width: card.unit.width * layout2.scale, height: card.unit.height * layout2.scale }, unit.x, unit.y, 7);
+      spawnSprite(`${id}_team`, unit.team === "blue" ? sprites.teamBlue : sprites.teamRed, unit.x, unit.y, 6);
+    }
+    despawnUnit(unit) {
+      this.units.delete(unit.id);
+      despawnSceneEntity(unit.id);
+      despawnSceneEntity(`${unit.id}_team`);
+    }
+    distance(a, b) {
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+    nearestEnemy(unit, maxDistance) {
+      let nearest;
+      for (const candidate of this.units.values()) {
+        if (candidate.team === unit.team || candidate.hp <= 0 || this.distance(unit, candidate) >= maxDistance) continue;
+        nearest = candidate;
+        maxDistance = this.distance(unit, candidate);
+      }
+      return nearest;
+    }
+    targetTower(unit) {
+      const enemy = unit.team === "blue" ? "red" : "blue";
+      const lane = this.towers.get(`${enemy}_${unit.lane}`);
+      if (lane?.alive) return lane;
+      const king = this.towers.get(`${enemy}_king`);
+      return king?.alive ? king : void 0;
+    }
+    move(unit, target, dt) {
+      const dx = target.x - unit.x;
+      const dy = target.y - unit.y;
+      const length = Math.max(1e-3, Math.hypot(dx, dy));
+      const step = Math.min(length, unit.card.unit.speed * dt);
+      unit.x += dx / length * step;
+      unit.y += dy / length * step;
+    }
+    updateUnits(dt) {
+      const scale = this.layout().scale;
+      for (const unit of [...this.units.values()]) {
+        if (!this.units.has(unit.id)) continue;
+        unit.attackTimer = Math.max(0, unit.attackTimer - dt);
+        const enemy = this.nearestEnemy(unit, unit.card.unit.range + 34);
+        const target = enemy ?? this.targetTower(unit);
+        if (!target) continue;
+        if (this.distance(unit, target) <= unit.card.unit.range + (enemy ? 10 : 32)) {
+          if (unit.attackTimer <= 0) {
+            if (enemy) {
+              enemy.hp -= unit.card.unit.damage;
+              if (enemy.hp <= 0) this.despawnUnit(enemy);
+            } else this.damageTower(target, unit.card.unit.damage, unit.team);
+            unit.attackTimer = unit.card.unit.attackDelay;
+          }
+        } else this.move(unit, target, dt);
+        if (!this.units.has(unit.id)) continue;
+        setTransform(unit.id, { x: unit.x, y: unit.y, z: 7 });
+        setTransform(`${unit.id}_team`, { x: unit.x, y: unit.y - unit.card.unit.height * scale * 0.42, z: 6 });
+      }
+    }
+    updateTowers(dt) {
+      for (const tower of this.towers.values()) {
+        if (!tower.alive) continue;
+        tower.attackTimer = Math.max(0, tower.attackTimer - dt);
+        let target;
+        let range = tower.kind === "king" ? 138 : 152;
+        for (const unit of this.units.values()) {
+          const distance = this.distance(tower, unit);
+          if (unit.team !== tower.team && distance < range) {
+            target = unit;
+            range = distance;
+          }
+        }
+        if (target && tower.attackTimer <= 0) {
+          target.hp -= tower.kind === "king" ? 72 : 58;
+          if (target.hp <= 0) this.despawnUnit(target);
+          tower.attackTimer = tower.kind === "king" ? 0.82 : 0.95;
+        }
+      }
+    }
+    damageTower(tower, amount, team) {
+      if (!tower.alive) return;
+      tower.hp -= amount;
+      if (tower.hp > 0) return;
+      tower.alive = false;
+      despawnSceneEntity(tower.id);
+      despawnSceneEntity(`${tower.id}_hp`);
+      if (team === "blue") this.blueCrowns += 1;
+      else this.redCrowns += 1;
+      if (tower.kind === "king") this.finish(team);
+    }
+    random() {
+      this.seed = this.seed * 48271 % 2147483647;
+      return this.seed / 2147483647;
+    }
+    enemyAi(dt, layout2) {
+      this.enemyTimer -= dt;
+      if (this.enemyTimer > 0) return;
+      const affordable = cards.filter((card2) => card2.cost <= this.enemyElixir);
+      if (affordable.length === 0) {
+        this.enemyTimer = 0.6;
+        return;
+      }
+      const card = affordable[Math.floor(this.random() * affordable.length)];
+      const laneX = this.random() < 0.5 ? layout2.fieldLeft + (layout2.fieldRight - layout2.fieldLeft) * 0.27 : layout2.fieldRight - (layout2.fieldRight - layout2.fieldLeft) * 0.27;
+      this.spawnUnit("red", card, laneX, layout2.riverY + 52 * layout2.scale, layout2);
+      this.enemyElixir -= card.cost;
+      this.enemyTimer = 1.35 + this.random() * 1.35;
+    }
+    checkTimeLimit() {
+      if (this.seconds > 0 || this.outcome) return;
+      if (this.blueCrowns !== this.redCrowns) return this.finish(this.blueCrowns > this.redCrowns ? "blue" : "red");
+      const blueHp = [...this.towers.values()].filter((tower) => tower.team === "blue" && tower.alive).reduce((sum, tower) => sum + tower.hp, 0);
+      const redHp = [...this.towers.values()].filter((tower) => tower.team === "red" && tower.alive).reduce((sum, tower) => sum + tower.hp, 0);
+      this.finish(blueHp === redHp ? "draw" : blueHp > redHp ? "blue" : "red");
+    }
+    handleMenu(pointer, screen, battle2) {
+      const toggle = keyJustPressed("Escape") || pointer.justPressed && pointerInside(pointer, battle2.settingsX, battle2.settingsY, 48 * battle2.scale, 48 * battle2.scale);
+      if (toggle) {
+        this.paused = !this.paused;
+        if (this.paused) {
+          spawnSprite("battle_menu_panel", sprites.settingsPanel);
+          for (const id of ["battle_menu_title", "battle_menu_restart", "battle_menu_exit"]) spawnText(id);
+          this.applyMenu(screen);
+        } else for (const id of SETTINGS_IDS) despawnSceneEntity(id);
+        return true;
+      }
+      if (!this.paused) return false;
+      if (!pointer.justPressed) return true;
+      if (pointerInside(pointer, screen.centerX, screen.centerY + 18 * screen.scale, 340 * screen.scale, 70 * screen.scale)) {
+        this.show(screen);
+      } else if (pointerInside(pointer, screen.centerX, screen.centerY - 82 * screen.scale, 340 * screen.scale, 70 * screen.scale)) requestExit();
+      return true;
+    }
+    applyMenu(screen) {
+      placeSprite("battle_menu_panel", { path: sprites.settingsPanel.path, width: 420 * screen.scale, height: 300 * screen.scale }, screen.centerX, screen.centerY, 70);
+      placeText("battle_menu_title", "BATTLE MENU", screen.centerX, screen.centerY + 104 * screen.scale, 72, 27 * screen.scale, colors.white);
+      placeText("battle_menu_restart", "RESTART", screen.centerX, screen.centerY + 18 * screen.scale, 72, 24 * screen.scale, colors.blue);
+      placeText("battle_menu_exit", "EXIT GAME", screen.centerX, screen.centerY - 82 * screen.scale, 72, 24 * screen.scale, colors.red);
+    }
+    finish(outcome) {
+      if (this.outcome) return;
+      this.outcome = outcome;
+      spawnSprite("battle_result_panel", sprites.settingsPanel);
+      for (const id of ["battle_result_title", "battle_result_score", "battle_result_again"]) spawnText(id);
+      this.applyResult(this.screen);
+    }
+    applyResult(screen) {
+      const title = this.outcome === "blue" ? "VICTORY" : this.outcome === "red" ? "DEFEAT" : "DRAW";
+      placeSprite("battle_result_panel", { path: sprites.settingsPanel.path, width: 420 * screen.scale, height: 300 * screen.scale }, screen.centerX, screen.centerY, 65);
+      placeText("battle_result_title", title, screen.centerX, screen.centerY + 94 * screen.scale, 66, 32 * screen.scale, title === "DEFEAT" ? colors.red : colors.gold);
+      placeText("battle_result_score", `${this.blueCrowns} CROWNS ${this.redCrowns}`, screen.centerX, screen.centerY + 15 * screen.scale, 66, 21 * screen.scale, colors.white);
+      placeText("battle_result_again", "PLAY AGAIN", screen.centerX, screen.centerY - 78 * screen.scale, 66, 24 * screen.scale, colors.blue);
+    }
+    handleResult(pointer, screen) {
+      if (!this.outcome) return false;
+      if (pointer.justPressed && pointerInside(pointer, screen.centerX, screen.centerY - 78 * screen.scale, 340 * screen.scale, 70 * screen.scale)) this.show(screen);
+      return true;
+    }
+  };
+
+  // modules/clash/game/src/lobby.ts
+  var tabs = ["shop", "cards", "battle", "social", "league"];
+  var tabLabels = {
+    shop: "SHOP",
+    cards: "CARDS",
+    battle: "BATTLE",
+    social: "CLAN",
+    league: "LEAGUE"
+  };
+  var spriteIds = [
+    "lobby_background",
+    "lobby_profile_panel",
+    "lobby_arena",
+    "lobby_arena_king",
+    "lobby_arena_king_local",
+    "lobby_trophy_track",
+    "lobby_chest_0",
+    "lobby_chest_1",
+    "lobby_chest_2",
+    "lobby_chest_3",
+    "lobby_battle_button",
+    "lobby_nav",
+    "lobby_level_panel",
+    "lobby_gold_panel",
+    "lobby_gems_panel",
+    "lobby_avatar",
+    "lobby_settings",
+    "lobby_tab_panel",
+    "lobby_tab_item_0",
+    "lobby_tab_item_1",
+    "lobby_tab_item_2",
+    "lobby_tab_item_3"
+  ];
+  var textIds = [
+    "lobby_level",
+    "lobby_gold",
+    "lobby_gems",
+    "lobby_player",
+    "lobby_clan",
+    "lobby_trophies",
+    "lobby_arena_title",
+    "lobby_arena_subtitle",
+    "lobby_chest_badge",
+    "lobby_battle_label",
+    "lobby_battle_mode",
+    "lobby_tab_title",
+    "lobby_tab_subtitle",
+    "lobby_tab_item_label_0",
+    "lobby_tab_item_label_1",
+    "lobby_tab_item_label_2",
+    "lobby_tab_item_label_3",
+    ...tabs.map((tab) => `lobby_tab_${tab}`)
+  ];
+  var settingsIds = ["lobby_settings_panel", "lobby_settings_title", "lobby_settings_close", "lobby_settings_exit"];
+  var battleContentIds = [
+    "lobby_arena",
+    "lobby_arena_king",
+    "lobby_arena_king_local",
+    "lobby_trophy_track",
+    "lobby_arena_title",
+    "lobby_arena_subtitle",
+    "lobby_chest_0",
+    "lobby_chest_1",
+    "lobby_chest_2",
+    "lobby_chest_3",
+    "lobby_chest_badge",
+    "lobby_battle_button",
+    "lobby_battle_label",
+    "lobby_battle_mode"
+  ];
+  var tabContentIds = [
+    "lobby_tab_panel",
+    "lobby_tab_title",
+    "lobby_tab_subtitle",
+    "lobby_tab_item_0",
+    "lobby_tab_item_1",
+    "lobby_tab_item_2",
+    "lobby_tab_item_3",
+    "lobby_tab_item_label_0",
+    "lobby_tab_item_label_1",
+    "lobby_tab_item_label_2",
+    "lobby_tab_item_label_3"
+  ];
+  var LobbyController = class {
+    tab = "battle";
+    settingsOpen = false;
+    layout = null;
+    show(layout2) {
+      clearScene();
+      this.layout = layout2;
+      this.tab = "battle";
+      this.settingsOpen = false;
+      for (const id of spriteIds) spawnSprite(id, sprites.homeResource);
+      for (const id of textIds) spawnText(id);
+      this.applyLayout(layout2);
+      setGameState(0, 3, "LOBBY");
+    }
+    resize(layout2) {
+      this.layout = layout2;
+      this.applyLayout(layout2);
+      if (this.settingsOpen) this.applySettingsLayout(layout2);
+    }
+    update(pointer) {
+      const layout2 = this.layout;
+      if (!layout2) return { type: "none" };
+      if (this.settingsOpen) return this.handleSettings(pointer, layout2);
+      const scale = layout2.scale;
+      const navY = layout2.bottom + 39 * scale;
+      const tabWidth = layout2.width / tabs.length;
+      if (pointer.justPressed && pointerInside(
+        pointer,
+        layout2.right - 27 * scale,
+        layout2.top - 83 * scale,
+        50 * scale,
+        50 * scale
+      )) {
+        this.openSettings(layout2);
+        return { type: "layout" };
+      }
+      const battlePressed = pointer.justPressed && pointerInside(
+        pointer,
+        layout2.centerX,
+        layout2.bottom + 136 * scale,
+        Math.min(300 * scale, layout2.width - 92 * scale),
+        82 * scale
+      );
+      if (this.tab === "battle" && (battlePressed || keyJustPressed("Space") || keyJustPressed("Enter"))) {
+        return { type: "start-matchmaking" };
+      }
+      if (pointer.justPressed && pointerInside(pointer, layout2.centerX, navY, layout2.width, 78 * scale)) {
+        const index = Math.max(0, Math.min(tabs.length - 1, Math.floor((pointer.x - layout2.left) / tabWidth)));
+        this.tab = tabs[index];
+        this.applyLayout(layout2);
+        setGameState(0, 3, `LOBBY:${this.tab.toUpperCase()}`);
+        return { type: "layout" };
+      }
+      return { type: "none" };
+    }
+    applyLayout(layout2) {
+      const scale = layout2.scale;
+      const top = layout2.top;
+      const bottom = layout2.bottom;
+      const centerX = layout2.centerX;
+      placeSprite("lobby_background", {
+        path: sprites.homeBackground.path,
+        width: Math.max(DESIGN_WIDTH, layout2.viewportWidth),
+        height: DESIGN_HEIGHT
+      }, 0, 0, -100);
+      const resourceY = top - 27 * scale;
+      const resourceGap = 7 * scale;
+      const resourceWidth = Math.min(126 * scale, (layout2.width - 2 * resourceGap) / 3);
+      const resourceXs = [
+        centerX - resourceWidth - resourceGap,
+        centerX,
+        centerX + resourceWidth + resourceGap
+      ];
+      for (const [index, id] of ["lobby_level_panel", "lobby_gold_panel", "lobby_gems_panel"].entries()) {
+        placeSprite(id, { path: sprites.homeResource.path, width: resourceWidth, height: 43 * scale }, resourceXs[index], resourceY, 20);
+      }
+      placeText("lobby_level", "18", resourceXs[0], resourceY, 22, 17 * scale, colors.white);
+      placeText("lobby_gold", "113 +", resourceXs[1], resourceY, 22, 16 * scale, colors.white);
+      placeText("lobby_gems", "100 +", resourceXs[2], resourceY, 22, 16 * scale, colors.white);
+      const profileY = top - 90 * scale;
+      placeSprite("lobby_profile_panel", { path: sprites.homeDeck.path, width: layout2.width - 18 * scale, height: 88 * scale }, centerX, profileY, 8);
+      placeSprite("lobby_avatar", { path: cards[0].art.path, width: 66 * scale, height: 60 * scale }, layout2.left + 48 * scale, profileY + 3 * scale, 11);
+      placeText("lobby_player", "BLUE KING", layout2.left + 142 * scale, profileY + 14 * scale, 12, 19 * scale, colors.white);
+      placeText("lobby_clan", "RUNEWEAVE CLAN", layout2.left + 151 * scale, profileY - 14 * scale, 12, 11 * scale, colors.muted);
+      placeText("lobby_trophies", "0 TROPHIES", layout2.right - 84 * scale, profileY - 13 * scale, 12, 13 * scale, colors.gold);
+      placeSprite("lobby_settings", { path: sprites.settingsIcon.path, width: 50 * scale, height: 50 * scale }, layout2.right - 27 * scale, profileY + 9 * scale, 14);
+      const arenaY = top - 316 * scale;
+      placeSprite("lobby_arena", { path: sprites.homePlatform.path, width: Math.min(354 * scale, layout2.width - 34 * scale), height: 254 * scale }, centerX, arenaY, 2);
+      placeSprite("lobby_arena_king", { path: cards[2].art.path, width: 126 * scale, height: 98 * scale }, centerX, arenaY + 38 * scale, 5);
+      placeSprite("lobby_arena_king_local", { path: "local-clash/chr_king.png", width: 116 * scale, height: 134 * scale }, centerX, arenaY + 30 * scale, 6);
+      placeText("lobby_arena_title", "TRAINING CAMP", centerX, arenaY - 74 * scale, 9, 20 * scale, colors.white);
+      placeText("lobby_arena_subtitle", "ARENA 1", centerX, arenaY - 99 * scale, 9, 13 * scale, colors.gold);
+      placeSprite("lobby_trophy_track", { path: sprites.homeResource.path, width: 250 * scale, height: 26 * scale }, centerX, arenaY - 127 * scale, 8);
+      const chestY = bottom + 242 * scale;
+      const chestGap = 7 * scale;
+      const chestWidth = Math.min(72 * scale, (layout2.width - 56 * scale) / 4);
+      const chestStart = centerX - (chestWidth * 3 + chestGap * 3) * 0.5;
+      for (let index = 0; index < 4; index += 1) {
+        placeSprite(`lobby_chest_${index}`, {
+          path: index === 0 ? sprites.cardSelected.path : sprites.cardFrame.path,
+          width: chestWidth,
+          height: 68 * scale
+        }, chestStart + index * (chestWidth + chestGap), chestY, 12);
+      }
+      placeText("lobby_chest_badge", "1", chestStart + 3 * (chestWidth + chestGap) + chestWidth * 0.38, chestY + 30 * scale, 15, 16 * scale, colors.white);
+      const buttonY = bottom + 136 * scale;
+      placeSprite("lobby_battle_button", {
+        path: sprites.homeBattleButton.path,
+        width: Math.min(300 * scale, layout2.width - 92 * scale),
+        height: 82 * scale
+      }, centerX, buttonY, 12);
+      placeText("lobby_battle_label", "BATTLE", centerX, buttonY + 7 * scale, 14, 32 * scale, colors.dark);
+      placeText("lobby_battle_mode", "1v1  TROPHY ROAD", centerX, buttonY - 27 * scale, 14, 10 * scale, colors.dark);
+      this.applyNavigation(layout2);
+      this.applyTabContent(layout2);
+    }
+    applyNavigation(layout2) {
+      const scale = layout2.scale;
+      const navY = layout2.bottom + 39 * scale;
+      placeSprite("lobby_nav", { path: sprites.homeNav.path, width: layout2.width, height: 76 * scale }, layout2.centerX, navY, 10);
+      const tabWidth = layout2.width / tabs.length;
+      for (const [index, tab] of tabs.entries()) {
+        const selected = tab === this.tab;
+        const x = layout2.left + tabWidth * (index + 0.5);
+        placeText(
+          `lobby_tab_${tab}`,
+          selected ? `[${tabLabels[tab]}]` : tabLabels[tab],
+          x,
+          navY,
+          13,
+          (selected ? 13 : 10) * scale,
+          selected ? colors.gold : colors.muted
+        );
+      }
+    }
+    applyTabContent(layout2) {
+      const hiddenX = layout2.right + 1e4;
+      if (this.tab === "battle") {
+        for (const id of tabContentIds) setTransform(id, { x: hiddenX, y: 0, z: 0 });
+        return;
+      }
+      for (const id of battleContentIds) setTransform(id, { x: hiddenX, y: 0, z: 0 });
+      const scale = layout2.scale;
+      const panelY = layout2.centerY - 31 * scale;
+      placeSprite("lobby_tab_panel", {
+        path: sprites.settingsPanel.path,
+        width: layout2.width - 24 * scale,
+        height: Math.min(450 * scale, layout2.height - 260 * scale)
+      }, layout2.centerX, panelY, 6);
+      const titles = {
+        shop: ["DAILY SHOP", "REFRESH IN 4H"],
+        cards: ["BATTLE DECK", "4 / 8 CARDS"],
+        social: ["RUNEWEAVE CLAN", "3 MEMBERS ONLINE"],
+        league: ["TROPHY ROAD", "0 / 400 TROPHIES"]
+      };
+      const [title, subtitle] = titles[this.tab];
+      placeText("lobby_tab_title", title, layout2.centerX, panelY + 168 * scale, 9, 25 * scale, colors.gold);
+      placeText("lobby_tab_subtitle", subtitle, layout2.centerX, panelY + 137 * scale, 9, 12 * scale, colors.muted);
+      const itemLabels = this.tab === "shop" ? ["KNIGHT  40", "ARCHERS  40", "GIANT  100", "FREE GIFT"] : this.tab === "cards" ? cards.map((card) => `${card.name}  LV 1`) : this.tab === "social" ? ["BLUE KING", "ARCHER 01", "GIANT 02", "INVITE"] : ["TRAINING", "BRONZE", "SILVER", "GOLD"];
+      const itemY = [panelY + 72 * scale, panelY - 22 * scale, panelY - 116 * scale, panelY - 116 * scale];
+      const itemX = [layout2.centerX - 94 * scale, layout2.centerX + 94 * scale, layout2.centerX - 94 * scale, layout2.centerX + 94 * scale];
+      for (let index = 0; index < 4; index += 1) {
+        const art = this.tab === "league" ? index < 2 ? sprites.towerBlue : sprites.towerRed : cards[index].art;
+        placeSprite(`lobby_tab_item_${index}`, {
+          path: art.path,
+          width: 74 * scale,
+          height: 68 * scale
+        }, itemX[index], itemY[index] + 13 * scale, 9);
+        placeText(`lobby_tab_item_label_${index}`, itemLabels[index], itemX[index], itemY[index] - 35 * scale, 10, 11 * scale, colors.white);
+      }
+    }
+    openSettings(layout2) {
+      this.settingsOpen = true;
+      spawnSprite("lobby_settings_panel", sprites.settingsPanel, layout2.centerX, layout2.centerY, 70);
+      spawnText("lobby_settings_title");
+      spawnText("lobby_settings_close");
+      spawnText("lobby_settings_exit");
+      this.applySettingsLayout(layout2);
+    }
+    closeSettings() {
+      this.settingsOpen = false;
+      for (const id of settingsIds) despawnSceneEntity(id);
+    }
+    applySettingsLayout(layout2) {
+      const scale = Math.min(layout2.scale, (layout2.height - 24) / 320);
+      placeSprite("lobby_settings_panel", { path: sprites.settingsPanel.path, width: 420 * scale, height: 300 * scale }, layout2.centerX, layout2.centerY, 70);
+      placeText("lobby_settings_title", "SETTINGS", layout2.centerX, layout2.centerY + 102 * scale, 72, 27 * scale, colors.white);
+      placeText("lobby_settings_close", "CLOSE", layout2.centerX, layout2.centerY + 10 * scale, 72, 24 * scale, colors.blue);
+      placeText("lobby_settings_exit", "EXIT GAME", layout2.centerX, layout2.centerY - 82 * scale, 72, 24 * scale, colors.red);
+    }
+    handleSettings(pointer, layout2) {
+      if (keyJustPressed("Escape")) {
+        this.closeSettings();
+        return { type: "layout" };
+      }
+      if (!pointer.justPressed) return { type: "none" };
+      const scale = layout2.scale;
+      if (pointerInside(pointer, layout2.centerX, layout2.centerY + 10 * scale, 340 * scale, 70 * scale)) {
+        this.closeSettings();
+        return { type: "layout" };
+      }
+      if (pointerInside(pointer, layout2.centerX, layout2.centerY - 82 * scale, 340 * scale, 70 * scale)) {
+        requestExit();
+        return { type: "exit" };
+      }
+      return { type: "none" };
+    }
+  };
+  var MatchmakingController = class {
+    elapsed = 0;
+    layout = null;
+    show(layout2) {
+      clearScene();
+      this.elapsed = 0;
+      this.layout = layout2;
+      spawnSprite("matchmaking_background", sprites.homeBackground);
+      spawnSprite("matchmaking_panel", sprites.settingsPanel);
+      spawnText("matchmaking_title");
+      spawnText("matchmaking_status");
+      spawnText("matchmaking_cancel");
+      this.resize(layout2);
+      setGameState(0, 3, "MATCHMAKING");
+    }
+    resize(layout2) {
+      this.layout = layout2;
+      const scale = layout2.scale;
+      placeSprite("matchmaking_background", { path: sprites.homeBackground.path, width: Math.max(DESIGN_WIDTH, layout2.viewportWidth), height: DESIGN_HEIGHT }, 0, 0, -100);
+      placeSprite("matchmaking_panel", { path: sprites.settingsPanel.path, width: 420 * scale, height: 300 * scale }, layout2.centerX, layout2.centerY, 10);
+      placeText("matchmaking_title", "FINDING OPPONENT", layout2.centerX, layout2.centerY + 78 * scale, 12, 25 * scale, colors.gold);
+      placeText("matchmaking_cancel", "CANCEL", layout2.centerX, layout2.centerY - 83 * scale, 12, 20 * scale, colors.blue);
+      this.updateStatus();
+    }
+    update(dt, pointer) {
+      const layout2 = this.layout;
+      if (!layout2) return "waiting";
+      this.elapsed += Math.min(Math.max(dt, 0), 0.05);
+      this.updateStatus();
+      if (keyJustPressed("Escape") || pointer.justPressed && pointerInside(
+        pointer,
+        layout2.centerX,
+        layout2.centerY - 83 * layout2.scale,
+        320 * layout2.scale,
+        70 * layout2.scale
+      )) return "cancel";
+      return this.elapsed >= 1.2 ? "ready" : "waiting";
+    }
+    updateStatus() {
+      const layout2 = this.layout;
+      if (!layout2) return;
+      const dots = ".".repeat(Math.floor(this.elapsed * 3) % 4);
+      placeText("matchmaking_status", `TRAINING BOT${dots}`, layout2.centerX, layout2.centerY, 12, 17 * layout2.scale, colors.white);
+    }
+  };
+
+  // modules/clash/game/src/clash.ts
+  var lobby = new LobbyController();
+  var matchmaking = new MatchmakingController();
+  var battle = new BattleController();
+  var route = "lobby";
+  var layout = createScreenLayout(DESKTOP_WINDOW_WIDTH, FALLBACK_SAFE_AREA);
+  var currentLayoutKey = "";
+  function readLayout() {
+    const pointer = primaryPointer();
+    return createScreenLayout(pointer.viewportWidth, windowSafeArea());
+  }
+  function applyLayout(nextLayout) {
+    layout = nextLayout;
+    currentLayoutKey = layoutKey(nextLayout);
+    if (route === "lobby") lobby.resize(nextLayout);
+    else if (route === "matchmaking") matchmaking.resize(nextLayout);
+    else battle.resize(nextLayout);
+  }
+  function showLobby() {
+    route = "lobby";
+    set3dEnabled(false);
+    lobby.show(layout);
+    currentLayoutKey = layoutKey(layout);
+  }
+  function showMatchmaking() {
+    route = "matchmaking";
+    set3dEnabled(false);
+    matchmaking.show(layout);
+    currentLayoutKey = layoutKey(layout);
+  }
+  function showBattle() {
+    route = "battle";
+    set3dEnabled(false);
+    battle.show(layout);
+    currentLayoutKey = layoutKey(layout);
+  }
+  function initialize() {
+    setWindowSize(DESKTOP_WINDOW_WIDTH, DESKTOP_WINDOW_HEIGHT);
+    layout = readLayout();
+    showLobby();
   }
   var callbacks = globalThis;
-  callbacks.on_script_loaded = function() {
-    setWindowSize(DESKTOP_WINDOW_WIDTH, DESKTOP_WINDOW_HEIGHT);
-    const safeArea = windowSafeArea();
-    resetBattle(safeArea.width, safeArea);
-  };
-  callbacks.on_script_reloaded = function() {
-    setWindowSize(DESKTOP_WINDOW_WIDTH, DESKTOP_WINDOW_HEIGHT);
-    const safeArea = windowSafeArea();
-    resetBattle(safeArea.width, safeArea);
-  };
+  callbacks.on_script_loaded = initialize;
+  callbacks.on_script_reloaded = initialize;
   callbacks.on_update = function(dt) {
     const pointer = primaryPointer();
-    syncResponsiveLayout(pointer.viewportWidth, windowSafeArea());
-    if (handleSettingsInput(pointer)) {
-      updateHud();
+    const nextLayout = createScreenLayout(pointer.viewportWidth, windowSafeArea());
+    if (layoutKey(nextLayout) !== currentLayoutKey) applyLayout(nextLayout);
+    if (route === "lobby") {
+      const action = lobby.update(pointer);
+      if (action.type === "start-matchmaking") showMatchmaking();
       return;
     }
-    if (handleResultInput(pointer)) {
-      updateHud();
+    if (route === "matchmaking") {
+      const result = matchmaking.update(dt, pointer);
+      if (result === "cancel") showLobby();
+      else if (result === "ready") showBattle();
       return;
     }
-    handleCardInput(pointer);
-    const frameTime = Math.min(Math.max(dt, 0), 0.05);
-    matchSystem(frameTime);
-    enemyAiSystem(frameTime);
-    unitSystem(frameTime);
-    towerCombatSystem(frameTime);
-    updateHud();
+    battle.update(dt, pointer);
   };
 })();

@@ -10,6 +10,10 @@ as real reflected Bevy components and resources; there is no script-side ECS sna
 | --- | --- |
 | `scene_spawn(id, x, y, z)` | Creates or updates an owned entity with Bevy `Transform`. |
 | `scene_set_sprite(id, path, width, height)` | Inserts a Bevy `Sprite` that loads from the runtime asset root. |
+| `scene_set_model(id, path)` | Loads scene 0 from a standard glTF 2.0 GLB into the owned entity. Proprietary containers that only use a `.glb` suffix are not supported. |
+| `scene_set_transform_3d(id, x, y, z, rx, ry, rz, scale)` | Applies a 3D translation, Euler rotation in radians, and uniform scale. |
+| `scene_play_animation(id, path, repeat)` | Loads animation 0 from a standard glTF 2.0 GLB and binds it after the model hierarchy is ready. |
+| `scene_set_3d_enabled(enabled)` | Enables or disables the runtime's fixed orthographic 3D camera. |
 | `scene_set_transform(id, x, y, z)` | Updates the entity's Bevy `Transform`. |
 | `scene_set_text(id, value, size, r, g, b, a, anchor)` | Inserts Bevy `Text2d`, `TextFont`, `TextColor`, and `Anchor` components. |
 | `scene_transform(id)` | Returns a BMS `ReflectReference` to Bevy `Transform`. |

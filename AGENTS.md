@@ -12,9 +12,13 @@
 
 ## Development Defaults
 
-Treat TypeScript as the default language for subsequent game development. Put gameplay, entities,
-systems, input, UI behavior, and iteration in TypeScript scripts and compiled JavaScript assets.
-Change the Rust runtime or host only when the scripting API cannot provide the required capability.
+Use TypeScript for all repository-owned scripts, including gameplay, entities, systems, input, UI
+behavior, tests, smoke checks, asset preparation, build tooling, and release tooling. Do not add or
+maintain handwritten `.js`, `.mjs`, or `.cjs` scripts. JavaScript files are allowed only as generated
+TypeScript output, vendored third-party code, or runtime assets that must be emitted for QuickJS.
+Keep generated JavaScript out of source-oriented TypeScript checks and regenerate it through the
+owning build command. Change the Rust runtime or host only when the scripting API cannot provide the
+required capability.
 
 ## BMS-First Scripting Architecture
 
