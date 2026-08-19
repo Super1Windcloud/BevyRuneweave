@@ -4,8 +4,13 @@ use bevy_asset::AssetLoader;
 use bevy_log::warn;
 use bevy_reflect::TypePath;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::{Language, LanguageExtensions, ScriptAsset, ScriptAssetError};
+
+/// A language-independent transformation applied before script source enters a runtime context.
+pub type ScriptAssetPreprocessor =
+    Arc<dyn Fn(&mut [u8]) -> Result<(), ScriptAssetError> + Send + Sync>;
 
 /// Script settings
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -20,7 +25,7 @@ pub struct ScriptAssetLoader {
     /// The file extensions this loader should handle
     language_extensions: &'static LanguageExtensions,
     /// preprocessor to run on the script before saving the content to an asset
-    pub preprocessor: Option<Box<dyn Fn(&mut [u8]) -> Result<(), ScriptAssetError> + Send + Sync>>,
+    pub preprocessor: Option<ScriptAssetPreprocessor>,
 }
 
 impl ScriptAssetLoader {
@@ -33,10 +38,7 @@ impl ScriptAssetLoader {
     }
 
     /// Add a preprocessor
-    pub fn with_preprocessor(
-        mut self,
-        preprocessor: Box<dyn Fn(&mut [u8]) -> Result<(), ScriptAssetError> + Send + Sync>,
-    ) -> Self {
+    pub fn with_preprocessor(mut self, preprocessor: ScriptAssetPreprocessor) -> Self {
         self.preprocessor = Some(preprocessor);
         self
     }

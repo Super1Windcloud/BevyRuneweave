@@ -5,6 +5,7 @@ compile_error!("the js and typescript features select the same QuickJS backend")
 
 mod runtime;
 mod script_api;
+mod script_crypto;
 
 pub(crate) const GAME_VIEWPORT_HEIGHT: f32 = 800.0;
 

@@ -28,13 +28,13 @@ use bevy::{
     window::{MonitorSelection, PresentMode, WindowResolution},
 };
 use bevy_mod_scripting::prelude::{
-    BMSPlugin, ScriptAsset, ScriptCallbackEvent, ScriptComponent, ScriptValue, callback_labels,
-    event_handler,
+    BMSPlugin, ConfigureScriptPlugin, ScriptAsset, ScriptCallbackEvent, ScriptComponent,
+    ScriptValue, callback_labels, event_handler,
 };
 #[cfg(target_os = "windows")]
 use winit::platform::windows::WindowExtWindows;
 
-use crate::script_api::RuneweaveScriptApiPlugin;
+use crate::{script_api::RuneweaveScriptApiPlugin, script_crypto::decrypt_script_asset};
 
 #[cfg(feature = "lua")]
 use bevy_mod_scripting::lua::LuaScriptingPlugin;
@@ -64,7 +64,14 @@ struct RuntimeConfig {
 callback_labels!(OnUpdate => "on_update");
 
 fn runtime_scripting_plugins() -> bevy::app::PluginGroupBuilder {
-    BMSPlugin.build()
+    let plugins = BMSPlugin.build();
+    #[cfg(feature = "lua")]
+    let plugins =
+        plugins.set(LuaScriptingPlugin::default().set_asset_preprocessor(decrypt_script_asset));
+    #[cfg(any(feature = "js", feature = "typescript"))]
+    let plugins =
+        plugins.set(QuickJsScriptingPlugin::default().set_asset_preprocessor(decrypt_script_asset));
+    plugins
 }
 
 #[derive(Resource)]

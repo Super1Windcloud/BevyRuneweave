@@ -19,7 +19,9 @@ use bevy_ecs::{
     schedule::SystemSet,
 };
 use bevy_log::error;
-use bevy_mod_scripting_asset::{Language, LanguageExtensions, ScriptAsset, ScriptAssetLoader};
+use bevy_mod_scripting_asset::{
+    Language, LanguageExtensions, ScriptAsset, ScriptAssetLoader, ScriptAssetPreprocessor,
+};
 
 #[cfg(feature = "script_systems")]
 use bevy_mod_scripting_bindings::AppScheduleRegistry;
@@ -106,6 +108,9 @@ pub struct ScriptingPlugin<P: IntoScriptPluginParams> {
     /// Declares the file extensions this plugin supports
     pub supported_extensions: Vec<&'static str>,
 
+    /// Optional language-independent transformation applied while loading script assets.
+    pub asset_preprocessor: Option<ScriptAssetPreprocessor>,
+
     /// initializers for the contexts, run when loading the script
     pub context_initializers: Vec<ContextInitializer<P>>,
 
@@ -144,6 +149,7 @@ impl<P: IntoScriptPluginParams> Default for ScriptingPlugin<P> {
             context_policy: ContextPolicy::default(),
             language: Default::default(),
             supported_extensions: Default::default(),
+            asset_preprocessor: None,
             context_initializers: Default::default(),
             context_pre_handling_initializers: Default::default(),
             emit_responses: false,
@@ -180,7 +186,11 @@ impl<P: IntoScriptPluginParams> Plugin for ScriptingPlugin<P> {
 
         app.insert_resource(ScriptContexts::<P>::new(self.context_policy.clone()));
         app.init_resource::<ScriptComponentsChangeCache>();
-        app.register_asset_loader(ScriptAssetLoader::new(config.language_extensions));
+        let mut asset_loader = ScriptAssetLoader::new(config.language_extensions);
+        if let Some(preprocessor) = &self.asset_preprocessor {
+            asset_loader = asset_loader.with_preprocessor(preprocessor.clone());
+        }
+        app.register_asset_loader(asset_loader);
 
         app.add_plugins((
             self.processing_pipeline_plugin.clone(),
@@ -278,6 +288,15 @@ pub trait ConfigureScriptPlugin {
     /// removes a supported file extension for the plugin's language.
     fn remove_supported_extension(self, extension: &'static str) -> Self;
 
+    /// Sets a preprocessor shared by every script asset handled by this language plugin.
+    fn set_asset_preprocessor(
+        self,
+        preprocessor: impl Fn(&mut [u8]) -> Result<(), bevy_mod_scripting_asset::ScriptAssetError>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self;
+
     /// Sets the script pipeline settings plugin
     fn set_pipeline_settings(self, pipeline: ScriptLoadingPipeline<Self::P>) -> Self;
 }
@@ -332,6 +351,17 @@ impl<P: IntoScriptPluginParams + AsMut<ScriptingPlugin<P>>> ConfigureScriptPlugi
         self.as_mut()
             .supported_extensions
             .retain(|&ext| ext != extension);
+        self
+    }
+
+    fn set_asset_preprocessor(
+        mut self,
+        preprocessor: impl Fn(&mut [u8]) -> Result<(), bevy_mod_scripting_asset::ScriptAssetError>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self {
+        self.as_mut().asset_preprocessor = Some(std::sync::Arc::new(preprocessor));
         self
     }
 

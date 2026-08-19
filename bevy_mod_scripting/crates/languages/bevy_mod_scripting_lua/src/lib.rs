@@ -148,6 +148,7 @@ impl Default for LuaScriptingPlugin {
             scripting_plugin: ScriptingPlugin {
                 runtime_initializers: Vec::default(),
                 supported_extensions: vec!["lua"],
+                asset_preprocessor: None,
                 context_initializers: vec![
                     ContextInitializer::new(
                         |_script_id: &ScriptAttachment, context: &mut LuaContext| {

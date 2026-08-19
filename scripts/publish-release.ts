@@ -1,5 +1,6 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createCipheriv, randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { deflateRawSync } from "node:zlib";
@@ -15,6 +16,8 @@ const upload = !process.argv.includes("--no-upload");
 const language = process.argv.find((arg) => arg.startsWith("--language="))?.slice(11) ?? "all";
 const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
 const output = join(root, "dist", "releases", tag);
+const scriptKeyName = "RUNEWEAVE_SCRIPT_KEY";
+const encryptedScriptMagic = Buffer.from([0x52, 0x57, 0x53, 0x43, 0x01]);
 
 type ProjectLanguage = "js" | "ts" | "lua";
 
@@ -35,7 +38,8 @@ interface ReleaseProject {
   packageName: string;
   language: ProjectLanguage;
   assets: string;
-  sourceEntry?: string;
+  sourceDirectory: string;
+  sourceEntry: string;
   scriptEntry: string;
 }
 
@@ -92,16 +96,19 @@ function discoverProjects(): ReleaseProject[] {
       if (extname(config.scriptEntry) !== expectedExtension) {
         throw new Error(`scriptEntry does not match module language in ${moduleFile}`);
       }
-      const sourceEntry = config.language === "ts"
-        ? join(moduleRoot, config.sourceDirectory, config.scriptEntry.slice(0, -expectedExtension.length) + ".ts")
-        : undefined;
-      if (sourceEntry && !existsSync(sourceEntry)) throw new Error(`Missing TypeScript entry: ${sourceEntry}`);
+      const sourceDirectory = join(moduleRoot, config.sourceDirectory);
+      const sourceEntryName = config.language === "ts"
+        ? config.scriptEntry.slice(0, -expectedExtension.length) + ".ts"
+        : config.scriptEntry;
+      const sourceEntry = join(sourceDirectory, sourceEntryName);
+      if (!existsSync(sourceEntry)) throw new Error(`Missing ${config.language} source entry: ${sourceEntry}`);
 
       return {
         directory: entry.name,
         packageName,
         language: config.language,
         assets,
+        sourceDirectory,
         sourceEntry,
         scriptEntry: config.scriptEntry,
       };
@@ -155,25 +162,61 @@ function crc32(data: Uint8Array) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-async function prepareAssets(project: ReleaseProject, destination: string) {
-  cpSync(project.assets, destination, { recursive: true });
-  const script = join(destination, project.scriptEntry);
-  if (project.language === "ts") {
-    await build({
-      entryPoints: [project.sourceEntry!],
-      outfile: script,
-      bundle: true,
-      format: "iife",
-      target: "es2023",
-    });
+function scriptEncryptionKey(): Buffer {
+  const value = process.env[scriptKeyName]?.trim();
+  if (!value || !/^[0-9a-fA-F]{64}$/.test(value)) {
+    throw new Error(`${scriptKeyName} must contain exactly 64 hexadecimal characters`);
   }
-  if (!existsSync(script)) return;
-  const sourceCode = readFileSync(script, "utf8");
-  if (project.language === "lua") {
-    writeFileSync(script, compressLua(sourceCode), "utf8");
-    return;
-  }
-  const result = await transform(sourceCode, {
+  return Buffer.from(value, "hex");
+}
+
+function encryptScript(source: string): Buffer {
+  const nonce = randomBytes(12);
+  const header = Buffer.concat([encryptedScriptMagic, nonce]);
+  const cipher = createCipheriv("aes-256-gcm", scriptEncryptionKey(), nonce);
+  cipher.setAAD(header);
+  const ciphertext = Buffer.concat([cipher.update(source, "utf8"), cipher.final()]);
+  return Buffer.concat([header, ciphertext, cipher.getAuthTag()]);
+}
+
+function filesUnder(directory: string, extension: string): string[] {
+  const files: string[] = [];
+  const visit = (current: string) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const path = join(current, entry.name);
+      if (entry.isDirectory()) visit(path);
+      else if (entry.isFile() && extname(entry.name).toLowerCase() === extension) files.push(path);
+    }
+  };
+  visit(directory);
+  return files.sort((left, right) => left.localeCompare(right));
+}
+
+function removePackagedScripts(destination: string, extensions: string[]) {
+  const extensionSet = new Set(extensions);
+  const visit = (current: string) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const path = join(current, entry.name);
+      if (entry.isDirectory()) visit(path);
+      else if (entry.isFile() && extensionSet.has(extname(entry.name).toLowerCase())) rmSync(path);
+    }
+  };
+  visit(destination);
+}
+
+async function bundleJavaScript(project: ReleaseProject): Promise<string> {
+  const result = await build({
+    entryPoints: [project.sourceEntry],
+    bundle: true,
+    format: "iife",
+    legalComments: "none",
+    platform: "neutral",
+    target: "es2023",
+    write: false,
+  });
+  const bundled = result.outputFiles?.[0];
+  if (!bundled) throw new Error(`esbuild produced no bundled entry for ${project.sourceEntry}`);
+  const minified = await transform(bundled.text, {
     loader: "js",
     minifyIdentifiers: true,
     minifySyntax: true,
@@ -182,7 +225,7 @@ async function prepareAssets(project: ReleaseProject, destination: string) {
     charset: "utf8",
   });
   // Keep release obfuscation parse-time only so gameplay callbacks gain no per-frame overhead.
-  const obfuscated = obfuscate(result.code, {
+  return `${obfuscate(minified.code, {
     compact: true,
     controlFlowFlattening: false,
     deadCodeInjection: false,
@@ -198,8 +241,49 @@ async function prepareAssets(project: ReleaseProject, destination: string) {
     target: "browser-no-eval",
     transformObjectKeys: false,
     unicodeEscapeSequence: true,
+  }).getObfuscatedCode()}\n`;
+}
+
+function luaModuleNames(sourceDirectory: string, path: string): string[] {
+  const sourcePath = relative(sourceDirectory, path).split(sep).join("/").slice(0, -4);
+  const canonical = sourcePath.endsWith("/init") ? sourcePath.slice(0, -5) : sourcePath;
+  return [...new Set([canonical.replaceAll("/", "."), canonical])];
+}
+
+function bundleLua(project: ReleaseProject): string {
+  const modules = filesUnder(project.sourceDirectory, ".lua")
+    .filter((path) => resolve(path) !== resolve(project.sourceEntry));
+  const owners = new Map<string, string>();
+  const bundledModules = modules.map((path, index) => {
+    const names = luaModuleNames(project.sourceDirectory, path);
+    for (const name of names) {
+      const owner = owners.get(name);
+      if (owner) throw new Error(`Lua module ${name} is provided by both ${owner} and ${path}`);
+      owners.set(name, path);
+    }
+    const loader = `__bundle_module_${index}`;
+    const registrations = names
+      .map((name) => `package.preload[${JSON.stringify(name)}]=${loader}`)
+      .join("\n");
+    return `local ${loader}=function(...)\n${readFileSync(path, "utf8")}\nend\n${registrations}`;
   });
-  writeFileSync(script, `${obfuscated.getObfuscatedCode()}\n`, "utf8");
+  bundledModules.push(readFileSync(project.sourceEntry, "utf8"));
+  return bundledModules.join("\n");
+}
+
+async function prepareAssets(project: ReleaseProject, destination: string) {
+  cpSync(project.assets, destination, { recursive: true });
+  const script = join(destination, project.scriptEntry);
+  mkdirSync(dirname(script), { recursive: true });
+  if (project.language === "lua") {
+    const bundled = bundleLua(project);
+    removePackagedScripts(destination, [".lua"]);
+    writeFileSync(script, encryptScript(compressLua(bundled)));
+    return;
+  }
+  const bundled = await bundleJavaScript(project);
+  removePackagedScripts(destination, [".js", ".mjs", ".cjs"]);
+  writeFileSync(script, encryptScript(bundled));
 }
 
 function compressLua(source: string) {

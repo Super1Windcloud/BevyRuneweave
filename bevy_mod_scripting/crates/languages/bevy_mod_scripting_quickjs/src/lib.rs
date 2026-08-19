@@ -67,6 +67,7 @@ impl Default for QuickJsScriptingPlugin {
                 context_policy: ContextPolicy::default(),
                 language: QUICKJS_LANGUAGE,
                 supported_extensions: vec!["js", "mjs"],
+                asset_preprocessor: None,
                 context_initializers: vec![
                     ContextInitializer::new(install_console),
                     ContextInitializer::new(bindings::install_bms_globals),

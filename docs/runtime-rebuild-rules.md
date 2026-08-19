@@ -85,12 +85,15 @@ just package-assets all 0.0.1
 just package-assets-typescript 0.0.1
 just package-assets-js 0.0.1
 just package-assets-lua 0.0.1
+just update-assets 0.0.1
 ```
 
 `package-assets all` 会通过 Cargo workspace 和各项目的 `modules/*/module.json` 自动扫描
 所有 `projects/*`，并以 Cargo package name 作为 ZIP 名称。语言专用命令会筛选所有对应
-语言的项目，而不是只处理一个固定示例；每个 TypeScript 项目都会从自己的源码入口编译。
-Lua Release 资源会经过 `luamin`，但这些处理均不会改变 runtime library。
+语言的项目，而不是只处理一个固定示例。打包会先把每个项目的 JavaScript/TypeScript
+依赖或 Lua 模块合并到 `scriptEntry` 指定的单一入口，再压缩混淆；ZIP 中不会保留其他脚本
+源码。`update-assets` 执行相同打包流程并替换 GitHub Release 中的同名资源。这些处理均不会
+改变 runtime library。
 
 ### Host 与安装包
 

@@ -2,6 +2,7 @@
 name = "bevy-runeweave"
 version = "0.1.0"
 edition = "2024"
+build = "build.rs"
 authors.workspace = true
 homepage = "https://github.com/Super1windcloud/BevyRuneWeave"
 description = "A Bevy-based ECS game framework for Lua, JavaScript, and TypeScript"
@@ -111,6 +112,7 @@ script_systems = ["bevy_mod_scripting/script_systems"]
 full_scripting = ["documentation", "dynamic_components", "script_systems"]
 
 [dependencies]
+aes-gcm = { version = "0.11.0", default-features = false, features = ["aes"] }
 # This is Bevy's `2d` feature set with `default_platform` expanded so the
 # embeddable runtime does not link the unused gilrs/libudev gamepad backend.
 bevy = { version = "0.19.0", default-features = false, features = [
