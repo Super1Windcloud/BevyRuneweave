@@ -70,9 +70,16 @@ pub(crate) fn decrypt_script_asset(content: &mut [u8]) -> Result<(), ScriptAsset
     if !content.starts_with(MAGIC) {
         return Ok(());
     }
+    let started = std::time::Instant::now();
     let key = EMBEDDED_KEY
         .ok_or_else(|| crypto_error("runtime was built without RUNEWEAVE_SCRIPT_KEY"))?;
-    decrypt_with_key(content, &decode_key(key)?)
+    let result = decrypt_with_key(content, &decode_key(key)?);
+    eprintln!(
+        "[runtime-timing] encrypted script decrypt: {} bytes in {:?}",
+        content.len(),
+        started.elapsed()
+    );
+    result
 }
 
 #[cfg(test)]

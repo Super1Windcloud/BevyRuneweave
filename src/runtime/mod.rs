@@ -7,6 +7,7 @@ use std::{
         Mutex,
         atomic::{AtomicBool, Ordering},
     },
+    time::Instant,
 };
 
 #[cfg(target_os = "android")]
@@ -27,6 +28,7 @@ use bevy::{
     prelude::*,
     window::{MonitorSelection, PresentMode, WindowResolution},
 };
+use bevy_mod_scripting::core::event::ScriptAttachedEvent;
 use bevy_mod_scripting::prelude::{
     BMSPlugin, ConfigureScriptPlugin, ScriptAsset, ScriptCallbackEvent, ScriptComponent,
     ScriptValue, callback_labels, event_handler,
@@ -83,6 +85,9 @@ struct LoadedScriptPath {
 #[derive(Resource)]
 struct RuntimeAssetRoot(PathBuf);
 
+#[derive(Resource)]
+struct RuntimeStartupTimer(Instant);
+
 #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
 #[derive(Resource)]
 struct ScriptFilePollTimer(Timer);
@@ -92,9 +97,35 @@ fn attach_script(
     asset_server: Res<AssetServer>,
     path: Res<LoadedScriptPath>,
 ) {
+    eprintln!(
+        "[runtime-timing] attach_script queued at {:?}",
+        path.asset_path
+    );
     commands.spawn(ScriptComponent::new(vec![
         asset_server.load::<ScriptAsset>(path.asset_path.clone()),
     ]));
+}
+
+fn log_script_attached(
+    mut events: MessageReader<ScriptAttachedEvent>,
+    timer: Res<RuntimeStartupTimer>,
+) {
+    if events.read().next().is_some() {
+        eprintln!(
+            "[runtime-timing] script asset attached after {:?}",
+            timer.0.elapsed()
+        );
+    }
+}
+
+fn log_first_update(timer: Res<RuntimeStartupTimer>, mut logged: Local<bool>) {
+    if !*logged {
+        *logged = true;
+        eprintln!(
+            "[runtime-timing] first update after {:?}",
+            timer.0.elapsed()
+        );
+    }
 }
 
 fn spawn_scene_camera(mut commands: Commands) {
@@ -352,6 +383,12 @@ fn script_backend(path: &Path) -> Result<&'static str, String> {
 
 /// Builds the Bevy application without starting its platform event loop.
 pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Result<App, String> {
+    let startup_timer = Instant::now();
+    eprintln!(
+        "[runtime-timing] build_app_with_assets start: assets={}, script={}",
+        asset_root.display(),
+        script_path.display()
+    );
     let asset_path = normalize_script_path(&asset_root, &script_path)?;
     let backend = script_backend(&asset_path)?;
     if !asset_root.is_dir() {
@@ -407,6 +444,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
     )
     .add_plugins(scripting_plugins)
     .add_plugins(RuneweaveScriptApiPlugin)
+    .insert_resource(RuntimeStartupTimer(startup_timer))
     .insert_resource(LoadedScriptPath {
         source_path: asset_root.join(&asset_path),
         modified: fs::metadata(asset_root.join(&asset_path))
@@ -428,6 +466,8 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         Update,
         (
             request_asset_reload,
+            log_first_update,
+            log_script_attached,
             #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
             poll_asset_reload,
             emit_update,

@@ -795,6 +795,12 @@ fn install_downloaded_package(
 }
 
 fn install_package(bytes: &[u8], source_name: &str, destination: &Path) -> Result<(), String> {
+    let started = std::time::Instant::now();
+    eprintln!(
+        "[launcher-timing] install package start: {} ({} bytes)",
+        source_name,
+        bytes.len()
+    );
     if destination.exists() {
         fs::remove_dir_all(destination)
             .map_err(|error| format!("Could not replace installed assets: {error}"))?;
@@ -822,6 +828,11 @@ fn install_package(bytes: &[u8], source_name: &str, destination: &Path) -> Resul
     if result.is_err() {
         let _ = fs::remove_dir_all(destination);
     }
+    eprintln!(
+        "[launcher-timing] install package finished in {:?}: {}",
+        started.elapsed(),
+        if result.is_ok() { "ok" } else { "failed" }
+    );
     result
 }
 
@@ -935,6 +946,7 @@ fn launch_runtime_process() -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
     let mut command = Command::new(executable);
     command.arg("--run-game");
+    eprintln!("[launcher-timing] spawning runtime process");
     command.spawn().map_err(|error| error.to_string())?;
     Ok(())
 }
