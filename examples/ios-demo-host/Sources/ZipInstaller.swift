@@ -93,6 +93,7 @@ enum ZipInstaller {
 
     private static func inflated(_ data: Data, expectedSize: Int) throws -> Data {
         var output = Data(count: max(expectedSize, 1))
+        let outputCapacity = output.count
         var stream = z_stream()
         let initialization = inflateInit2_(&stream, -MAX_WBITS, ZLIB_VERSION,
                                            Int32(MemoryLayout<z_stream>.size))
@@ -106,7 +107,7 @@ enum ZipInstaller {
                 )
                 stream.avail_in = uInt(data.count)
                 stream.next_out = destination.baseAddress?.assumingMemoryBound(to: Bytef.self)
-                stream.avail_out = uInt(output.count)
+                stream.avail_out = uInt(outputCapacity)
                 return inflate(&stream, Z_FINISH)
             }
         }
