@@ -59,12 +59,22 @@ impl ProcessMode {
     }
 }
 
-#[derive(Clone, Copy, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 enum Language {
     Js,
     TypeScript,
     Lua,
+}
+
+impl Language {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Js => "JavaScript",
+            Self::TypeScript => "TypeScript",
+            Self::Lua => "Lua",
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -82,27 +92,60 @@ struct EngineConfig {
 
 #[derive(Deserialize)]
 struct ScriptConfig {
-    #[serde(rename = "language")]
-    _language: Language,
+    language: Language,
     entry: PathBuf,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct InstalledGame {
+    project: String,
+    name: String,
+    version: String,
+    language: Language,
 }
 
 struct LauncherApp {
     url: String,
     downloading: bool,
-    installed_game_available: bool,
+    installed_games: Vec<InstalledGame>,
+    active_project: Option<String>,
     error: Option<String>,
     result: Option<Receiver<Result<(), String>>>,
 }
 
 impl LauncherApp {
     fn new() -> Self {
-        Self {
+        let mut app = Self {
             url: String::new(),
             downloading: false,
-            installed_game_available: active_assets_root().is_ok(),
+            installed_games: Vec::new(),
+            active_project: None,
             error: None,
             result: None,
+        };
+        if let Err(error) = app.refresh_installed_games() {
+            app.error = Some(error);
+        }
+        app
+    }
+
+    fn refresh_installed_games(&mut self) -> Result<(), String> {
+        let (installed_games, active_project) = installed_games()?;
+        self.installed_games = installed_games;
+        self.active_project = active_project;
+        Ok(())
+    }
+
+    fn start_installed_game(&mut self, project: &str) {
+        let result = platform_data_root()
+            .and_then(|root| write_active_project(&root, project))
+            .and_then(|()| launch_runtime_process());
+        match result {
+            Ok(()) => {
+                self.active_project = Some(project.to_owned());
+                self.error = None;
+            }
+            Err(error) => self.error = Some(error),
         }
     }
 
@@ -136,8 +179,9 @@ impl LauncherApp {
         self.downloading = false;
         match result {
             Ok(()) => {
-                self.installed_game_available = true;
-                if let Err(error) = launch_runtime_process() {
+                if let Err(error) = self.refresh_installed_games() {
+                    self.error = Some(error);
+                } else if let Err(error) = launch_runtime_process() {
                     self.error = Some(error);
                 }
             }
@@ -191,11 +235,54 @@ impl eframe::App for LauncherApp {
                 }
             });
 
+            ui.add_space(14.0);
+            ui.heading("Installed games");
+            ui.add_space(4.0);
+            let mut project_to_start = None;
+            egui::ScrollArea::vertical()
+                .max_height(240.0)
+                .auto_shrink([false, true])
+                .show(ui, |ui| {
+                    if self.installed_games.is_empty() {
+                        ui.weak("No installed games");
+                    }
+                    for game in &self.installed_games {
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            ui.vertical(|ui| {
+                                ui.strong(&game.name);
+                                ui.weak(format!(
+                                    "Version {} | {}",
+                                    game.version,
+                                    game.language.label()
+                                ));
+                            });
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    if ui
+                                        .add_enabled(!self.downloading, egui::Button::new("Start"))
+                                        .clicked()
+                                    {
+                                        project_to_start = Some(game.project.clone());
+                                    }
+                                    if self.active_project.as_deref() == Some(game.project.as_str())
+                                    {
+                                        ui.weak("Active");
+                                    }
+                                },
+                            );
+                        });
+                    }
+                });
+            if let Some(project) = project_to_start {
+                self.start_installed_game(&project);
+            }
+
+            ui.add_space(10.0);
             ui.horizontal(|ui| {
-                if !self.downloading
-                    && self.installed_game_available
-                    && ui.button("Start Installed Game").clicked()
-                    && let Err(error) = launch_runtime_process()
+                if ui.button("Refresh Installed Games").clicked()
+                    && let Err(error) = self.refresh_installed_games()
                 {
                     self.error = Some(error);
                 }
@@ -380,6 +467,64 @@ fn active_assets_root() -> Result<PathBuf, String> {
         load_config(&development)?;
         Ok(development)
     })
+}
+
+fn installed_games() -> Result<(Vec<InstalledGame>, Option<String>), String> {
+    let installed_root = platform_data_root()?;
+    fs::create_dir_all(&installed_root).map_err(|error| error.to_string())?;
+    installed_games_at(&installed_root)
+}
+
+fn installed_games_at(
+    installed_root: &Path,
+) -> Result<(Vec<InstalledGame>, Option<String>), String> {
+    // Preserve the existing newest-project fallback and active marker migration.
+    let _ = active_assets_root_at(installed_root);
+
+    let active_project = fs::read_to_string(installed_root.join(ACTIVE_PROJECT_FILE))
+        .ok()
+        .map(|project| project.trim().to_owned())
+        .filter(|project| project_directory_name(project).as_deref() == Ok(project.as_str()));
+    let mut games = Vec::new();
+    for entry in fs::read_dir(installed_root).map_err(|error| error.to_string())? {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if !file_type.is_dir() {
+            continue;
+        }
+        let Some(project) = entry.file_name().to_str().map(str::to_owned) else {
+            continue;
+        };
+        if project_directory_name(&project).as_deref() != Ok(project.as_str()) {
+            continue;
+        }
+        let assets = entry.path().join("assets");
+        let Ok(config) = load_config(&assets) else {
+            continue;
+        };
+        games.push(InstalledGame {
+            project,
+            name: config.name,
+            version: config.version,
+            language: config.script.language,
+        });
+    }
+    games.sort_by(|left, right| {
+        left.name
+            .to_ascii_lowercase()
+            .cmp(&right.name.to_ascii_lowercase())
+            .then_with(|| left.project.cmp(&right.project))
+    });
+    let active_project = active_project.filter(|active| {
+        games
+            .iter()
+            .any(|game| game.project.as_str() == active.as_str())
+    });
+    Ok((games, active_project))
 }
 
 fn active_assets_root_at(installed_root: &Path) -> Result<PathBuf, String> {
@@ -1017,6 +1162,16 @@ mod tests {
     }
 
     fn asset_package_zip(prefix: &str) -> Vec<u8> {
+        asset_package_zip_for(prefix, "Test", "1.0.0", "typescript", "shooter.js")
+    }
+
+    fn asset_package_zip_for(
+        prefix: &str,
+        name: &str,
+        version: &str,
+        language: &str,
+        entry: &str,
+    ) -> Vec<u8> {
         let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
         let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
         writer
@@ -1024,11 +1179,14 @@ mod tests {
             .unwrap();
         writer
             .write_all(
-                br#"{"schemaVersion":1,"name":"Test","version":"1.0.0","script":{"language":"typescript","entry":"shooter.js"}}"#,
+                format!(
+                    r#"{{"schemaVersion":1,"name":"{name}","version":"{version}","script":{{"language":"{language}","entry":"{entry}"}}}}"#
+                )
+                .as_bytes(),
             )
             .unwrap();
         writer
-            .start_file(format!("{prefix}shooter.js"), options)
+            .start_file(format!("{prefix}{entry}"), options)
             .unwrap();
         writer.write_all(b"globalThis.testGame = true;").unwrap();
         writer.finish().unwrap().into_inner()
@@ -1119,6 +1277,40 @@ mod tests {
             .filter(|entry| !entry.file_name().to_string_lossy().starts_with('.'))
             .count();
         assert_eq!(project_directories, 1);
+    }
+
+    #[test]
+    fn lists_installed_games_with_metadata_and_active_project() {
+        let root = tempfile::tempdir().unwrap();
+        install_downloaded_package(
+            root.path(),
+            &asset_package_zip_for("", "Zulu", "2.0.0", "lua", "main.lua"),
+            "zulu.zip",
+        )
+        .unwrap();
+        install_downloaded_package(
+            root.path(),
+            &asset_package_zip_for("", "Alpha", "1.2.3", "js", "main.js"),
+            "alpha.zip",
+        )
+        .unwrap();
+        fs::create_dir_all(root.path().join(".installing-hidden/assets")).unwrap();
+        fs::write(
+            root.path()
+                .join(".installing-hidden/assets/engineConfig.json"),
+            b"{}",
+        )
+        .unwrap();
+
+        let (games, active_project) = installed_games_at(root.path()).unwrap();
+
+        assert_eq!(games.len(), 2);
+        assert_eq!(games[0].name, "Alpha");
+        assert_eq!(games[0].version, "1.2.3");
+        assert_eq!(games[0].language, Language::Js);
+        assert_eq!(games[1].name, "Zulu");
+        assert_eq!(games[1].language, Language::Lua);
+        assert_eq!(active_project.as_deref(), Some("alpha"));
     }
 
     #[test]

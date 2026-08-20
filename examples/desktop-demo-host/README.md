@@ -7,6 +7,10 @@ stable project-specific directory in the user data directory (`<engineConfig.nam
 ABI. Reinstalling the same project replaces that directory instead of creating a new one from an
 HTTP redirect filename.
 
+The launcher lists every valid installed project with its name, version, and script language.
+Starting a list item updates `active-project` before spawning the runtime process. Use the refresh
+command after changing the application-data directory outside the launcher.
+
 Supported package formats:
 
 - ZIP and tar archives

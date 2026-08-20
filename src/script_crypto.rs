@@ -1,4 +1,7 @@
-use aes_gcm::{Aes256Gcm, KeyInit, aead::AeadInPlace};
+use aes_gcm::{
+    Aes256Gcm, KeyInit,
+    aead::{AeadInOut, Nonce, Tag},
+};
 use bevy_mod_scripting::prelude::ScriptAssetError;
 use std::io;
 
@@ -52,10 +55,12 @@ fn decrypt_with_key(content: &mut [u8], key: &[u8; 32]) -> Result<(), ScriptAsse
     let (header, encrypted) = content.split_at_mut(HEADER_LEN);
     let ciphertext_len = encrypted.len() - TAG_LEN;
     let (ciphertext, tag) = encrypted.split_at_mut(ciphertext_len);
-    let nonce = aes_gcm::Nonce::from_slice(&header[MAGIC.len() + 1..]);
-    let tag = aes_gcm::Tag::from_slice(tag);
+    let nonce = <&Nonce<Aes256Gcm>>::try_from(&header[MAGIC.len() + 1..])
+        .map_err(|_| crypto_error("encrypted script nonce has an invalid length"))?;
+    let tag = <&Tag<Aes256Gcm>>::try_from(&*tag)
+        .map_err(|_| crypto_error("encrypted script tag has an invalid length"))?;
     cipher
-        .decrypt_in_place_detached(nonce, header, ciphertext, tag)
+        .decrypt_inout_detached(nonce, header, ciphertext.into(), tag)
         .map_err(|_| {
             crypto_error("authentication failed; the key or encrypted source is invalid")
         })?;
@@ -96,12 +101,10 @@ mod tests {
         let mut ciphertext = plaintext.to_vec();
         let cipher = Aes256Gcm::new_from_slice(&TEST_KEY)
             .map_err(|_| crypto_error("could not initialize test cipher"))?;
+        let nonce = <&Nonce<Aes256Gcm>>::try_from(TEST_NONCE.as_slice())
+            .map_err(|_| crypto_error("test nonce has an invalid length"))?;
         let tag = cipher
-            .encrypt_in_place_detached(
-                aes_gcm::Nonce::from_slice(&TEST_NONCE),
-                &header,
-                &mut ciphertext,
-            )
+            .encrypt_inout_detached(nonce, &header, ciphertext.as_mut_slice().into())
             .map_err(|_| crypto_error("could not encrypt test fixture"))?;
         header.extend_from_slice(&ciphertext);
         header.extend_from_slice(&tag);

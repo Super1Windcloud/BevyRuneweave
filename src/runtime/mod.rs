@@ -26,6 +26,7 @@ use bevy::winit::WINIT_WINDOWS;
 use bevy::{
     asset::AssetPlugin,
     prelude::*,
+    render::{Render, RenderApp, RenderSystems, view::window::ExtractedWindows},
     window::{MonitorSelection, PresentMode, WindowResolution},
 };
 use bevy_mod_scripting::core::event::ScriptAttachedEvent;
@@ -126,6 +127,26 @@ fn log_first_update(timer: Res<RuntimeStartupTimer>, mut logged: Local<bool>) {
             timer.0.elapsed()
         );
     }
+}
+
+fn log_first_frame_presented(
+    timer: Res<RuntimeStartupTimer>,
+    windows: Res<ExtractedWindows>,
+    mut logged: Local<bool>,
+) {
+    if *logged
+        || !windows.values().any(|window| {
+            window.swap_chain_texture_view.is_some() && window.swap_chain_texture.is_none()
+        })
+    {
+        return;
+    }
+
+    *logged = true;
+    eprintln!(
+        "[runtime-timing] first frame submitted for presentation after {:?}",
+        timer.0.elapsed()
+    );
 }
 
 fn spawn_scene_camera(mut commands: Commands) {
@@ -483,6 +504,13 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         0.5,
         TimerMode::Repeating,
     )));
+    app.get_sub_app_mut(RenderApp)
+        .ok_or_else(|| "render app is unavailable".to_owned())?
+        .insert_resource(RuntimeStartupTimer(startup_timer))
+        .add_systems(
+            Render,
+            log_first_frame_presented.after(RenderSystems::Render),
+        );
     Ok(app)
 }
 
