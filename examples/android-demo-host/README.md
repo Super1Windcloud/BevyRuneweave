@@ -26,11 +26,15 @@ and matches the requested profile. Android Debug builds accept invalid TLS certi
 hostnames in both the launcher downloader and script HTTP API. Release builds always use strict TLS
 validation.
 
-Select an ABI set with a Gradle property:
+Select an ABI set through the repository recipe:
 
 ```bash
-./gradlew :app:assembleDebug -PruneweaveAbis=arm64-v8a
+just build-android-demo "" arm64-v8a
 ```
+
+The repository-level command delegates profile selection, ABI validation, and Gradle invocation to
+`scripts/build-android-demo-host.ts`. Use `--dry-run` on that script to validate arguments without
+building, installing, launching, or attaching logcat.
 
 Building the runtime requires an Android SDK, NDK, Rust Android targets, and `cargo-ndk`. Building
 the APK from an existing dist runtime does not invoke Cargo. Downloaded Lua, JavaScript, and

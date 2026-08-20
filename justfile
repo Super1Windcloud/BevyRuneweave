@@ -207,13 +207,12 @@ package-macos-dmg profile="":
 
 # Install, launch, and stream Debug logcat, or assemble the unsigned Release host.
 build-android-demo profile="" abis="arm64-v8a,x86_64":
-    examples/android-demo-host/gradlew -p examples/android-demo-host :app:{{ if profile == "--release" { "assembleRelease" } else { "logcatDebug" } }} -PruneweaveAbis="{{abis}}"
+    npm exec -- tsx scripts/build-android-demo-host.ts {{profile}} --abis="{{abis}}"
 
 # Install and launch the Debug iOS host, or only build the Release host.
 build-ios-demo profile="":
     {{ if profile == "--release" { "true" } else { "npm exec -- tsx scripts/prepare-ios-debug-secrets.ts" } }}
-    xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj -scheme BevyRuneweaveHost -sdk iphonesimulator -destination "generic/platform=iOS Simulator" -configuration {{ if profile == "--release" { "Release" } else { "Debug" } }} -derivedDataPath dist/ios-demo-derived-data ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
-    if [ "{{profile}}" != "--release" ]; then npm exec -- tsx scripts/launch-ios-demo.ts; fi
+    npm exec -- tsx scripts/build-ios-demo-host.ts {{ if profile == "--release" { "--release" } else { "" } }}
 
 # Run formatting, project checks, and gameplay tests.
 verify: fmt-check bms-check check bms-test test

@@ -17,14 +17,28 @@ xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj \
   ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build
 ```
 
-`just build-ios-demo` reuses the XCFramework under `dist/runtimes/ios`, builds the Debug host app,
-and then boots a simulator if needed, installs the app, and launches it. The launch command remains
+`just build-ios-demo` reuses the XCFramework under `dist/runtimes/ios`. Debug builds prefer an
+available physical iPhone, install the app, and launch it through CoreDevice. When no usable iPhone
+or signing setup is available, the command falls back to a simulator. The launch command remains
 attached to the app so Swift, Rust, Bevy, and script stdout/stderr are visible in the current
 terminal; close the app or press `Ctrl+C` to stop streaming. Native crash reports remain available
 under `$HOME/Library/Logs/DiagnosticReports/BevyRuneweave-*.ips`. Run `just build-runtime-ios`
 separately when the runtime changes.
 
-The Debug workflow prefers an already booted iPhone. Select a specific simulator by name or UDID:
+Physical-device installation requires an Apple Development signing identity and a 10-character team
+ID. Store the team ID in the root `.env`; the generated signing configuration remains untracked:
+
+```bash
+RUNEWEAVE_IOS_DEVELOPMENT_TEAM=ABCDEFGHIJ
+```
+
+Select a specific connected iPhone by name, CoreDevice identifier, or UDID:
+
+```bash
+RUNEWEAVE_IOS_DEVICE="My iPhone" just build-ios-demo
+```
+
+When the workflow falls back to a simulator, select it by name or UDID:
 
 ```bash
 RUNEWEAVE_IOS_SIMULATOR="iPhone 17 Pro" just build-ios-demo
