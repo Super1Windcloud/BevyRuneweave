@@ -109,6 +109,11 @@ just run-js
 just run-ts
 ```
 
+Every TypeScript project executable compiles its own `package.json` build target from Rust `main`
+before starting Bevy. Direct commands such as `cargo run -p script-squadron-typescript` and
+`cargo run -p clash-ts` therefore cannot start with a stale generated JavaScript entry. This
+development workflow requires Node.js and the repository TypeScript dependencies to be installed.
+
 Drag with a mouse or on Android/iOS, or move with the arrow keys or `WASD`; weapons fire
 automatically. Click or tap the top-right settings icon to pause, restart, or exit the game. A
 click, touch, or Space starts and restarts a run. Scores continue increasing without a cap.
@@ -156,8 +161,9 @@ components directly; there is no mirrored ECS or per-language product adapter. S
 
 Script files support Bevy asset hot reload. Updating `game/assets/shooter.js` or
 `game/assets/shooter.lua` in the active JavaScript or Lua project reinitializes game state and prints
-`Reloading script after source change`. TypeScript is handled separately: `just run-ts` runs its
-watch compiler, so changes to `projects/ts/modules/shooter/game/src/shooter.ts` are compiled and reloaded automatically.
+`Reloading script after source change`. TypeScript is handled separately: its Rust entry compiles
+once at startup, while `just run-ts` also runs the watch compiler so later changes to
+`projects/ts/modules/shooter/game/src/shooter.ts` are compiled and reloaded automatically.
 
 ## Build and Verification
 
