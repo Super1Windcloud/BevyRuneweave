@@ -20,19 +20,13 @@ use std::{
 const CONFIG_FILE: &str = "engineConfig.json";
 const ACTIVE_PROJECT_FILE: &str = "active-project";
 const BUILD_TARGET: &str = env!("RUNEWEAVE_BUILD_TARGET");
-const REMOTE_ASSETS: [(&str, &str); 3] = [
-    (
-        "TypeScript",
-        "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-typescript.zip",
-    ),
-    (
-        "JavaScript",
-        "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-js.zip",
-    ),
-    (
-        "Lua",
-        "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-lua.zip",
-    ),
+const GITHUB_API_ROOT: &str = "https://api.github.com/repos/Super1Windcloud/BevyRuneweave";
+const GITHUB_RELEASE_DOWNLOAD_ROOT: &str =
+    "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download";
+const FALLBACK_RELEASE_ASSETS: [&str; 3] = [
+    "script-squadron-typescript.zip",
+    "script-squadron-js.zip",
+    "script-squadron-lua.zip",
 ];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -96,6 +90,21 @@ struct ScriptConfig {
     entry: PathBuf,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+struct ReleaseAsset {
+    name: String,
+    browser_download_url: String,
+    size: u64,
+}
+
+#[derive(Deserialize)]
+struct LatestRelease {
+    tag_name: String,
+    assets: Vec<ReleaseAsset>,
+}
+
+type RemoteAssetsResult = Result<(String, Vec<ReleaseAsset>), String>;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct InstalledGame {
     project: String,
@@ -109,8 +118,11 @@ struct LauncherApp {
     downloading: bool,
     installed_games: Vec<InstalledGame>,
     active_project: Option<String>,
+    remote_release_tag: Option<String>,
+    remote_assets: Vec<ReleaseAsset>,
     error: Option<String>,
     result: Option<Receiver<Result<(), String>>>,
+    remote_assets_result: Option<Receiver<RemoteAssetsResult>>,
 }
 
 impl LauncherApp {
@@ -120,8 +132,11 @@ impl LauncherApp {
             downloading: false,
             installed_games: Vec::new(),
             active_project: None,
+            remote_release_tag: None,
+            remote_assets: Vec::new(),
             error: None,
             result: None,
+            remote_assets_result: Some(fetch_remote_assets()),
         };
         if let Err(error) = app.refresh_installed_games() {
             app.error = Some(error);
@@ -188,32 +203,81 @@ impl LauncherApp {
             Err(error) => self.error = Some(error),
         }
     }
+
+    fn refresh_remote_assets(&mut self) {
+        self.remote_assets_result = Some(fetch_remote_assets());
+        self.error = None;
+    }
+
+    fn poll_remote_assets(&mut self, context: &egui::Context) {
+        let Some(receiver) = &self.remote_assets_result else {
+            return;
+        };
+        let Ok(result) = receiver.try_recv() else {
+            return;
+        };
+
+        self.remote_assets_result = None;
+        match result {
+            Ok((tag, assets)) => {
+                self.remote_release_tag = Some(tag);
+                self.remote_assets = assets;
+            }
+            Err(error) => self.error = Some(format!("Could not load release assets: {error}")),
+        }
+        context.request_repaint();
+    }
 }
 
 impl eframe::App for LauncherApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let context = ui.ctx().clone();
         self.poll_download();
+        self.poll_remote_assets(&context);
         egui::Frame::central_panel(ui.style()).show(ui, |ui| {
             ui.add_space(12.0);
             ui.heading("Bevy RuneWeave");
             ui.add_space(12.0);
 
-            ui.label("GitHub release assets");
-            ui.horizontal_wrapped(|ui| {
-                for (name, url) in REMOTE_ASSETS {
-                    if ui
-                        .add_enabled(
-                            !self.downloading,
-                            egui::Button::new(format!("Download {name}")),
-                        )
-                        .clicked()
-                    {
-                        self.url = url.to_owned();
-                        self.start_download(&context);
-                    }
+            ui.horizontal(|ui| {
+                let label = self
+                    .remote_release_tag
+                    .as_deref()
+                    .map(|tag| format!("GitHub release assets ({tag})"))
+                    .unwrap_or_else(|| "GitHub release assets".to_owned());
+                ui.label(label);
+                if self.remote_assets_result.is_some() {
+                    ui.spinner();
+                } else if ui.button("Refresh").clicked() {
+                    self.refresh_remote_assets();
                 }
             });
+            if !self.remote_assets.is_empty() {
+                let assets = self.remote_assets.clone();
+                egui::ScrollArea::vertical()
+                    .id_salt("remote_release_assets")
+                    .max_height(150.0)
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            for asset in assets {
+                                let asset_id = asset.name.clone();
+                                ui.push_id(asset_id, |ui| {
+                                    if ui
+                                        .add_enabled(
+                                            !self.downloading,
+                                            egui::Button::new(release_asset_label(&asset)),
+                                        )
+                                        .clicked()
+                                    {
+                                        self.url = asset.browser_download_url;
+                                        self.start_download(&context);
+                                    }
+                                });
+                            }
+                        });
+                    });
+            }
             ui.add_space(10.0);
 
             let response = ui.add_enabled(
@@ -240,6 +304,7 @@ impl eframe::App for LauncherApp {
             ui.add_space(4.0);
             let mut project_to_start = None;
             egui::ScrollArea::vertical()
+                .id_salt("installed_games")
                 .max_height(240.0)
                 .auto_shrink([false, true])
                 .show(ui, |ui| {
@@ -247,31 +312,37 @@ impl eframe::App for LauncherApp {
                         ui.weak("No installed games");
                     }
                     for game in &self.installed_games {
-                        ui.separator();
-                        ui.horizontal(|ui| {
-                            ui.vertical(|ui| {
-                                ui.strong(&game.name);
-                                ui.weak(format!(
-                                    "Version {} | {}",
-                                    game.version,
-                                    game.language.label()
-                                ));
+                        ui.push_id(&game.project, |ui| {
+                            ui.separator();
+                            ui.horizontal(|ui| {
+                                ui.vertical(|ui| {
+                                    ui.strong(&game.name);
+                                    ui.weak(format!(
+                                        "Version {} | {}",
+                                        game.version,
+                                        game.language.label()
+                                    ));
+                                });
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        if ui
+                                            .add_enabled(
+                                                !self.downloading,
+                                                egui::Button::new("Start"),
+                                            )
+                                            .clicked()
+                                        {
+                                            project_to_start = Some(game.project.clone());
+                                        }
+                                        if self.active_project.as_deref()
+                                            == Some(game.project.as_str())
+                                        {
+                                            ui.weak("Active");
+                                        }
+                                    },
+                                );
                             });
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    if ui
-                                        .add_enabled(!self.downloading, egui::Button::new("Start"))
-                                        .clicked()
-                                    {
-                                        project_to_start = Some(game.project.clone());
-                                    }
-                                    if self.active_project.as_deref() == Some(game.project.as_str())
-                                    {
-                                        ui.weak("Active");
-                                    }
-                                },
-                            );
                         });
                     }
                 });
@@ -835,6 +906,86 @@ fn extract_rar(_bytes: &[u8], _destination: &Path) -> Result<(), String> {
     Err("RAR extraction is not supported on this operating system".to_owned())
 }
 
+fn fetch_remote_assets() -> Receiver<RemoteAssetsResult> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = sender.send(load_remote_assets());
+    });
+    receiver
+}
+
+fn load_remote_assets() -> RemoteAssetsResult {
+    #[cfg(not(debug_assertions))]
+    {
+        Ok(("direct downloads".to_owned(), fallback_release_assets()))
+    }
+    #[cfg(debug_assertions)]
+    {
+        load_remote_assets_from_api().or_else(|error| {
+            eprintln!("GitHub release API unavailable, using direct downloads: {error}");
+            Ok(("direct downloads".to_owned(), fallback_release_assets()))
+        })
+    }
+}
+
+#[cfg(debug_assertions)]
+fn load_remote_assets_from_api() -> RemoteAssetsResult {
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("BevyRuneweave-Desktop-Demo/0.1")
+        .build()
+        .map_err(|error| error.to_string())?;
+    let mut request = client.get(format!("{GITHUB_API_ROOT}/releases/latest"));
+    if let Some(token) = option_env!("RUNEWEAVE_GITHUB_TOKEN")
+        .map(str::to_owned)
+        .or_else(|| std::env::var("GITHUB_TOKEN").ok())
+        .or_else(|| std::env::var("GH_TOKEN").ok())
+        .filter(|token| !token.trim().is_empty())
+    {
+        request = request.bearer_auth(token);
+    }
+    let mut latest = request
+        .send()
+        .and_then(reqwest::blocking::Response::error_for_status)
+        .map_err(|error| error.to_string())?
+        .json::<LatestRelease>()
+        .map_err(|error| error.to_string())?;
+    latest.assets.sort_by(|left, right| {
+        left.name
+            .to_ascii_lowercase()
+            .cmp(&right.name.to_ascii_lowercase())
+    });
+    Ok((latest.tag_name, latest.assets))
+}
+
+fn fallback_release_assets() -> Vec<ReleaseAsset> {
+    FALLBACK_RELEASE_ASSETS
+        .into_iter()
+        .map(|name| ReleaseAsset {
+            name: name.to_owned(),
+            browser_download_url: format!("{GITHUB_RELEASE_DOWNLOAD_ROOT}/{name}"),
+            size: 0,
+        })
+        .collect()
+}
+
+fn release_asset_label(asset: &ReleaseAsset) -> String {
+    if asset.size == 0 {
+        format!("Download {}", asset.name)
+    } else {
+        format!("Download {} ({})", asset.name, format_size(asset.size))
+    }
+}
+
+fn format_size(bytes: u64) -> String {
+    if bytes >= 1024 * 1024 {
+        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+    } else if bytes >= 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
 fn download_and_install(url: &str) -> Result<(), String> {
     let root = platform_data_root()?;
     fs::create_dir_all(&root).map_err(|error| error.to_string())?;
@@ -1219,6 +1370,59 @@ mod tests {
             &zip_bytes("nested/test.txt", CONTENT),
             "package.zip",
             "nested/test.txt",
+        );
+    }
+
+    #[test]
+    fn parses_every_release_asset_shape() {
+        let assets: Vec<ReleaseAsset> = serde_json::from_str(
+            r#"[
+                {"name":"clash-ts.zip","browser_download_url":"https://example/clash.zip","size":1048576},
+                {"name":"script-squadron-lua.zip","browser_download_url":"https://example/lua.zip","size":512}
+            ]"#,
+        )
+        .unwrap();
+
+        assert_eq!(assets.len(), 2);
+        assert_eq!(assets[0].name, "clash-ts.zip");
+        assert_eq!(format_size(assets[0].size), "1.0 MB");
+        assert_eq!(format_size(assets[1].size), "512 B");
+    }
+
+    #[test]
+    fn parses_assets_from_latest_release_response() {
+        let release: LatestRelease = serde_json::from_str(
+            r#"{
+                "id": 42,
+                "tag_name": "0.0.1",
+                "assets": [
+                    {"name":"script-squadron-js.zip","browser_download_url":"https://example/js.zip","size":2048}
+                ]
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(release.tag_name, "0.0.1");
+        assert_eq!(release.assets.len(), 1);
+        assert_eq!(release.assets[0].name, "script-squadron-js.zip");
+    }
+
+    #[test]
+    fn release_api_fallback_uses_public_latest_download_urls() {
+        let assets = fallback_release_assets();
+
+        assert_eq!(assets.len(), FALLBACK_RELEASE_ASSETS.len());
+        assert_eq!(assets[0].size, 0);
+        assert_eq!(
+            assets[0].browser_download_url,
+            format!(
+                "{GITHUB_RELEASE_DOWNLOAD_ROOT}/{}",
+                FALLBACK_RELEASE_ASSETS[0]
+            )
+        );
+        assert_eq!(
+            release_asset_label(&assets[0]),
+            format!("Download {}", FALLBACK_RELEASE_ASSETS[0])
         );
     }
 

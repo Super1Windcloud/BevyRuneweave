@@ -43,6 +43,8 @@ class MainActivity : Activity() {
     private lateinit var downloadButton: Button
     private lateinit var launchButton: Button
     private val remoteAssetButtons = mutableListOf<Button>()
+    private lateinit var remoteAssetsContainer: LinearLayout
+    private lateinit var remoteAssetsStatus: TextView
     private lateinit var progress: ProgressBar
     private lateinit var status: TextView
     private lateinit var rootView: LinearLayout
@@ -64,6 +66,7 @@ class MainActivity : Activity() {
         applyBottomNavigationInsets()
         applyTheme()
         updateInstalledState()
+        loadRemoteAssets()
     }
 
     override fun onDestroy() {
@@ -174,16 +177,12 @@ class MainActivity : Activity() {
         }, matchWrap())
         addView(label("GitHub release assets", 16f), matchWrap())
 
-        REMOTE_ASSETS.forEach { (name, url) ->
-            val button = themedButton("Download $name").apply {
-                setOnClickListener {
-                    urlField.setText(url)
-                    installFromUrl()
-                }
-            }
-            remoteAssetButtons += button
-            addView(button, ViewGroup.LayoutParams.MATCH_PARENT, dp(48))
+        remoteAssetsStatus = label("Loading latest release...", 14f, secondary = true)
+        addView(remoteAssetsStatus, matchWrap())
+        remoteAssetsContainer = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
         }
+        addView(remoteAssetsContainer, matchWrap())
 
         urlField = EditText(context).apply {
             hint = "HTTPS asset package URL"
@@ -324,6 +323,102 @@ class MainActivity : Activity() {
     )
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+
+    private fun loadRemoteAssets() {
+        remoteAssetsStatus.text = "Loading latest release..."
+        remoteAssetsContainer.removeAllViews()
+        remoteAssetButtons.clear()
+        executor.execute {
+            val result = runCatching { fetchRemoteAssets() }
+                .recover { fallbackRemoteRelease() }
+            runOnUiThread {
+                result.onSuccess(::showRemoteAssets).onFailure { error ->
+                    remoteAssetsStatus.text = error.message ?: "Could not load release assets"
+                    remoteAssetsContainer.addView(
+                        themedButton("Refresh").apply { setOnClickListener { loadRemoteAssets() } },
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        dp(48),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun showRemoteAssets(release: RemoteRelease) {
+        remoteAssetsStatus.text = "Latest release ${release.tag}"
+        release.assets.forEach { asset ->
+            val detail = if (asset.size > 0) " (${formatSize(asset.size)})" else ""
+            val button = themedButton("Download ${asset.name}$detail").apply {
+                setOnClickListener {
+                    urlField.setText(asset.url)
+                    installFromUrl()
+                }
+            }
+            remoteAssetButtons += button
+            remoteAssetsContainer.addView(button, ViewGroup.LayoutParams.MATCH_PARENT, dp(48))
+        }
+        if (release.assets.isEmpty()) remoteAssetsStatus.text = "Latest release has no assets"
+    }
+
+    private fun fetchRemoteAssets(): RemoteRelease {
+        if (!BuildConfig.DEBUG) return fallbackRemoteRelease()
+        val latest = readJsonObject(URL("$GITHUB_API_ROOT/releases/latest"))
+        val tag = latest.getString("tag_name")
+        val assetsJson = latest.getJSONArray("assets")
+        val assets = buildList {
+            repeat(assetsJson.length()) { index ->
+                val asset = assetsJson.getJSONObject(index)
+                add(RemoteAsset(
+                    asset.getString("name"),
+                    asset.getString("browser_download_url"),
+                    asset.getLong("size"),
+                ))
+            }
+        }
+        return RemoteRelease(tag, assets.sortedBy { it.name.lowercase() })
+    }
+
+    private fun fallbackRemoteRelease() = RemoteRelease(
+        "direct downloads",
+        FALLBACK_RELEASE_ASSETS.map { name ->
+            RemoteAsset(name, "$GITHUB_RELEASE_DOWNLOAD_ROOT/$name", 0)
+        },
+    )
+
+    private fun readJsonObject(url: URL) = JSONObject(readRemoteMetadata(url))
+
+    private fun readRemoteMetadata(url: URL): String {
+        val connection = openDownloadConnection(url).apply {
+            connectTimeout = 15_000
+            readTimeout = 30_000
+            setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty("User-Agent", "BevyRuneweave-Android-Demo/0.1")
+            setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+            if (BuildConfig.DEBUG && BuildConfig.GITHUB_TOKEN.isNotBlank()) {
+                setRequestProperty("Authorization", "Bearer ${BuildConfig.GITHUB_TOKEN}")
+            }
+        }
+        try {
+            check(connection.responseCode in 200..299) {
+                "Release lookup failed with HTTP ${connection.responseCode}"
+            }
+            return connection.inputStream.bufferedReader().use { reader ->
+                val text = reader.readText()
+                check(text.toByteArray().size <= MAX_REMOTE_METADATA_BYTES) {
+                    "Release metadata is too large"
+                }
+                text
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun formatSize(bytes: Long) = when {
+        bytes >= 1024 * 1024 -> "%.1f MB".format(bytes.toDouble() / (1024 * 1024))
+        bytes >= 1024 -> "%.1f KB".format(bytes.toDouble() / 1024)
+        else -> "$bytes B"
+    }
 
     private fun installFromUrl() {
         val rawUrl = urlField.text.toString().trim()
@@ -497,17 +592,25 @@ class MainActivity : Activity() {
             }.socketFactory
         }
 
-        private val REMOTE_ASSETS = listOf(
-            "TypeScript" to "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-typescript.zip",
-            "JavaScript" to "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-js.zip",
-            "Lua" to "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/script-squadron-lua.zip",
+        private const val GITHUB_API_ROOT =
+            "https://api.github.com/repos/Super1Windcloud/BevyRuneweave"
+        private const val GITHUB_RELEASE_DOWNLOAD_ROOT =
+            "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download"
+        private val FALLBACK_RELEASE_ASSETS = listOf(
+            "script-squadron-typescript.zip",
+            "script-squadron-js.zip",
+            "script-squadron-lua.zip",
         )
+        private const val MAX_REMOTE_METADATA_BYTES = 2 * 1024 * 1024
         private const val MAX_ENTRIES = 10_000
         private const val MAX_UNPACKED_BYTES = 256L * 1024L * 1024L
         private const val PREFERENCES = "host_settings"
         private const val DARK_MODE = "dark_mode"
         private const val BOTTOM_NAVIGATION_HEIGHT_DP = 72
     }
+
+    private data class RemoteAsset(val name: String, val url: String, val size: Long)
+    private data class RemoteRelease(val tag: String, val assets: List<RemoteAsset>)
 
     private enum class Page { HOME, SETTINGS }
 }

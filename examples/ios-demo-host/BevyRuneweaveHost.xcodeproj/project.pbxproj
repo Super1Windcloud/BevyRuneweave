@@ -5,18 +5,29 @@
 	objectVersion = 56;
 	objects = {
 
-		100000000000000000000001 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000001 /* main.m */; };
-		100000000000000000000002 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000002 /* assets */; };
-		100000000000000000000003 /* BevyRuneweave.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 200000000000000000000003 /* BevyRuneweave.xcframework */; };
-		100000000000000000000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000007 /* Assets.xcassets */; };
+			100000000000000000000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000001 /* main.swift */; };
+			100000000000000000000002 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000002 /* assets */; };
+			100000000000000000000003 /* BevyRuneweave.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 200000000000000000000003 /* BevyRuneweave.xcframework */; };
+			100000000000000000000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000007 /* Assets.xcassets */; };
+			100000000000000000000005 /* HostSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000008 /* HostSupport.swift */; };
+			100000000000000000000006 /* ZipInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000009 /* ZipInstaller.swift */; };
+			100000000000000000000007 /* PackageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20000000000000000000000A /* PackageStore.swift */; };
+			100000000000000000000008 /* ReleaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20000000000000000000000B /* ReleaseClient.swift */; };
+			100000000000000000000009 /* HostUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20000000000000000000000C /* HostUI.swift */; };
 
-		200000000000000000000001 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+			200000000000000000000001 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		200000000000000000000002 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = "<group>"; };
 		200000000000000000000003 /* BevyRuneweave.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = BevyRuneweave.xcframework; path = ../../dist/runtimes/ios/xcframework/lib/BevyRuneweave.xcframework; sourceTree = "<group>"; };
 		200000000000000000000004 /* BevyRuneweave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BevyRuneweave.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		200000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = ../Info.plist; sourceTree = "<group>"; };
 		200000000000000000000006 /* Runtime.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Runtime.xcconfig; sourceTree = "<group>"; };
-		200000000000000000000007 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+			200000000000000000000007 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+			200000000000000000000008 /* HostSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostSupport.swift; sourceTree = "<group>"; };
+			200000000000000000000009 /* ZipInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZipInstaller.swift; sourceTree = "<group>"; };
+			20000000000000000000000A /* PackageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageStore.swift; sourceTree = "<group>"; };
+			20000000000000000000000B /* ReleaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseClient.swift; sourceTree = "<group>"; };
+			20000000000000000000000C /* HostUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostUI.swift; sourceTree = "<group>"; };
+			20000000000000000000000D /* BevyRuneweaveHost-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "BevyRuneweaveHost-Bridging-Header.h"; sourceTree = "<group>"; };
 
 		300000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -33,7 +44,14 @@
 		300000000000000000000003 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (100000000000000000000001 /* main.m in Sources */,);
+				files = (
+					100000000000000000000001 /* main.swift in Sources */,
+					100000000000000000000005 /* HostSupport.swift in Sources */,
+					100000000000000000000006 /* ZipInstaller.swift in Sources */,
+					100000000000000000000007 /* PackageStore.swift in Sources */,
+					100000000000000000000008 /* ReleaseClient.swift in Sources */,
+					100000000000000000000009 /* HostUI.swift in Sources */,
+				);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 
@@ -51,7 +69,15 @@
 		};
 		400000000000000000000002 /* Sources */ = {
 			isa = PBXGroup;
-			children = (200000000000000000000001 /* main.m */,);
+				children = (
+					200000000000000000000001 /* main.swift */,
+					200000000000000000000008 /* HostSupport.swift */,
+					200000000000000000000009 /* ZipInstaller.swift */,
+					20000000000000000000000A /* PackageStore.swift */,
+					20000000000000000000000B /* ReleaseClient.swift */,
+					20000000000000000000000C /* HostUI.swift */,
+					20000000000000000000000D /* BevyRuneweaveHost-Bridging-Header.h */,
+				);
 			path = Sources;
 			sourceTree = "<group>";
 		};
@@ -122,8 +148,10 @@
 				buildSettings = {
 					ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 					CODE_SIGNING_ALLOWED = NO;
-				INFOPLIST_FILE = Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+						INFOPLIST_FILE = Info.plist;
+					LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+					SWIFT_OBJC_BRIDGING_HEADER = "Sources/BevyRuneweaveHost-Bridging-Header.h";
+					SWIFT_VERSION = 5.0;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -135,8 +163,11 @@
 				buildSettings = {
 					ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 					CODE_SIGNING_ALLOWED = NO;
-				INFOPLIST_FILE = Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+					INFOPLIST_FILE = Info.plist;
+					LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+					SWIFT_OBJC_BRIDGING_HEADER = "Sources/BevyRuneweaveHost-Bridging-Header.h";
+					SWIFT_VERSION = 5.0;
+					RUNEWEAVE_GITHUB_TOKEN = "";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

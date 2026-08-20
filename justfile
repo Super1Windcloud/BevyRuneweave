@@ -211,6 +211,7 @@ build-android-demo profile="" abis="arm64-v8a,x86_64":
 
 # Install and launch the Debug iOS host, or only build the Release host.
 build-ios-demo profile="":
+    {{ if profile == "--release" { "true" } else { "npm exec -- tsx scripts/prepare-ios-debug-secrets.ts" } }}
     xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj -scheme BevyRuneweaveHost -sdk iphonesimulator -destination "generic/platform=iOS Simulator" -configuration {{ if profile == "--release" { "Release" } else { "Debug" } }} -derivedDataPath dist/ios-demo-derived-data ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
     if [ "{{profile}}" != "--release" ]; then npm exec -- tsx scripts/launch-ios-demo.ts; fi
 

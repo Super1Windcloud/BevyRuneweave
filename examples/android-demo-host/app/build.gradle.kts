@@ -1,5 +1,6 @@
 import org.gradle.api.tasks.Sync
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -12,6 +13,12 @@ val requestedRelease = gradle.startParameter.taskNames.any { it.contains("releas
 val runtimeProfile = if (requestedRelease) "release" else "debug"
 val runtimeDist = rootProject.layout.projectDirectory.dir("../../dist/runtimes/android")
 val rustJniLibs = layout.buildDirectory.dir("generated/rustJniLibs")
+val debugGitHubToken = Properties().run {
+    val environment = rootProject.layout.projectDirectory.file("../../.env").asFile
+    if (environment.isFile) environment.inputStream().use(::load)
+    getProperty("GITHUB_TOKEN", "").trim()
+}
+fun quotedBuildConfig(value: String) = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
     namespace = "io.github.super1windcloud.runeweave.demo"
@@ -26,9 +33,14 @@ android {
     }
 
     sourceSets["main"].jniLibs.srcDir(rustJniLibs)
+    buildFeatures.buildConfig = true
     buildTypes {
+        debug {
+            buildConfigField("String", "GITHUB_TOKEN", quotedBuildConfig(debugGitHubToken))
+        }
         release {
             isMinifyEnabled = false
+            buildConfigField("String", "GITHUB_TOKEN", "\"\"")
         }
     }
 

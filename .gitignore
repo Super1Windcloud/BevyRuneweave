@@ -3,6 +3,7 @@
 /dist
 .idea
 .env
+examples/ios-demo-host/Config/DebugSecrets.xcconfig
 node_modules
 /examples/android-demo-host/.gradle
 /examples/android-demo-host/**/build

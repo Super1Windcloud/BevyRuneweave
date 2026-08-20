@@ -19,7 +19,7 @@ xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj \
 
 `just build-ios-demo` reuses the XCFramework under `dist/runtimes/ios`, builds the Debug host app,
 and then boots a simulator if needed, installs the app, and launches it. The launch command remains
-attached to the app so Objective-C, Rust, Bevy, and script stdout/stderr are visible in the current
+attached to the app so Swift, Rust, Bevy, and script stdout/stderr are visible in the current
 terminal; close the app or press `Ctrl+C` to stop streaming. Native crash reports remain available
 under `$HOME/Library/Logs/DiagnosticReports/BevyRuneweave-*.ips`. Run `just build-runtime-ios`
 separately when the runtime changes.
@@ -33,11 +33,11 @@ RUNEWEAVE_IOS_SIMULATOR="iPhone 17 Pro" just build-ios-demo
 `just build-ios-demo --release` only builds the Release simulator app; it does not install or launch
 it. Pass `--release` to `just build-runtime-ios` separately when a Release runtime is required.
 
-The launcher presents the available GitHub TypeScript, JavaScript, and Lua release assets plus a
-custom HTTPS URL field. Downloading and starting a game are always user initiated. The selected ZIP
-is extracted into staging, validated through `engineConfig.json`, atomically promoted under
-Application Support, and then activated in the running runtime. A previously installed package can
-be started explicitly with **Start installed game**.
+The launcher reads every asset from the latest GitHub Release through the paginated Releases API and
+presents it alongside a custom HTTPS URL field. Downloading and starting a game are always user
+initiated. The selected ZIP is extracted into staging, validated through `engineConfig.json`,
+atomically promoted under Application Support, and then activated in the running runtime. A
+previously installed package can be started explicitly with **Start installed game**.
 
 Script exit requests restore the native launcher window. The Bevy runtime remains alive behind it
 because winit owns the application's single `UIApplicationMain` event loop; starting another game
