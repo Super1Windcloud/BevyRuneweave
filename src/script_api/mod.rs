@@ -2,6 +2,7 @@
 
 mod input;
 mod network;
+mod ui;
 
 use std::path::{Component as PathComponent, Path};
 
@@ -21,6 +22,10 @@ use input::{
     input_primary_touch,
 };
 use network::ScriptNetwork;
+use ui::{
+    ScriptUiNode, ui_button_just_pressed, ui_clear, ui_despawn, ui_set_image, ui_set_style,
+    ui_set_text, ui_spawn,
+};
 
 const MAX_ENTITY_ID_LENGTH: usize = 128;
 
@@ -550,11 +555,16 @@ pub(crate) struct RuneweaveScriptApiPlugin;
 impl Plugin for RuneweaveScriptApiPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<ScriptEntityId>()
+            .register_type::<ScriptUiNode>()
             .register_type::<Transform>()
             .register_type::<Sprite>()
             .register_type::<Text2d>()
             .register_type::<TextFont>()
             .register_type::<TextColor>()
+            .register_type::<Node>()
+            .register_type::<Text>()
+            .register_type::<ImageNode>()
+            .register_type::<Button>()
             .register_type::<WorldAssetRoot>()
             .register_type::<ScriptGameState>()
             .init_resource::<ScriptNetwork>()
@@ -580,6 +590,13 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("scene_despawn", scene_despawn)
             .register("scene_clear", scene_clear)
             .register("scene_transform", scene_transform)
+            .register("ui_spawn", ui_spawn)
+            .register("ui_set_style", ui_set_style)
+            .register("ui_set_text", ui_set_text)
+            .register("ui_set_image", ui_set_image)
+            .register("ui_button_just_pressed", ui_button_just_pressed)
+            .register("ui_despawn", ui_despawn)
+            .register("ui_clear", ui_clear)
             .register("game_state_set", game_state_set)
             .register("app_request_exit", app_request_exit)
             .register("window_set_size", window_set_size)

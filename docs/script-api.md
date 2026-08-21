@@ -27,6 +27,56 @@ as real reflected Bevy components and resources; there is no script-side ECS sna
 Entity ownership is derived from BMS `CurrentScriptAttachment`. Detaching or reloading a script
 removes only the entities owned by that attachment.
 
+## Retained UI
+
+Runeweave UI nodes are real Bevy `Node`, `Text`, `ImageNode`, and `Button` components. They use
+Bevy's Flexbox layout and are separate from world-space `Sprite`/`Text2d` scene entities.
+
+| Function | Behavior |
+| --- | --- |
+| `ui_spawn(id, parentId, kind)` | Creates a `node`, `text`, `image`, or `button`; an empty parent ID creates a root. |
+| `ui_set_style(id, styleJson)` | Applies validated CSS-like Flexbox style JSON. |
+| `ui_set_text(id, value, size, r, g, b, a)` | Sets text content, size, and color on a text node. |
+| `ui_set_image(id, path)` | Loads an asset-root-relative image into an image node. |
+| `ui_button_just_pressed(id)` | Reports a button's transition to Bevy `Interaction::Pressed`. |
+| `ui_despawn(id)` | Removes one UI node and its descendants. |
+| `ui_clear()` | Removes UI nodes owned by the current script. |
+
+Style lengths accept finite numbers as logical pixels, strings such as `"24px"` and `"100%"`, or
+`"auto"`. Supported fields are `width`, `height`, min/max dimensions, `left`, `right`, `top`,
+`bottom`, `flexDirection`, `alignItems`, `justifyContent`, `position`, `display`, `gap`, `rowGap`,
+`columnGap`, `padding`, `margin`, `borderRadius`, `flexGrow`, `flexShrink`, and RGBA `background`.
+Unknown fields and invalid values are rejected without partially changing the node.
+
+TypeScript projects can use the declarative helpers in `api/ui.ts`:
+
+```ts
+import { button, column, mountUi, text, updateUi } from "../../api/ui.js";
+
+mountUi(column("menu", {
+  width: "100%",
+  height: "100%",
+  padding: 24,
+  gap: 12,
+  alignItems: "center",
+  justifyContent: "center",
+}, [
+  text("title", "Runeweave", { fontSize: 28 }),
+  button("start", "START", {
+    style: { width: 180, height: 56, borderRadius: 12, background: [0.1, 0.5, 0.9, 1] },
+    onClick: startGame,
+  }),
+]));
+
+function on_update(): void {
+  updateUi();
+}
+```
+
+Lua and JavaScript receive the same seven registered functions. Lua can pass style JSON directly,
+for example `ui_set_style("menu", '{"width":"100%","flexDirection":"column"}')`, and poll
+`ui_button_just_pressed` from `on_update`.
+
 ## Platform Services
 
 Keyboard functions are `input_key_pressed`, `input_key_just_pressed`, and

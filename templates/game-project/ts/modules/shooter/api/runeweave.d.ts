@@ -33,6 +33,13 @@ declare function scene_set_text(
 declare function scene_despawn(id: string): boolean;
 declare function scene_clear(): void;
 declare function scene_transform(id: string): BmsReflectReference | null;
+declare function ui_spawn(id: string, parentId: string, kind: "node" | "text" | "image" | "button"): boolean;
+declare function ui_set_style(id: string, styleJson: string): boolean;
+declare function ui_set_text(id: string, value: string, fontSize: number, red: number, green: number, blue: number, alpha: number): boolean;
+declare function ui_set_image(id: string, path: string): boolean;
+declare function ui_button_just_pressed(id: string): boolean;
+declare function ui_despawn(id: string): boolean;
+declare function ui_clear(): void;
 declare function game_state_set(score: number, lives: number, message: string): void;
 declare function app_request_exit(): boolean;
 declare function window_set_size(width: number, height: number): boolean;
