@@ -28,6 +28,11 @@ const FALLBACK_RELEASE_ASSETS: [&str; 3] = [
     "script-squadron-js.zip",
     "script-squadron-lua.zip",
 ];
+#[cfg(target_os = "macos")]
+const LAUNCHER_ICON: &[u8] =
+    include_bytes!("../../../assets/branding/bevy_launcher_icon_macos.png");
+#[cfg(not(target_os = "macos"))]
+const LAUNCHER_ICON: &[u8] = include_bytes!("../../../assets/branding/bevy_icon.png");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ProcessMode {
@@ -1262,9 +1267,7 @@ fn main() -> eframe::Result {
         return Ok(());
     }
 
-    let icon =
-        eframe::icon_data::from_png_bytes(include_bytes!("../../../assets/branding/bevy_icon.png"))
-            .unwrap_or_default();
+    let icon = eframe::icon_data::from_png_bytes(LAUNCHER_ICON).unwrap_or_default();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1000.0, 693.0])

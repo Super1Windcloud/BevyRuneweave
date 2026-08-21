@@ -55,6 +55,8 @@ const WINDOW_WIDTH: u32 = 600;
 const WINDOW_HEIGHT: u32 = 800;
 #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
 const DEFAULT_WINDOW_ICON: &[u8] = include_bytes!("../../assets/branding/bevy_icon.png");
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+const DESKTOP_ICON_CORNER_RADIUS_RATIO: f32 = 0.2;
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -194,6 +196,27 @@ fn spawn_scene_camera(mut commands: Commands) {
     });
 }
 
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+fn decode_desktop_icon(bytes: &[u8]) -> Result<image::RgbaImage, image::ImageError> {
+    let mut image = image::load_from_memory(bytes)?.into_rgba8();
+    let (width, height) = image.dimensions();
+    let radius = width.min(height) as f32 * DESKTOP_ICON_CORNER_RADIUS_RATIO;
+    let half_width = width as f32 / 2.0;
+    let half_height = height as f32 / 2.0;
+    let inner_half_width = (half_width - radius).max(0.0);
+    let inner_half_height = (half_height - radius).max(0.0);
+
+    for (x, y, pixel) in image.enumerate_pixels_mut() {
+        let dx = ((x as f32 + 0.5) - half_width).abs() - inner_half_width;
+        let dy = ((y as f32 + 0.5) - half_height).abs() - inner_half_height;
+        let corner_distance = dx.max(0.0).hypot(dy.max(0.0));
+        let coverage = (radius + 0.5 - corner_distance).clamp(0.0, 1.0);
+        pixel.0[3] = (pixel.0[3] as f32 * coverage).round() as u8;
+    }
+
+    Ok(image)
+}
+
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 fn set_default_window_icon(
     primary_window: Single<Entity, With<PrimaryWindow>>,
@@ -201,8 +224,8 @@ fn set_default_window_icon(
 ) {
     let bytes = fs::read(asset_root.0.join(".runtime-icon.png"))
         .unwrap_or_else(|_| DEFAULT_WINDOW_ICON.to_vec());
-    let image = match image::load_from_memory(&bytes) {
-        Ok(image) => image.into_rgba8(),
+    let image = match decode_desktop_icon(&bytes) {
+        Ok(image) => image,
         Err(error) => {
             warn!("Failed to decode the embedded Bevy window icon: {error}");
             return;
@@ -240,8 +263,8 @@ fn set_default_window_icon(asset_root: Res<RuntimeAssetRoot>) {
 
     let bytes = fs::read(asset_root.0.join(".runtime-icon.png"))
         .unwrap_or_else(|_| DEFAULT_WINDOW_ICON.to_vec());
-    let image = match image::load_from_memory(&bytes) {
-        Ok(image) => image.into_rgba8(),
+    let image = match decode_desktop_icon(&bytes) {
+        Ok(image) => image,
         Err(error) => {
             warn!("Failed to decode the embedded Bevy application icon: {error}");
             return;
@@ -669,6 +692,25 @@ mod tests {
 
     extern "C" fn record_exit_callback() {
         EXIT_CALLBACK_CALLED.store(true, Ordering::Release);
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn desktop_icon_has_rounded_corners_without_changing_inner_alpha() {
+        let mut source = image::RgbaImage::from_pixel(32, 32, image::Rgba([40, 80, 120, 255]));
+        source.put_pixel(16, 16, image::Rgba([40, 80, 120, 73]));
+        let mut encoded = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(source)
+            .write_to(&mut encoded, image::ImageFormat::Png)
+            .expect("test icon must encode");
+
+        let rounded = decode_desktop_icon(encoded.get_ref()).expect("test icon must decode");
+
+        assert_eq!(rounded.get_pixel(0, 0).0[3], 0);
+        assert_eq!(rounded.get_pixel(31, 0).0[3], 0);
+        assert_eq!(rounded.get_pixel(0, 31).0[3], 0);
+        assert_eq!(rounded.get_pixel(31, 31).0[3], 0);
+        assert_eq!(rounded.get_pixel(16, 16).0, [40, 80, 120, 73]);
     }
 
     #[test]

@@ -30,11 +30,12 @@ cp "$script_dir/Info.plist" "$contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$contents/Info.plist"
 
 iconset="$staging/AppIcon.iconset"
+icon_source="$repo_root/assets/branding/bevy_launcher_icon_macos.png"
 mkdir -p "$iconset"
 for size in 16 32 128 256 512; do
     double=$((size * 2))
-    sips -z "$size" "$size" "$repo_root/assets/branding/bevy_icon.png" --out "$iconset/icon_${size}x${size}.png" >/dev/null
-    sips -z "$double" "$double" "$repo_root/assets/branding/bevy_icon.png" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+    sips -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+    sips -z "$double" "$double" "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
 done
 iconutil -c icns "$iconset" -o "$resources/AppIcon.icns"
 
