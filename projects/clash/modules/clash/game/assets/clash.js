@@ -74,6 +74,7 @@
     settingsIcon: { path: "sprites/settings-icon.png", width: 54, height: 54 },
     settingsPanel: { path: "sprites/settings-panel.png", width: 440, height: 320 },
     homeBackground: { path: "sprites/royale/home-bg.png", width: DESIGN_WIDTH, height: DESIGN_HEIGHT },
+    homeReference: { path: "sprites/royale/home-reference.png", width: DESIGN_WIDTH, height: 1003 },
     homePlatform: { path: "sprites/royale/home-platform.png", width: 360, height: 260 },
     homeBattleButton: { path: "sprites/royale/home-battle-button.png", width: 310, height: 92 },
     homeResource: { path: "sprites/royale/home-resource.png", width: 136, height: 46 },
@@ -596,23 +597,7 @@
     league: "LEAGUE"
   };
   var spriteIds = [
-    "lobby_background",
-    "lobby_profile_panel",
-    "lobby_arena",
-    "lobby_arena_king",
-    "lobby_arena_king_local",
-    "lobby_trophy_track",
-    "lobby_chest_0",
-    "lobby_chest_1",
-    "lobby_chest_2",
-    "lobby_chest_3",
-    "lobby_battle_button",
-    "lobby_nav",
-    "lobby_level_panel",
-    "lobby_gold_panel",
-    "lobby_gems_panel",
-    "lobby_avatar",
-    "lobby_settings",
+    "lobby_reference",
     "lobby_tab_panel",
     "lobby_tab_item_0",
     "lobby_tab_item_1",
@@ -620,42 +605,15 @@
     "lobby_tab_item_3"
   ];
   var textIds = [
-    "lobby_level",
-    "lobby_gold",
-    "lobby_gems",
-    "lobby_player",
-    "lobby_clan",
-    "lobby_trophies",
-    "lobby_arena_title",
-    "lobby_arena_subtitle",
-    "lobby_chest_badge",
-    "lobby_battle_label",
-    "lobby_battle_mode",
+    "lobby_tab_selection",
     "lobby_tab_title",
     "lobby_tab_subtitle",
     "lobby_tab_item_label_0",
     "lobby_tab_item_label_1",
     "lobby_tab_item_label_2",
-    "lobby_tab_item_label_3",
-    ...tabs.map((tab) => `lobby_tab_${tab}`)
+    "lobby_tab_item_label_3"
   ];
   var settingsIds = ["lobby_settings_panel", "lobby_settings_title", "lobby_settings_close", "lobby_settings_exit"];
-  var battleContentIds = [
-    "lobby_arena",
-    "lobby_arena_king",
-    "lobby_arena_king_local",
-    "lobby_trophy_track",
-    "lobby_arena_title",
-    "lobby_arena_subtitle",
-    "lobby_chest_0",
-    "lobby_chest_1",
-    "lobby_chest_2",
-    "lobby_chest_3",
-    "lobby_chest_badge",
-    "lobby_battle_button",
-    "lobby_battle_label",
-    "lobby_battle_mode"
-  ];
   var tabContentIds = [
     "lobby_tab_panel",
     "lobby_tab_title",
@@ -669,6 +627,40 @@
     "lobby_tab_item_label_2",
     "lobby_tab_item_label_3"
   ];
+  var settingsHitArea = {
+    centerX: 0.912,
+    centerY: 0.141,
+    width: 0.12,
+    height: 0.065
+  };
+  var battleHitArea = {
+    centerX: 0.505,
+    centerY: 0.827,
+    width: 0.35,
+    height: 0.09
+  };
+  var navigationTop = 0.924;
+  var navigationHitArea = {
+    centerX: 0.5,
+    centerY: (navigationTop + 1) * 0.5,
+    width: 1,
+    height: 1 - navigationTop
+  };
+  function frameX(layout2, normalizedX) {
+    return layout2.left + layout2.width * normalizedX;
+  }
+  function frameY(layout2, normalizedY) {
+    return layout2.top - layout2.height * normalizedY;
+  }
+  function pointerInsideHitArea(pointer, layout2, area) {
+    return pointerInside(
+      pointer,
+      frameX(layout2, area.centerX),
+      frameY(layout2, area.centerY),
+      layout2.width * area.width,
+      layout2.height * area.height
+    );
+  }
   var LobbyController = class {
     tab = "battle";
     settingsOpen = false;
@@ -692,30 +684,16 @@
       const layout2 = this.layout;
       if (!layout2) return { type: "none" };
       if (this.settingsOpen) return this.handleSettings(pointer, layout2);
-      const scale = layout2.scale;
-      const navY = layout2.bottom + 39 * scale;
       const tabWidth = layout2.width / tabs.length;
-      if (pointer.justPressed && pointerInside(
-        pointer,
-        layout2.right - 27 * scale,
-        layout2.top - 83 * scale,
-        50 * scale,
-        50 * scale
-      )) {
+      if (pointer.justPressed && pointerInsideHitArea(pointer, layout2, settingsHitArea)) {
         this.openSettings(layout2);
         return { type: "layout" };
       }
-      const battlePressed = pointer.justPressed && pointerInside(
-        pointer,
-        layout2.centerX,
-        layout2.bottom + 136 * scale,
-        Math.min(300 * scale, layout2.width - 92 * scale),
-        82 * scale
-      );
+      const battlePressed = pointer.justPressed && pointerInsideHitArea(pointer, layout2, battleHitArea);
       if (this.tab === "battle" && (battlePressed || keyJustPressed("Space") || keyJustPressed("Enter"))) {
         return { type: "start-matchmaking" };
       }
-      if (pointer.justPressed && pointerInside(pointer, layout2.centerX, navY, layout2.width, 78 * scale)) {
+      if (pointer.justPressed && pointerInsideHitArea(pointer, layout2, navigationHitArea)) {
         const index = Math.max(0, Math.min(tabs.length - 1, Math.floor((pointer.x - layout2.left) / tabWidth)));
         this.tab = tabs[index];
         this.applyLayout(layout2);
@@ -725,84 +703,30 @@
       return { type: "none" };
     }
     applyLayout(layout2) {
-      const scale = layout2.scale;
-      const top = layout2.top;
-      const bottom = layout2.bottom;
-      const centerX = layout2.centerX;
-      placeSprite("lobby_background", {
-        path: sprites.homeBackground.path,
-        width: Math.max(DESIGN_WIDTH, layout2.viewportWidth),
-        height: DESIGN_HEIGHT
-      }, 0, 0, -100);
-      const resourceY = top - 27 * scale;
-      const resourceGap = 7 * scale;
-      const resourceWidth = Math.min(126 * scale, (layout2.width - 2 * resourceGap) / 3);
-      const resourceXs = [
-        centerX - resourceWidth - resourceGap,
-        centerX,
-        centerX + resourceWidth + resourceGap
-      ];
-      for (const [index, id] of ["lobby_level_panel", "lobby_gold_panel", "lobby_gems_panel"].entries()) {
-        placeSprite(id, { path: sprites.homeResource.path, width: resourceWidth, height: 43 * scale }, resourceXs[index], resourceY, 20);
-      }
-      placeText("lobby_level", "18", resourceXs[0], resourceY, 22, 17 * scale, colors.white);
-      placeText("lobby_gold", "113 +", resourceXs[1], resourceY, 22, 16 * scale, colors.white);
-      placeText("lobby_gems", "100 +", resourceXs[2], resourceY, 22, 16 * scale, colors.white);
-      const profileY = top - 90 * scale;
-      placeSprite("lobby_profile_panel", { path: sprites.homeDeck.path, width: layout2.width - 18 * scale, height: 88 * scale }, centerX, profileY, 8);
-      placeSprite("lobby_avatar", { path: cards[0].art.path, width: 66 * scale, height: 60 * scale }, layout2.left + 48 * scale, profileY + 3 * scale, 11);
-      placeText("lobby_player", "BLUE KING", layout2.left + 142 * scale, profileY + 14 * scale, 12, 19 * scale, colors.white);
-      placeText("lobby_clan", "RUNEWEAVE CLAN", layout2.left + 151 * scale, profileY - 14 * scale, 12, 11 * scale, colors.muted);
-      placeText("lobby_trophies", "0 TROPHIES", layout2.right - 84 * scale, profileY - 13 * scale, 12, 13 * scale, colors.gold);
-      placeSprite("lobby_settings", { path: sprites.settingsIcon.path, width: 50 * scale, height: 50 * scale }, layout2.right - 27 * scale, profileY + 9 * scale, 14);
-      const arenaY = top - 316 * scale;
-      placeSprite("lobby_arena", { path: sprites.homePlatform.path, width: Math.min(354 * scale, layout2.width - 34 * scale), height: 254 * scale }, centerX, arenaY, 2);
-      placeSprite("lobby_arena_king", { path: cards[2].art.path, width: 126 * scale, height: 98 * scale }, centerX, arenaY + 38 * scale, 5);
-      placeSprite("lobby_arena_king_local", { path: "local-clash/chr_king.png", width: 116 * scale, height: 134 * scale }, centerX, arenaY + 30 * scale, 6);
-      placeText("lobby_arena_title", "TRAINING CAMP", centerX, arenaY - 74 * scale, 9, 20 * scale, colors.white);
-      placeText("lobby_arena_subtitle", "ARENA 1", centerX, arenaY - 99 * scale, 9, 13 * scale, colors.gold);
-      placeSprite("lobby_trophy_track", { path: sprites.homeResource.path, width: 250 * scale, height: 26 * scale }, centerX, arenaY - 127 * scale, 8);
-      const chestY = bottom + 242 * scale;
-      const chestGap = 7 * scale;
-      const chestWidth = Math.min(72 * scale, (layout2.width - 56 * scale) / 4);
-      const chestStart = centerX - (chestWidth * 3 + chestGap * 3) * 0.5;
-      for (let index = 0; index < 4; index += 1) {
-        placeSprite(`lobby_chest_${index}`, {
-          path: index === 0 ? sprites.cardSelected.path : sprites.cardFrame.path,
-          width: chestWidth,
-          height: 68 * scale
-        }, chestStart + index * (chestWidth + chestGap), chestY, 12);
-      }
-      placeText("lobby_chest_badge", "1", chestStart + 3 * (chestWidth + chestGap) + chestWidth * 0.38, chestY + 30 * scale, 15, 16 * scale, colors.white);
-      const buttonY = bottom + 136 * scale;
-      placeSprite("lobby_battle_button", {
-        path: sprites.homeBattleButton.path,
-        width: Math.min(300 * scale, layout2.width - 92 * scale),
-        height: 82 * scale
-      }, centerX, buttonY, 12);
-      placeText("lobby_battle_label", "BATTLE", centerX, buttonY + 7 * scale, 14, 32 * scale, colors.dark);
-      placeText("lobby_battle_mode", "1v1  TROPHY ROAD", centerX, buttonY - 27 * scale, 14, 10 * scale, colors.dark);
+      placeSprite("lobby_reference", {
+        path: sprites.homeReference.path,
+        width: layout2.width,
+        height: layout2.height
+      }, layout2.centerX, layout2.centerY, -100);
       this.applyNavigation(layout2);
       this.applyTabContent(layout2);
     }
     applyNavigation(layout2) {
-      const scale = layout2.scale;
-      const navY = layout2.bottom + 39 * scale;
-      placeSprite("lobby_nav", { path: sprites.homeNav.path, width: layout2.width, height: 76 * scale }, layout2.centerX, navY, 10);
-      const tabWidth = layout2.width / tabs.length;
-      for (const [index, tab] of tabs.entries()) {
-        const selected = tab === this.tab;
-        const x = layout2.left + tabWidth * (index + 0.5);
-        placeText(
-          `lobby_tab_${tab}`,
-          selected ? `[${tabLabels[tab]}]` : tabLabels[tab],
-          x,
-          navY,
-          13,
-          (selected ? 13 : 10) * scale,
-          selected ? colors.gold : colors.muted
-        );
+      if (this.tab === "battle") {
+        setTransform("lobby_tab_selection", { x: layout2.right + 1e4, y: 0, z: 0 });
+        return;
       }
+      const tabWidth = layout2.width / tabs.length;
+      const index = tabs.indexOf(this.tab);
+      placeText(
+        "lobby_tab_selection",
+        `[${tabLabels[this.tab]}]`,
+        layout2.left + tabWidth * (index + 0.5),
+        frameY(layout2, 0.967),
+        20,
+        12 * layout2.scale,
+        colors.gold
+      );
     }
     applyTabContent(layout2) {
       const hiddenX = layout2.right + 1e4;
@@ -810,7 +734,6 @@
         for (const id of tabContentIds) setTransform(id, { x: hiddenX, y: 0, z: 0 });
         return;
       }
-      for (const id of battleContentIds) setTransform(id, { x: hiddenX, y: 0, z: 0 });
       const scale = layout2.scale;
       const panelY = layout2.centerY - 31 * scale;
       placeSprite("lobby_tab_panel", {

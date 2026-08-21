@@ -18,6 +18,7 @@ export const sprites = {
   settingsIcon: { path: "sprites/settings-icon.png", width: 54, height: 54 },
   settingsPanel: { path: "sprites/settings-panel.png", width: 440, height: 320 },
   homeBackground: { path: "sprites/royale/home-bg.png", width: DESIGN_WIDTH, height: DESIGN_HEIGHT },
+  homeReference: { path: "sprites/royale/home-reference.png", width: DESIGN_WIDTH, height: 1_003 },
   homePlatform: { path: "sprites/royale/home-platform.png", width: 360, height: 260 },
   homeBattleButton: { path: "sprites/royale/home-battle-button.png", width: 310, height: 92 },
   homeResource: { path: "sprites/royale/home-resource.png", width: 136, height: 46 },

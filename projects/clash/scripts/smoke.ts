@@ -131,11 +131,15 @@ function intersectsSafeArea(entity: MockEntity): boolean {
 runtime.on_script_loaded();
 assert.equal(set3dEnabledCalls, 1);
 assert.equal(gameState.message, "LOBBY");
-assert.ok(entities.has("lobby_arena"));
-assert.ok(entities.has("lobby_battle_button"));
+const lobbyReference = assertEntity("lobby_reference");
+assert.equal(lobbyReference.path, "sprites/royale/home-reference.png");
+assert.deepEqual(
+  { x: lobbyReference.x, y: lobbyReference.y, width: lobbyReference.width, height: lobbyReference.height },
+  { x: 0, y: -5, width: safeArea.width, height: safeArea.height },
+);
 
 for (const entity of entities.values()) {
-  if (entity.id === "lobby_background" || !intersectsSafeArea(entity)) continue;
+  if (entity.id === "lobby_reference" || !intersectsSafeArea(entity)) continue;
   if (entity.width !== undefined) {
     assert.ok(entity.x - entity.width * 0.5 >= safeArea.left - 1, `${entity.id} crosses the left safe area`);
     assert.ok(entity.x + entity.width * 0.5 <= safeArea.right + 1, `${entity.id} crosses the right safe area`);
@@ -146,13 +150,18 @@ for (const entity of entities.values()) {
   }
 }
 
+tap(safeArea.left + safeArea.width * 0.912, safeArea.top - safeArea.height * 0.141);
+assert.ok(entities.has("lobby_settings_panel"));
+tap(0, (safeArea.top + safeArea.bottom) * 0.5 + 10 * (safeArea.height / 800));
+assert.ok(!entities.has("lobby_settings_panel"));
+
 tap(-168, safeArea.bottom + 39);
 assert.equal(gameState.message, "LOBBY:SHOP");
 
 tap(0, safeArea.bottom + 39);
 assert.equal(gameState.message, "LOBBY:BATTLE");
 
-tap(0, safeArea.bottom + 136);
+tap(safeArea.left + safeArea.width * 0.505, safeArea.top - safeArea.height * 0.827);
 assert.equal(gameState.message, "MATCHMAKING");
 assert.equal(set3dEnabledCalls, 2);
 for (let frame = 0; frame < 25; frame += 1) runtime.on_update(0.05);
