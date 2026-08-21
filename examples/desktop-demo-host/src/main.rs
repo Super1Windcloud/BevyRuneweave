@@ -1185,25 +1185,57 @@ fn runtime_library_name() -> &'static str {
     }
 }
 
+fn prepare_runtime_icon(assets: &Path, icon: &str) -> Result<(), String> {
+    let target = assets.join(".runtime-icon.png");
+    if icon.starts_with("http://") || icon.starts_with("https://") {
+        let response = reqwest::blocking::get(icon)
+            .and_then(reqwest::blocking::Response::error_for_status)
+            .map_err(|error| format!("Could not download runtime icon: {error}"))?;
+        let bytes = response
+            .bytes()
+            .map_err(|error| format!("Could not read runtime icon response: {error}"))?;
+        return fs::write(&target, bytes)
+            .map_err(|error| format!("Could not write {}: {error}", target.display()));
+    }
+
+    let relative = Path::new(icon);
+    if relative.is_absolute()
+        || relative
+            .components()
+            .any(|component| component == Component::ParentDir)
+    {
+        return Err("icon must be a relative path inside assets or an HTTP(S) URL".to_owned());
+    }
+
+    let source = assets.join(relative);
+    if source == target {
+        let metadata = fs::metadata(&source)
+            .map_err(|error| format!("Could not read {}: {error}", source.display()))?;
+        if !metadata.is_file() || metadata.len() == 0 {
+            return Err(format!(
+                "Runtime icon is empty or not a file: {}",
+                source.display()
+            ));
+        }
+        return Ok(());
+    }
+
+    fs::copy(&source, &target).map(|_| ()).map_err(|error| {
+        format!(
+            "Could not copy runtime icon from {} to {}: {error}",
+            source.display(),
+            target.display()
+        )
+    })
+}
+
 fn run_game() -> Result<(), String> {
     let assets = active_assets_root()?;
     let config = load_config(&assets)?;
-    if let Some(icon) = config.icon.as_deref() {
-        let target = assets.join(".runtime-icon.png");
-        if icon.starts_with("http://") || icon.starts_with("https://") {
-            if let Ok(response) =
-                reqwest::blocking::get(icon).and_then(reqwest::blocking::Response::error_for_status)
-                && let Ok(bytes) = response.bytes()
-            {
-                let _ = fs::write(target, bytes);
-            }
-        } else {
-            let relative = Path::new(icon);
-            if !relative.is_absolute() && !relative.components().any(|c| c == Component::ParentDir)
-            {
-                let _ = fs::copy(assets.join(relative), target);
-            }
-        }
+    if let Some(icon) = config.icon.as_deref()
+        && let Err(error) = prepare_runtime_icon(&assets, icon)
+    {
+        eprintln!("Bevy RuneWeave: {error}; using the default runtime icon");
     }
     let executable_dir = executable_directory()?;
     let library_name = runtime_library_name();
@@ -1302,6 +1334,35 @@ mod tests {
         assert_eq!(
             release_log_path_at(data_root, ProcessMode::Runtime),
             data_root.join("logs/runtime.log")
+        );
+    }
+
+    #[test]
+    fn preserves_runtime_icon_when_config_already_uses_target_path() {
+        let assets = tempfile::tempdir().unwrap();
+        let icon = assets.path().join(".runtime-icon.png");
+        fs::write(&icon, b"clash icon bytes").unwrap();
+
+        prepare_runtime_icon(assets.path(), ".runtime-icon.png").unwrap();
+
+        assert_eq!(fs::read(icon).unwrap(), b"clash icon bytes");
+    }
+
+    #[test]
+    fn copies_project_icon_to_runtime_icon_path() {
+        let assets = tempfile::tempdir().unwrap();
+        fs::create_dir_all(assets.path().join("branding")).unwrap();
+        fs::write(
+            assets.path().join("branding/icon.png"),
+            b"project icon bytes",
+        )
+        .unwrap();
+
+        prepare_runtime_icon(assets.path(), "branding/icon.png").unwrap();
+
+        assert_eq!(
+            fs::read(assets.path().join(".runtime-icon.png")).unwrap(),
+            b"project icon bytes"
         );
     }
 

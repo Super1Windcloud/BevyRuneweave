@@ -217,14 +217,32 @@ fn decode_desktop_icon(bytes: &[u8]) -> Result<image::RgbaImage, image::ImageErr
     Ok(image)
 }
 
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+fn load_desktop_icon(asset_root: &Path) -> Result<image::RgbaImage, image::ImageError> {
+    let custom_icon = asset_root.join(".runtime-icon.png");
+    match fs::read(&custom_icon) {
+        Ok(bytes) => match decode_desktop_icon(&bytes) {
+            Ok(image) => return Ok(image),
+            Err(error) => warn!(
+                "Failed to decode custom runtime icon {}: {error}; using the default icon",
+                custom_icon.display()
+            ),
+        },
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => warn!(
+            "Failed to read custom runtime icon {}: {error}; using the default icon",
+            custom_icon.display()
+        ),
+        Err(_) => {}
+    }
+    decode_desktop_icon(DEFAULT_WINDOW_ICON)
+}
+
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 fn set_default_window_icon(
     primary_window: Single<Entity, With<PrimaryWindow>>,
     asset_root: Res<RuntimeAssetRoot>,
 ) {
-    let bytes = fs::read(asset_root.0.join(".runtime-icon.png"))
-        .unwrap_or_else(|_| DEFAULT_WINDOW_ICON.to_vec());
-    let image = match decode_desktop_icon(&bytes) {
+    let image = match load_desktop_icon(&asset_root.0) {
         Ok(image) => image,
         Err(error) => {
             warn!("Failed to decode the embedded Bevy window icon: {error}");
@@ -261,9 +279,7 @@ fn set_default_window_icon(asset_root: Res<RuntimeAssetRoot>) {
     use objc2_app_kit::{NSApplication, NSBitmapImageRep, NSDeviceRGBColorSpace, NSImage};
     use objc2_foundation::NSSize;
 
-    let bytes = fs::read(asset_root.0.join(".runtime-icon.png"))
-        .unwrap_or_else(|_| DEFAULT_WINDOW_ICON.to_vec());
-    let image = match decode_desktop_icon(&bytes) {
+    let image = match load_desktop_icon(&asset_root.0) {
         Ok(image) => image,
         Err(error) => {
             warn!("Failed to decode the embedded Bevy application icon: {error}");
