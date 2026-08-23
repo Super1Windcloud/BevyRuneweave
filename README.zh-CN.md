@@ -202,8 +202,8 @@ just build-runtime linux
 `x86_64-pc-windows-msvc`。构建脚本需要支持直接执行 TypeScript 的 Node.js 版本。
 Android 需要 `cargo-ndk` 和已安装的 Android NDK，只支持并默认构建 `arm64-v8a`、
 `x86_64`，最低 API 为
-26。iOS 只能在安装 Xcode 的 macOS 上构建，默认生成包含 arm64 真机和 Apple Silicon
-模拟器 slice 的 `BevyRuneweave.xcframework`。可通过脚本帮助中列出的环境变量覆盖
+26。iOS 只能在安装 Xcode 的 macOS 上构建，默认生成仅包含真机架构的
+`BevyRuneweave.xcframework`。可通过脚本帮助中列出的环境变量覆盖
 目标架构和输出目录：
 
 Android 构建会自动选择 `ANDROID_HOME` 或 `ANDROID_SDK_ROOT` 下最新的 side-by-side NDK；
@@ -213,7 +213,7 @@ Android 构建会自动选择 `ANDROID_HOME` 或 `ANDROID_SDK_ROOT` 下最新的
 npm exec -- tsx scripts/build-runtime.ts --help
 WINDOWS_TARGETS=x86_64-pc-windows-msvc just build-runtime-windows
 ANDROID_ABIS=arm64-v8a just build-runtime-android
-IOS_SIMULATOR_TARGETS=aarch64-apple-ios-sim,x86_64-apple-ios just build-runtime-ios
+IOS_DEVICE_TARGETS=aarch64-apple-ios just build-runtime-ios
 ```
 
 框架主库产出供 Rust 项目使用的 `rlib`；`crates/runtime-cdylib` 为 Windows、macOS、

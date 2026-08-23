@@ -171,19 +171,21 @@ function vendoredLua(target: string) {
 }
 function ios() {
   if (hostOs() !== "macos") throw new Error("iOS runtimes can only be built on macOS");
-  const device = values("IOS_DEVICE_TARGETS", "aarch64-apple-ios"), simulator = values("IOS_SIMULATOR_TARGETS", "aarch64-apple-ios-sim");
-  const work = join(tmpdir(), `runeweave-ios-${process.pid}`); rmSync(work, { recursive: true, force: true }); mkdirSync(join(work, "device"), { recursive: true }); mkdirSync(join(work, "simulator"));
+  const device = values("IOS_DEVICE_TARGETS", "aarch64-apple-ios");
+  const work = join(tmpdir(), `runeweave-ios-${process.pid}`); rmSync(work, { recursive: true, force: true }); mkdirSync(join(work, "device"), { recursive: true });
   try {
-    for (const [group, targets] of [["device", device], ["simulator", simulator]] as const) for (const target of targets) {
+    for (const target of device) {
       requireTarget(target); run("cargo", ["build", ...cargoProfileArgs, ...cargoFeatureArgs, "--lib", "-p", "bevy-runeweave-runtime-staticlib", "--target", target], { IPHONEOS_DEPLOYMENT_TARGET: process.env.IOS_DEPLOYMENT_TARGET ?? "13.0" });
-      run("libtool", ["-static", "-o", join(work, group, `${target}.a`), join(targetDir, target, profile, "libbevy_runeweave.a"), vendoredLua(target)]);
+      run("libtool", ["-static", "-o", join(work, "device", `${target}.a`), join(targetDir, target, profile, "libbevy_runeweave.a"), vendoredLua(target)]);
     }
-    const deviceLib = join(work, "libbevy_runeweave-device.a"), simulatorLib = join(work, "libbevy_runeweave-simulator.a");
-    run("lipo", ["-create", ...readdirSync(join(work, "device")).map((x) => join(work, "device", x)), "-output", deviceLib]);
-    run("lipo", ["-create", ...readdirSync(join(work, "simulator")).map((x) => join(work, "simulator", x)), "-output", simulatorLib]);
+    const deviceLib = join(work, "libbevy_runeweave-device.a");
+    const deviceInputs = readdirSync(join(work, "device")).map((x) => join(work, "device", x));
+    if (deviceInputs.length === 0) throw new Error("No iOS device targets were configured");
+    if (deviceInputs.length === 1) cpSync(deviceInputs[0], deviceLib);
+    else run("lipo", ["-create", ...deviceInputs, "-output", deviceLib]);
     const destination = fresh("ios", "xcframework");
-    run("xcodebuild", ["-create-xcframework", "-library", deviceLib, "-headers", join(root, "include"), "-library", simulatorLib, "-headers", join(root, "include"), "-output", join(destination, "lib", "BevyRuneweave.xcframework")]);
-    info(destination, "ios", `${device.join(",")};${simulator.join(",")}`);
+    run("xcodebuild", ["-create-xcframework", "-library", deviceLib, "-headers", join(root, "include"), "-output", join(destination, "lib", "BevyRuneweave.xcframework")]);
+    info(destination, "ios", device.join(","));
   } finally { rmSync(work, { recursive: true, force: true }); }
 }
 
