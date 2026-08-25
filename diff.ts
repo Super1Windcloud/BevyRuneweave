@@ -653,6 +653,30 @@ const nonInteractive =
         "--non-interactive",
     );
 
+const useMaster =
+    process.argv.includes(
+        "--master",
+    );
+
+const useAppConfig =
+    process.argv.includes(
+        "--app-config",
+    );
+
+if (
+    useMaster &&
+    useAppConfig
+) {
+
+    console.error(
+        "--master 与 --app-config 不能同时使用",
+    );
+
+    rl.close();
+
+    process.exit(1);
+}
+
 
 // ============================================================
 // 开始选择
@@ -660,7 +684,14 @@ const nonInteractive =
 
 let mode: "1" | "2";
 
-if (nonInteractive) {
+if (useMaster) {
+
+    mode = "1";
+
+} else if (
+    useAppConfig ||
+    nonInteractive
+) {
 
     mode = "2";
 
