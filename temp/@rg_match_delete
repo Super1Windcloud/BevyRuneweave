@@ -1,0 +1,672 @@
+    private boolean isOpenUpdateSO;//是否更新SO
+    private boolean isShowShare;//是否打开分享
+    private boolean isShowChest;//是否宝箱活动入口
+    private boolean isShowHallowmasChest;//是否万圣节宝箱活动入口
+    private boolean isShowCustomRoomInvite;//是否显示房间邀请
+    private String activityUrl;//活动入口链接
+    private String gratitudeUrl;//活动入口链接
+    private boolean isNeedSystemAnnouncement;//是否需要访问系统通知接口
+    private boolean isNeedStopServiceAnnouncement;//是否需要访问停服通知接口
+    private String newGratitudeUrl;//新活动入口链接
+    private AdsConfig adsConfig;//广告配置
+    private AdsConfig specialAdsConfig;//特殊广告配置
+    private boolean isShowFriendMatch;//是否显示好友匹配
+    private boolean isShowDressRecommend;//是否显示好友匹配
+    private int dailyShareVersionCode;//版本号大于多少以上显示拉新活动
+    private boolean isShowGameGuide;//是否显示游戏引导
+    private int videoSubmitActivityCode;//版本号多少以上显示视频投稿活动弹窗
+    private int reportInterval;//上报时间间隔
+    private int pingReportInterval;//Ping值上报时间间隔
+    private int huaweiEventCountLimit; //Huawei事件上报数据限制
+    private int thinkDataEventCountLimit; //ThinkData事件上报数据限制
+    private boolean isOpenRemoteConfig;//是否开启远程配置
+    private int[] bedWarNoviceGuideFilterRange;//起床新手引导过滤区间
+    private int[] bedWarNoviceGuideFilterRangeNew;//起床新手引导过滤区间
+    private boolean isOpenRechargeBind;//是否打开充值绑定开关
+    private boolean isOpenRechargeForOther;//是否打开为他人充值
+    private AvatarDownloadConfig avatarDownloadConfig;//头像框资源下载配置
+
+    private GameRedPoint gameRedPoint;//底部导航游戏红点
+    private String socialHomeBgPic;//社交家园背景图
+    private boolean christmas25Entrance = false;
+
+    @SerializedName("hidePointsMallAppVersionRanges")
+    private List<AppVersionRange> hidePointsMallAppVersionRanges;
+
+
+    public void setReportCustomANR2Bugly(boolean reportCustomANR2Bugly) {
+        this.reportCustomANR2Bugly = reportCustomANR2Bugly;
+    }
+
+    public void setAnrWithoutGoogleReport(boolean anrWithoutGoogleReport) {
+        this.anrWithoutGoogleReport = anrWithoutGoogleReport;
+    }
+
+    public boolean isPointsMallVersionHidden(int appVersion) {
+        if (hidePointsMallAppVersionRanges == null) {
+            return false;
+        }
+        for (AppVersionRange range : hidePointsMallAppVersionRanges) {
+            if (range != null && range.contains(appVersion)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean isPointsMallEnabled(int appVersion, String flavorUrl) {
+        return isPointsMallUrlEnabled(flavorUrl) && !isPointsMallVersionHidden(appVersion);
+    }
+
+    public List<AppVersionRange> getHidePointsMallAppVersionRanges() {
+        return hidePointsMallAppVersionRanges == null
+                ? new ArrayList<>()
+                : hidePointsMallAppVersionRanges;
+    }
+
+    public void setHidePointsMallAppVersionRanges(List<AppVersionRange> ranges) {
+        this.hidePointsMallAppVersionRanges = ranges;
+    }
+
+    public static final class AppVersionRange {
+        @SerializedName("min")
+        private int min;
+
+        @SerializedName("max")
+        private int max;
+
+        public int getMin() {
+            return min;
+        }
+
+        public void setMin(int min) {
+            this.min = min;
+        }
+
+        public int getMax() {
+            return max;
+        }
+
+        public void setMax(int max) {
+            this.max = max;
+        }
+
+        public boolean contains(int appVersion) {
+            return min <= max && appVersion >= min && appVersion <= max;
+        }
+    }
+
+    public void setPersonalEffectsStoreEntrance(Boolean personalEffectsStoreEntrance) {
+        this.personalEffectsStoreEntrance = personalEffectsStoreEntrance;
+    }
+
+    public void setTriggerAfterGame(boolean triggerAfterGame) {
+        this.triggerAfterGame = triggerAfterGame;
+    }
+
+    public void setAnniversary8Entrance(boolean anniversary8Entrance) {
+        this.anniversary8Entrance = anniversary8Entrance;
+    }
+
+    public boolean isChristmas25Entrance() {
+        return christmas25Entrance;
+    }
+
+    public void setChristmas25Entrance(boolean christmas25Entrance) {
+        this.christmas25Entrance = christmas25Entrance;
+    }
+
+    public void setEnableMiningEntranceNew(boolean enableMiningEntranceNew) {
+        this.enableMiningEntranceNew = enableMiningEntranceNew;
+    }
+
+    private String guideGameId = ""; //首页新手引导第一个选中游戏id
+
+    private boolean gameRoomEntrance = false;// 是否打开游戏房间的入口（旧版本，需要保持关闭状态）
+
+    private boolean gameRomeEntranceNew = false; // 是否打开游戏房间的入口 （修复完问题的版本）
+
+    private boolean enableBgGoIndex = false;
+    private String bedWarNoviceNotGuideGameType = ""; // 需要地图重定向的游戏ID
+
+    private boolean enableRUThirdPayment;
+
+
+
+
+
+
+
+
+    public void setHardMissThirdPaymentAppVersion(Long hardMissThirdPaymentAppVersion) {
+        this.hardMissThirdPaymentAppVersion = hardMissThirdPaymentAppVersion;
+    }
+
+    public boolean isEnableRUThirdPayment() {
+        return enableRUThirdPayment;
+    }
+
+    public void setEnableRUThirdPayment(boolean enableRUThirdPayment) {
+        this.enableRUThirdPayment = enableRUThirdPayment;
+    }
+
+    public void setDisableIM(boolean disableIM) {
+        this.disableIM = disableIM;
+    }
+
+    private String bedWarNoviceGuideMapMode = ""; // 需要地图重定向的游戏模式
+
+    public void setBedWarRefereeModeGameTypes(List<String> bedWarRefereeModeGameTypes) {
+        this.bedWarRefereeModeGameTypes = bedWarRefereeModeGameTypes;
+    }
+
+    public void setBedWarMapRedirectConfigs(List<BedWarMapRedirectConfig> bedWarMapRedirectConfigs) {
+        this.bedWarMapRedirectConfigs = bedWarMapRedirectConfigs;
+    }
+
+    public String getBedWarNoviceNotGuideGameType() {
+        return bedWarNoviceNotGuideGameType;
+    }
+
+    public void setBedWarNoviceNotGuideGameType(String bedWarNoviceNotGuideGameType) {
+        this.bedWarNoviceNotGuideGameType = bedWarNoviceNotGuideGameType;
+    }
+
+    public void setBedWarRefereeMode(String bedWarRefereeMode) {
+        this.bedWarRefereeMode = bedWarRefereeMode;
+    }
+
+    public String getBedWarNoviceGuideMapMode() {
+        return bedWarNoviceGuideMapMode;
+    }
+
+    public void setBedWarNoviceGuideMapMode(String bedWarNoviceGuideMapMode) {
+        this.bedWarNoviceGuideMapMode = bedWarNoviceGuideMapMode;
+    }
+
+    public void setBgGoIndexVipUrl(String bgGoIndexVipUrl) {
+        this.bgGoIndexVipUrl = bgGoIndexVipUrl;
+    }
+
+    public void setPayFailDiscordUrl(String payFailDiscordUrl) {
+        this.payFailDiscordUrl = payFailDiscordUrl;
+    }
+
+    public boolean isEnableBgGoIndex() {
+        return enableBgGoIndex;
+    }
+
+    public void setEnableBgGoIndex(boolean enableBgGoIndex) {
+        this.enableBgGoIndex = enableBgGoIndex;
+    }
+
+    public void setEnablePayFailDiscord(boolean enablePayFailDiscord) {
+        this.enablePayFailDiscord = enablePayFailDiscord;
+    }
+
+    public boolean isGameRomeEntranceNew() {
+        return gameRomeEntranceNew;
+    }
+
+    public void setGameRomeEntranceNew(boolean gameRomeEntranceNew) {
+        this.gameRomeEntranceNew = gameRomeEntranceNew;
+    }
+
+    public boolean isGameRoomEntrance() {
+        return gameRoomEntrance;
+    }
+
+    public void setGameRoomEntrance(boolean gameRoomEntrance) {
+        this.gameRoomEntrance = gameRoomEntrance;
+    }
+
+    public void setGetVerticalGameList(List<String> getVerticalGameList) {
+        this.getVerticalGameList = getVerticalGameList;
+    }
+
+    public void setGameRoomAutoDisplayShareDialog(boolean gameRoomAutoDisplayShareDialog) {
+        this.gameRoomAutoDisplayShareDialog = gameRoomAutoDisplayShareDialog;
+    }
+
+    public void setGameRoomUGCEntrance(boolean gameRoomUGCEntrance) {
+        this.gameRoomUGCEntrance = gameRoomUGCEntrance;
+    }
+
+    public void setAccountSecurityV8BindEmailToggle(boolean accountSecurityV8BindEmailToggle) {
+        this.accountSecurityV8BindEmailToggle = accountSecurityV8BindEmailToggle;
+    }
+
+    public void setAccountSecurityV8BindEmailIntervalDays(int accountSecurityV8BindEmailIntervalDays) {
+        this.accountSecurityV8BindEmailIntervalDays = accountSecurityV8BindEmailIntervalDays;
+    }
+
+    public void setDisplayOldDressUpgradeEntranceInDecoratePage(boolean displayOldDressUpgradeEntranceInDecoratePage) {
+        this.displayOldDressUpgradeEntranceInDecoratePage = displayOldDressUpgradeEntranceInDecoratePage;
+    }
+
+    public void setEnableMyselfSuitGuide(boolean enableMyselfSuitGuide) {
+        this.enableMyselfSuitGuide = enableMyselfSuitGuide;
+    }
+
+    public void setEnableReportFpsAndPing(boolean enableReportFpsAndPing) {
+        this.enableReportFpsAndPing = enableReportFpsAndPing;
+    }
+
+    public void setGuideGameId(String guideGameId) {
+        this.guideGameId = guideGameId;
+    }
+
+    public String getGuideGameId() {
+        return guideGameId;
+    }
+
+    public void setShowHomeGuideNew(boolean showHomeGuideNew) {
+        isShowHomeGuideNew = showHomeGuideNew;
+    }
+
+    public void setDisplayUMPCheckDialog(boolean displayUMPCheckDialog) {
+        this.displayUMPCheckDialog = displayUMPCheckDialog;
+    }
+
+    public void setDisplayGameDetailsBiggyBank(boolean displayGameDetailsBiggyBank) {
+        this.displayGameDetailsBiggyBank = displayGameDetailsBiggyBank;
+    }
+
+    public void setShowUserFamilyEditToggle(boolean showUserFamilyEditToggle) {
+        this.isShowUserFamilyEditToggle = showUserFamilyEditToggle;
+    }
+
+    public void setShowUserInfoProps(boolean showUserInfoProps) {
+        isShowUserInfoProps = showUserInfoProps;
+    }
+
+    public void setOpenFamilyCustom(boolean openFamilyCustom) {
+        this.openFamilyCustom = openFamilyCustom;
+    }
+
+    public void setShowThirdPart(boolean showThirdPart) {
+        isShowThirdPart = showThirdPart;
+    }
+
+    public boolean isOpenUpdateSO() {
+        return isOpenUpdateSO;
+    }
+
+    public void setOpenUpdateSO(boolean openUpdateSO) {
+        isOpenUpdateSO = openUpdateSO;
+    }
+
+    public void setOpenMorePay(boolean openMorePay) {
+        isOpenMorePay = openMorePay;
+    }
+
+    public boolean isShowShare() {
+        return isShowShare;
+    }
+
+    public void setShowShare(boolean showShare) {
+        isShowShare = showShare;
+    }
+
+    public void setShowCampaign(boolean showCampaign) {
+        isShowCampaign = showCampaign;
+    }
+
+    public boolean isShowChest() {
+        return isShowChest;
+    }
+
+    public void setShowChest(boolean showChest) {
+        isShowChest = showChest;
+    }
+
+    public boolean isShowHallowmasChest() {
+        return isShowHallowmasChest;
+    }
+
+    public void setShowHallowmasChest(boolean showHallowmasChest) {
+        isShowHallowmasChest = showHallowmasChest;
+    }
+
+    public void setShowUniversalActivity(boolean showUniversalActivity) {
+        isShowUniversalActivity = showUniversalActivity;
+    }
+
+    public void setShowChatTranslate(boolean showChatTranslate) {
+        isShowChatTranslate = showChatTranslate;
+    }
+
+    public void setUniversalActivityVersionCode(int universalActivityVersionCode) {
+        this.universalActivityVersionCode = universalActivityVersionCode;
+    }
+
+    public void setActivityVersionCode(int activityVersionCode) {
+        this.activityVersionCode = activityVersionCode;
+    }
+
+    public void setShowPartyInvite(boolean showPartyInvite) {
+        isShowPartyInvite = showPartyInvite;
+    }
+
+
+    public boolean isShowCustomRoomInvite() {
+        return isShowCustomRoomInvite;
+    }
+
+    public void setShowCustomRoomInvite(boolean showCustomRoomInvite) {
+        isShowCustomRoomInvite = showCustomRoomInvite;
+    }
+
+    public String getActivityUrl() {
+        return activityUrl;
+    }
+
+    public void setActivityUrl(String activityUrl) {
+        this.activityUrl = activityUrl;
+    }
+
+    public AdsConfig getAdsConfig() {
+        return adsConfig;
+    }
+
+    public void setAdsConfig(AdsConfig adsConfig) {
+        this.adsConfig = adsConfig;
+    }
+
+    public AdsConfig getSpecialAdsConfig() {
+        return specialAdsConfig;
+    }
+
+    public void setSpecialAdsConfig(AdsConfig specialAdsConfig) {
+        this.specialAdsConfig = specialAdsConfig;
+    }
+
+    public boolean isShowFriendMatch() {
+        return isShowFriendMatch;
+    }
+
+    public void setShowFriendMatch(boolean showFriendMatch) {
+        isShowFriendMatch = showFriendMatch;
+    }
+
+    public String getGratitudeUrl() {
+        return gratitudeUrl;
+    }
+
+    public void setGratitudeUrl(String gratitudeUrl) {
+        this.gratitudeUrl = gratitudeUrl;
+    }
+
+    public String getNewGratitudeUrl() {
+        return newGratitudeUrl;
+    }
+
+    public void setNewGratitudeUrl(String newGratitudeUrl) {
+        this.newGratitudeUrl = newGratitudeUrl;
+    }
+
+    public boolean isShowDressRecommend() {
+        return isShowDressRecommend;
+    }
+
+    public void setShowDressRecommend(boolean showDressRecommend) {
+        isShowDressRecommend = showDressRecommend;
+    }
+
+    public void setOpenMTP(boolean openMTP) {
+        isOpenMTP = openMTP;
+    }
+
+    public void setShowMoreGame(boolean showMoreGame) {
+        isShowMoreGame = showMoreGame;
+    }
+
+    public void setVerifyLoginShowDownloadButton(boolean verifyLoginShowDownloadButton) {
+        this.verifyLoginShowDownloadButton = verifyLoginShowDownloadButton;
+    }
+
+    public int getDailyShareVersionCode() {
+        return dailyShareVersionCode;
+    }
+
+    public void setDailyShareVersionCode(int dailyShareVersionCode) {
+        this.dailyShareVersionCode = dailyShareVersionCode;
+    }
+
+    public boolean isNeedSystemAnnouncement() {
+        return isNeedSystemAnnouncement;
+    }
+
+    public void setNeedSystemAnnouncement(boolean needSystemAnnouncement) {
+        isNeedSystemAnnouncement = needSystemAnnouncement;
+    }
+
+    public boolean isNeedStopServiceAnnouncement() {
+        return isNeedStopServiceAnnouncement;
+    }
+
+    public void setNeedStopServiceAnnouncement(boolean needStopServiceAnnouncement) {
+        isNeedStopServiceAnnouncement = needStopServiceAnnouncement;
+    }
+
+    public void setSilentDownload(boolean silentDownload) {
+        isSilentDownload = silentDownload;
+    }
+
+    public boolean isShowGameGuide() {
+        return isShowGameGuide;
+    }
+
+    public void setShowGameGuide(boolean showGameGuide) {
+        isShowGameGuide = showGameGuide;
+    }
+
+    public int getVideoSubmitActivityCode() {
+        return videoSubmitActivityCode;
+    }
+
+    public void setVideoSubmitActivityCode(int videoSubmitActivityCode) {
+        this.videoSubmitActivityCode = videoSubmitActivityCode;
+    }
+
+    public int getReportInterval() {
+        return reportInterval;
+    }
+
+    public void setReportInterval(int reportInterval) {
+        this.reportInterval = reportInterval;
+    }
+
+    public void setDisableKinesisEvent(boolean disableKinesisEvent) {
+        this.disableKinesisEvent = disableKinesisEvent;
+    }
+
+    public void setDisableHuaweiEvent(boolean disableHuaweiEvent) {
+        this.disableHuaweiEvent = disableHuaweiEvent;
+    }
+
+    public int getHuaweiEventCountLimit() {
+        return huaweiEventCountLimit;
+    }
+
+    public void setHuaweiEventCountLimit(int huaweiEventCountLimit) {
+        this.huaweiEventCountLimit = huaweiEventCountLimit;
+    }
+
+    public int getThinkDataEventCountLimit() {
+        return thinkDataEventCountLimit;
+    }
+
+    public void setThinkDataEventCountLimit(int thinkDataEventCountLimit) {
+        this.thinkDataEventCountLimit = thinkDataEventCountLimit;
+    }
+
+    public int getPingReportInterval() {
+        return pingReportInterval;
+    }
+
+    public void setPingReportInterval(int pingReportInterval) {
+        this.pingReportInterval = pingReportInterval;
+    }
+
+    public void setTickInterval(int tickInterval) {
+        this.tickInterval = tickInterval;
+    }
+
+    public void setVideoBanner(List<BannerEntity> videoBanner) {
+        this.videoBanner = videoBanner;
+    }
+
+    public void setTempMTPBlackList(List<String> tempMTPBlackList) {
+        this.tempMTPBlackList = tempMTPBlackList;
+    }
+
+    public void setShowFriendFollow(boolean showFriendFollow) {
+        isShowFriendFollow = showFriendFollow;
+    }
+
+    public void setV2CommonGameList(List<String> v2CommonGameList) {
+        this.v2CommonGameList = v2CommonGameList;
+    }
+
+    public void setShowMainGuide(boolean showMainGuide) {
+        isShowMainGuide = showMainGuide;
+    }
+
+    public void setStartPlatformLobbyEntry(boolean startPlatformLobbyEntry) {
+        this.startPlatformLobbyEntry = startPlatformLobbyEntry;
+    }
+
+    public void setShowTopActivity(boolean showTopActivity) {
+        isShowTopActivity = showTopActivity;
+    }
+
+    public void setUseNewSearch(boolean useNewSearch) {
+        isUseNewSearch = useNewSearch;
+    }
+
+
+    public void setSensitiveWordVersion(int sensitiveWordVersion) {
+        this.sensitiveWordVersion = sensitiveWordVersion;
+    }
+
+    public AvatarDownloadConfig getAvatarDownloadConfig() {
+        return avatarDownloadConfig;
+    }
+
+    public void setAvatarDownloadConfig(AvatarDownloadConfig avatarDownloadConfig) {
+        this.avatarDownloadConfig = avatarDownloadConfig;
+    }
+
+    public boolean isOpenRemoteConfig() {
+        return isOpenRemoteConfig;
+    }
+
+    public void setOpenRemoteConfig(boolean openRemoteConfig) {
+        isOpenRemoteConfig = openRemoteConfig;
+    }
+
+    public void setShowGoldExchange(boolean showGoldExchange) {
+        isShowGoldExchange = showGoldExchange;
+    }
+
+    public void setGameTypeConfig(Map<String, List<String>> gameTypeConfig) {
+        this.gameTypeConfig = gameTypeConfig;
+    }
+
+    public void setLocalFirebaseTest(Map<Long, Map<String, String>> localFirebaseTest) {
+        this.localFirebaseTest = localFirebaseTest;
+    }
+
+    public boolean isOpenRechargeBind() {
+        return isOpenRechargeBind;
+    }
+
+    public void setOpenRechargeBind(boolean openRechargeBind) {
+        isOpenRechargeBind = openRechargeBind;
+    }
+
+    public boolean isOpenRechargeForOther() {
+        return isOpenRechargeForOther;
+    }
+
+    public void setOpenRechargeForOther(boolean openRechargeForOther) {
+        isOpenRechargeForOther = openRechargeForOther;
+    }
+
+    public int[] getBedWarNoviceGuideFilterRange() {
+        return bedWarNoviceGuideFilterRange;
+    }
+
+    public void setBedWarNoviceGuideFilterRange(int[] bedWarNoviceGuideFilterRange) {
+        this.bedWarNoviceGuideFilterRange = bedWarNoviceGuideFilterRange;
+    }
+
+    public int[] getBedWarNoviceGuideFilterRangeNew() {
+        return bedWarNoviceGuideFilterRangeNew;
+    }
+
+    public void setBedWarNoviceGuideFilterRangeNew(int[] bedWarNoviceGuideFilterRangeNew) {
+        this.bedWarNoviceGuideFilterRangeNew = bedWarNoviceGuideFilterRangeNew;
+    }
+
+    public void setShowBigPartyMinimumVersion(int showBigPartyMinimumVersion) {
+        this.showBigPartyMinimumVersion = showBigPartyMinimumVersion;
+    }
+
+    public void setAdUnitIds(AdUnitConfig adUnitIds) {
+        this.adUnitIds = adUnitIds;
+    }
+
+    public void setCustomSex(int customSex) {
+        this.customSex = customSex;
+    }
+
+    public void setShowHomeTopBanner(boolean showHomeTopBanner) {
+        this.showHomeTopBanner = showHomeTopBanner;
+    }
+
+    public GameRedPoint getGameRedPoint() {
+        return gameRedPoint;
+    }
+
+    public void setGameRedPoint(GameRedPoint gameRedPoint) {
+        this.gameRedPoint = gameRedPoint;
+    }
+
+    public void setPayFailInvestigationInterval(int payFailInvestigationInterval) {
+        this.payFailInvestigationInterval = payFailInvestigationInterval;
+    }
+
+    public String getSocialHomeBgPic() {
+        return socialHomeBgPic;
+    }
+
+    public void setSocialHomeBgPic(String socialHomeBgPic) {
+        this.socialHomeBgPic = socialHomeBgPic;
+    }
+
+    public void setShowHomestead(boolean showHomestead) {
+        isShowHomestead = showHomestead;
+    }
+
+    public void setNeedBindEmail(boolean needBindEmail) {
+        isNeedBindEmail = needBindEmail;
+    }
+
+    public void setFriendSend(boolean friendSend) {
+        isFriendSend = friendSend;
+    }
+
+    public void setFacebookHelperLoginEntrance(boolean facebookHelperLoginEntrance) {
+        this.facebookHelperLoginEntrance = facebookHelperLoginEntrance;
+    }
+
+    public void setReportTokenEmpty(boolean reportTokenEmpty) {
+        this.reportTokenEmpty = reportTokenEmpty;
+    }
+
+    public void setEnableLogDebugReportEvent(boolean enableLogDebugReportEvent) {
+        this.enableLogDebugReportEvent = enableLogDebugReportEvent;
+    }
+
