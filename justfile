@@ -214,5 +214,9 @@ build-ios-demo profile="":
     {{ if profile == "--release" { "true" } else { "npm exec -- tsx scripts/prepare-ios-debug-secrets.ts" } }}
     npm exec -- tsx scripts/build-ios-demo-host.ts {{ if profile == "--release" { "--release" } else { "" } }}
 
+# Update the underlying Bevy runtime version to latest (or specified version) and record changes into CHANGELOG.md.
+update-bevy version="" check="true":
+    npm exec -- tsx scripts/update-bevy-runtime.ts {{ if version != "" { "--version=" + version } else { "" } }} {{ if check == "false" { "--no-check" } else { "" } }}
+
 # Run formatting, project checks, and gameplay tests.
 verify: fmt-check bms-check check bms-test test

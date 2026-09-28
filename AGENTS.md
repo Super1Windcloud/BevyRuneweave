@@ -74,12 +74,16 @@ cannot be executed in the current environment must be called out explicitly as a
   `dynamic_components`, or `script_systems` independently, or use `full_scripting` to enable all
   three. These capability features must not change which script engines are embedded.
 - `npm run release:assets` packages assets and uploads same-named Release assets using `.env` credentials.
+- `just update-bevy` (or `npm run update:bevy`) updates the underlying Bevy engine version to latest (or `--version=<target>`), updates manifests/lockfiles, verifies compilation, and writes details into `CHANGELOG.md`.
 
 ## Configuration and Assets
 
 Each game package must include `assets/engineConfig.json` with `schemaVersion`, `name`, `version`,
 and `script.language`/`script.entry`. Entry paths must remain relative to `assets` and must not use `..`.
 Keep generated output under `dist/`; never commit `.env`, tokens, or generated binaries.
+`GITHUB_TOKEN` (or `GH_TOKEN`) can be read from `.env` in the repository root (or environment variables)
+by tooling and agents for GitHub API operations (such as upstream release queries, asset publishing,
+and changelog generation). Never print, log, or commit secret tokens or `.env` contents.
 
 ## Style and Testing
 

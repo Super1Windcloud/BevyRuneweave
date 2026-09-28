@@ -18,7 +18,7 @@ script_systems = ["bevy-runeweave/script_systems"]
 full_scripting = ["documentation", "dynamic_components", "script_systems"]
 
 [dependencies]
-bevy = { version = "0.19.0", default-features = false, features = ["android-native-activity"] }
+bevy = { version = "0.19.1", default-features = false, features = ["android-native-activity"] }
 bevy-runeweave = { path = "../../..", default-features = false, features = ["unified"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
