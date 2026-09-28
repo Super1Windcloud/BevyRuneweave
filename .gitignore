@@ -9,3 +9,4 @@ node_modules
 /examples/android-demo-host/**/build
 assets/clash
 index.html
+temp
