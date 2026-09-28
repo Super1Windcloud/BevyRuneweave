@@ -87,42 +87,128 @@ function readEnvironmentToken(): string | undefined {
   return undefined;
 }
 
+interface CompareResponse {
+  total_commits?: number;
+  commits?: Array<{
+    commit: {
+      message: string;
+      author?: { name?: string };
+    };
+  }>;
+}
+
+interface ReleaseInfo {
+  releaseUrl: string;
+  compareUrl: string;
+  notesSummary: string;
+  totalCommits: number;
+  internalChangesMarkdown: string;
+}
+
 async function fetchReleaseNotes(
   currentVersion: string,
   targetVersion: string,
-): Promise<{ releaseUrl: string; compareUrl: string; notesSummary: string }> {
+): Promise<ReleaseInfo> {
   const releaseUrl = `https://github.com/bevyengine/bevy/releases/tag/v${targetVersion}`;
   const compareUrl = `https://github.com/bevyengine/bevy/compare/v${currentVersion}...v${targetVersion}`;
   let notesSummary = "";
+  let totalCommits = 0;
+  let internalChangesMarkdown = "";
 
+  const token = readEnvironmentToken();
+  const headers: Record<string, string> = {
+    "User-Agent": "bevy-runeweave-runtime-updater/1.0",
+    Accept: "application/vnd.github.v3+json",
+  };
+  if (token) {
+    headers["Authorization"] = `token ${token}`;
+  }
+
+  // 1. Fetch GitHub Release info
   try {
     const apiUrl = `https://api.github.com/repos/bevyengine/bevy/releases/tags/v${targetVersion}`;
-    const token = readEnvironmentToken();
-    const headers: Record<string, string> = {
-      "User-Agent": "bevy-runeweave-runtime-updater/1.0",
-      Accept: "application/vnd.github.v3+json",
-    };
-    if (token) {
-      headers["Authorization"] = `token ${token}`;
-    }
-
     const response = await fetch(apiUrl, { headers });
 
     if (response.ok) {
       const data = (await response.json()) as GitHubReleaseResponse;
       if (data.body) {
         const trimmed = data.body.trim();
-        // If the release notes are very long, extract the top lines or summary
-        const lines = trimmed.split(/\r?\n/).filter(Boolean);
-        const excerpt = lines.slice(0, 10).join("\n");
-        notesSummary = excerpt;
+        // Ignore generic one-liners pointing to compare URL
+        if (!trimmed.toLowerCase().includes("a full diff of what's in this release can be seen here")) {
+          const lines = trimmed.split(/\r?\n/).filter(Boolean);
+          notesSummary = lines.slice(0, 15).join("\n");
+        }
       }
     }
   } catch {
     // Gracefully handle network / rate limiting errors
   }
 
-  return { releaseUrl, compareUrl, notesSummary };
+  // 2. Fetch detailed commits and PR changes from GitHub Compare API
+  try {
+    const compareApiUrl = `https://api.github.com/repos/bevyengine/bevy/compare/v${currentVersion}...v${targetVersion}`;
+    const response = await fetch(compareApiUrl, { headers });
+    if (response.ok) {
+      const data = (await response.json()) as CompareResponse;
+      totalCommits = data.total_commits ?? 0;
+      const commits = data.commits ?? [];
+
+      const categories: Record<string, string[]> = {
+        "渲染与着色器 (Rendering & Shaders)": [],
+        "UI 与文本排版 (UI & Text)": [],
+        "ECS 架构与场景系统 (ECS, Scenes & Observers)": [],
+        "平台与窗口输入 (Platform, Window & Input)": [],
+        "资源与音视频 (Assets & Audio)": [],
+        "通用修复与优化 (General Fixes & Optimizations)": [],
+      };
+
+      for (const c of commits) {
+        const rawMsg = c.commit.message.split(/\r?\n/)[0].trim();
+        if (!rawMsg || /^release bevy/i.test(rawMsg)) continue;
+
+        // Convert PR #12345 to Markdown link
+        const linkified = rawMsg.replace(
+          /#(\d+)/g,
+          "[#$1](https://github.com/bevyengine/bevy/pull/$1)",
+        );
+        const lower = rawMsg.toLowerCase();
+
+        if (
+          /render|shader|shadow|light|fog|ssao|mesh|batch|solari|irradiance|draw|2d flicker|color|wgsl|clearcoat/i.test(
+            lower,
+          )
+        ) {
+          categories["渲染与着色器 (Rendering & Shaders)"].push(linkified);
+        } else if (/ui|text|font|border radius|overlay|diagnostics|radio/i.test(lower)) {
+          categories["UI 与文本排版 (UI & Text)"].push(linkified);
+        } else if (/ecs|observer|subapp|entity|bsn|scene/i.test(lower)) {
+          categories["ECS 架构与场景系统 (ECS, Scenes & Observers)"].push(linkified);
+        } else if (/window|cursor|wayland|ios|wasm|input|osk|resolution/i.test(lower)) {
+          categories["平台与窗口输入 (Platform, Window & Input)"].push(linkified);
+        } else if (/audio|sound|mp4|asset|handletemplate/i.test(lower)) {
+          categories["资源与音视频 (Assets & Audio)"].push(linkified);
+        } else {
+          categories["通用修复与优化 (General Fixes & Optimizations)"].push(linkified);
+        }
+      }
+
+      const lines: string[] = [];
+      for (const [title, items] of Object.entries(categories)) {
+        if (items.length > 0) {
+          lines.push(`#### ${title}`);
+          for (const item of items) {
+            lines.push(`- ${item}`);
+          }
+          lines.push("");
+        }
+      }
+      internalChangesMarkdown = lines.join("\n").trim();
+    }
+  } catch {
+    // Gracefully handle network / rate limiting errors
+  }
+
+  return { releaseUrl, compareUrl, notesSummary, totalCommits, internalChangesMarkdown };
 }
 
 function updateRootCargoToml(
@@ -160,19 +246,25 @@ function writeOrUpdateChangelog(
   targetVersion: string,
   majorMinor: string,
   isPrerelease: boolean,
-  releaseInfo: { releaseUrl: string; compareUrl: string; notesSummary: string },
+  releaseInfo: ReleaseInfo,
   verificationStatus: string,
 ) {
   const today = new Date().toISOString().slice(0, 10);
   const versionTitle = `## [Bevy ${targetVersion}] - ${today}`;
 
-  let notesBlock = "";
+  let notesSection = "";
   if (releaseInfo.notesSummary) {
     const quoteLines = releaseInfo.notesSummary
       .split("\n")
-      .map((line) => `  > ${line}`)
+      .map((line) => `> ${line}`)
       .join("\n");
-    notesBlock = `- **上游发布说明**：\n${quoteLines}\n`;
+    notesSection = `\n### 上游版本核心说明\n${quoteLines}\n`;
+  }
+
+  let internalChangesSection = "";
+  if (releaseInfo.internalChangesMarkdown) {
+    const countText = releaseInfo.totalCommits > 0 ? ` (共 ${releaseInfo.totalCommits} 项变更)` : "";
+    internalChangesSection = `\n### Bevy 引擎内部更新详情${countText}\n${releaseInfo.internalChangesMarkdown}\n`;
   }
 
   const entryContent = `${versionTitle}
@@ -181,13 +273,13 @@ function writeOrUpdateChangelog(
 - **版本升级**：将底层 Bevy 引擎版本由 \`${currentVersion}\` 升级至 \`${targetVersion}\`。
 - **上游版本发布**：[Bevy v${targetVersion}](${releaseInfo.releaseUrl})
 - **代码对比与变更**：[\`v${currentVersion}...v${targetVersion}\`](${releaseInfo.compareUrl})
-${notesBlock}- **已同步更新的项目配置**：
+- **已同步更新的项目配置**：
   - \`Cargo.toml\`：\`bevy\` 依赖升级至 \`${targetVersion}\`（工作区 \`bevy_*\` 子模块依赖：\`${isPrerelease ? targetVersion : majorMinor}\`）
   - \`crates/runtime-cdylib/Cargo.toml\`：\`bevy\` 依赖升级至 \`${targetVersion}\`
   - \`examples/android-demo-host/runtime/Cargo.toml\`：\`bevy\` 依赖升级至 \`${targetVersion}\`
   - \`Cargo.lock\` 与 \`examples/android-demo-host/runtime/Cargo.lock\`：锁文件依赖版本同步锁定
 - **自动化验证**：${verificationStatus}
-`;
+${notesSection}${internalChangesSection}`;
 
   const header = `# 更新日志 (Changelog)
 
@@ -229,12 +321,27 @@ ${notesBlock}- **已同步更新的项目配置**：
   console.log(`Appended Bevy ${targetVersion} section to ${changelogPath}.`);
 }
 
+function inferPreviousVersion(targetVersion: string): string | undefined {
+  const cleanVersion = targetVersion.split("-")[0];
+  const parts = cleanVersion.split(".");
+  if (parts.length === 3) {
+    const major = parseInt(parts[0], 10);
+    const minor = parseInt(parts[1], 10);
+    const patch = parseInt(parts[2], 10);
+    if (!isNaN(patch) && patch > 0) {
+      return `${major}.${minor}.${patch - 1}`;
+    }
+  }
+  return undefined;
+}
+
 async function main() {
   const isDryRun = hasFlag("dry-run");
   const isForce = hasFlag("force");
   const skipCheck = hasFlag("no-check");
   const includePrerelease = hasFlag("include-prerelease");
   const requestedVersion = getOption("version");
+  const requestedFromVersion = getOption("from") ?? getOption("from-version");
 
   const rootCargoPath = join(root, "Cargo.toml");
   const cdylibCargoPath = join(root, "crates", "runtime-cdylib", "Cargo.toml");
@@ -256,6 +363,13 @@ async function main() {
   const targetVersion = requestedVersion ?? (await fetchLatestBevyVersion(includePrerelease));
   console.log(`Target Bevy runtime version:  ${targetVersion}`);
 
+  let baseVersion = currentVersion;
+  if (targetVersion === currentVersion) {
+    baseVersion = requestedFromVersion ?? inferPreviousVersion(targetVersion) ?? currentVersion;
+  } else if (requestedFromVersion) {
+    baseVersion = requestedFromVersion;
+  }
+
   if (targetVersion === currentVersion && !isForce) {
     console.log(`\nBevy runtime is already at the target version (${currentVersion}).`);
     console.log("To re-run update, lockfile sync, and changelog generation anyway, specify --force.");
@@ -267,11 +381,12 @@ async function main() {
   const majorMinor = semverParts.length >= 2 ? `${semverParts[0]}.${semverParts[1]}` : targetVersion;
 
   console.log(`\nPlanned updates:`);
+  console.log(`- Base (previous) version for diff: ${baseVersion}`);
   console.log(`- Root Cargo.toml: bevy -> ${targetVersion}, workspace dependencies -> ${isPrerelease ? targetVersion : majorMinor}`);
   console.log(`- crates/runtime-cdylib/Cargo.toml: bevy -> ${targetVersion}`);
   console.log(`- examples/android-demo-host/runtime/Cargo.toml: bevy -> ${targetVersion}`);
 
-  const releaseInfo = await fetchReleaseNotes(currentVersion, targetVersion);
+  const releaseInfo = await fetchReleaseNotes(baseVersion, targetVersion);
 
   if (isDryRun) {
     console.log("\n[DRY RUN] Would update Cargo manifests and lockfiles, and write to CHANGELOG.md.");
@@ -316,7 +431,7 @@ async function main() {
       console.error(`Check upstream migration notes at: ${releaseInfo.compareUrl}`);
       verificationStatus = `校验未通过：编译或测试失败，可能存在不兼容的重大变更，需要手动进行迁移。`;
       writeOrUpdateChangelog(
-        currentVersion,
+        baseVersion,
         targetVersion,
         majorMinor,
         isPrerelease,
@@ -329,7 +444,7 @@ async function main() {
 
   // 4. Update CHANGELOG.md
   writeOrUpdateChangelog(
-    currentVersion,
+    baseVersion,
     targetVersion,
     majorMinor,
     isPrerelease,
@@ -337,7 +452,7 @@ async function main() {
     verificationStatus,
   );
 
-  console.log(`\nSuccessfully updated Bevy runtime version: ${currentVersion} -> ${targetVersion}!`);
+  console.log(`\nSuccessfully updated Bevy runtime version: ${baseVersion} -> ${targetVersion}!`);
 }
 
 main().catch((err: unknown) => {
