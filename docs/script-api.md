@@ -27,6 +27,25 @@ as real reflected Bevy components and resources; there is no script-side ECS sna
 Entity ownership is derived from BMS `CurrentScriptAttachment`. Detaching or reloading a script
 removes only the entities owned by that attachment.
 
+### Reflected Gameplay Actors
+
+`scene_actor_set(id, kind, health, speed, radius)` adds or replaces a real reflected `ScriptActor`
+component on an existing owned entity. Kind must be nonempty and at most 64 bytes; numeric arguments
+must be finite and nonnegative, and radius must be positive. Invalid arguments or missing entities
+return `false` without changing the entity.
+
+`scene_actor(id)` returns its BMS `ReflectReference`, or nil/null when the entity or component does
+not exist. Fields are `kind`, `health`, `speed`, `radius`, `power`, `cooldown`, `lifetime`,
+`velocity_x`, and `velocity_z`; the last five default to zero. Lua uses normal field access;
+QuickJS/TypeScript uses `reference.get(name)` and `reference.set(name, value)`. Reflection writes
+follow the normal BMS type/access checks; gameplay must keep numeric values finite.
+
+`scene_actor_ids()` queries the real World and returns sorted IDs of actors owned by the current
+attachment. No actor list or component snapshot is retained outside Bevy. Movement, circle/segment
+collision rules and combat remain TypeScript gameplay; these APIs do not implement native physics.
+Both language adapters consume the same registry entries. They use portable Bevy types on all five
+targets; platform execution must still be verified separately.
+
 ## Retained UI
 
 Runeweave UI nodes are real Bevy `Node`, `Text`, `ImageNode`, and `Button` components. They use

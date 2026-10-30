@@ -1,0 +1,18 @@
+{
+  "name": "@runeweave/ember-arena",
+  "version": "0.1.0",
+  "author": "superwindcloud",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "esbuild modules/ember-arena/game/src/ember-arena.ts --bundle --format=iife --target=es2023 --outfile=modules/ember-arena/game/assets/ember-arena.js",
+    "watch": "esbuild modules/ember-arena/game/src/ember-arena.ts --bundle --format=iife --target=es2023 --outfile=modules/ember-arena/game/assets/ember-arena.js --watch=forever",
+    "check": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.scripts.json --noEmit",
+    "prepare:assets": "tsx scripts/prepare-assets.ts",
+    "test": "npm run check && npm run build && tsx --test scripts/smoke.test.ts"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "typescript": "7.0.2"
+  }
+}

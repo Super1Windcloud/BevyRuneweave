@@ -94,3 +94,8 @@ interface RuneweaveCallbacks {
   on_script_reloaded: () => void;
   on_update: (dt: number) => void;
 }
+
+/** ScriptActor is a real reflected Bevy component owned by this attachment. */
+declare function scene_actor_set(id: string, kind: string, health: number, speed: number, radius: number): boolean;
+declare function scene_actor(id: string): BmsReflectReference | null;
+declare function scene_actor_ids(): string[];

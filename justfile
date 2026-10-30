@@ -39,6 +39,14 @@ run-js:
 run-desktop-demo profile="":
     cargo run --manifest-path examples/desktop-demo-host/Cargo.toml --target-dir target {{profile}}
 
+# Build the TypeScript project and run the Ember Arena acceptance game.
+run-ember-arena profile="":
+    cargo run {{profile}} -p ember-arena-ts
+
+# Type-check, bundle, and simulate Ember Arena gameplay contracts.
+test-ember-arena:
+    npm --prefix projects/ember-arena test
+
 # Watch, compile, and run the TypeScript game with QuickJS.
 run-ts:
     {{ if os_family() == "windows" { "just run-ts-windows" } else { "just run-ts-unix" } }}

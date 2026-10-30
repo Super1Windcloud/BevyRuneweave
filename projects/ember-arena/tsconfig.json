@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "preserve",
+    "rootDir": "modules/ember-arena",
+    "outDir": "modules/ember-arena/game/assets",
+    "strict": true,
+    "noEmit": true,
+    "noEmitOnError": true,
+    "removeComments": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "modules/ember-arena/game/src/**/*.ts",
+    "modules/ember-arena/api/**/*.ts",
+    "modules/ember-arena/api/**/*.d.ts"
+  ]
+}

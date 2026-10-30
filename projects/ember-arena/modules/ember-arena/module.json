@@ -1,0 +1,8 @@
+{
+    "schemaVersion": 1,
+    "name": "ember-arena",
+    "language": "ts",
+    "sourceDirectory": "game/src",
+    "assetDirectory": "game/assets",
+    "scriptEntry": "ember-arena.js"
+}

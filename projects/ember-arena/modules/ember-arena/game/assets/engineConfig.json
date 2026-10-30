@@ -1,0 +1,15 @@
+{
+    "schemaVersion": 1,
+    "name": "ember-arena",
+    "version": "0.1.0",
+    "appName": "Ember Arena",
+    "icon": "sprites/settings-icon.png",
+    "script": {
+        "language": "typescript",
+        "entry": "ember-arena.js"
+    },
+    "metadata": {
+        "sourceLanguage": "typescript",
+        "runtime": "quickjs"
+    }
+}

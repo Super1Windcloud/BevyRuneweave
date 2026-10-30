@@ -1,5 +1,6 @@
 //! Script-facing Runeweave APIs registered through BMS.
 
+mod actor;
 mod input;
 mod network;
 #[cfg(test)]
@@ -19,6 +20,7 @@ use bevy_mod_scripting::{
     script::ScriptAttachment,
 };
 
+use actor::{ScriptActor, scene_actor, scene_actor_ids, scene_actor_set};
 use input::{
     input_key_just_pressed, input_key_just_released, input_key_pressed, input_primary_pointer,
     input_primary_touch,
@@ -591,6 +593,7 @@ pub(crate) struct RuneweaveScriptApiPlugin;
 impl Plugin for RuneweaveScriptApiPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<ScriptEntityId>()
+            .register_type::<ScriptActor>()
             .register_type::<ScriptUiNode>()
             .register_type::<Transform>()
             .register_type::<Sprite>()
@@ -616,6 +619,9 @@ impl Plugin for RuneweaveScriptApiPlugin {
         let network = app.world().resource::<ScriptNetwork>().clone();
         NamespaceBuilder::<GlobalNamespace>::new_unregistered(app.world_mut())
             .register("scene_spawn", scene_spawn)
+            .register("scene_actor_set", scene_actor_set)
+            .register("scene_actor", scene_actor)
+            .register("scene_actor_ids", scene_actor_ids)
             .register("scene_set_sprite", scene_set_sprite)
             .register("scene_set_model", scene_set_model)
             .register("scene_set_transform_3d", scene_set_transform_3d)
