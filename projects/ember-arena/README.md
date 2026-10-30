@@ -4,6 +4,8 @@ A small TypeScript survival game created with `just create-game ember-arena ts`.
 One room, three enemy waves, a final warden, automatic attacks, collectible crystals,
 three upgrade choices, pause, restart, result screens, and an in-game runtime check page.
 Characters use low-poly GLB models and a fixed orthographic 3D camera; menus use retained Bevy UI.
+The game also includes persistent records/settings, seeded encounters, a warden health bar,
+hit feedback and optional reduced visual effects.
 
 ## Run
 
@@ -28,6 +30,26 @@ Desktop and mobile: drag to move. Attacks aim automatically at the nearest enemy
 crystals for upgrades. Red bolts and enemy contact cause damage. Pillars block movement and bolts.
 After 40, 85, and 130 seconds, the encounter advances; time stops while paused or choosing an upgrade.
 Defeat the warden to win. Returning to the launcher uses the existing portable exit API.
+
+## Progress and settings
+
+Open **SETTINGS & PROGRESS** from the menu or pause screen. Drag sensitivity, control hints,
+reduced effects and the next run's seed are saved through the BMS storage registry. The seed
+resets the encounter random generator at run start, so repeated runs with the same seed reproduce
+spawn positions and enemy choices for the same simulation steps. Changing it during a paused run
+affects the next run. Compact controls and paginated runtime checks adapt to short landscape windows.
+
+Completed wins/losses record the highest score, finished-run count, wins and fastest victory once.
+Abandoned runs are not counted. The current combat encounter is not serialized for resume.
+Data is written to the project's `profile` key in the platform-private save directory, separately
+from game assets. No files are written every frame. The game continues if the service is unavailable
+or a write fails; settings show the error and offer retry. An incompatible/corrupt existing save is
+preserved without automatic overwrite. Reset requires a second confirmation and affects only this
+game's saved progress/settings, leaving the current encounter intact.
+
+The warden's health bar and casting warning clarify the final encounter. Hits show damage feedback
+and short-lived impact models. **REDUCED FX** suppresses impact models and vitality color changes;
+damage information remains visible.
 
 ## Assets
 
@@ -67,7 +89,8 @@ Circle and swept-segment collision is gameplay code, not an integrated native ph
 | GLB and animation | Offline tests validate GLB headers, embedded textures and selected clip; request acceptance alone does not prove rendered animation. |
 | HTTP | Optional live GET/POST check; simulation doubles are not real-backend evidence. |
 | Host and reload | Native exit remains user-triggered. Callback reset is tested; full host re-entry and native reload require platform runs. |
-| Audio, save data, physics | Not implemented as script services; explicitly marked as API gaps. |
+| Persistent progress/settings | Structured BMS storage results; tests cover reopening, namespace isolation, invalid/oversized values, corruption, I/O failures, retries and confirmed reset. |
+| Audio, native physics | Not implemented as script services; explicitly marked as API gaps. |
 | Dynamic components / script systems | Optional BMS capabilities are not enabled or exercised by this game. |
 | Lua gameplay | Actor API parity is tested; the full game is TypeScript only. |
 | Platforms | Shared APIs use portable Bevy/BMS types; Windows, Linux, Android and iOS execution must be verified separately. |
@@ -78,16 +101,18 @@ The game is a foundation for acceptance coverage, not proof of every possible ga
 
 ### Verified on 2026-10-30
 
-- `just test-ember-arena`: 7 tests passed, including a complete simulated boss victory.
-- `cargo test --locked --offline -p bevy-runeweave --lib`: 30 passed, 1 performance test ignored.
+- `just test-ember-arena`: 13 tests passed, including a complete simulated boss victory, persistent settings, corrupt-save preservation, save retry, deterministic encounters and effect cleanup.
+- `cargo test --locked --offline -p bevy-runeweave --lib`: 36 passed, 1 performance test ignored.
   Includes real Lua/QuickJS actor mutation, foreign-owner rejection, and actual game-bundle
-  execution through QuickJS with movement, UI checks and callback reset.
+  execution through QuickJS with movement, paginated UI checks and callback reset. Six storage
+  tests cover real filesystem round trips, project isolation, late callbacks during a game switch,
+  traversal/size limits, bad data, failed replacement, and equivalent Lua/QuickJS results.
 - `npm run typecheck:scripts`, the original TypeScript project's check, Rust formatting and
   `git diff --check` passed.
-- `just run-ember-arena`: macOS Debug executable built and started on Metal; the native menu
-  and 3D room rendered. A screenshot and startup log are under
-  `dist/asset-downloads/ember-arena/menu.png` and `native-smoke.log`.
+- `just run-ember-arena`: the updated macOS Debug executable built and started on Metal;
+  the native combat scene rendered with the mage, enemies, crystals and HUD. The screenshot and
+  startup log are `dist/asset-downloads/ember-arena/gameplay-v2.png` and `native-v2.log`.
 - Native combat input was not automated because macOS event-posting access is unavailable.
-  Windows, Linux, Android, iOS, Release mode, full native reload, audio, persistent saves,
+  Windows, Linux, Android, iOS, Release mode, full native reload, audio, native save durability,
   native physics, live external HTTP, performance and accessibility remain unverified or unimplemented
   as specified above. No other-platform build success is implied.

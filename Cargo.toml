@@ -73,6 +73,7 @@ nonmax = { version = "0.5", default-features = false, features = ["std"] }
 profiling = { version = "1.0", default-features = false, features = ["procmacros"] }
 serde = { version = "1.0", default-features = false }
 serde_json = "1"
+tempfile = "3.27"
 reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "rustls"] }
 dot-writer = { version = "0.1.4", default-features = false }
 parking_lot = { version = "0.12.1", default-features = false }
@@ -138,6 +139,7 @@ bevy = { version = "0.19.1", default-features = false, features = [
 ] }
 bevy_mod_scripting = { path = "bevy_mod_scripting", default-features = false }
 reqwest.workspace = true
+tempfile.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 

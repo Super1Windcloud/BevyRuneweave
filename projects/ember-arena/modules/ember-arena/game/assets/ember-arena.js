@@ -11,6 +11,13 @@
   };
   var clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   var distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+  function seededRandom(seed) {
+    let value = seed >>> 0;
+    return () => {
+      value = Math.imul(value, 1664525) + 1013904223 >>> 0;
+      return value / 4294967296;
+    };
+  }
   function direction(a, b) {
     const length = distance(a, b);
     return length < 1e-4 ? { x: 0, z: 0 } : { x: (b.x - a.x) / length, z: (b.z - a.z) / length };
@@ -84,6 +91,42 @@
     if (!scene_actor_set(id, type, spec.health, spec.speed, spec.radius)) throw new Error(`Could not create actor: ${id}`);
     scene_play_animation(id, `models/${spec.model}.glb`, true);
     change(id, "cooldown", 1.5);
+  }
+
+  // modules/ember-arena/game/src/profile.ts
+  function defaultProfile() {
+    return {
+      schemaVersion: 1,
+      bestScore: 0,
+      runs: 0,
+      wins: 0,
+      bestTime: 0,
+      seed: 1337,
+      sensitivity: 1,
+      showHints: true,
+      reducedMotion: false
+    };
+  }
+  function parseProfile(raw) {
+    const value = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid profile");
+    const data = value;
+    if (data.schemaVersion !== 1) throw new Error("unsupported save version");
+    for (const key of ["bestScore", "runs", "wins", "seed"]) {
+      if (!Number.isSafeInteger(data[key]) || data[key] < 0) throw new Error(`invalid ${key}`);
+    }
+    if (data.wins > data.runs || data.seed > 4294967295 || typeof data.bestTime !== "number" || !Number.isFinite(data.bestTime) || data.bestTime < 0 || ![0.75, 1, 1.25, 1.5].includes(data.sensitivity) || typeof data.showHints !== "boolean" || typeof data.reducedMotion !== "boolean") throw new Error("invalid settings");
+    return {
+      schemaVersion: 1,
+      bestScore: data.bestScore,
+      runs: data.runs,
+      wins: data.wins,
+      bestTime: data.bestTime,
+      seed: data.seed,
+      sensitivity: data.sensitivity,
+      showHints: data.showHints,
+      reducedMotion: data.reducedMotion
+    };
   }
 
   // modules/ember-arena/api/ui.ts
@@ -164,17 +207,67 @@
   var networkRequests = [];
   var networkStatus = "HTTP: NOT_RUN (use the network check button)";
   var checks = [];
+  var profile = defaultProfile();
+  var saveNotice = "";
+  var saveBlocked = false;
+  var resetPending = false;
+  var settingsReturn = "menu";
+  var runRecorded = false;
+  var random = seededRandom(profile.seed);
+  var hurtTimer = 0;
+  var lastDamage = 0;
+  var checkPage = 0;
+  var compactUi = () => window_metrics().height > 0 && window_metrics().height < 650;
   var uid = (prefix) => `${prefix}_${nextId++}`;
   var health = () => Math.max(0, field("player", "health"));
   var targetExperience = () => 4 + level * 3;
+  function loadProfile() {
+    saveBlocked = false;
+    saveNotice = "";
+    profile = defaultProfile();
+    const result = storage_read("profile");
+    if (result.state === "error") {
+      saveNotice = `Save unavailable (${result.error}). Playing in this session is safe.`;
+      saveBlocked = result.error === "invalid_data" || result.error === "too_large";
+    } else if (result.state === "ok") {
+      try {
+        profile = parseProfile(result.value);
+      } catch {
+        saveBlocked = true;
+        saveNotice = "Existing save is incompatible. It will not be overwritten.";
+      }
+    }
+  }
+  function persistProfile() {
+    if (saveBlocked) return;
+    const result = storage_write("profile", JSON.stringify(profile));
+    saveNotice = result.state === "ok" ? "Progress and settings saved." : `Save failed (${result.error}). You can retry in settings.`;
+  }
+  function openSettings() {
+    settingsReturn = phase;
+    resetPending = false;
+    setPhase("settings");
+  }
+  function resetProfile() {
+    const result = storage_remove("profile");
+    if (result.state === "error") {
+      saveNotice = `Reset failed (${result.error}). Existing save retained.`;
+    } else {
+      profile = defaultProfile();
+      saveBlocked = false;
+      saveNotice = "Saved progress reset. Your current run is unchanged.";
+    }
+    resetPending = false;
+    drawUi();
+  }
   function action(id, label, callback, primary = false) {
     return button(id, label, {
       onClick: callback,
-      fontSize: 16,
+      fontSize: compactUi() ? 12 : 16,
       color: primary ? [0.06, 0.08, 0.08, 1] : [0.9, 0.95, 0.95, 1],
       style: {
         width: "100%",
-        height: 48,
+        height: compactUi() ? 36 : 48,
         borderRadius: 8,
         background: primary ? amber : [0.1, 0.17, 0.19, 1]
       }
@@ -195,21 +288,26 @@
     return column("panel", {
       width: "90%",
       maxWidth: 470,
-      padding: 24,
-      gap: 12,
+      padding: compactUi() ? 12 : 24,
+      gap: compactUi() ? 6 : 12,
       background: ink,
       borderRadius: 16
     }, [
       text("panel_kicker", "RUNEWEAVE / EMBER ARENA", { fontSize: 12, color: amber }),
-      text("panel_title", title, { fontSize: 32 }),
-      text("panel_subtitle", subtitle, { fontSize: 14, color: muted }),
+      text("panel_title", title, { fontSize: compactUi() ? 22 : 32 }),
+      text("panel_subtitle", subtitle, {
+        fontSize: compactUi() ? 11 : 14,
+        color: muted,
+        style: { display: compactUi() ? "none" : "flex" }
+      }),
       ...content
     ]);
   }
   function drawUi() {
     const pointer = input_primary_pointer();
     const safe = window_safe_area();
-    viewport = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}`;
+    const metrics = window_metrics();
+    viewport = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
     const children = [];
     if (phase === "playing") {
       children.push(column("hud", { width: "100%", padding: 16, gap: 8 }, [
@@ -228,12 +326,19 @@
         node("health_track", { width: "100%", height: 4, background: [0.1, 0.2, 0.2, 0.7] }, [
           node("health_fill", { width: `${clamp(health(), 0, 100)}%`, height: 4, background: teal })
         ]),
-        text("hud_info", statusLine(), { fontSize: 12, color: muted })
+        text("hud_info", statusLine(), { fontSize: 12, color: muted }),
+        column("boss_panel", { width: "100%", gap: 4, display: scene_actor("warden") ? "flex" : "none" }, [
+          text("boss_label", "THE WARDEN", { fontSize: 14, color: amber }),
+          node("boss_track", { width: "100%", height: 5, background: ink }, [
+            node("boss_fill", { width: "100%", height: 5, background: [0.95, 0.25, 0.2, 1] })
+          ])
+        ]),
+        text("combat_notice", "", { fontSize: 16, color: amber })
       ]));
       children.push(text("hint", "WASD / ARROWS OR DRAG  |  AUTO FIRE  |  ESC TO PAUSE", {
         fontSize: 11,
         color: muted,
-        style: { position: "absolute", bottom: 12, left: 16, right: 16 }
+        style: { position: "absolute", bottom: 12, left: 16, right: 16, display: profile.showHints ? "flex" : "none" }
       }));
     } else if (phase === "menu") {
       children.push(panel("Guard the last ember.", "A tiny survival adventure in one room.\nThree waves. One warden. Make every upgrade count.", [
@@ -242,6 +347,8 @@
           text("menu_controls", "Move with WASD, arrows or a drag.\nYour mage fires at the nearest enemy.", { fontSize: 14, color: muted })
         ]),
         action("start", "ENTER THE ARENA", startRun, true),
+        text("saved_stats", `BEST ${profile.bestScore}  /  WINS ${profile.wins} / ${profile.runs}  /  SEED ${profile.seed}`, { fontSize: 12, color: teal }),
+        action("settings", "SETTINGS & PROGRESS", openSettings),
         action("checks", "RUNTIME CHECKS", openChecks),
         action("exit", "RETURN TO LAUNCHER", () => {
           app_request_exit();
@@ -251,12 +358,65 @@
     } else if (phase === "paused") {
       children.push(panel("Take a breath.", "The arena is paused. Your run is safe here.", [
         action("resume", "KEEP GOING", () => setPhase("playing"), true),
+        action("settings", "SETTINGS & PROGRESS", openSettings),
         action("checks", "RUNTIME CHECKS", openChecks),
         action("restart", "RESTART RUN", startRun),
         action("home", "MAIN MENU", loadMenu),
         action("exit", "RETURN TO LAUNCHER", () => {
           app_request_exit();
         })
+      ]));
+    } else if (phase === "settings") {
+      const changeSetting = (change2) => {
+        change2();
+        persistProfile();
+        drawUi();
+      };
+      const pair = (id, first, second) => row(id, { width: "100%", justifyContent: "space-between" }, [
+        column(`${id}_left`, { width: "49%" }, [first]),
+        column(`${id}_right`, { width: "49%" }, [second])
+      ]);
+      children.push(panel("Make it your arena.", `BEST ${profile.bestScore} / ${profile.wins} WINS / ${profile.runs} FINISHED RUNS`, [
+        pair("settings_input", action("sensitivity", `DRAG  /  ${profile.sensitivity.toFixed(2)}x`, () => changeSetting(() => {
+          const values = [0.75, 1, 1.25, 1.5];
+          profile.sensitivity = values[(values.indexOf(profile.sensitivity) + 1) % values.length];
+        })), action("hints", `HINTS  /  ${profile.showHints ? "ON" : "OFF"}`, () => changeSetting(() => {
+          profile.showHints = !profile.showHints;
+        }))),
+        pair(
+          "settings_effects",
+          action("motion", `REDUCED FX  /  ${profile.reducedMotion ? "ON" : "OFF"}`, () => changeSetting(() => {
+            profile.reducedMotion = !profile.reducedMotion;
+          })),
+          action("seed", `SEED  /  ${profile.seed}`, () => changeSetting(() => {
+            profile.seed = profile.seed + 1 >>> 0;
+          }))
+        ),
+        text("save_notice", saveNotice || "Your settings and finished-run records are saved locally.", { fontSize: 12, color: muted }),
+        ...resetPending ? [
+          text("reset_warning", "Clear this game's saved records and settings?", { fontSize: 13, color: amber }),
+          pair(
+            "reset_actions",
+            action("confirm_reset", "CONFIRM RESET", resetProfile),
+            action("cancel_reset", "KEEP MY DATA", () => {
+              resetPending = false;
+              drawUi();
+            })
+          )
+        ] : [
+          pair(
+            "save_actions",
+            action("retry_save", "RETRY SAVE", () => {
+              persistProfile();
+              drawUi();
+            }),
+            action("reset_save", "RESET SAVED PROGRESS", () => {
+              resetPending = true;
+              drawUi();
+            })
+          )
+        ],
+        action("settings_back", "BACK", () => setPhase(settingsReturn), true)
       ]));
     } else if (phase === "upgrade") {
       children.push(panel("A spark of power.", `LEVEL ${level} / Choose one upgrade to continue.`, [
@@ -270,6 +430,8 @@
         `${score} POINTS / LEVEL ${level} / ${Math.floor(elapsed)} SECONDS`,
         [
           text("result_note", phase === "won" ? "The warden has fallen. The room is yours." : "Keep moving, collect crystals, and watch the red bolts.", { fontSize: 14, color: muted }),
+          text("result_record", `BEST ${profile.bestScore}  /  WINS ${profile.wins} / ${profile.runs}`, { fontSize: 14, color: teal }),
+          text("result_save", saveNotice, { fontSize: 12, color: muted }),
           action("restart", "PLAY AGAIN", startRun, true),
           action("home", "MAIN MENU", loadMenu),
           action("exit", "RETURN TO LAUNCHER", () => {
@@ -278,8 +440,15 @@
         ]
       ));
     } else {
+      const pageSize = compactUi() ? 3 : 6;
+      const pages = Math.max(1, Math.ceil(checks.length / pageSize));
+      checkPage = Math.min(checkPage, pages - 1);
       children.push(panel("Runtime checks", "Contract checks run in the live script context.", [
-        ...checks.map((line, index) => text(`check_${index}`, line, { fontSize: 12, color: line.startsWith("FAIL") ? [1, 0.3, 0.3, 1] : muted })),
+        ...checks.slice(checkPage * pageSize, (checkPage + 1) * pageSize).map((line, index) => text(`check_${index}`, line, { fontSize: compactUi() ? 11 : 12, color: line.startsWith("FAIL") ? [1, 0.3, 0.3, 1] : muted })),
+        action("check_page", `NEXT PAGE  /  ${checkPage + 1} OF ${pages}`, () => {
+          checkPage = (checkPage + 1) % pages;
+          drawUi();
+        }),
         text("network_status", networkStatus, { fontSize: 12, color: muted }),
         action("network", "CHECK HTTP (PUBLIC ECHO SERVICE)", checkNetwork),
         action("back", "BACK", () => setPhase(returnPhase), true)
@@ -299,6 +468,16 @@
     game_state_set(score, Math.ceil(health()), phase.toUpperCase());
   }
   function setPhase(next) {
+    if ((next === "won" || next === "lost") && !runRecorded) {
+      runRecorded = true;
+      profile.runs++;
+      profile.bestScore = Math.max(profile.bestScore, score);
+      if (next === "won") {
+        profile.wins++;
+        profile.bestTime = profile.bestTime > 0 ? Math.min(profile.bestTime, elapsed) : elapsed;
+      }
+      persistProfile();
+    }
     phase = next;
     lastPointer.pressed = false;
     publish();
@@ -332,6 +511,9 @@
     damage = 16;
     fireDelay = 0.48;
     bossSpawned = false;
+    runRecorded = false;
+    hurtTimer = 0;
+    random = seededRandom(profile.seed);
     room();
     setPhase("playing");
   }
@@ -346,9 +528,9 @@
   }
   function spawnEnemy() {
     const types = wave === 0 ? ["chaser"] : wave === 1 ? ["chaser", "ranger"] : ["chaser", "ranger", "charger"];
-    const angle = Math.random() * Math.PI * 2;
+    const angle = random() * Math.PI * 2;
     const point = constrain({ x: Math.cos(angle) * (halfWidth - 0.5), z: Math.sin(angle) * 5 }, 0.45, halfWidth);
-    enemy(uid("enemy"), types[Math.floor(Math.random() * types.length)], point);
+    enemy(uid("enemy"), types[Math.floor(random() * types.length)], point);
   }
   function projectile(start, target, hostile, power, angleOffset = 0) {
     const id = uid(hostile ? "hostile" : "ember");
@@ -366,10 +548,30 @@
     model(id, "crystal", point, 1, 0.35);
     scene_actor_set(id, "crystal", 1, 0, 0.2);
   }
+  function impact(point) {
+    if (profile.reducedMotion) return;
+    const id = uid("impact");
+    model(id, "ember", point, 1.7, 0.7);
+    scene_actor_set(id, "effect", 1, 0, 0.1);
+  }
+  function effectsStep(dt, ids) {
+    for (const id of ids) {
+      if (!scene_actor(id) || kind(id) !== "effect") continue;
+      const age = field(id, "lifetime") + dt;
+      if (age > 0.18) scene_despawn(id);
+      else {
+        change(id, "lifetime", age);
+        const scale = scene_transform(id).get("scale");
+        for (const axis of ["x", "y", "z"]) scale.set(axis, Math.max(0.1, 1.7 * (1 - age / 0.18)));
+      }
+    }
+  }
   function hurtPlayer(power) {
     if (field("player", "cooldown") > 0) return;
     change("player", "health", Math.max(0, health() - power));
     change("player", "cooldown", 0.65);
+    lastDamage = power;
+    hurtTimer = 0.65;
     if (health() <= 0) setPhase("lost");
   }
   function playerStep(dt, pointer) {
@@ -381,8 +583,8 @@
     let dx = x / normal * speed * dt;
     let dz = z / normal * speed * dt;
     if (pointer.pressed && lastPointer.pressed && pointer.y < window_safe_area().top - 90) {
-      dx += (pointer.x - lastPointer.x) * 22 / 800;
-      dz -= (pointer.y - lastPointer.y) * 22 / 800 / 0.7474;
+      dx += (pointer.x - lastPointer.x) * 22 / 800 * profile.sensitivity;
+      dz -= (pointer.y - lastPointer.y) * 22 / 800 / 0.7474 * profile.sensitivity;
     }
     const length = Math.hypot(dx, dz);
     const factor = length > speed * dt * 2 ? speed * dt * 2 / length : 1;
@@ -439,6 +641,7 @@
         for (const target of targets) {
           if (!scene_actor(target) || !segmentHits(current, next, position(target), field(target, "radius") + 0.16)) continue;
           const hp = field(target, "health") - field(id, "power");
+          impact(position(target));
           change(target, "health", hp);
           if (hp <= 0) {
             const type2 = kind(target);
@@ -485,6 +688,7 @@
   function openChecks() {
     returnPhase = phase;
     checks = [];
+    checkPage = 0;
     const check = (name, run) => {
       try {
         checks.push(`${run() ? "PASS" : "FAIL"}  ${name}`);
@@ -522,11 +726,20 @@
       input_key_just_pressed("KeyW");
       input_key_just_released("KeyW");
       input_primary_touch();
-      return window_safe_area().width > 0 && input_primary_pointer().viewportHeight > 0;
+      return window_safe_area().width > 0 && input_primary_pointer().viewportHeight > 0 && window_metrics().width > 0;
     });
     check("Unknown HTTP request state", () => http_poll(2147483647).state === "unknown");
+    const storage = storage_read("_acceptance_probe");
+    if (storage.state === "error" && storage.error === "unavailable") checks.push("NOT_RUN  Persistent storage (no private data directory)");
+    else check("Persistent write / read / remove", () => {
+      if (storage.state !== "missing") return false;
+      const written = storage_write("_acceptance_probe", "ember-arena-probe");
+      const read = storage_read("_acceptance_probe");
+      const removed = storage_remove("_acceptance_probe");
+      return written.state === "ok" && read.state === "ok" && read.value === "ember-arena-probe" && removed.state === "ok";
+    });
     checks.push("REQUESTED  GLB models + walking animation (visual check)");
-    checks.push("NOT_RUN  Audio / save / native physics: API gaps");
+    checks.push("NOT_RUN  Audio / native physics: API gaps");
     checks.push("NOT_RUN  Lua gameplay / other platforms / hot reload");
     setPhase("checks");
   }
@@ -554,10 +767,12 @@ ${status}`;
   callbacks.on_script_loaded = () => {
     window_set_size(1280, 800);
     networkRequests = [];
+    loadProfile();
     loadMenu();
   };
   callbacks.on_script_reloaded = () => {
     networkRequests = [];
+    loadProfile();
     loadMenu();
   };
   callbacks.on_update = (delta) => {
@@ -565,7 +780,8 @@ ${status}`;
     const pointer = input_primary_pointer();
     const safe = window_safe_area();
     halfWidth = clamp(Math.min(safe.right, -safe.left) / 800 * 22 - 0.4, 2.8, 8);
-    const signature = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}`;
+    const metrics = window_metrics();
+    const signature = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
     if (viewport !== signature) {
       viewport = signature;
       drawUi();
@@ -578,6 +794,7 @@ ${status}`;
       if (phase === "playing") setPhase("paused");
       else if (phase === "paused") setPhase("playing");
       else if (phase === "checks") setPhase(returnPhase);
+      else if (phase === "settings") setPhase(settingsReturn);
       return;
     }
     if (phase === "menu" && input_key_just_pressed("Space")) {
@@ -586,6 +803,7 @@ ${status}`;
     }
     if (phase !== "playing") return;
     elapsed += dt;
+    hurtTimer = Math.max(0, hurtTimer - dt);
     const nextWave = waveAt(elapsed);
     if (nextWave !== wave) {
       wave = nextWave;
@@ -621,15 +839,26 @@ ${status}`;
     if (phase !== "playing") return;
     crystalsStep(dt, ids);
     if (phase !== "playing") return;
+    effectsStep(dt, ids);
     publish();
     uiTimer += dt;
     if (uiTimer > 0.15) {
       uiTimer = 0;
-      ui_set_text("hud_health", `VITALITY  ${Math.ceil(health())}`, 16, ...teal);
+      const hurtColor = hurtTimer > 0 && !profile.reducedMotion ? amber : teal;
+      const [red, green, blue, alpha] = hurtColor;
+      ui_set_text("hud_health", `VITALITY  ${Math.ceil(health())}`, 16, red, green, blue, alpha);
       ui_set_text("hud_score", `LV ${level}  /  ${score} POINTS`, 12, ...muted);
       ui_set_text("hud_wave", wave < 3 ? `WAVE ${wave + 1} / 3` : "THE WARDEN", 16, ...amber);
       ui_set_text("hud_info", statusLine(), 12, ...muted);
       ui_set_style("health_fill", JSON.stringify({ width: `${clamp(health(), 0, 100)}%` }));
+      const boss = scene_actor("warden");
+      ui_set_style("boss_panel", JSON.stringify({ display: boss ? "flex" : "none" }));
+      const casting = boss && field("warden", "cooldown") <= 0.5;
+      ui_set_text("combat_notice", hurtTimer > 0 ? `HIT  -${lastDamage}` : casting ? "WARDEN IS CASTING  /  KEEP MOVING" : "", 16, ...amber);
+      if (boss) {
+        ui_set_text("boss_label", `THE WARDEN  ${Math.max(0, Math.ceil(field("warden", "health")))} / ${enemySpecs.boss.health}`, 14, ...amber);
+        ui_set_style("boss_fill", JSON.stringify({ width: `${clamp(field("warden", "health") / enemySpecs.boss.health * 100, 0, 100)}%` }));
+      }
     }
   };
 })();

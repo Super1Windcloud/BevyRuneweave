@@ -5,6 +5,7 @@ mod input;
 mod network;
 #[cfg(test)]
 mod perf_baseline;
+pub(crate) mod storage;
 mod ui;
 
 use std::path::{Component as PathComponent, Path};
@@ -23,9 +24,12 @@ use bevy_mod_scripting::{
 use actor::{ScriptActor, scene_actor, scene_actor_ids, scene_actor_set};
 use input::{
     input_key_just_pressed, input_key_just_released, input_key_pressed, input_primary_pointer,
-    input_primary_touch,
+    input_primary_touch, window_metrics,
 };
 use network::ScriptNetwork;
+use storage::{
+    ScriptStorage, clear_detached_storage_bindings, storage_read, storage_remove, storage_write,
+};
 use ui::{
     ScriptUiNode, ui_button_just_pressed, ui_clear, ui_despawn, ui_set_image, ui_set_style,
     ui_set_text, ui_spawn,
@@ -609,10 +613,12 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register_type::<ScriptGameState>()
             .init_resource::<ScriptNetwork>()
             .init_resource::<ScriptGameState>()
+            .init_resource::<ScriptStorage>()
             .add_systems(
                 Update,
                 (
                     clear_detached_script_entities,
+                    clear_detached_storage_bindings,
                     bind_pending_script_animations,
                 ),
             );
@@ -620,6 +626,9 @@ impl Plugin for RuneweaveScriptApiPlugin {
         let network = app.world().resource::<ScriptNetwork>().clone();
         NamespaceBuilder::<GlobalNamespace>::new_unregistered(app.world_mut())
             .register("scene_spawn", scene_spawn)
+            .register("storage_read", storage_read)
+            .register("storage_write", storage_write)
+            .register("storage_remove", storage_remove)
             .register("scene_actor_set", scene_actor_set)
             .register("scene_actor", scene_actor)
             .register("scene_actor_ids", scene_actor_ids)
@@ -644,6 +653,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("app_request_exit", app_request_exit)
             .register("window_set_size", window_set_size)
             .register("window_safe_area", window_safe_area)
+            .register("window_metrics", window_metrics)
             .register("input_key_pressed", input_key_pressed)
             .register("input_key_just_pressed", input_key_just_pressed)
             .register("input_key_just_released", input_key_just_released)

@@ -3,7 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import { createContext, runInContext } from "node:vm";
-import { constrain, distance, pillars, segmentHits, waveAt } from "../modules/ember-arena/game/src/rules.js";
+import { constrain, distance, pillars, seededRandom, segmentHits, waveAt } from "../modules/ember-arena/game/src/rules.js";
+import { defaultProfile, parseProfile } from "../modules/ember-arena/game/src/profile.js";
 
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
 type RecordValue = { [key: string]: unknown };
@@ -20,7 +21,7 @@ class Reference {
   }
   set(key: string, value: unknown): void { this.value[key] = value; }
 }
-function harness(width = 1280, height = 800, mobile = false) {
+function harness(width = 1280, height = 800, mobile = false, saves = new Map<string, string>()) {
   const entities = new Map<string, Entity>();
   const ui = new Map<string, Ui>();
   const pressed = new Set<string>();
@@ -28,7 +29,8 @@ function harness(width = 1280, height = 800, mobile = false) {
   const clicks = new Set<string>();
   let state = { score: 0, lives: 0, message: "" };
   let exitRequested = false;
-  let pointer = { pressed: false, justPressed: false, x: 0, y: 0, viewportWidth: width, viewportHeight: height };
+  let storageFailure = "";
+  let pointer = { pressed: false, justPressed: false, x: 0, y: 0, viewportWidth: width / height * 800, viewportHeight: 800 };
   const despawnUi = (id: string): boolean => {
     if (!ui.has(id)) return false;
     for (const [child, element] of [...ui]) if (element.parent === id) despawnUi(child);
@@ -36,6 +38,14 @@ function harness(width = 1280, height = 800, mobile = false) {
   };
   const context = createContext({
     console,
+    storage_read: (key: string) => storageFailure ? { state: "error", error: storageFailure }
+      : saves.has(key) ? { state: "ok", value: saves.get(key) } : { state: "missing" },
+    storage_write: (key: string, value: string) => {
+      if (storageFailure) return { state: "error", error: storageFailure };
+      saves.set(key, value); return { state: "ok" };
+    },
+    storage_remove: (key: string) => storageFailure ? { state: "error", error: storageFailure }
+      : { state: saves.delete(key) ? "ok" : "missing" },
     scene_clear: () => entities.clear(),
     scene_spawn: (id: string, x: number, y: number, z: number) => {
       if (![x, y, z].every(Number.isFinite)) return false;
@@ -90,8 +100,9 @@ function harness(width = 1280, height = 800, mobile = false) {
     input_key_just_released: () => false,
     input_primary_touch: () => ({ pressed: false, justPressed: false, x: 0, y: 0, deltaX: 0, deltaY: 0 }),
     input_primary_pointer: () => pointer,
-    window_safe_area: () => ({ left: -width / 2, right: width / 2, bottom: -height / 2, top: height / 2,
-      width: width - (mobile ? 20 : 0), height: height - (mobile ? 40 : 0),
+    window_metrics: () => ({ width, height }),
+    window_safe_area: () => ({ left: -pointer.viewportWidth / 2, right: pointer.viewportWidth / 2, bottom: -400, top: 400,
+      width: pointer.viewportWidth - (mobile ? 20 : 0), height: 800 - (mobile ? 40 : 0),
       leftInset: mobile ? 10 : 0, rightInset: mobile ? 10 : 0, topInset: mobile ? 20 : 0, bottomInset: mobile ? 20 : 0 }),
     window_set_size: (w: number, h: number) => !mobile && Number.isFinite(w) && Number.isFinite(h),
     app_request_exit: () => { exitRequested = true; return true; },
@@ -104,7 +115,8 @@ function harness(width = 1280, height = 800, mobile = false) {
   const tick = (count = 1): void => {
     for (let frame = 0; frame < count; frame++) { context.on_update(0.05); pressed.clear(); clicks.clear(); }
   };
-  return { entities, ui, keys, pressed, tick, context,
+  return { entities, ui, keys, pressed, tick, context, saves,
+    failStorage: (error = "") => { storageFailure = error; },
     state: () => state,
     click: (id: string) => { assert.ok(ui.has(id), `Missing button ${id}`); clicks.add(id); tick(); },
     pointer: (value: Partial<typeof pointer>) => { pointer = { ...pointer, ...value }; },
@@ -128,8 +140,12 @@ test("menu, movement, pause, restart, diagnostics and host exit", () => {
   const before = JSON.stringify([...game.entities]); game.tick(20);
   assert.equal(JSON.stringify([...game.entities]), before, "pause must freeze the world");
   game.click("checks");
-  const results = [...game.ui.values()].flatMap((element) => element.text ?? []);
-  assert.equal(results.filter((line) => line.startsWith("PASS")).length, 7);
+  const results: string[] = [];
+  for (let page = 0; page < 2; page++) {
+    results.push(...[...game.ui.values()].flatMap((element) => element.text ?? []));
+    game.click("check_page");
+  }
+  assert.equal(results.filter((line) => line.startsWith("PASS")).length, 8);
   assert.equal(results.filter((line) => line.startsWith("FAIL")).length, 0);
   game.click("network"); game.tick();
   assert.match(game.ui.get("network_status")!.text!, /PASS GET 200/);
@@ -168,13 +184,18 @@ test("three waves, boss victory, bounded actors and repeatable restart", () => {
   const game = harness(); game.click("start");
   game.entities.get("player")!.body!.health = 100_000;
   let maximum = 0;
+  let sawBossBar = false;
   for (let frame = 0; frame < 6500 && game.state().message !== "WON"; frame++) {
     if (game.state().message === "UPGRADE") game.click("upgrade_power");
     game.tick(); maximum = Math.max(maximum, game.entities.size);
+    if (game.ui.get("boss_panel")?.style?.display === "flex") sawBossBar = true;
   }
   assert.equal(game.state().message, "WON");
   assert.ok(game.state().score >= 500);
+  assert.equal(parseProfile(game.saves.get("profile")!).wins, 1);
+  assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
   assert.ok(maximum < 230, `Unexpected entity growth: ${maximum}`);
+  assert.ok(sawBossBar, "boss vitality must be visible during the final encounter");
   game.click("restart");
   assert.equal(game.state().score, 0);
   assert.equal(game.state().lives, 100);
@@ -199,5 +220,80 @@ test("downloaded GLBs contain an embedded texture and walking clip", () => {
     assert.equal(document.animations[0].name, "Walking_A");
     assert.ok(document.images.every((image: { uri?: string; bufferView?: number }) => image.uri === undefined && image.bufferView !== undefined));
     assert.ok(document.buffers.every((buffer: { uri?: string }) => buffer.uri === undefined));
+  }
+});
+
+test("settings persist across sessions, and reset requires confirmation", () => {
+  const saves = new Map<string, string>();
+  const game = harness(1280, 800, false, saves);
+  game.click("settings"); game.click("sensitivity"); game.click("hints"); game.click("motion"); game.click("seed");
+  const saved = parseProfile(saves.get("profile")!);
+  assert.equal(saved.sensitivity, 1.25); assert.equal(saved.showHints, false);
+  assert.equal(saved.reducedMotion, true); assert.equal(saved.seed, 1338);
+  const reopened = harness(1280, 800, false, saves);
+  reopened.click("settings"); assert.match(reopened.ui.get("sensitivity__label")!.text!, /1.25x/);
+  reopened.click("reset_save"); assert.ok(saves.has("profile"));
+  reopened.click("cancel_reset"); assert.ok(saves.has("profile"));
+  reopened.click("reset_save"); reopened.click("confirm_reset"); assert.ok(!saves.has("profile"));
+  reopened.click("settings_back"); reopened.click("start");
+  assert.equal(reopened.ui.get("hint")!.style!.display, "flex");
+});
+test("incompatible saves are preserved until an explicit reset", () => {
+  const saves = new Map([["profile", "{\"schemaVersion\":99,\"valuable\":true}"]]);
+  const game = harness(1280, 800, false, saves); game.click("settings");
+  assert.match(game.ui.get("save_notice")!.text!, /will not be overwritten/);
+  game.click("hints"); game.click("retry_save");
+  assert.equal(saves.get("profile"), "{\"schemaVersion\":99,\"valuable\":true}");
+  game.click("settings_back"); game.click("start"); assert.equal(game.state().message, "PLAYING");
+});
+test("failed saves can be retried and a finished run is counted once", () => {
+  const game = harness(); game.click("settings"); game.failStorage("io"); game.click("hints");
+  assert.match(game.ui.get("save_notice")!.text!, /Save failed/);
+  game.failStorage(); game.click("retry_save"); assert.equal(parseProfile(game.saves.get("profile")!).showHints, false);
+  game.click("settings_back"); game.click("start");
+  game.entities.get("player")!.body!.health = 1;
+  game.entities.set("lethal", {
+    transform: { translation: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } },
+    body: { kind: "chaser", health: 1000, speed: 0, radius: 0.4, cooldown: 10, lifetime: 0 },
+  });
+  game.tick(20); assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
+  game.context.on_script_reloaded(); game.tick();
+  assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
+});
+test("seeded encounters replay exactly and landscape UI uses compact controls", () => {
+  const first = seededRandom(1337); const second = seededRandom(1337);
+  assert.deepEqual(Array.from({ length: 20 }, first), Array.from({ length: 20 }, second));
+  assert.notEqual(seededRandom(1337)(), seededRandom(1338)());
+  const one = harness(); const two = harness(); one.click("start"); two.click("start"); one.tick(5); two.tick(5);
+  assert.deepEqual([...one.entities], [...two.entities]);
+  const landscape = harness(800, 400, true); landscape.click("settings");
+  assert.equal(landscape.ui.get("settings_back")!.style!.height, 36);
+  assert.equal(landscape.ui.get("settings_input")!.style!.justifyContent, "space-between");
+});
+test("save schema validation rejects bad statistics and nonfinite settings", () => {
+  assert.deepEqual(parseProfile(JSON.stringify(defaultProfile())), defaultProfile());
+  for (const data of [null, [], { ...defaultProfile(), bestScore: -1 }, { ...defaultProfile(), wins: 3 },
+    { ...defaultProfile(), sensitivity: 100 }, { ...defaultProfile(), seed: 0x100000000 }, { ...defaultProfile(), showHints: "false" }]) {
+    assert.throws(() => parseProfile(JSON.stringify(data)));
+  }
+});
+
+test("hit effects expire, and reduced effects disables them", () => {
+  for (const reduced of [false, true]) {
+    const game = harness();
+    if (reduced) { game.click("settings"); game.click("motion"); game.click("settings_back"); }
+    game.click("start");
+    game.entities.set("target", {
+      transform: { translation: { x: 0, y: 0, z: -1 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } },
+      body: { kind: "chaser", health: 1000, speed: 0, radius: 0.4, cooldown: 10, lifetime: 0 },
+    });
+    let sawEffect = false;
+    for (let frame = 0; frame < 12; frame++) {
+      game.tick(); if ([...game.entities.values()].some((entity) => entity.body?.kind === "effect")) sawEffect = true;
+    }
+    assert.equal(sawEffect, !reduced);
+    game.entities.delete("target");
+    game.tick(5);
+    assert.ok(![...game.entities.values()].some((entity) => entity.body?.kind === "effect"));
   }
 });

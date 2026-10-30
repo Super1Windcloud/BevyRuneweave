@@ -10,6 +10,10 @@ export const enemySpecs: Record<EnemyKind, { model: string; health: number; spee
 };
 export const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 export const distance = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.z - b.z);
+export function seededRandom(seed: number): () => number {
+  let value = seed >>> 0;
+  return () => { value = (Math.imul(value, 1664525) + 1013904223) >>> 0; return value / 0x100000000; };
+}
 export function direction(a: Point, b: Point): Point {
   const length = distance(a, b);
   return length < 0.0001 ? { x: 0, z: 0 } : { x: (b.x - a.x) / length, z: (b.z - a.z) / length };

@@ -104,3 +104,14 @@ interface RuneweaveCallbacks {
 declare function scene_actor_set(id: string, kind: string, health: number, speed: number, radius: number): boolean;
 declare function scene_actor(id: string): BmsReflectReference | null | undefined;
 declare function scene_actor_ids(): string[];
+
+/** Values are UTF-8 strings, scoped by engineConfig.name; maximum 64 KiB per key. */
+type StorageError = "invalid_key" | "unavailable" | "too_large" | "invalid_data" | "io";
+type StorageReadResult = { state: "ok"; value: string } | { state: "missing" } | { state: "error"; error: StorageError };
+type StorageWriteResult = { state: "ok" } | { state: "error"; error: StorageError };
+declare function storage_read(key: string): StorageReadResult;
+declare function storage_write(key: string, value: string): StorageWriteResult;
+declare function storage_remove(key: string): StorageWriteResult | { state: "missing" };
+
+/** Logical pixel dimensions for native Bevy UI, distinct from virtual pointer units. */
+declare function window_metrics(): { width: number; height: number };

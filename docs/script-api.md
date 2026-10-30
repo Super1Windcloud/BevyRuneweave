@@ -23,6 +23,7 @@ as real reflected Bevy components and resources; there is no script-side ECS sna
 | `app_request_exit()` | Returns an embedding host to its launcher, or sends `AppExit::Success` when no host callback is installed. Reports whether the request was accepted. |
 | `window_set_size(width, height)` | Sets the primary window size on desktop; returns `false` without resizing on Android and iOS. |
 | `window_safe_area()` | Returns the native safe rectangle in the same centered world coordinates as the primary pointer. |
+| `window_metrics()` | Returns logical window pixel `width` and `height` for retained UI, or zero dimensions when there is no primary window. Pointer coordinates remain virtual world units. |
 
 Entity ownership is derived from BMS `CurrentScriptAttachment`. Detaching or reloading a script
 removes only the entities owned by that attachment.
@@ -134,3 +135,44 @@ HTTP functions are `http_get`, `http_post`, and `http_poll`. These services are 
 through BMS; the Lua and QuickJS runtimes contain no Runeweave-specific service bindings.
 
 TypeScript declarations and ergonomic wrappers live in `projects/ts/modules/shooter/api`.
+
+## Persistent Storage
+
+The BMS registry exposes `storage_read(key)`, `storage_write(key, value)` and `storage_remove(key)`
+to both Lua and QuickJS. Values are UTF-8 strings; JSON serialization/versioning belongs to the game.
+Keys and the `engineConfig.name` project namespace accept 1-64 ASCII letters, digits, `_` or `-`.
+Scripts never receive or select filesystem paths. Keys cannot traverse to other projects.
+
+- Read: `{ state: "ok", value }`, `{ state: "missing" }`, or `{ state: "error", error }`.
+- Write: `{ state: "ok" }` or `{ state: "error", error }`.
+- Remove: `{ state: "ok" }`, `{ state: "missing" }`, or `{ state: "error", error }`.
+- Error codes: `invalid_key`, `unavailable`, `too_large`, `invalid_data`, `io`.
+
+Each value is limited to 64 KiB in UTF-8 bytes. Reads are bounded and invalid UTF-8 is reported without
+deleting the original file. Writes stage a private temporary file in the destination directory,
+sync its contents, then use [tempfile's atomic replacement](https://docs.rs/tempfile/latest/tempfile/struct.NamedTempFile.html#method.persist).
+The containing directory is synced best-effort on Unix. This is not a multi-key transaction, a
+cross-process merge protocol, or an absolute power-loss durability guarantee; concurrent writers
+use the last successful replacement. Small synchronous I/O should run at settings/result transitions,
+not every gameplay frame. Errors are returned as data and do not crash script execution.
+
+Files live under `<data-root>/saves/<engineConfig.name>/<key>.save`, independently of installed assets:
+
+| Platform | Default data root |
+| --- | --- |
+| Windows | `%LOCALAPPDATA%/Bevy RuneWeave` |
+| macOS | `$HOME/Library/Application Support/Bevy RuneWeave` |
+| Linux | `$XDG_DATA_HOME/Bevy RuneWeave`, or `$HOME/.local/share/Bevy RuneWeave` |
+| Android | NativeActivity's private `internal_data_path()/Bevy RuneWeave` |
+| iOS | App sandbox `$HOME/Library/Application Support/Bevy RuneWeave` |
+
+An absolute `RUNEWEAVE_DATA_DIR` supplied by the host overrides the default data root. Missing or invalid
+project configuration/private data directories produce `unavailable`; the runtime does not fall back to
+writing into a resource package. No C ABI change is required. Shared declarations and return values
+are portable across all five platforms; build/run evidence must be reported per target.
+
+Storage is a real Bevy resource accessed through `WorldGuard`, with no value cache or mirrored ECS.
+The first storage operation binds the current BMS attachment to its project namespace. Script switches
+refresh the default namespace for new attachments while preserving bindings for callbacks from the old
+game; detached entity scripts cannot write, and detach events release their bindings. This prevents a
+late callback from writing the previous game's data into a newly selected game's save directory.

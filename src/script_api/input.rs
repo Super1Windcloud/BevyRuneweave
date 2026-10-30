@@ -13,6 +13,26 @@ enum InputKind {
     JustReleased,
 }
 
+/// Logical window pixels for retained UI; pointer coordinates remain virtual world units.
+pub(super) fn window_metrics(context: FunctionCallContext) -> Result<ScriptValue, InteropError> {
+    context.world()?.with_world(|world| {
+        let window = world.iter_entities().find_map(|entity| {
+            entity.get::<PrimaryWindow>()?;
+            entity.get::<Window>()
+        });
+        let mut values = bevy::platform::collections::HashMap::default();
+        values.insert(
+            "width".into(),
+            ScriptValue::Float(window.map_or(0.0, |window| f64::from(window.width()))),
+        );
+        values.insert(
+            "height".into(),
+            ScriptValue::Float(window.map_or(0.0, |window| f64::from(window.height()))),
+        );
+        ScriptValue::Map(values)
+    })
+}
+
 fn input_matches(
     context: FunctionCallContext,
     key: String,

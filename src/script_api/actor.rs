@@ -239,6 +239,7 @@ mod tests {
             QuickJsScriptingPlugin, quickjs_context_load, quickjs_handler,
         };
 
+        let save_root = tempfile::tempdir().unwrap();
         let mut app = App::new();
         app.add_plugins((
             bevy::app::TaskPoolPlugin::default(),
@@ -258,6 +259,10 @@ mod tests {
         .init_asset::<bevy::world_serialization::WorldAsset>()
         .init_asset::<AnimationClip>()
         .init_asset::<AnimationGraph>();
+        app.insert_resource(super::super::storage::ScriptStorage::for_test(
+            save_root.path(),
+            "arena",
+        ));
         app.world_mut().spawn((
             Window {
                 resolution: WindowResolution::new(1280, 800),
@@ -324,22 +329,26 @@ mod tests {
             call("on_update", &mut context)?;
             click("checks")?;
             call("on_update", &mut context)?;
-            guard.with_world_mut(|world| {
-                let mut query = world.query_filtered::<&Text, With<ScriptUiNode>>();
-                let lines = query
-                    .iter(world)
-                    .map(|text| text.0.clone())
-                    .collect::<Vec<_>>();
+            let mut lines = std::collections::HashSet::new();
+            for _ in 0..2 {
+                guard.with_world_mut(|world| {
+                    let mut query = world.query_filtered::<&Text, With<ScriptUiNode>>();
+                    lines.extend(query.iter(world).map(|text| text.0.clone()));
+                })?;
+                click("check_page")?;
+                call("on_update", &mut context)?;
+            }
+            {
                 assert_eq!(
                     lines.iter().filter(|line| line.starts_with("PASS")).count(),
-                    7,
+                    8,
                     "{lines:?}"
                 );
                 assert!(
                     !lines.iter().any(|line| line.starts_with("FAIL")),
                     "{lines:?}"
                 );
-            })?;
+            }
             call("on_script_reloaded", &mut context)?;
             guard.with_world_mut(|world| {
                 assert_eq!(world.query::<&ScriptActor>().iter(world).count(), 1);

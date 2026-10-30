@@ -359,6 +359,7 @@ fn request_asset_reload(
     asset_server: Res<AssetServer>,
     asset_root: Res<RuntimeAssetRoot>,
     mut path: ResMut<LoadedScriptPath>,
+    mut storage: ResMut<crate::script_api::storage::ScriptStorage>,
     scripts: Query<Entity, With<ScriptComponent>>,
 ) {
     let Some(request) = take_runtime_request() else {
@@ -378,6 +379,7 @@ fn request_asset_reload(
                 return;
             }
         };
+        storage.refresh_for_assets(&asset_root.0);
         for entity in &scripts {
             commands.entity(entity).despawn();
         }
@@ -394,6 +396,7 @@ fn request_asset_reload(
     }
 
     info!("Reloading script: {}", path.source_path.display());
+    storage.refresh_for_assets(&asset_root.0);
     asset_server.reload(path.asset_path.clone());
 }
 
@@ -528,6 +531,9 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         asset_path,
     })
     .insert_resource(RuntimeAssetRoot(asset_root.clone()))
+    .insert_resource(crate::script_api::storage::ScriptStorage::for_assets(
+        &asset_root,
+    ))
     .add_systems(
         Startup,
         (
