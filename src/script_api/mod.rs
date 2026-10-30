@@ -2,11 +2,13 @@
 
 mod input;
 mod network;
+#[cfg(test)]
+mod perf_baseline;
 mod ui;
 
 use std::path::{Component as PathComponent, Path};
 
-use bevy::{prelude::*, sprite::Anchor};
+use bevy::{ecs::component::Mutable, prelude::*, sprite::Anchor};
 use bevy_mod_scripting::{
     bindings::{
         FunctionCallContext, InteropError, ReflectReference, ScriptValue, WorldExtensions,
@@ -104,6 +106,19 @@ fn find_owned_entity(world: &mut World, owner: &ScriptAttachment, id: &str) -> O
         .map(|(entity, _, _)| entity)
 }
 
+/// Writes `value` only when it differs, so per-frame script syncs do not trigger
+/// change detection (transform propagation, text relayout) for unchanged data.
+pub(super) fn set_component_if_neq<C>(world: &mut World, entity: Entity, value: C)
+where
+    C: Component<Mutability = Mutable> + PartialEq,
+{
+    if let Some(mut current) = world.get_mut::<C>(entity) {
+        current.set_if_neq(value);
+    } else {
+        world.entity_mut(entity).insert(value);
+    }
+}
+
 fn scene_spawn(
     context: FunctionCallContext,
     id: String,
@@ -117,9 +132,7 @@ fn scene_spawn(
     let (world, owner) = current_script(&context)?;
     world.with_world_mut(|world| {
         if let Some(entity) = find_owned_entity(world, &owner, &id) {
-            world
-                .entity_mut(entity)
-                .insert(Transform::from_xyz(x, y, z));
+            set_component_if_neq(world, entity, Transform::from_xyz(x, y, z));
         } else {
             world.spawn((
                 ScriptOwnedBy(owner),
@@ -208,11 +221,15 @@ fn scene_set_transform_3d(
         let Some(entity) = find_owned_entity(world, &owner, &id) else {
             return false;
         };
-        world.entity_mut(entity).insert(Transform {
-            translation: Vec3::new(x, y, z),
-            rotation: Quat::from_euler(EulerRot::XYZ, rotation_x, rotation_y, rotation_z),
-            scale: Vec3::splat(scale),
-        });
+        set_component_if_neq(
+            world,
+            entity,
+            Transform {
+                translation: Vec3::new(x, y, z),
+                rotation: Quat::from_euler(EulerRot::XYZ, rotation_x, rotation_y, rotation_z),
+                scale: Vec3::splat(scale),
+            },
+        );
         true
     })
 }
@@ -272,9 +289,7 @@ fn scene_set_transform(
         let Some(entity) = find_owned_entity(world, &owner, &id) else {
             return false;
         };
-        world
-            .entity_mut(entity)
-            .insert(Transform::from_xyz(x, y, z));
+        set_component_if_neq(world, entity, Transform::from_xyz(x, y, z));
         true
     })
 }
@@ -296,20 +311,35 @@ fn scene_set_text(
         let Some(entity) = find_owned_entity(world, &owner, &id) else {
             return false;
         };
-        world.entity_mut(entity).insert((
-            Text2d::new(value),
+        match world.get_mut::<Text2d>(entity) {
+            Some(mut text) => {
+                if **text != value {
+                    **text = value;
+                }
+            }
+            None => {
+                world.entity_mut(entity).insert(Text2d::new(value));
+            }
+        }
+        set_component_if_neq(
+            world,
+            entity,
             TextFont {
                 font_size: FontSize::Px(font_size.max(1.0)),
                 ..default()
             },
+        );
+        set_component_if_neq(
+            world,
+            entity,
             TextColor(Color::srgba(
                 red.clamp(0.0, 1.0),
                 green.clamp(0.0, 1.0),
                 blue.clamp(0.0, 1.0),
                 alpha.clamp(0.0, 1.0),
             )),
-            text_anchor(&anchor),
-        ));
+        );
+        set_component_if_neq(world, entity, text_anchor(&anchor));
         true
     })
 }
@@ -348,11 +378,17 @@ fn game_state_set(
     message: String,
 ) -> Result<(), InteropError> {
     context.world()?.with_world_mut(|world| {
-        world.insert_resource(ScriptGameState {
+        let state = ScriptGameState {
             score,
             lives,
             message,
-        });
+        };
+        match world.get_resource_mut::<ScriptGameState>() {
+            Some(mut current) => {
+                current.set_if_neq(state);
+            }
+            None => world.insert_resource(state),
+        }
     })
 }
 
@@ -718,6 +754,72 @@ mod tests {
         assert_eq!(transform.translation, Vec3::new(7.0, 8.0, 9.0));
         assert_eq!(transform.scale, Vec3::splat(1.5));
         Ok(())
+    }
+
+    #[test]
+    fn unchanged_scene_writes_do_not_trigger_change_detection() -> Result<(), InteropError> {
+        let mut world = World::new();
+        world.init_resource::<AppScriptFunctionRegistry>();
+        world.init_resource::<AppTypeRegistry>();
+        world.init_resource::<ScriptGameState>();
+        let attachment = ScriptAttachment::StaticScript(Handle::<ScriptAsset>::default());
+        let cache =
+            WorldGuard::setup_cache(&world, CurrentScriptAttachment(Some(attachment.clone())));
+
+        WorldGuard::with_static_guard(&mut world, cache, |guard| {
+            let context = FunctionCallContext::new(Language::Unknown);
+            let write_frame = |context: &FunctionCallContext, x: f32, text: &str| {
+                scene_set_transform(context.clone(), "hud".to_owned(), x, 2.0, 3.0)?;
+                scene_set_text(
+                    context.clone(),
+                    "hud".to_owned(),
+                    text.to_owned(),
+                    24.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    "top_left".to_owned(),
+                )?;
+                game_state_set(context.clone(), 10, 3, text.to_owned())
+            };
+            let changed = |guard: &WorldGuard| {
+                guard.with_world_mut(|world| {
+                    let entity = find_owned_entity(world, &attachment, "hud")
+                        .expect("hud entity must exist");
+                    let entity = world.entity(entity);
+                    [
+                        entity
+                            .get_ref::<Transform>()
+                            .is_some_and(|c| c.is_changed()),
+                        entity.get_ref::<Text2d>().is_some_and(|c| c.is_changed()),
+                        entity.get_ref::<TextFont>().is_some_and(|c| c.is_changed()),
+                        entity
+                            .get_ref::<TextColor>()
+                            .is_some_and(|c| c.is_changed()),
+                        entity.get_ref::<Anchor>().is_some_and(|c| c.is_changed()),
+                        world.resource_ref::<ScriptGameState>().is_changed(),
+                    ]
+                })
+            };
+
+            assert!(scene_spawn(
+                context.clone(),
+                "hud".to_owned(),
+                1.0,
+                2.0,
+                3.0
+            )?);
+            write_frame(&context, 1.0, "SCORE 10")?;
+            guard.with_world_mut(World::clear_trackers)?;
+
+            write_frame(&context, 1.0, "SCORE 10")?;
+            assert_eq!(changed(&guard)?, [false; 6]);
+
+            write_frame(&context, 4.0, "SCORE 20")?;
+            assert_eq!(changed(&guard)?, [true, true, false, false, false, true]);
+            Ok::<(), InteropError>(())
+        })
     }
 
     #[test]

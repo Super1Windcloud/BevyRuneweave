@@ -10,8 +10,8 @@ use bevy_mod_scripting::{
 use serde::Deserialize;
 
 use super::{
-    ScriptEntityId, ScriptOwnedBy, current_script, find_owned_entity, valid_asset_path,
-    valid_entity_id,
+    ScriptEntityId, ScriptOwnedBy, current_script, find_owned_entity, set_component_if_neq,
+    valid_asset_path, valid_entity_id,
 };
 
 #[derive(Component, Reflect, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -270,18 +270,18 @@ pub(super) fn ui_set_style(
             {
                 return false;
             }
-            world.entity_mut(entity).insert((
-                updated_node,
+            set_component_if_neq(
+                world,
+                entity,
                 BackgroundColor(Color::srgba(
                     red.clamp(0.0, 1.0),
                     green.clamp(0.0, 1.0),
                     blue.clamp(0.0, 1.0),
                     alpha.clamp(0.0, 1.0),
                 )),
-            ));
-        } else {
-            world.entity_mut(entity).insert(updated_node);
+            );
         }
+        set_component_if_neq(world, entity, updated_node);
         true
     })
 }
@@ -311,17 +311,18 @@ pub(super) fn ui_set_text(
         let Some(mut text) = world.get_mut::<Text>(entity) else {
             return false;
         };
-        **text = value;
-        drop(text);
-        world.entity_mut(entity).insert((
-            TextFont::from_font_size(font_size.max(1.0)),
+        text.set_if_neq(Text(value));
+        set_component_if_neq(world, entity, TextFont::from_font_size(font_size.max(1.0)));
+        set_component_if_neq(
+            world,
+            entity,
             TextColor(Color::srgba(
                 red.clamp(0.0, 1.0),
                 green.clamp(0.0, 1.0),
                 blue.clamp(0.0, 1.0),
                 alpha.clamp(0.0, 1.0),
             )),
-        ));
+        );
         true
     })
 }
@@ -346,7 +347,9 @@ pub(super) fn ui_set_image(
         let Some(mut image_node) = world.get_mut::<ImageNode>(entity) else {
             return false;
         };
-        image_node.image = image;
+        if image_node.image != image {
+            image_node.image = image;
+        }
         true
     })
 }

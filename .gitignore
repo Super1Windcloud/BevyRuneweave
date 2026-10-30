@@ -10,3 +10,4 @@ node_modules
 assets/clash
 index.html
 temp
+.DS_Store

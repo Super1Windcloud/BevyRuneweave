@@ -63,6 +63,8 @@ cannot be executed in the current environment must be called out explicitly as a
 - `just fmt-check` verifies Rust formatting; `just check` checks all three language projects.
 - `just test` runs runtime gameplay tests for JS, TypeScript, and Lua.
 - `just verify` runs the complete formatting, check, and test suite.
+- `just bench` measures script API hot paths in release mode against the machine-local baseline in
+  `target/perf-baseline/`; `just bench save` records it and `just bench compare <percent>` gates regressions.
 - `just build-runtime-{windows,macos,linux}` builds one Lua/QuickJS runtime library without the desktop launcher.
 - `just build-android-demo` and `just build-ios-demo` build native hosts using the unified runtime.
 - `just package-windows-installer` and `just package-macos-dmg` create complete desktop installers.

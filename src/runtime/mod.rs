@@ -335,6 +335,25 @@ fn source_has_changed(
     current.is_some() && current != previous
 }
 
+#[derive(Debug, PartialEq)]
+enum RuntimeRequest {
+    Switch(PathBuf),
+    Reload,
+}
+
+fn take_runtime_request() -> Option<RuntimeRequest> {
+    // A switch performs a fresh load, so it also consumes any pending reload.
+    let reload_requested = RELOAD_REQUESTED.swap(false, Ordering::AcqRel);
+    let switch_requested = SCRIPT_SWITCH_REQUESTED
+        .lock()
+        .ok()
+        .and_then(|mut requested| requested.take());
+    match switch_requested {
+        Some(path) => Some(RuntimeRequest::Switch(path)),
+        None => reload_requested.then_some(RuntimeRequest::Reload),
+    }
+}
+
 fn request_asset_reload(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -342,11 +361,10 @@ fn request_asset_reload(
     mut path: ResMut<LoadedScriptPath>,
     scripts: Query<Entity, With<ScriptComponent>>,
 ) {
-    let requested = SCRIPT_SWITCH_REQUESTED
-        .lock()
-        .ok()
-        .and_then(|mut requested| requested.take());
-    if let Some(requested) = requested {
+    let Some(request) = take_runtime_request() else {
+        return;
+    };
+    if let RuntimeRequest::Switch(requested) = request {
         let asset_path = match normalize_script_path(&asset_root.0, &requested)
             .and_then(|path| script_backend(&path).map(|_| path))
         {
@@ -375,11 +393,8 @@ fn request_asset_reload(
         return;
     }
 
-    let reload_requested = RELOAD_REQUESTED.swap(false, Ordering::AcqRel);
-    if reload_requested {
-        info!("Reloading script: {}", path.source_path.display());
-        asset_server.reload(path.asset_path.clone());
-    }
+    info!("Reloading script: {}", path.source_path.display());
+    asset_server.reload(path.asset_path.clone());
 }
 
 #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
@@ -638,7 +653,6 @@ pub unsafe extern "C" fn game_runtime_switch_script(script_path: *const c_char) 
     match SCRIPT_SWITCH_REQUESTED.lock() {
         Ok(mut requested) => {
             *requested = Some(script_path);
-            RELOAD_REQUESTED.store(true, Ordering::Release);
             0
         }
         Err(_) => 3,
@@ -756,6 +770,23 @@ mod tests {
         assert!(source_has_changed(Some(first), Some(second)));
         assert!(source_has_changed(None, Some(first)));
         assert!(!source_has_changed(Some(first), None));
+    }
+
+    #[test]
+    fn script_switch_consumes_pending_reload_without_reloading_again() {
+        let script = std::ffi::CString::new(default_script_path()).expect("path has no NUL");
+
+        game_runtime_request_reload();
+        assert_eq!(unsafe { game_runtime_switch_script(script.as_ptr()) }, 0);
+        assert_eq!(
+            take_runtime_request(),
+            Some(RuntimeRequest::Switch(PathBuf::from(default_script_path())))
+        );
+        assert_eq!(take_runtime_request(), None);
+
+        game_runtime_request_reload();
+        assert_eq!(take_runtime_request(), Some(RuntimeRequest::Reload));
+        assert_eq!(take_runtime_request(), None);
     }
 
     #[test]
