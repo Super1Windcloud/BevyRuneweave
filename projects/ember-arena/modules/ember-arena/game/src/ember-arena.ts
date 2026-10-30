@@ -55,6 +55,9 @@ function panel(title: string, subtitle: string, content: UiElement[]): UiElement
   ]);
 }
 function drawUi(): void {
+  const pointer = input_primary_pointer();
+  const safe = window_safe_area();
+  viewport = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}`;
   const children: UiElement[] = [];
   if (phase === "playing") {
     children.push(column("hud", { width: "100%", padding: 16, gap: 8 }, [
@@ -329,7 +332,7 @@ function openChecks(): void {
     const camera = scene_set_3d_enabled(false) && scene_set_3d_enabled(true);
     return sprite && label && transformed && camera;
   });
-  check("Despawn invalidates lookup", () => scene_despawn("probe") && scene_actor("probe") === null && scene_transform("probe") === null);
+  check("Despawn invalidates lookup", () => scene_despawn("probe") && scene_actor("probe") == null && scene_transform("probe") == null);
   check("UI validation + child cleanup", () => {
     ui_spawn("probe_ui", "", "node");
     ui_spawn("probe_child", "probe_ui", "text");

@@ -61,13 +61,13 @@ function harness(width = 1280, height = 800, mobile = false) {
       if (!entities.has(id)) return false;
       entities.get(id)!.transform.translation = { x, y, z }; return true;
     },
-    scene_transform: (id: string) => entities.has(id) ? new Reference(entities.get(id)!.transform) : null,
+    scene_transform: (id: string) => entities.has(id) ? new Reference(entities.get(id)!.transform) : undefined,
     scene_actor_set: (id: string, kind: string, health: number, speed: number, radius: number) => {
       if (!entities.has(id) || ![health, speed, radius].every(Number.isFinite) || radius <= 0) return false;
       entities.get(id)!.body = { kind, health, speed, radius, power: 0, cooldown: 0, lifetime: 0, velocity_x: 0, velocity_z: 0 };
       return true;
     },
-    scene_actor: (id: string) => entities.get(id)?.body ? new Reference(entities.get(id)!.body!) : null,
+    scene_actor: (id: string) => entities.get(id)?.body ? new Reference(entities.get(id)!.body!) : undefined,
     scene_actor_ids: () => [...entities].filter(([, value]) => value.body).map(([id]) => id).sort(),
     scene_despawn: (id: string) => entities.delete(id),
     game_state_set: (score: number, lives: number, message: string) => { state = { score, lives, message }; },

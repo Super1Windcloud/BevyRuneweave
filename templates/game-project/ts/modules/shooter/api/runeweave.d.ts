@@ -32,7 +32,7 @@ declare function scene_set_text(
 ): boolean;
 declare function scene_despawn(id: string): boolean;
 declare function scene_clear(): void;
-declare function scene_transform(id: string): BmsReflectReference | null;
+declare function scene_transform(id: string): BmsReflectReference | null | undefined;
 declare function ui_spawn(id: string, parentId: string, kind: "node" | "text" | "image" | "button"): boolean;
 declare function ui_set_style(id: string, styleJson: string): boolean;
 declare function ui_set_text(id: string, value: string, fontSize: number, red: number, green: number, blue: number, alpha: number): boolean;
@@ -97,5 +97,5 @@ interface RuneweaveCallbacks {
 
 /** ScriptActor is a real reflected Bevy component owned by this attachment. */
 declare function scene_actor_set(id: string, kind: string, health: number, speed: number, radius: number): boolean;
-declare function scene_actor(id: string): BmsReflectReference | null;
+declare function scene_actor(id: string): BmsReflectReference | null | undefined;
 declare function scene_actor_ids(): string[];

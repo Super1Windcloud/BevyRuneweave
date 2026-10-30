@@ -112,4 +112,4 @@ const manifest = { author: "Kay Lousberg", license: "CC0-1.0", commit, records }
 const manifestPath = join(assets, "licenses/sources.json");
 mkdirSync(dirname(manifestPath), { recursive: true });
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-console.log(`Prepared ${records.length} downloaded characters and 9 procedural room models.`);
+console.log(`Prepared ${records.length} downloaded characters and 8 procedural room models.`);

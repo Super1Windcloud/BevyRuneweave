@@ -542,7 +542,8 @@ fn clear_owned_entities(world: &mut World, owner: &ScriptAttachment) {
         .map(|(entity, _)| entity)
         .collect::<Vec<_>>();
     for entity in entities {
-        world.despawn(entity);
+        // Despawning an owned parent can already remove owned UI descendants.
+        let _ = world.try_despawn(entity);
     }
 }
 
@@ -554,7 +555,7 @@ fn clear_detached_script_entities(
     for event in detached.read() {
         for (entity, owner) in &owned {
             if owner.0 == event.0 {
-                commands.entity(entity).despawn();
+                commands.entity(entity).try_despawn();
             }
         }
     }

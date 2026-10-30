@@ -114,6 +114,25 @@ mod tests {
     #[test]
     fn actor_state_is_reflected_and_queries_exclude_unowned_entities() -> Result<(), InteropError> {
         let mut app = app();
+        let foreign_owner = app.world_mut().spawn_empty().id();
+        app.world_mut().spawn((
+            ScriptOwnedBy(ScriptAttachment::EntityScript(
+                foreign_owner,
+                Handle::default(),
+            )),
+            ScriptEntityId("foreign".into()),
+            ScriptActor {
+                kind: "foreign".into(),
+                health: 1.0,
+                speed: 0.0,
+                radius: 1.0,
+                power: 0.0,
+                cooldown: 0.0,
+                lifetime: 0.0,
+                velocity_x: 0.0,
+                velocity_z: 0.0,
+            },
+        ));
         let attachment = ScriptAttachment::StaticScript(Handle::<ScriptAsset>::default());
         let cache = WorldGuard::setup_cache(app.world(), CurrentScriptAttachment(Some(attachment)));
         WorldGuard::with_static_guard(app.world_mut(), cache, |_guard| {
@@ -144,6 +163,15 @@ mod tests {
                 0.5
             )?);
             assert_eq!(scene_actor_ids(context.clone())?, vec!["enemy"]);
+            assert!(scene_actor(context.clone(), "foreign".into())?.is_none());
+            assert!(!scene_actor_set(
+                context.clone(),
+                "foreign".into(),
+                "enemy".into(),
+                5.0,
+                1.0,
+                0.5
+            )?);
             assert!(scene_actor(context.clone(), "enemy".into())?.is_some());
             super::super::scene_despawn(context.clone(), "enemy".into())?;
             assert!(scene_actor_ids(context.clone())?.is_empty());
@@ -199,6 +227,133 @@ mod tests {
         assert_eq!(actor.health, 73.0);
         assert_eq!(transform.translation.x, 6.0);
         Ok(())
+    }
+
+    #[cfg(any(feature = "js", feature = "typescript"))]
+    #[test]
+    fn quickjs_arena_runs_with_real_actor_components_and_ui() -> Result<(), InteropError> {
+        use super::super::{ScriptGameState, ui::ScriptUiNode};
+        use bevy::asset::AssetApp;
+        use bevy::window::{PrimaryWindow, WindowResolution};
+        use bevy_mod_scripting::quickjs::{
+            QuickJsScriptingPlugin, quickjs_context_load, quickjs_handler,
+        };
+
+        let mut app = App::new();
+        app.add_plugins((
+            bevy::app::TaskPoolPlugin::default(),
+            bevy::asset::AssetPlugin {
+                file_path: format!(
+                    "{}/projects/ember-arena/modules/ember-arena/game/assets",
+                    env!("CARGO_MANIFEST_DIR")
+                ),
+                ..default()
+            },
+            CoreScriptGlobalsPlugin::default(),
+            BMSScriptingInfrastructurePlugin::default(),
+            QuickJsScriptingPlugin::default(),
+            RuneweaveScriptApiPlugin,
+        ))
+        .init_asset::<Image>()
+        .init_asset::<bevy::world_serialization::WorldAsset>()
+        .init_asset::<AnimationClip>()
+        .init_asset::<AnimationGraph>();
+        app.world_mut().spawn((
+            Window {
+                resolution: WindowResolution::new(1280, 800),
+                ..default()
+            },
+            PrimaryWindow,
+        ));
+        app.world_mut()
+            .spawn((Camera3d::default(), Camera::default()));
+        app.world_mut().init_resource::<ButtonInput<KeyCode>>();
+        app.finish();
+        let world_id = app.world().id();
+        let attachment = ScriptAttachment::StaticScript(Handle::<ScriptAsset>::default());
+        let cache = WorldGuard::setup_cache(
+            app.world(),
+            CurrentScriptAttachment(Some(attachment.clone())),
+        );
+        WorldGuard::with_static_guard(app.world_mut(), cache, |guard| {
+            let mut context = quickjs_context_load(
+                &attachment,
+                include_bytes!(
+                    "../../projects/ember-arena/modules/ember-arena/game/assets/ember-arena.js"
+                ),
+                world_id,
+            )?;
+            let call = |name: &str, context: &mut _| {
+                quickjs_handler(
+                    if name == "on_update" {
+                        vec![bevy_mod_scripting::bindings::ScriptValue::Float(0.05)]
+                    } else {
+                        Vec::new()
+                    },
+                    &attachment,
+                    &CallbackLabel::from(name),
+                    context,
+                    world_id,
+                )
+            };
+            let click = |id: &str| -> Result<(), InteropError> {
+                guard.with_world_mut(|world| {
+                    let entity = super::super::find_owned_entity(world, &attachment, id)
+                        .expect("button exists");
+                    world.entity_mut(entity).insert(Interaction::Pressed);
+                })
+            };
+            call("on_script_loaded", &mut context)?;
+            click("start")?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                world
+                    .resource_mut::<ButtonInput<KeyCode>>()
+                    .press(KeyCode::KeyD);
+            })?;
+            for _ in 0..10 {
+                call("on_update", &mut context)?;
+            }
+            guard.with_world_mut(|world| {
+                let entity = super::super::find_owned_entity(world, &attachment, "player").unwrap();
+                assert!(world.get::<Transform>(entity).unwrap().translation.x > 0.0);
+                assert_eq!(world.resource::<ScriptGameState>().message, "PLAYING");
+                world.resource_mut::<ButtonInput<KeyCode>>().clear();
+            })?;
+            click("pause")?;
+            call("on_update", &mut context)?;
+            click("checks")?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                let mut query = world.query_filtered::<&Text, With<ScriptUiNode>>();
+                let lines = query
+                    .iter(world)
+                    .map(|text| text.0.clone())
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    lines.iter().filter(|line| line.starts_with("PASS")).count(),
+                    7,
+                    "{lines:?}"
+                );
+                assert!(
+                    !lines.iter().any(|line| line.starts_with("FAIL")),
+                    "{lines:?}"
+                );
+            })?;
+            call("on_script_reloaded", &mut context)?;
+            guard.with_world_mut(|world| {
+                assert_eq!(world.query::<&ScriptActor>().iter(world).count(), 1);
+                assert_eq!(world.resource::<ScriptGameState>().message, "MENU");
+                assert_eq!(
+                    world
+                        .query_filtered::<&Node, (With<ScriptUiNode>, Without<ChildOf>)>()
+                        .iter(world)
+                        .count(),
+                    1
+                );
+            })?;
+            Ok(())
+        })
     }
 
     #[cfg(feature = "lua")]

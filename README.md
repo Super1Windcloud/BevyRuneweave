@@ -109,6 +109,10 @@ just run-js
 just run-ts
 ```
 
+The template-based [Ember Arena](projects/ember-arena/README.md) survival game adds three waves,
+a boss, upgrades, retained UI and runtime contract checks. Run `just run-ember-arena` or
+`just test-ember-arena`; its documentation records asset sources and verification boundaries.
+
 Every TypeScript project executable compiles its own `package.json` build target from Rust `main`
 before starting Bevy. Direct commands such as `cargo run -p script-squadron-typescript` therefore
 cannot start with a stale generated JavaScript entry. This development workflow requires Node.js

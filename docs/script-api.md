@@ -34,7 +34,7 @@ component on an existing owned entity. Kind must be nonempty and at most 64 byte
 must be finite and nonnegative, and radius must be positive. Invalid arguments or missing entities
 return `false` without changing the entity.
 
-`scene_actor(id)` returns its BMS `ReflectReference`, or nil/null when the entity or component does
+`scene_actor(id)` returns its BMS `ReflectReference`, or Lua nil / JavaScript undefined when the entity or component does
 not exist. Fields are `kind`, `health`, `speed`, `radius`, `power`, `cooldown`, `lifetime`,
 `velocity_x`, and `velocity_z`; the last five default to zero. Lua uses normal field access;
 QuickJS/TypeScript uses `reference.get(name)` and `reference.set(name, value)`. Reflection writes
