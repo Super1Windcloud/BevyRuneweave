@@ -18,15 +18,25 @@ Supported package formats:
 - 7z extraction (read only)
 - RAR extraction (read only, on Windows, macOS, and Linux)
 
+Launch it from the repository root (debug by default), reusing the repository's `target/` cache:
+
+```bash
+just run-desktop-demo
+just run-desktop-demo --release
+```
+
 Build and test it independently from the repository workspace:
 
 ```bash
-cargo test --manifest-path examples/desktop-demo-host/Cargo.toml
-cargo run --manifest-path examples/desktop-demo-host/Cargo.toml
+cargo test --manifest-path examples/desktop-demo-host/Cargo.toml --target-dir target
+cargo run --manifest-path examples/desktop-demo-host/Cargo.toml --target-dir target
 ```
 
 Use `just build-runtime-windows`, `just build-runtime-macos`, or `just build-runtime-linux` to
 package the single Lua/QuickJS runtime library. These commands do not build this launcher.
+Before starting a game through the launcher, build the runtime for your desktop platform. For
+example, on macOS run `just build-runtime-macos` first. `just run-desktop-demo` builds and starts
+the launcher without rebuilding the runtime library.
 
 The packaged launcher selects the native library for its operating system and keeps downloaded
 assets in the user's application-data directory. Complete installers also include the TypeScript

@@ -35,6 +35,10 @@ run-lua:
 run-js:
     cargo run -p script-squadron-js
 
+# Build and run the standalone desktop launcher (debug by default).
+run-desktop-demo profile="":
+    cargo run --manifest-path examples/desktop-demo-host/Cargo.toml --target-dir target {{profile}}
+
 # Watch, compile, and run the TypeScript game with QuickJS.
 run-ts:
     {{ if os_family() == "windows" { "just run-ts-windows" } else { "just run-ts-unix" } }}
