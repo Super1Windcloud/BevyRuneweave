@@ -7,7 +7,6 @@ examples/ios-demo-host/Config/DebugSecrets.xcconfig
 node_modules
 /examples/android-demo-host/.gradle
 /examples/android-demo-host/**/build
-assets/clash
 index.html
 temp
 .DS_Store

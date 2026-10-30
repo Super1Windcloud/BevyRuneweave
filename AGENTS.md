@@ -96,6 +96,7 @@ tests for runtime behavior and configuration validation; keep test names descrip
 
 ## Commits and Pull Requests
 
+Write all commit messages in English, including the subject and body.
 Use Conventional Commit prefixes such as `feat(runtime):`, `fix(host):`, `build(scripts):`, or
 `docs:` followed by a concise description. PRs should explain behavior changes, list verification
 commands, identify platform/toolchain prerequisites, and include screenshots for visible Windows UI

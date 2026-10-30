@@ -110,9 +110,9 @@ just run-ts
 ```
 
 Every TypeScript project executable compiles its own `package.json` build target from Rust `main`
-before starting Bevy. Direct commands such as `cargo run -p script-squadron-typescript` and
-`cargo run -p clash-ts` therefore cannot start with a stale generated JavaScript entry. This
-development workflow requires Node.js and the repository TypeScript dependencies to be installed.
+before starting Bevy. Direct commands such as `cargo run -p script-squadron-typescript` therefore
+cannot start with a stale generated JavaScript entry. This development workflow requires Node.js
+and the repository TypeScript dependencies to be installed.
 
 Drag with a mouse or on Android/iOS, or move with the arrow keys or `WASD`; weapons fire
 automatically. Click or tap the top-right settings icon to pause, restart, or exit the game. A

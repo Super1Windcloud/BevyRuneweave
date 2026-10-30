@@ -1341,11 +1341,11 @@ mod tests {
     fn preserves_runtime_icon_when_config_already_uses_target_path() {
         let assets = tempfile::tempdir().unwrap();
         let icon = assets.path().join(".runtime-icon.png");
-        fs::write(&icon, b"clash icon bytes").unwrap();
+        fs::write(&icon, b"project icon bytes").unwrap();
 
         prepare_runtime_icon(assets.path(), ".runtime-icon.png").unwrap();
 
-        assert_eq!(fs::read(icon).unwrap(), b"clash icon bytes");
+        assert_eq!(fs::read(icon).unwrap(), b"project icon bytes");
     }
 
     #[test]
@@ -1441,14 +1441,14 @@ mod tests {
     fn parses_every_release_asset_shape() {
         let assets: Vec<ReleaseAsset> = serde_json::from_str(
             r#"[
-                {"name":"clash-ts.zip","browser_download_url":"https://example/clash.zip","size":1048576},
+                {"name":"script-squadron-typescript.zip","browser_download_url":"https://example/typescript.zip","size":1048576},
                 {"name":"script-squadron-lua.zip","browser_download_url":"https://example/lua.zip","size":512}
             ]"#,
         )
         .unwrap();
 
         assert_eq!(assets.len(), 2);
-        assert_eq!(assets[0].name, "clash-ts.zip");
+        assert_eq!(assets[0].name, "script-squadron-typescript.zip");
         assert_eq!(format_size(assets[0].size), "1.0 MB");
         assert_eq!(format_size(assets[1].size), "512 B");
     }
