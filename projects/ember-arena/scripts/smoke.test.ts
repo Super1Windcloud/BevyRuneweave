@@ -379,16 +379,48 @@ test("in-game backpack inventory, item usage and hero class switching", () => {
 
 test("official shattered pixel dungeon sprite assets exist and are valid", () => {
   const spdFiles = [
-    "amulet.png",
-    "goo.png",
+    // Heroes
+    "warrior.png",
+    "mage.png",
+    "rogue.png",
+    "huntress.png",
+    "avatars.png",
+    "hero_icons.png",
+
+    // Mobs
     "rat.png",
     "gnoll.png",
     "crab.png",
+    "swarm.png",
+    "slime.png",
+    "goo.png",
+    "skeleton.png",
+    "thief.png",
+
+    // Items & environment
+    "amulet.png",
     "items.png",
+    "item_icons.png",
+    "tiles_sewers.png",
+    "terrain_features.png",
+    "water0.png",
+
+    // UI
     "banners.png",
     "badges.png",
-    "hero_icons.png",
+    "boss_hp.png",
+    "buffs.png",
+    "icons.png",
+    "status_pane.png",
+    "toolbar.png",
+    "menu_pane.png",
+
+    // Splashes
     "sewers.jpg",
+    "warrior.jpg",
+    "mage.jpg",
+    "rogue.jpg",
+    "huntress.jpg",
   ];
   for (const file of spdFiles) {
     const fullPath = resolve(assets, `sprites/spd/${file}`);

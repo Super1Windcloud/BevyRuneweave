@@ -52,6 +52,9 @@
       name: "WARRIOR",
       title: "Vanguard of the Sewers",
       model: "Knight",
+      splash: "sprites/spd/warrior.jpg",
+      sprite: "sprites/spd/warrior.png",
+      icon: "sprites/spd/hero_icons.png",
       description: "Equipped with iron mail and a tempered blade. Sturdy and resilient in direct melee.",
       baseHealth: 100,
       baseSpeed: 3.7,
@@ -64,6 +67,9 @@
       name: "MAGE",
       title: "Scholar of Arcana",
       model: "Mage",
+      splash: "sprites/spd/mage.jpg",
+      sprite: "sprites/spd/mage.png",
+      icon: "sprites/spd/hero_icons.png",
       description: "Channels magic missile bolts from an ancient staff. Rapid ranged firepower.",
       baseHealth: 100,
       baseSpeed: 3.7,
@@ -76,6 +82,9 @@
       name: "ROGUE",
       title: "Shadow Stalker",
       model: "Rogue_Hooded",
+      splash: "sprites/spd/rogue.jpg",
+      sprite: "sprites/spd/rogue.png",
+      icon: "sprites/spd/hero_icons.png",
       description: "Shrouded in a cloak of shadows. Swift movement and deadly surprise attacks.",
       baseHealth: 100,
       baseSpeed: 4.1,
@@ -88,6 +97,9 @@
       name: "HUNTRESS",
       title: "Seeker of the Slums",
       model: "Barbarian",
+      splash: "sprites/spd/huntress.jpg",
+      sprite: "sprites/spd/huntress.png",
+      icon: "sprites/spd/hero_icons.png",
       description: "Armed with a spirit bow and fiery alchemy. Masters area damage.",
       baseHealth: 100,
       baseSpeed: 3.8,
@@ -102,25 +114,29 @@
       name: "Marsupial Rat",
       depth: 1,
       lore: "Fast, scurrying pest native to the upper sewer conduits.",
-      drops: "Dew Drops, Gold Coins, Mystery Meat"
+      drops: "Dew Drops, Gold Coins, Mystery Meat",
+      sprite: "sprites/spd/rat.png"
     },
     ranger: {
       name: "Gnoll Scout",
       depth: 2,
       lore: "Wild hyena scout slinging poisoned darts from afar.",
-      drops: "Gold, Healing Potions, Darts"
+      drops: "Gold, Healing Potions, Darts",
+      sprite: "sprites/spd/gnoll.png"
     },
     charger: {
       name: "Sewer Crab",
       depth: 3,
       lore: "Heavy chitin carapace charging with crushing claws.",
-      drops: "Armor Plates, Dew Drops, Meat"
+      drops: "Armor Plates, Dew Drops, Meat",
+      sprite: "sprites/spd/crab.png"
     },
     boss: {
       name: "Goo (The Warden)",
       depth: 5,
       lore: "The colossal caustic slime ruling the sewer depths. Pumps itself up before explosive blasts!",
-      drops: "Amulet of Yendor, 500 Gold"
+      drops: "Amulet of Yendor, 500 Gold",
+      sprite: "sprites/spd/goo.png"
     }
   };
   var itemCatalog = {
@@ -129,49 +145,56 @@
       name: "Potion of Healing",
       category: "potion",
       description: "Restores 45 Vitality and cures caustic ooze.",
-      effectText: "A warm soothing energy flows through you (+45 HP)."
+      effectText: "A warm soothing energy flows through you (+45 HP).",
+      sprite: "sprites/spd/items.png"
     },
     potion_liquid_flame: {
       id: "potion_liquid_flame",
       name: "Liquid Flame",
       category: "potion",
       description: "Hurls volatile fire that deals 35 damage to surrounding foes.",
-      effectText: "The flask shatters into a roaring blaze (35 damage)! "
+      effectText: "The flask shatters into a roaring blaze (35 damage)! ",
+      sprite: "sprites/spd/items.png"
     },
     potion_invisibility: {
       id: "potion_invisibility",
       name: "Potion of Invisibility",
       category: "potion",
       description: "Cloaks hero in shadows for 6s. Grants guaranteed surprise attacks.",
-      effectText: "You vanish from enemy sight. Surprise attacks ready!"
+      effectText: "You vanish from enemy sight. Surprise attacks ready!",
+      sprite: "sprites/spd/items.png"
     },
     potion_strength: {
       id: "potion_strength",
       name: "Potion of Strength",
       category: "potion",
       description: "Permanently enhances hero strike power by +4.",
-      effectText: "Your muscles surge with power (+4 Base Damage)!"
+      effectText: "Your muscles surge with power (+4 Base Damage)!",
+      sprite: "sprites/spd/items.png"
     },
     scroll_upgrade: {
       id: "scroll_upgrade",
       name: "Scroll of Upgrade",
       category: "scroll",
       description: "Upgrades equipped gear (+8 Damage, +20 Max Vitality).",
-      effectText: "Ancient runes infuse your weaponry (+8 DMG, +20 HP)!"
+      effectText: "Ancient runes infuse your weaponry (+8 DMG, +20 HP)!",
+      sprite: "sprites/spd/items.png"
     },
     scroll_magic_mapping: {
       id: "scroll_magic_mapping",
       name: "Magic Mapping",
       category: "scroll",
       description: "Reveals the sewer currents and draws all crystals to you.",
-      effectText: "The dungeon layout clears in your mind! Crystals magnetic!"
+      effectText: "The dungeon layout clears in your mind! Crystals magnetic!",
+      sprite: "sprites/spd/items.png"
     },
     food_ration: {
       id: "food_ration",
       name: "Food Ration",
       category: "food",
       description: "Wholesome subterranean bread. Resets hunger and restores 15 HP.",
-      effectText: "You feast on the ration. Hunger fully satisfied (+15 HP)!"
+      effectText: "You feast on the ration. Hunger fully satisfied (+15 HP)!",
+      sprite: "sprites/spd/items.png"
     }
   };
   function getHungerStatus(hungerTime) {
@@ -442,18 +465,19 @@
     const count = inventory[kindKey];
     const disabled = count <= 0;
     return row(`item_row_${kindKey}`, { width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8 }, [
+      image(`item_ico_${kindKey}`, def.sprite, { width: 24, height: 24 }),
       column(`item_info_${kindKey}`, { flexGrow: 1 }, [
         text(`item_title_${kindKey}`, `${def.name}  x${count}`, { fontSize: 14, color: disabled ? muted : teal }),
         text(`item_desc_${kindKey}`, def.description, { fontSize: 11, color: muted })
       ]),
-      button(`use_${kindKey}`, disabled ? "EMPTY" : `USE [${def.id.slice(0, 3).toUpperCase()}]`, {
+      button(`use_${kindKey}`, disabled ? "EMPTY" : `USE`, {
         onClick: () => {
           useInventoryItem(kindKey);
           drawUi();
         },
         fontSize: 12,
         style: {
-          width: 100,
+          width: 80,
           height: 36,
           borderRadius: 6,
           background: disabled ? [0.08, 0.12, 0.14, 0.6] : amber
@@ -554,12 +578,18 @@
       const hungerColor = hunger === "satiated" ? teal : hunger === "hungry" ? amber : crimson;
       children.push(column("hud", { width: "100%", padding: 16, gap: 6 }, [
         row("hud_top", { width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8 }, [
-          column("hud_stats", { gap: 2, flexGrow: 1 }, [
-            text("hud_health", `VITALITY  ${Math.ceil(health())}`, { fontSize: 16, color: teal }),
-            text("hud_score", `LV ${level} / ${score} PTS / ${gold} G`, { fontSize: 12, color: muted })
+          row("hud_hero_box", { gap: 8, alignItems: "center" }, [
+            image("hud_hero_icon", heroClasses[selectedClass].icon, { width: 28, height: 28 }),
+            column("hud_stats", { gap: 2, flexGrow: 1 }, [
+              text("hud_health", `VITALITY  ${Math.ceil(health())}`, { fontSize: 16, color: teal }),
+              text("hud_score", `LV ${level} / ${score} PTS / ${gold} G`, { fontSize: 12, color: muted })
+            ])
           ]),
           column("hud_center", { alignItems: "center", gap: 2 }, [
-            text("hud_wave", wave < 3 ? `SEWERS: DEPTH ${wave + 1}` : "DEPTH 5: GOO'S LAIR", { fontSize: 15, color: amber }),
+            row("hud_depth_row", { gap: 4, alignItems: "center" }, [
+              image("hud_badge_icon", "sprites/spd/badges.png", { width: 16, height: 16 }),
+              text("hud_wave", wave < 3 ? `SEWERS: DEPTH ${wave + 1}` : "DEPTH 5: GOO'S LAIR", { fontSize: 15, color: amber })
+            ]),
             text("hud_hunger", hunger.toUpperCase(), { fontSize: 11, color: hungerColor })
           ]),
           row("hud_controls", { gap: 4 }, [
@@ -582,6 +612,7 @@
         column("boss_panel", { width: "100%", gap: 4, display: scene_actor("warden") ? "flex" : "none" }, [
           row("boss_title_row", { gap: 8, alignItems: "center" }, [
             image("boss_icon", "sprites/spd/goo.png", { width: 20, height: 20 }),
+            image("boss_hp_frame", "sprites/spd/boss_hp.png", { width: 16, height: 16 }),
             text("boss_label", "GOO (THE WARDEN)", { fontSize: 14, color: amber })
           ]),
           node("boss_track", { width: "100%", height: 5, background: ink }, [
@@ -618,11 +649,13 @@
     } else if (phase === "menu") {
       const heroSpec = heroClasses[selectedClass];
       children.push(panel("Descent into the Sewers", "Recreation of Shattered Pixel Dungeon.\nFight through 5 sewer depths, defeat Goo, and claim the Amulet.", [
+        image("spd_banner", "sprites/spd/banners.png", { width: compactUi() ? 180 : 220, height: compactUi() ? 34 : 42 }),
         row("menu_art", { gap: 12, alignItems: "center" }, [
           image("menu_icon", "sprites/spd/amulet.png", { width: 32, height: 32 }),
           text("menu_controls", "Defeat sewer vermin, find potions & scrolls.\nDefeat Goo on Depth 5 to claim the Amulet.", { fontSize: 13, color: muted })
         ]),
         row("hero_select_row", { width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8 }, [
+          image("hero_splash", heroSpec.splash, { width: compactUi() ? 46 : 56, height: compactUi() ? 46 : 56, borderRadius: 8 }),
           column("hero_desc_col", { flexGrow: 1, gap: 2 }, [
             text("hero_class_label", `CLASS: ${heroSpec.name}`, { fontSize: 16, color: amber }),
             text("hero_title_label", heroSpec.title, { fontSize: 12, color: teal }),
@@ -724,10 +757,16 @@
         [
           ...phase === "won" ? [
             row("won_art", { gap: 12, alignItems: "center", justifyContent: "center" }, [
+              image("victory_banner", "sprites/spd/banners.png", { width: 180, height: 36 }),
               image("victory_amulet", "sprites/spd/amulet.png", { width: 44, height: 44 }),
               text("victory_amulet_label", "AMULET OF YENDOR CLAIMED", { fontSize: 13, color: amber })
             ])
-          ] : [],
+          ] : [
+            row("lost_art", { gap: 8, alignItems: "center", justifyContent: "center" }, [
+              image("defeat_badge", "sprites/spd/badges.png", { width: 36, height: 36 }),
+              text("defeat_label", "PERISHED IN THE SEWERS", { fontSize: 13, color: crimson })
+            ])
+          ],
           text(
             "result_note",
             phase === "won" ? "Goo has dissolved into primordial sludge. You have conquered the Sewers and recovered the Amulet!" : "The treacherous sewers claim another daring adventurer. Try another class and venture forth again!",

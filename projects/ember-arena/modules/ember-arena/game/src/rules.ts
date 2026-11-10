@@ -61,6 +61,9 @@ export interface HeroClassSpec {
   name: string;
   title: string;
   model: string;
+  splash: string;
+  sprite: string;
+  icon: string;
   description: string;
   baseHealth: number;
   baseSpeed: number;
@@ -75,6 +78,9 @@ export const heroClasses: Record<HeroClass, HeroClassSpec> = {
     name: "WARRIOR",
     title: "Vanguard of the Sewers",
     model: "Knight",
+    splash: "sprites/spd/warrior.jpg",
+    sprite: "sprites/spd/warrior.png",
+    icon: "sprites/spd/hero_icons.png",
     description: "Equipped with iron mail and a tempered blade. Sturdy and resilient in direct melee.",
     baseHealth: 100,
     baseSpeed: 3.7,
@@ -87,6 +93,9 @@ export const heroClasses: Record<HeroClass, HeroClassSpec> = {
     name: "MAGE",
     title: "Scholar of Arcana",
     model: "Mage",
+    splash: "sprites/spd/mage.jpg",
+    sprite: "sprites/spd/mage.png",
+    icon: "sprites/spd/hero_icons.png",
     description: "Channels magic missile bolts from an ancient staff. Rapid ranged firepower.",
     baseHealth: 100,
     baseSpeed: 3.7,
@@ -99,6 +108,9 @@ export const heroClasses: Record<HeroClass, HeroClassSpec> = {
     name: "ROGUE",
     title: "Shadow Stalker",
     model: "Rogue_Hooded",
+    splash: "sprites/spd/rogue.jpg",
+    sprite: "sprites/spd/rogue.png",
+    icon: "sprites/spd/hero_icons.png",
     description: "Shrouded in a cloak of shadows. Swift movement and deadly surprise attacks.",
     baseHealth: 100,
     baseSpeed: 4.1,
@@ -111,6 +123,9 @@ export const heroClasses: Record<HeroClass, HeroClassSpec> = {
     name: "HUNTRESS",
     title: "Seeker of the Slums",
     model: "Barbarian",
+    splash: "sprites/spd/huntress.jpg",
+    sprite: "sprites/spd/huntress.png",
+    icon: "sprites/spd/hero_icons.png",
     description: "Armed with a spirit bow and fiery alchemy. Masters area damage.",
     baseHealth: 100,
     baseSpeed: 3.8,
@@ -127,6 +142,7 @@ export interface DungeonMonsterInfo {
   depth: number;
   lore: string;
   drops: string;
+  sprite: string;
 }
 
 export const dungeonMonsters: Record<EnemyKind, DungeonMonsterInfo> = {
@@ -135,24 +151,28 @@ export const dungeonMonsters: Record<EnemyKind, DungeonMonsterInfo> = {
     depth: 1,
     lore: "Fast, scurrying pest native to the upper sewer conduits.",
     drops: "Dew Drops, Gold Coins, Mystery Meat",
+    sprite: "sprites/spd/rat.png",
   },
   ranger: {
     name: "Gnoll Scout",
     depth: 2,
     lore: "Wild hyena scout slinging poisoned darts from afar.",
     drops: "Gold, Healing Potions, Darts",
+    sprite: "sprites/spd/gnoll.png",
   },
   charger: {
     name: "Sewer Crab",
     depth: 3,
     lore: "Heavy chitin carapace charging with crushing claws.",
     drops: "Armor Plates, Dew Drops, Meat",
+    sprite: "sprites/spd/crab.png",
   },
   boss: {
     name: "Goo (The Warden)",
     depth: 5,
     lore: "The colossal caustic slime ruling the sewer depths. Pumps itself up before explosive blasts!",
     drops: "Amulet of Yendor, 500 Gold",
+    sprite: "sprites/spd/goo.png",
   },
 };
 
@@ -171,6 +191,7 @@ export interface ItemDef {
   category: "potion" | "scroll" | "food";
   description: string;
   effectText: string;
+  sprite: string;
 }
 
 export const itemCatalog: Record<ItemKind, ItemDef> = {
@@ -180,6 +201,7 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     category: "potion",
     description: "Restores 45 Vitality and cures caustic ooze.",
     effectText: "A warm soothing energy flows through you (+45 HP).",
+    sprite: "sprites/spd/items.png",
   },
   potion_liquid_flame: {
     id: "potion_liquid_flame",
@@ -187,6 +209,7 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     category: "potion",
     description: "Hurls volatile fire that deals 35 damage to surrounding foes.",
     effectText: "The flask shatters into a roaring blaze (35 damage)! ",
+    sprite: "sprites/spd/items.png",
   },
   potion_invisibility: {
     id: "potion_invisibility",
@@ -194,6 +217,7 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     category: "potion",
     description: "Cloaks hero in shadows for 6s. Grants guaranteed surprise attacks.",
     effectText: "You vanish from enemy sight. Surprise attacks ready!",
+    sprite: "sprites/spd/items.png",
   },
   potion_strength: {
     id: "potion_strength",
@@ -201,6 +225,7 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     category: "potion",
     description: "Permanently enhances hero strike power by +4.",
     effectText: "Your muscles surge with power (+4 Base Damage)!",
+    sprite: "sprites/spd/items.png",
   },
   scroll_upgrade: {
     id: "scroll_upgrade",
@@ -208,6 +233,7 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     category: "scroll",
     description: "Upgrades equipped gear (+8 Damage, +20 Max Vitality).",
     effectText: "Ancient runes infuse your weaponry (+8 DMG, +20 HP)!",
+    sprite: "sprites/spd/items.png",
   },
   scroll_magic_mapping: {
     id: "scroll_magic_mapping",
@@ -215,6 +241,7 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     category: "scroll",
     description: "Reveals the sewer currents and draws all crystals to you.",
     effectText: "The dungeon layout clears in your mind! Crystals magnetic!",
+    sprite: "sprites/spd/items.png",
   },
   food_ration: {
     id: "food_ration",
@@ -222,6 +249,7 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     category: "food",
     description: "Wholesome subterranean bread. Resets hunger and restores 15 HP.",
     effectText: "You feast on the ration. Hunger fully satisfied (+15 HP)!",
+    sprite: "sprites/spd/items.png",
   },
 };
 

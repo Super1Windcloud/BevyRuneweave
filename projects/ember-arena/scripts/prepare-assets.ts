@@ -113,16 +113,48 @@ box("beacon", [0.30, 1.2, 0.30], [1, 0.5, 0.12], true);
 const spdAssetsDir = join(assets, "sprites/spd");
 mkdirSync(spdAssetsDir, { recursive: true });
 const spdFiles: Record<string, string> = {
-  "amulet.png": "sprites/amulet.png",
-  "goo.png": "sprites/goo.png",
+  // Heroes
+  "warrior.png": "sprites/warrior.png",
+  "mage.png": "sprites/mage.png",
+  "rogue.png": "sprites/rogue.png",
+  "huntress.png": "sprites/huntress.png",
+  "avatars.png": "sprites/avatars.png",
+  "hero_icons.png": "interfaces/hero_icons.png",
+
+  // Mobs
   "rat.png": "sprites/rat.png",
   "gnoll.png": "sprites/gnoll.png",
   "crab.png": "sprites/crab.png",
+  "swarm.png": "sprites/swarm.png",
+  "slime.png": "sprites/slime.png",
+  "goo.png": "sprites/goo.png",
+  "skeleton.png": "sprites/skeleton.png",
+  "thief.png": "sprites/thief.png",
+
+  // Items & environment
+  "amulet.png": "sprites/amulet.png",
   "items.png": "sprites/items.png",
+  "item_icons.png": "sprites/item_icons.png",
+  "tiles_sewers.png": "environment/tiles_sewers.png",
+  "terrain_features.png": "environment/terrain_features.png",
+  "water0.png": "environment/water0.png",
+
+  // UI
   "banners.png": "interfaces/banners.png",
   "badges.png": "interfaces/badges.png",
-  "hero_icons.png": "interfaces/hero_icons.png",
+  "boss_hp.png": "interfaces/boss_hp.png",
+  "buffs.png": "interfaces/buffs.png",
+  "icons.png": "interfaces/icons.png",
+  "status_pane.png": "interfaces/status_pane.png",
+  "toolbar.png": "interfaces/toolbar.png",
+  "menu_pane.png": "interfaces/menu_pane.png",
+
+  // Splashes
   "sewers.jpg": "splashes/sewers.jpg",
+  "warrior.jpg": "splashes/warrior.jpg",
+  "mage.jpg": "splashes/mage.jpg",
+  "rogue.jpg": "splashes/rogue.jpg",
+  "huntress.jpg": "splashes/huntress.jpg",
 };
 const spdBase = "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets";
 for (const [localName, remotePath] of Object.entries(spdFiles)) {

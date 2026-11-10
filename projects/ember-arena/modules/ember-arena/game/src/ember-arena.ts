@@ -155,15 +155,16 @@ function itemAction(kindKey: ItemKind): UiElement {
   const count = inventory[kindKey];
   const disabled = count <= 0;
   return row(`item_row_${kindKey}`, { width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8 }, [
+    image(`item_ico_${kindKey}`, def.sprite, { width: 24, height: 24 }),
     column(`item_info_${kindKey}`, { flexGrow: 1 }, [
       text(`item_title_${kindKey}`, `${def.name}  x${count}`, { fontSize: 14, color: disabled ? muted : teal }),
       text(`item_desc_${kindKey}`, def.description, { fontSize: 11, color: muted }),
     ]),
-    button(`use_${kindKey}`, disabled ? "EMPTY" : `USE [${def.id.slice(0, 3).toUpperCase()}]`, {
+    button(`use_${kindKey}`, disabled ? "EMPTY" : `USE`, {
       onClick: () => { useInventoryItem(kindKey); drawUi(); },
       fontSize: 12,
       style: {
-        width: 100,
+        width: 80,
         height: 36,
         borderRadius: 6,
         background: disabled ? [0.08, 0.12, 0.14, 0.6] : amber,
@@ -269,12 +270,18 @@ function drawUi(): void {
     const hungerColor = hunger === "satiated" ? teal : hunger === "hungry" ? amber : crimson;
     children.push(column("hud", { width: "100%", padding: 16, gap: 6 }, [
       row("hud_top", { width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8 }, [
-        column("hud_stats", { gap: 2, flexGrow: 1 }, [
-          text("hud_health", `VITALITY  ${Math.ceil(health())}`, { fontSize: 16, color: teal }),
-          text("hud_score", `LV ${level} / ${score} PTS / ${gold} G`, { fontSize: 12, color: muted }),
+        row("hud_hero_box", { gap: 8, alignItems: "center" }, [
+          image("hud_hero_icon", heroClasses[selectedClass].icon, { width: 28, height: 28 }),
+          column("hud_stats", { gap: 2, flexGrow: 1 }, [
+            text("hud_health", `VITALITY  ${Math.ceil(health())}`, { fontSize: 16, color: teal }),
+            text("hud_score", `LV ${level} / ${score} PTS / ${gold} G`, { fontSize: 12, color: muted }),
+          ]),
         ]),
         column("hud_center", { alignItems: "center", gap: 2 }, [
-          text("hud_wave", wave < 3 ? `SEWERS: DEPTH ${wave + 1}` : "DEPTH 5: GOO'S LAIR", { fontSize: 15, color: amber }),
+          row("hud_depth_row", { gap: 4, alignItems: "center" }, [
+            image("hud_badge_icon", "sprites/spd/badges.png", { width: 16, height: 16 }),
+            text("hud_wave", wave < 3 ? `SEWERS: DEPTH ${wave + 1}` : "DEPTH 5: GOO'S LAIR", { fontSize: 15, color: amber }),
+          ]),
           text("hud_hunger", hunger.toUpperCase(), { fontSize: 11, color: hungerColor }),
         ]),
         row("hud_controls", { gap: 4 }, [
@@ -297,6 +304,7 @@ function drawUi(): void {
       column("boss_panel", { width: "100%", gap: 4, display: scene_actor("warden") ? "flex" : "none" }, [
         row("boss_title_row", { gap: 8, alignItems: "center" }, [
           image("boss_icon", "sprites/spd/goo.png", { width: 20, height: 20 }),
+          image("boss_hp_frame", "sprites/spd/boss_hp.png", { width: 16, height: 16 }),
           text("boss_label", "GOO (THE WARDEN)", { fontSize: 14, color: amber }),
         ]),
         node("boss_track", { width: "100%", height: 5, background: ink }, [
@@ -333,11 +341,13 @@ function drawUi(): void {
   } else if (phase === "menu") {
     const heroSpec = heroClasses[selectedClass];
     children.push(panel("Descent into the Sewers", "Recreation of Shattered Pixel Dungeon.\nFight through 5 sewer depths, defeat Goo, and claim the Amulet.", [
+      image("spd_banner", "sprites/spd/banners.png", { width: compactUi() ? 180 : 220, height: compactUi() ? 34 : 42 }),
       row("menu_art", { gap: 12, alignItems: "center" }, [
         image("menu_icon", "sprites/spd/amulet.png", { width: 32, height: 32 }),
         text("menu_controls", "Defeat sewer vermin, find potions & scrolls.\nDefeat Goo on Depth 5 to claim the Amulet.", { fontSize: 13, color: muted }),
       ]),
       row("hero_select_row", { width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8 }, [
+        image("hero_splash", heroSpec.splash, { width: compactUi() ? 46 : 56, height: compactUi() ? 46 : 56, borderRadius: 8 }),
         column("hero_desc_col", { flexGrow: 1, gap: 2 }, [
           text("hero_class_label", `CLASS: ${heroSpec.name}`, { fontSize: 16, color: amber }),
           text("hero_title_label", heroSpec.title, { fontSize: 12, color: teal }),
@@ -404,10 +414,16 @@ function drawUi(): void {
       `${score} POINTS / LEVEL ${level} / ${Math.floor(elapsed)} SECONDS`, [
         ...(phase === "won" ? [
           row("won_art", { gap: 12, alignItems: "center", justifyContent: "center" }, [
+            image("victory_banner", "sprites/spd/banners.png", { width: 180, height: 36 }),
             image("victory_amulet", "sprites/spd/amulet.png", { width: 44, height: 44 }),
             text("victory_amulet_label", "AMULET OF YENDOR CLAIMED", { fontSize: 13, color: amber }),
           ]),
-        ] : []),
+        ] : [
+          row("lost_art", { gap: 8, alignItems: "center", justifyContent: "center" }, [
+            image("defeat_badge", "sprites/spd/badges.png", { width: 36, height: 36 }),
+            text("defeat_label", "PERISHED IN THE SEWERS", { fontSize: 13, color: crimson }),
+          ]),
+        ]),
         text("result_note", phase === "won"
           ? "Goo has dissolved into primordial sludge. You have conquered the Sewers and recovered the Amulet!"
           : "The treacherous sewers claim another daring adventurer. Try another class and venture forth again!",
