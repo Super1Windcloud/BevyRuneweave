@@ -108,8 +108,35 @@ box("ember", [0.20, 0.20, 0.45], [1, 0.48, 0.10], true);
 box("hostile", [0.30, 0.30, 0.30], [1, 0.13, 0.20], true);
 box("crystal", [0.25, 0.45, 0.25], [0.15, 0.95, 0.68], true);
 box("beacon", [0.30, 1.2, 0.30], [1, 0.5, 0.12], true);
-const manifest = { author: "Kay Lousberg", license: "CC0-1.0", commit, records };
+
+// Shattered Pixel Dungeon official assets
+const spdAssetsDir = join(assets, "sprites/spd");
+mkdirSync(spdAssetsDir, { recursive: true });
+const spdFiles: Record<string, string> = {
+  "amulet.png": "sprites/amulet.png",
+  "goo.png": "sprites/goo.png",
+  "rat.png": "sprites/rat.png",
+  "gnoll.png": "sprites/gnoll.png",
+  "crab.png": "sprites/crab.png",
+  "items.png": "sprites/items.png",
+  "banners.png": "interfaces/banners.png",
+  "badges.png": "interfaces/badges.png",
+  "hero_icons.png": "interfaces/hero_icons.png",
+  "sewers.jpg": "splashes/sewers.jpg",
+};
+const spdBase = "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets";
+for (const [localName, remotePath] of Object.entries(spdFiles)) {
+  const cached = join(cache, `spd-${localName}`);
+  if (!existsSync(cached)) {
+    const res = await fetch(`${spdBase}/${remotePath}`, { signal: AbortSignal.timeout(60_000) });
+    if (!res.ok) throw new Error(`SPD asset download failed: ${remotePath} (${res.status})`);
+    writeFileSync(cached, Buffer.from(await res.arrayBuffer()));
+  }
+  writeFileSync(join(spdAssetsDir, localName), readFileSync(cached));
+}
+
+const manifest = { author: "Kay Lousberg & Evan Debenham (00-Evan)", license: "CC0-1.0 & GPL-3.0", commit, records };
 const manifestPath = join(assets, "licenses/sources.json");
 mkdirSync(dirname(manifestPath), { recursive: true });
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-console.log(`Prepared ${records.length} downloaded characters and 8 procedural room models.`);
+console.log(`Prepared ${records.length} downloaded characters, 8 procedural room models, and ${Object.keys(spdFiles).length} Shattered Pixel Dungeon assets.`);

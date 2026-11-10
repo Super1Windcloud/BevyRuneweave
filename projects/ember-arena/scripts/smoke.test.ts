@@ -3,7 +3,20 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import { createContext, runInContext } from "node:vm";
-import { constrain, distance, pillars, seededRandom, segmentHits, waveAt } from "../modules/ember-arena/game/src/rules.js";
+import {
+  constrain,
+  distance,
+  dungeonMonsters,
+  getHungerStatus,
+  heroClasses,
+  heroClassList,
+  isSurpriseStrike,
+  itemCatalog,
+  pillars,
+  seededRandom,
+  segmentHits,
+  waveAt,
+} from "../modules/ember-arena/game/src/rules.js";
 import { defaultProfile, parseProfile } from "../modules/ember-arena/game/src/profile.js";
 
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
@@ -295,5 +308,92 @@ test("hit effects expire, and reduced effects disables them", () => {
     game.entities.delete("target");
     game.tick(5);
     assert.ok(![...game.entities.values()].some((entity) => entity.body?.kind === "effect"));
+  }
+});
+
+test("shattered pixel dungeon classes, items, surprise attacks and hunger mechanics", () => {
+  assert.equal(heroClassList.length, 4);
+  for (const classKey of heroClassList) {
+    const spec = heroClasses[classKey];
+    assert.ok(spec.name.length > 0);
+    assert.ok(spec.baseHealth >= 90);
+    assert.ok(spec.baseDamage >= 15);
+  }
+
+  assert.equal(dungeonMonsters.boss.name, "Goo (The Warden)");
+  assert.equal(dungeonMonsters.chaser.name, "Marsupial Rat");
+  assert.equal(dungeonMonsters.ranger.name, "Gnoll Scout");
+  assert.equal(dungeonMonsters.charger.name, "Sewer Crab");
+
+  assert.ok("potion_healing" in itemCatalog);
+  assert.ok("scroll_upgrade" in itemCatalog);
+  assert.ok("potion_liquid_flame" in itemCatalog);
+  assert.ok("food_ration" in itemCatalog);
+
+  // Surprise attack: true when invisible
+  assert.ok(isSurpriseStrike({ x: 0, z: 0 }, { x: 3, z: 3 }, true));
+  // Surprise attack: true when near pillar cover
+  const nearPillar = { x: pillars[0]!.x + 0.5, z: pillars[0]!.z };
+  const farEnemy = { x: pillars[0]!.x + 4, z: pillars[0]!.z + 4 };
+  assert.ok(isSurpriseStrike(nearPillar, farEnemy, false));
+  // False in wide open field
+  assert.ok(!isSurpriseStrike({ x: 6, z: 4 }, { x: 6, z: 2 }, false));
+
+  // Hunger status
+  assert.equal(getHungerStatus(10), "satiated");
+  assert.equal(getHungerStatus(80), "hungry");
+  assert.equal(getHungerStatus(150), "starving");
+});
+
+test("in-game backpack inventory, item usage and hero class switching", () => {
+  const game = harness();
+  // Hero cycle in menu
+  assert.match(game.ui.get("hero_class_label")!.text!, /WARRIOR/);
+  game.click("hero_class");
+  assert.match(game.ui.get("hero_class_label")!.text!, /MAGE/);
+  game.click("hero_class");
+  assert.match(game.ui.get("hero_class_label")!.text!, /ROGUE/);
+  game.click("hero_class");
+  assert.match(game.ui.get("hero_class_label")!.text!, /HUNTRESS/);
+  game.click("hero_class");
+  assert.match(game.ui.get("hero_class_label")!.text!, /WARRIOR/);
+
+  // Start game and open backpack
+  game.click("start");
+  assert.equal(game.state().message, "PLAYING");
+  game.click("bag_btn");
+  assert.equal(game.state().message, "INVENTORY");
+  assert.match(game.ui.get("item_title_potion_healing")!.text!, /Potion of Healing/);
+
+  // Drink healing potion
+  game.entities.get("player")!.body!.health = 40;
+  game.click("use_potion_healing");
+  assert.equal(game.entities.get("player")!.body!.health, 85);
+
+  // Read upgrade scroll
+  game.click("use_scroll_upgrade");
+  // Close bag
+  game.click("close_bag");
+  assert.equal(game.state().message, "PLAYING");
+});
+
+test("official shattered pixel dungeon sprite assets exist and are valid", () => {
+  const spdFiles = [
+    "amulet.png",
+    "goo.png",
+    "rat.png",
+    "gnoll.png",
+    "crab.png",
+    "items.png",
+    "banners.png",
+    "badges.png",
+    "hero_icons.png",
+    "sewers.jpg",
+  ];
+  for (const file of spdFiles) {
+    const fullPath = resolve(assets, `sprites/spd/${file}`);
+    assert.ok(existsSync(fullPath), `Missing SPD asset: ${file}`);
+    const stat = readFileSync(fullPath);
+    assert.ok(stat.length > 0, `Empty asset: ${file}`);
   }
 });

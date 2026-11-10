@@ -46,6 +46,148 @@
   function waveAt(elapsed2) {
     return waveEnds.filter((end) => elapsed2 >= end).length;
   }
+  var heroClasses = {
+    warrior: {
+      id: "warrior",
+      name: "WARRIOR",
+      title: "Vanguard of the Sewers",
+      model: "Knight",
+      description: "Equipped with iron mail and a tempered blade. Sturdy and resilient in direct melee.",
+      baseHealth: 100,
+      baseSpeed: 3.7,
+      baseDamage: 18,
+      fireDelay: 0.48,
+      perks: "+1 Potion of Healing, higher base strike power"
+    },
+    mage: {
+      id: "mage",
+      name: "MAGE",
+      title: "Scholar of Arcana",
+      model: "Mage",
+      description: "Channels magic missile bolts from an ancient staff. Rapid ranged firepower.",
+      baseHealth: 100,
+      baseSpeed: 3.7,
+      baseDamage: 16,
+      fireDelay: 0.4,
+      perks: "+1 Scroll of Upgrade, 16% faster wand casting"
+    },
+    rogue: {
+      id: "rogue",
+      name: "ROGUE",
+      title: "Shadow Stalker",
+      model: "Rogue_Hooded",
+      description: "Shrouded in a cloak of shadows. Swift movement and deadly surprise attacks.",
+      baseHealth: 100,
+      baseSpeed: 4.1,
+      baseDamage: 15,
+      fireDelay: 0.46,
+      perks: "+1 Potion of Invisibility, +10% move speed"
+    },
+    huntress: {
+      id: "huntress",
+      name: "HUNTRESS",
+      title: "Seeker of the Slums",
+      model: "Barbarian",
+      description: "Armed with a spirit bow and fiery alchemy. Masters area damage.",
+      baseHealth: 100,
+      baseSpeed: 3.8,
+      baseDamage: 19,
+      fireDelay: 0.48,
+      perks: "+1 Potion of Liquid Flame & Food Ration"
+    }
+  };
+  var heroClassList = ["warrior", "mage", "rogue", "huntress"];
+  var dungeonMonsters = {
+    chaser: {
+      name: "Marsupial Rat",
+      depth: 1,
+      lore: "Fast, scurrying pest native to the upper sewer conduits.",
+      drops: "Dew Drops, Gold Coins, Mystery Meat"
+    },
+    ranger: {
+      name: "Gnoll Scout",
+      depth: 2,
+      lore: "Wild hyena scout slinging poisoned darts from afar.",
+      drops: "Gold, Healing Potions, Darts"
+    },
+    charger: {
+      name: "Sewer Crab",
+      depth: 3,
+      lore: "Heavy chitin carapace charging with crushing claws.",
+      drops: "Armor Plates, Dew Drops, Meat"
+    },
+    boss: {
+      name: "Goo (The Warden)",
+      depth: 5,
+      lore: "The colossal caustic slime ruling the sewer depths. Pumps itself up before explosive blasts!",
+      drops: "Amulet of Yendor, 500 Gold"
+    }
+  };
+  var itemCatalog = {
+    potion_healing: {
+      id: "potion_healing",
+      name: "Potion of Healing",
+      category: "potion",
+      description: "Restores 45 Vitality and cures caustic ooze.",
+      effectText: "A warm soothing energy flows through you (+45 HP)."
+    },
+    potion_liquid_flame: {
+      id: "potion_liquid_flame",
+      name: "Liquid Flame",
+      category: "potion",
+      description: "Hurls volatile fire that deals 35 damage to surrounding foes.",
+      effectText: "The flask shatters into a roaring blaze (35 damage)! "
+    },
+    potion_invisibility: {
+      id: "potion_invisibility",
+      name: "Potion of Invisibility",
+      category: "potion",
+      description: "Cloaks hero in shadows for 6s. Grants guaranteed surprise attacks.",
+      effectText: "You vanish from enemy sight. Surprise attacks ready!"
+    },
+    potion_strength: {
+      id: "potion_strength",
+      name: "Potion of Strength",
+      category: "potion",
+      description: "Permanently enhances hero strike power by +4.",
+      effectText: "Your muscles surge with power (+4 Base Damage)!"
+    },
+    scroll_upgrade: {
+      id: "scroll_upgrade",
+      name: "Scroll of Upgrade",
+      category: "scroll",
+      description: "Upgrades equipped gear (+8 Damage, +20 Max Vitality).",
+      effectText: "Ancient runes infuse your weaponry (+8 DMG, +20 HP)!"
+    },
+    scroll_magic_mapping: {
+      id: "scroll_magic_mapping",
+      name: "Magic Mapping",
+      category: "scroll",
+      description: "Reveals the sewer currents and draws all crystals to you.",
+      effectText: "The dungeon layout clears in your mind! Crystals magnetic!"
+    },
+    food_ration: {
+      id: "food_ration",
+      name: "Food Ration",
+      category: "food",
+      description: "Wholesome subterranean bread. Resets hunger and restores 15 HP.",
+      effectText: "You feast on the ration. Hunger fully satisfied (+15 HP)!"
+    }
+  };
+  function getHungerStatus(hungerTime) {
+    if (hungerTime < 60) return "satiated";
+    if (hungerTime < 120) return "hungry";
+    return "starving";
+  }
+  function isSurpriseStrike(heroPos, targetPos, isInvisible, obstaclePillars = pillars) {
+    if (isInvisible) return true;
+    for (const pillar of obstaclePillars) {
+      if (distance(heroPos, pillar) < 1.4 && distance(targetPos, pillar) > 1.3) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   // modules/ember-arena/game/src/actors.ts
   function actor(id) {
@@ -187,14 +329,17 @@
   var amber = [1, 0.6, 0.2, 1];
   var muted = [0.55, 0.69, 0.71, 1];
   var teal = [0.17, 0.83, 0.65, 1];
+  var crimson = [0.95, 0.25, 0.2, 1];
   var phase = "menu";
   var returnPhase = "menu";
+  var selectedClass = "warrior";
   var elapsed = 0;
   var score = 0;
   var wave = 0;
   var level = 1;
   var experience = 0;
-  var damage = 16;
+  var damage = 18;
+  var maxHealth = 100;
   var fireDelay = 0.48;
   var fireTimer = 0;
   var spawnTimer = 0;
@@ -217,10 +362,29 @@
   var hurtTimer = 0;
   var lastDamage = 0;
   var checkPage = 0;
+  var gold = 0;
+  var hungerTimer = 0;
+  var invisTimer = 0;
+  var causticOozeTimer = 0;
+  var surpriseNoticeTimer = 0;
+  var dungeonLogs = [];
+  var inventory = {
+    potion_healing: 1,
+    potion_liquid_flame: 1,
+    potion_invisibility: 1,
+    potion_strength: 0,
+    scroll_upgrade: 1,
+    scroll_magic_mapping: 0,
+    food_ration: 1
+  };
   var compactUi = () => window_metrics().height > 0 && window_metrics().height < 650;
   var uid = (prefix) => `${prefix}_${nextId++}`;
   var health = () => Math.max(0, field("player", "health"));
   var targetExperience = () => 4 + level * 3;
+  function pushLog(entry) {
+    dungeonLogs.unshift(entry);
+    if (dungeonLogs.length > 3) dungeonLogs.pop();
+  }
   function loadProfile() {
     saveBlocked = false;
     saveNotice = "";
@@ -273,6 +437,82 @@
       }
     });
   }
+  function itemAction(kindKey) {
+    const def = itemCatalog[kindKey];
+    const count = inventory[kindKey];
+    const disabled = count <= 0;
+    return row(`item_row_${kindKey}`, { width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8 }, [
+      column(`item_info_${kindKey}`, { flexGrow: 1 }, [
+        text(`item_title_${kindKey}`, `${def.name}  x${count}`, { fontSize: 14, color: disabled ? muted : teal }),
+        text(`item_desc_${kindKey}`, def.description, { fontSize: 11, color: muted })
+      ]),
+      button(`use_${kindKey}`, disabled ? "EMPTY" : `USE [${def.id.slice(0, 3).toUpperCase()}]`, {
+        onClick: () => {
+          useInventoryItem(kindKey);
+          drawUi();
+        },
+        fontSize: 12,
+        style: {
+          width: 100,
+          height: 36,
+          borderRadius: 6,
+          background: disabled ? [0.08, 0.12, 0.14, 0.6] : amber
+        },
+        color: disabled ? muted : [0.06, 0.08, 0.08, 1]
+      })
+    ]);
+  }
+  function useInventoryItem(kindKey) {
+    if (inventory[kindKey] <= 0) return false;
+    inventory[kindKey]--;
+    const def = itemCatalog[kindKey];
+    if (kindKey === "potion_healing") {
+      change("player", "health", Math.min(maxHealth, health() + 45));
+      causticOozeTimer = 0;
+      pushLog(def.effectText);
+    } else if (kindKey === "potion_liquid_flame") {
+      const heroPos = position("player");
+      for (const id of scene_actor_ids()) {
+        if (!scene_actor(id) || !(kind(id) in enemySpecs)) continue;
+        const targetPos = position(id);
+        if (distance(heroPos, targetPos) <= 4.2) {
+          impact(targetPos);
+          change(id, "health", field(id, "health") - 35);
+          if (field(id, "health") <= 0) {
+            score += kind(id) === "boss" ? 500 : 10;
+            pickup(targetPos);
+            scene_despawn(id);
+            if (kind(id) === "boss") setPhase("won");
+          }
+        }
+      }
+      pushLog(def.effectText);
+    } else if (kindKey === "potion_invisibility") {
+      invisTimer = 6;
+      pushLog(def.effectText);
+    } else if (kindKey === "potion_strength") {
+      damage += 4;
+      pushLog(def.effectText);
+    } else if (kindKey === "scroll_upgrade") {
+      damage += 8;
+      maxHealth += 20;
+      change("player", "health", Math.min(maxHealth, health() + 20));
+      pushLog(def.effectText);
+    } else if (kindKey === "scroll_magic_mapping") {
+      const heroPos = position("player");
+      for (const id of scene_actor_ids()) {
+        if (scene_actor(id) && kind(id) === "crystal") {
+          move(id, { x: heroPos.x + (random() - 0.5) * 0.4, z: heroPos.z + (random() - 0.5) * 0.4 });
+        }
+      }
+      pushLog(def.effectText);
+    } else if (kindKey === "food_ration") {
+      hungerTimer = 0;
+      change("player", "health", Math.min(maxHealth, health() + 15));
+      pushLog(def.effectText);
+    }
+    return true;
+  }
   function safeStyle() {
     const safe = window_safe_area();
     const pointer = input_primary_pointer();
@@ -293,7 +533,7 @@
       background: ink,
       borderRadius: 16
     }, [
-      text("panel_kicker", "RUNEWEAVE / EMBER ARENA", { fontSize: 12, color: amber }),
+      text("panel_kicker", "SHATTERED PIXEL DUNGEON", { fontSize: 12, color: amber }),
       text("panel_title", title, { fontSize: compactUi() ? 22 : 32 }),
       text("panel_subtitle", subtitle, {
         fontSize: compactUi() ? 11 : 14,
@@ -310,65 +550,118 @@
     viewport = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
     const children = [];
     if (phase === "playing") {
-      children.push(column("hud", { width: "100%", padding: 16, gap: 8 }, [
+      const hunger = getHungerStatus(hungerTimer);
+      const hungerColor = hunger === "satiated" ? teal : hunger === "hungry" ? amber : crimson;
+      children.push(column("hud", { width: "100%", padding: 16, gap: 6 }, [
         row("hud_top", { width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8 }, [
-          column("hud_stats", { gap: 4, flexGrow: 1 }, [
+          column("hud_stats", { gap: 2, flexGrow: 1 }, [
             text("hud_health", `VITALITY  ${Math.ceil(health())}`, { fontSize: 16, color: teal }),
-            text("hud_score", `LV ${level}  /  ${score} POINTS`, { fontSize: 12, color: muted })
+            text("hud_score", `LV ${level} / ${score} PTS / ${gold} G`, { fontSize: 12, color: muted })
           ]),
-          text("hud_wave", wave < 3 ? `WAVE ${wave + 1} / 3` : "THE WARDEN", { fontSize: 16, color: amber }),
-          button("pause", "II", {
-            onClick: () => setPhase("paused"),
-            fontSize: 20,
-            style: { width: 48, height: 44, margin: 4, background: ink, borderRadius: 8 }
-          })
+          column("hud_center", { alignItems: "center", gap: 2 }, [
+            text("hud_wave", wave < 3 ? `SEWERS: DEPTH ${wave + 1}` : "DEPTH 5: GOO'S LAIR", { fontSize: 15, color: amber }),
+            text("hud_hunger", hunger.toUpperCase(), { fontSize: 11, color: hungerColor })
+          ]),
+          row("hud_controls", { gap: 4 }, [
+            button("bag_btn", "BAG [I]", {
+              onClick: () => setPhase("inventory"),
+              fontSize: 12,
+              style: { width: 56, height: 40, background: [0.12, 0.22, 0.24, 1], borderRadius: 6 }
+            }),
+            button("pause", "II", {
+              onClick: () => setPhase("paused"),
+              fontSize: 18,
+              style: { width: 44, height: 40, background: ink, borderRadius: 6 }
+            })
+          ])
         ]),
         node("health_track", { width: "100%", height: 4, background: [0.1, 0.2, 0.2, 0.7] }, [
-          node("health_fill", { width: `${clamp(health(), 0, 100)}%`, height: 4, background: teal })
+          node("health_fill", { width: `${clamp(health() / maxHealth * 100, 0, 100)}%`, height: 4, background: teal })
         ]),
         text("hud_info", statusLine(), { fontSize: 12, color: muted }),
         column("boss_panel", { width: "100%", gap: 4, display: scene_actor("warden") ? "flex" : "none" }, [
-          text("boss_label", "THE WARDEN", { fontSize: 14, color: amber }),
+          row("boss_title_row", { gap: 8, alignItems: "center" }, [
+            image("boss_icon", "sprites/spd/goo.png", { width: 20, height: 20 }),
+            text("boss_label", "GOO (THE WARDEN)", { fontSize: 14, color: amber })
+          ]),
           node("boss_track", { width: "100%", height: 5, background: ink }, [
-            node("boss_fill", { width: "100%", height: 5, background: [0.95, 0.25, 0.2, 1] })
+            node("boss_fill", { width: "100%", height: 5, background: crimson })
           ])
         ]),
-        text("combat_notice", "", { fontSize: 16, color: amber })
+        text("combat_notice", "", { fontSize: 15, color: amber }),
+        column("hud_logs", { width: "100%", gap: 2, padding: 4 }, [
+          ...dungeonLogs.map(
+            (entry, idx) => text(`log_line_${idx}`, entry, { fontSize: 11, color: idx === 0 ? teal : muted })
+          )
+        ])
       ]));
-      children.push(text("hint", "WASD / ARROWS OR DRAG  |  AUTO FIRE  |  ESC TO PAUSE", {
+      children.push(text("hint", "WASD/DRAG MOVE | I: BAG | SPACE: REST | 1-7: QUICK ITEMS | ESC: PAUSE", {
         fontSize: 11,
         color: muted,
         style: { position: "absolute", bottom: 12, left: 16, right: 16, display: profile.showHints ? "flex" : "none" }
       }));
-    } else if (phase === "menu") {
-      children.push(panel("Guard the last ember.", "A tiny survival adventure in one room.\nThree waves. One warden. Make every upgrade count.", [
-        row("menu_art", { gap: 12, alignItems: "center" }, [
-          image("menu_icon", "sprites/settings-icon.png", { width: 32, height: 32 }),
-          text("menu_controls", "Move with WASD, arrows or a drag.\nYour mage fires at the nearest enemy.", { fontSize: 14, color: muted })
+    } else if (phase === "inventory") {
+      children.push(panel("Hero's Backpack", `SEWERS / GOLD ${gold} / HUNGER: ${getHungerStatus(hungerTimer).toUpperCase()}`, [
+        row("bag_header", { gap: 10, alignItems: "center" }, [
+          image("bag_icon", "sprites/spd/items.png", { width: 32, height: 32 }),
+          text("bag_title", "SEWER SATCHEL & ALCHEMY", { fontSize: 14, color: amber })
         ]),
-        action("start", "ENTER THE ARENA", startRun, true),
+        itemAction("potion_healing"),
+        itemAction("potion_liquid_flame"),
+        itemAction("potion_invisibility"),
+        itemAction("potion_strength"),
+        itemAction("scroll_upgrade"),
+        itemAction("scroll_magic_mapping"),
+        itemAction("food_ration"),
+        action("close_bag", "CLOSE BACKPACK [ESC / I]", () => setPhase("playing"), true)
+      ]));
+    } else if (phase === "menu") {
+      const heroSpec = heroClasses[selectedClass];
+      children.push(panel("Descent into the Sewers", "Recreation of Shattered Pixel Dungeon.\nFight through 5 sewer depths, defeat Goo, and claim the Amulet.", [
+        row("menu_art", { gap: 12, alignItems: "center" }, [
+          image("menu_icon", "sprites/spd/amulet.png", { width: 32, height: 32 }),
+          text("menu_controls", "Defeat sewer vermin, find potions & scrolls.\nDefeat Goo on Depth 5 to claim the Amulet.", { fontSize: 13, color: muted })
+        ]),
+        row("hero_select_row", { width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8 }, [
+          column("hero_desc_col", { flexGrow: 1, gap: 2 }, [
+            text("hero_class_label", `CLASS: ${heroSpec.name}`, { fontSize: 16, color: amber }),
+            text("hero_title_label", heroSpec.title, { fontSize: 12, color: teal }),
+            text("hero_perks_label", heroSpec.perks, { fontSize: 11, color: muted })
+          ]),
+          button("hero_class", "CYCLE HERO", {
+            onClick: () => {
+              const nextIdx = (heroClassList.indexOf(selectedClass) + 1) % heroClassList.length;
+              selectedClass = heroClassList[nextIdx];
+              room();
+              drawUi();
+            },
+            fontSize: 12,
+            style: { width: 110, height: 42, background: [0.15, 0.25, 0.28, 1], borderRadius: 8 }
+          })
+        ]),
+        action("start", "DESCEND INTO THE SEWERS", startRun, true),
         text("saved_stats", `BEST ${profile.bestScore}  /  WINS ${profile.wins} / ${profile.runs}  /  SEED ${profile.seed}`, { fontSize: 12, color: teal }),
         action("settings", "SETTINGS & PROGRESS", openSettings),
         action("checks", "RUNTIME CHECKS", openChecks),
         action("exit", "RETURN TO LAUNCHER", () => {
           app_request_exit();
         }),
-        text("credits", "Characters by Kay Lousberg / KayKit (CC0)", { fontSize: 11, color: muted })
+        text("credits", "Based on Shattered Pixel Dungeon (00-Evan/Watabou). KayKit 3D Models (CC0).", { fontSize: 11, color: muted })
       ]));
     } else if (phase === "paused") {
-      children.push(panel("Take a breath.", "The arena is paused. Your run is safe here.", [
-        action("resume", "KEEP GOING", () => setPhase("playing"), true),
+      children.push(panel("Sewer Rest Camp", "The subterranean conduits grow quiet. Prepare your next move.", [
+        action("resume", "KEEP EXPLORING", () => setPhase("playing"), true),
         action("settings", "SETTINGS & PROGRESS", openSettings),
         action("checks", "RUNTIME CHECKS", openChecks),
-        action("restart", "RESTART RUN", startRun),
+        action("restart", "RESTART DESCENT", startRun),
         action("home", "MAIN MENU", loadMenu),
         action("exit", "RETURN TO LAUNCHER", () => {
           app_request_exit();
         })
       ]));
     } else if (phase === "settings") {
-      const changeSetting = (change2) => {
-        change2();
+      const changeSetting = (changeFn) => {
+        changeFn();
         persistProfile();
         drawUi();
       };
@@ -419,20 +712,30 @@
         action("settings_back", "BACK", () => setPhase(settingsReturn), true)
       ]));
     } else if (phase === "upgrade") {
-      children.push(panel("A spark of power.", `LEVEL ${level} / Choose one upgrade to continue.`, [
-        action("upgrade_power", "EMBER  /  +8 attack damage", () => upgrade("power"), true),
+      children.push(panel("Dungeon Empowerment", `LEVEL ${level} / Harness the dungeon embers to enhance your hero.`, [
+        action("upgrade_power", "EMBER  /  +8 strike damage", () => upgrade("power"), true),
         action("upgrade_haste", "TEMPO  /  16% faster attacks", () => upgrade("haste")),
         action("upgrade_vigor", "VIGOR  /  heal 30, move faster", () => upgrade("vigor"))
       ]));
     } else if (phase === "won" || phase === "lost") {
       children.push(panel(
-        phase === "won" ? "The ember endures." : "One more spark?",
+        phase === "won" ? "The Amulet of Yendor is Yours!" : "You Perished in the Sewers.",
         `${score} POINTS / LEVEL ${level} / ${Math.floor(elapsed)} SECONDS`,
         [
-          text("result_note", phase === "won" ? "The warden has fallen. The room is yours." : "Keep moving, collect crystals, and watch the red bolts.", { fontSize: 14, color: muted }),
+          ...phase === "won" ? [
+            row("won_art", { gap: 12, alignItems: "center", justifyContent: "center" }, [
+              image("victory_amulet", "sprites/spd/amulet.png", { width: 44, height: 44 }),
+              text("victory_amulet_label", "AMULET OF YENDOR CLAIMED", { fontSize: 13, color: amber })
+            ])
+          ] : [],
+          text(
+            "result_note",
+            phase === "won" ? "Goo has dissolved into primordial sludge. You have conquered the Sewers and recovered the Amulet!" : "The treacherous sewers claim another daring adventurer. Try another class and venture forth again!",
+            { fontSize: 14, color: muted }
+          ),
           text("result_record", `BEST ${profile.bestScore}  /  WINS ${profile.wins} / ${profile.runs}`, { fontSize: 14, color: teal }),
           text("result_save", saveNotice, { fontSize: 12, color: muted }),
-          action("restart", "PLAY AGAIN", startRun, true),
+          action("restart", "DESCENT AGAIN", startRun, true),
           action("home", "MAIN MENU", loadMenu),
           action("exit", "RETURN TO LAUNCHER", () => {
             app_request_exit();
@@ -444,7 +747,9 @@
       const pages = Math.max(1, Math.ceil(checks.length / pageSize));
       checkPage = Math.min(checkPage, pages - 1);
       children.push(panel("Runtime checks", "Contract checks run in the live script context.", [
-        ...checks.slice(checkPage * pageSize, (checkPage + 1) * pageSize).map((line, index) => text(`check_${index}`, line, { fontSize: compactUi() ? 11 : 12, color: line.startsWith("FAIL") ? [1, 0.3, 0.3, 1] : muted })),
+        ...checks.slice(checkPage * pageSize, (checkPage + 1) * pageSize).map(
+          (line, index) => text(`check_${index}`, line, { fontSize: compactUi() ? 11 : 12, color: line.startsWith("FAIL") ? [1, 0.3, 0.3, 1] : muted })
+        ),
         action("check_page", `NEXT PAGE  /  ${checkPage + 1} OF ${pages}`, () => {
           checkPage = (checkPage + 1) % pages;
           drawUi();
@@ -462,7 +767,11 @@
   }
   function statusLine() {
     const remaining = wave < 3 ? [40, 85, 130][wave] - elapsed : elapsed - 130;
-    return `${Math.max(0, Math.ceil(remaining))}s  /  CRYSTALS ${experience}/${targetExperience()}  /  ${scene_actor_ids().length} ACTORS`;
+    const statusEffects = [
+      invisTimer > 0 ? `CLOAKED(${invisTimer.toFixed(1)}s)` : "",
+      causticOozeTimer > 0 ? `OOZE(${causticOozeTimer.toFixed(1)}s)` : ""
+    ].filter(Boolean).join(" ");
+    return `${Math.max(0, Math.ceil(remaining))}s  /  CRYSTALS ${experience}/${targetExperience()}  /  ${scene_actor_ids().length} ACTORS${statusEffects ? `  /  ${statusEffects}` : ""}`;
   }
   function publish() {
     game_state_set(score, Math.ceil(health()), phase.toUpperCase());
@@ -497,9 +806,10 @@
       model(`pillar_${index}`, "pillar", pillar, 1, 0.65);
       model(`beacon_${index}`, "beacon", pillar, 0.6, 1.7);
     }
-    model("player", "Mage", { x: 0, z: 0 }, 0.65);
-    scene_actor_set("player", "player", 100, 3.7, 0.35);
-    scene_play_animation("player", "models/Mage.glb", true);
+    const heroSpec = heroClasses[selectedClass];
+    model("player", heroSpec.model, { x: 0, z: 0 }, 0.65);
+    scene_actor_set("player", "player", 100, heroSpec.baseSpeed, 0.35);
+    scene_play_animation("player", `models/${heroSpec.model}.glb`, true);
   }
   function loadMenu() {
     room();
@@ -507,13 +817,33 @@
   }
   function startRun() {
     elapsed = score = wave = experience = fireTimer = spawnTimer = nextId = uiTimer = 0;
+    gold = 0;
+    hungerTimer = 0;
+    invisTimer = 0;
+    causticOozeTimer = 0;
+    surpriseNoticeTimer = 0;
     level = 1;
-    damage = 16;
-    fireDelay = 0.48;
+    const heroSpec = heroClasses[selectedClass];
+    damage = heroSpec.baseDamage;
+    maxHealth = 100;
+    fireDelay = heroSpec.fireDelay;
     bossSpawned = false;
     runRecorded = false;
     hurtTimer = 0;
     random = seededRandom(profile.seed);
+    inventory = {
+      potion_healing: selectedClass === "warrior" ? 2 : 1,
+      potion_liquid_flame: selectedClass === "huntress" ? 2 : 1,
+      potion_invisibility: selectedClass === "rogue" ? 2 : 1,
+      potion_strength: 0,
+      scroll_upgrade: selectedClass === "mage" ? 2 : 1,
+      scroll_magic_mapping: selectedClass === "mage" ? 1 : 0,
+      food_ration: 1
+    };
+    dungeonLogs = [
+      `Welcome to the Sewers, ${heroSpec.name}.`,
+      "Descend the 5 depths, defeat Goo, and claim the Amulet."
+    ];
     room();
     setPhase("playing");
   }
@@ -530,7 +860,8 @@
     const types = wave === 0 ? ["chaser"] : wave === 1 ? ["chaser", "ranger"] : ["chaser", "ranger", "charger"];
     const angle = random() * Math.PI * 2;
     const point = constrain({ x: Math.cos(angle) * (halfWidth - 0.5), z: Math.sin(angle) * 5 }, 0.45, halfWidth);
-    enemy(uid("enemy"), types[Math.floor(random() * types.length)], point);
+    const pickedType = types[Math.floor(random() * types.length)];
+    enemy(uid("enemy"), pickedType, point);
   }
   function projectile(start, target, hostile, power, angleOffset = 0) {
     const id = uid(hostile ? "hostile" : "ember");
@@ -591,6 +922,18 @@
     const next = constrain({ x: current.x + dx * factor, z: current.z + dz * factor }, 0.35, halfWidth);
     move("player", next, length > 1e-3 ? Math.atan2(dx, dz) : Math.PI);
     change("player", "cooldown", Math.max(0, field("player", "cooldown") - dt));
+    if (invisTimer > 0) invisTimer = Math.max(0, invisTimer - dt);
+    if (surpriseNoticeTimer > 0) surpriseNoticeTimer = Math.max(0, surpriseNoticeTimer - dt);
+    hungerTimer += dt;
+    if (hungerTimer > 120 && field("player", "cooldown") <= 0) {
+      change("player", "health", Math.max(0, health() - dt * 1.5));
+      if (health() <= 0) setPhase("lost");
+    }
+    if (causticOozeTimer > 0) {
+      causticOozeTimer = Math.max(0, causticOozeTimer - dt);
+      change("player", "health", Math.max(0, health() - dt * 2));
+      if (health() <= 0) setPhase("lost");
+    }
   }
   function enemiesStep(dt, ids) {
     const player = position("player");
@@ -610,10 +953,15 @@
       const cooldown = field(id, "cooldown") - dt;
       change(id, "cooldown", cooldown);
       if (cooldown <= 0 && (type === "ranger" || type === "boss")) {
-        for (const angle of type === "boss" ? [-0.55, -0.28, 0, 0.28, 0.55] : [0]) projectile(next, player, true, 12, angle);
+        for (const angle of type === "boss" ? [-0.55, -0.28, 0, 0.28, 0.55] : [0]) {
+          projectile(next, player, true, 12, angle);
+        }
         change(id, "cooldown", type === "boss" ? 2.2 : 2.8);
       }
-      if (distance(next, player) < field(id, "radius") + 0.35) hurtPlayer(type === "boss" ? 25 : 15);
+      if (distance(next, player) < field(id, "radius") + 0.35) {
+        if (type === "boss") causticOozeTimer = 3.5;
+        hurtPlayer(type === "boss" ? 25 : 15);
+      }
       if (phase !== "playing") return;
     }
   }
@@ -640,15 +988,29 @@
       } else {
         for (const target of targets) {
           if (!scene_actor(target) || !segmentHits(current, next, position(target), field(target, "radius") + 0.16)) continue;
-          const hp = field(target, "health") - field(id, "power");
-          impact(position(target));
+          const targetPos = position(target);
+          const heroPos = position("player");
+          const surprise = isSurpriseStrike(heroPos, targetPos, invisTimer > 0);
+          const effectiveDamage = surprise ? Math.round(field(id, "power") * 1.5) : field(id, "power");
+          if (surprise) {
+            surpriseNoticeTimer = 0.8;
+            pushLog(`Surprise attack! 100% Hit on ${dungeonMonsters[kind(target)].name} (-${effectiveDamage})!`);
+          }
+          const hp = field(target, "health") - effectiveDamage;
+          impact(targetPos);
           change(target, "health", hp);
           if (hp <= 0) {
-            const type2 = kind(target);
-            pickup(position(target));
-            score += type2 === "boss" ? 500 : 10;
+            const targetType = kind(target);
+            pickup(targetPos);
+            score += targetType === "boss" ? 500 : 10;
+            gold += targetType === "boss" ? 100 : Math.floor(random() * 8) + 3;
+            const roll = random();
+            if (roll < 0.2 && inventory.potion_healing < 5) inventory.potion_healing++;
+            else if (roll < 0.35 && inventory.food_ration < 4) inventory.food_ration++;
+            else if (roll < 0.45 && inventory.potion_liquid_flame < 4) inventory.potion_liquid_flame++;
+            pushLog(`${dungeonMonsters[targetType].name} defeated! (+${targetType === "boss" ? 500 : 10} pts)`);
             scene_despawn(target);
-            if (type2 === "boss") setPhase("won");
+            if (targetType === "boss") setPhase("won");
           }
           hit = true;
           break;
@@ -704,7 +1066,10 @@
       reference.set("x", 2);
       return field("probe", "health") === 3 && position("probe").x === 2 && scene_actor_ids().includes("probe");
     });
-    check("Invalid values / missing entities rejected", () => !scene_actor_set("missing", "probe", 1, 1, 1) && !scene_set_transform_3d("probe", 0, 0, 0, 0, 0, 0, -1) && !scene_set_model("probe", "../forbidden.glb") && !window_set_size(NaN, 100));
+    check(
+      "Invalid values / missing entities rejected",
+      () => !scene_actor_set("missing", "probe", 1, 1, 1) && !scene_set_transform_3d("probe", 0, 0, 0, 0, 0, 0, -1) && !scene_set_model("probe", "../forbidden.glb") && !window_set_size(NaN, 100)
+    );
     check("2D sprite / text / transform / camera toggle", () => {
       const sprite = scene_set_sprite("probe", "sprites/settings-icon.png", 32, 32);
       const label = scene_set_text("probe", "2D probe", 16, 1, 1, 1, 1, "center");
@@ -717,9 +1082,9 @@
       ui_spawn("probe_ui", "", "node");
       ui_spawn("probe_child", "probe_ui", "text");
       ui_spawn("probe_image", "probe_ui", "image");
-      const image2 = ui_set_image("probe_image", "sprites/settings-icon.png");
+      const img = ui_set_image("probe_image", "sprites/settings-icon.png");
       const rejected = !ui_set_style("probe_ui", JSON.stringify({ unsupported: 1 }));
-      return image2 && rejected && ui_despawn("probe_ui") && !ui_set_text("probe_child", "gone", 12, 1, 1, 1, 1);
+      return img && rejected && ui_despawn("probe_ui") && !ui_set_text("probe_child", "gone", 12, 1, 1, 1, 1);
     });
     check("Keyboard / touch / pointer / safe-area reads", () => {
       input_key_pressed("KeyW");
@@ -731,13 +1096,15 @@
     check("Unknown HTTP request state", () => http_poll(2147483647).state === "unknown");
     const storage = storage_read("_acceptance_probe");
     if (storage.state === "error" && storage.error === "unavailable") checks.push("NOT_RUN  Persistent storage (no private data directory)");
-    else check("Persistent write / read / remove", () => {
-      if (storage.state !== "missing") return false;
-      const written = storage_write("_acceptance_probe", "ember-arena-probe");
-      const read = storage_read("_acceptance_probe");
-      const removed = storage_remove("_acceptance_probe");
-      return written.state === "ok" && read.state === "ok" && read.value === "ember-arena-probe" && removed.state === "ok";
-    });
+    else {
+      check("Persistent write / read / remove", () => {
+        if (storage.state !== "missing") return false;
+        const written = storage_write("_acceptance_probe", "ember-arena-probe");
+        const read = storage_read("_acceptance_probe");
+        const removed = storage_remove("_acceptance_probe");
+        return written.state === "ok" && read.state === "ok" && read.value === "ember-arena-probe" && removed.state === "ok";
+      });
+    }
     checks.push("REQUESTED  GLB models + walking animation (visual check)");
     checks.push("NOT_RUN  Audio / native physics: API gaps");
     checks.push("NOT_RUN  Lua gameplay / other platforms / hot reload");
@@ -792,6 +1159,7 @@ ${status}`;
     if (phase !== previousPhase) return;
     if (input_key_just_pressed("Escape")) {
       if (phase === "playing") setPhase("paused");
+      else if (phase === "inventory") setPhase("playing");
       else if (phase === "paused") setPhase("playing");
       else if (phase === "checks") setPhase(returnPhase);
       else if (phase === "settings") setPhase(settingsReturn);
@@ -801,6 +1169,23 @@ ${status}`;
       startRun();
       return;
     }
+    if (phase === "playing") {
+      if (input_key_just_pressed("KeyI") || input_key_just_pressed("KeyB")) {
+        setPhase("inventory");
+        return;
+      }
+      if (input_key_just_pressed("Digit1")) useInventoryItem("potion_healing");
+      if (input_key_just_pressed("Digit2")) useInventoryItem("potion_liquid_flame");
+      if (input_key_just_pressed("Digit3")) useInventoryItem("potion_invisibility");
+      if (input_key_just_pressed("Digit4")) useInventoryItem("potion_strength");
+      if (input_key_just_pressed("Digit5")) useInventoryItem("scroll_upgrade");
+      if (input_key_just_pressed("Digit6")) useInventoryItem("scroll_magic_mapping");
+      if (input_key_just_pressed("Digit7")) useInventoryItem("food_ration");
+      if (input_key_just_pressed("Space")) {
+        change("player", "health", Math.min(maxHealth, health() + 2));
+        pushLog("You take a brief rest in the shadows (+2 HP).");
+      }
+    }
     if (phase !== "playing") return;
     elapsed += dt;
     hurtTimer = Math.max(0, hurtTimer - dt);
@@ -809,6 +1194,7 @@ ${status}`;
       wave = nextWave;
       if (wave < 3) {
         level++;
+        pushLog(`Descended deeper into Sewer Depth ${wave + 1}!`);
         setPhase("upgrade");
         return;
       }
@@ -819,6 +1205,7 @@ ${status}`;
     if (wave >= 3 && !bossSpawned) {
       enemy("warden", "boss", { x: 0, z: -4.5 });
       bossSpawned = true;
+      pushLog("ALERT: Goo (The Warden of the Sewers) has emerged!");
     }
     spawnTimer -= dt;
     if (spawnTimer <= 0 && ids.filter((id) => kind(id) in enemySpecs).length < (wave >= 3 ? 8 : 22)) {
@@ -847,16 +1234,17 @@ ${status}`;
       const hurtColor = hurtTimer > 0 && !profile.reducedMotion ? amber : teal;
       const [red, green, blue, alpha] = hurtColor;
       ui_set_text("hud_health", `VITALITY  ${Math.ceil(health())}`, 16, red, green, blue, alpha);
-      ui_set_text("hud_score", `LV ${level}  /  ${score} POINTS`, 12, ...muted);
-      ui_set_text("hud_wave", wave < 3 ? `WAVE ${wave + 1} / 3` : "THE WARDEN", 16, ...amber);
+      ui_set_text("hud_score", `LV ${level} / ${score} PTS / ${gold} G`, 12, ...muted);
+      ui_set_text("hud_wave", wave < 3 ? `SEWERS: DEPTH ${wave + 1}` : "DEPTH 5: GOO'S LAIR", 16, ...amber);
       ui_set_text("hud_info", statusLine(), 12, ...muted);
-      ui_set_style("health_fill", JSON.stringify({ width: `${clamp(health(), 0, 100)}%` }));
+      ui_set_style("health_fill", JSON.stringify({ width: `${clamp(health() / maxHealth * 100, 0, 100)}%` }));
       const boss = scene_actor("warden");
       ui_set_style("boss_panel", JSON.stringify({ display: boss ? "flex" : "none" }));
-      const casting = boss && field("warden", "cooldown") <= 0.5;
-      ui_set_text("combat_notice", hurtTimer > 0 ? `HIT  -${lastDamage}` : casting ? "WARDEN IS CASTING  /  KEEP MOVING" : "", 16, ...amber);
+      const casting = boss && field("warden", "cooldown") <= 0.6;
+      const combatMessage = hurtTimer > 0 ? `HIT -${lastDamage}` : surpriseNoticeTimer > 0 ? "SURPRISE ATTACK! 100% HIT" : casting ? "GOO IS PUMPING UP! RETREAT BEHIND PILLARS!" : "";
+      ui_set_text("combat_notice", combatMessage, 16, ...amber);
       if (boss) {
-        ui_set_text("boss_label", `THE WARDEN  ${Math.max(0, Math.ceil(field("warden", "health")))} / ${enemySpecs.boss.health}`, 14, ...amber);
+        ui_set_text("boss_label", `GOO (THE WARDEN) ${Math.max(0, Math.ceil(field("warden", "health")))} / ${enemySpecs.boss.health}`, 14, ...amber);
         ui_set_style("boss_fill", JSON.stringify({ width: `${clamp(field("warden", "health") / enemySpecs.boss.health * 100, 0, 100)}%` }));
       }
     }

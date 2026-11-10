@@ -1,11 +1,11 @@
-# Ember Arena
+# Ember Arena (Shattered Pixel Dungeon Edition)
 
-A small TypeScript survival game created with `just create-game ember-arena ts`.
-One room, three enemy waves, a final warden, automatic attacks, collectible crystals,
-three upgrade choices, pause, restart, result screens, and an in-game runtime check page.
-Characters use low-poly GLB models and a fixed orthographic 3D camera; menus use retained Bevy UI.
-The game also includes persistent records/settings, seeded encounters, a warden health bar,
-hit feedback and optional reduced visual effects.
+A TypeScript dungeon survival adaptation replicating the core mechanics and atmosphere of the open-source classic
+[Shattered Pixel Dungeon](https://github.com/00-Evan/shattered-pixel-dungeon) by 00-Evan (Evan Debenham) & Watabou (Oleg Dolya).
+Five sewer depths, four playable hero classes (Warrior, Mage, Rogue, Huntress), classic sewer mobs (Marsupial Rat,
+Gnoll Scout, Sewer Crab), the final warden boss Goo, surprise attack mechanics, backpack inventory with potions & scrolls,
+hunger management, persistent records/settings, and in-game runtime check verification.
+Characters use low-poly 3D models with official Shattered Pixel Dungeon sprite assets and an orthographic camera; menus use retained Bevy UI.
 
 ## Run
 
@@ -25,43 +25,39 @@ To watch TypeScript edits while the game is open, run:
 npm --prefix projects/ember-arena run watch
 ```
 
-Desktop: WASD/arrow keys to move, Escape to pause/resume, Space to start from the menu.
-Desktop and mobile: drag to move. Attacks aim automatically at the nearest enemy. Collect green
-crystals for upgrades. Red bolts and enemy contact cause damage. Pillars block movement and bolts.
-After 40, 85, and 130 seconds, the encounter advances; time stops while paused or choosing an upgrade.
-Defeat the warden to win. Returning to the launcher uses the existing portable exit API.
+Desktop: WASD/arrow keys to move, Space to wait/rest or start, `I` or `B` to open the backpack inventory,
+`1`-`7` for quick-use potions and scrolls, Escape to pause/resume.
+Desktop and mobile: drag or click to move. Attacks aim automatically at the nearest enemy.
+Collect green dew crystals for upgrades. Pillars and obstacles block line of sight, allowing Surprise Attacks.
+After 40, 85, and 130 seconds, the dungeon depths advance. Defeat Goo (The Warden) to claim the Amulet of Yendor!
 
-## Progress and settings
+## Gameplay & Shattered Pixel Dungeon Mechanics
 
-Open **SETTINGS & PROGRESS** from the menu or pause screen. Drag sensitivity, control hints,
-reduced effects and the next run's seed are saved through the BMS storage registry. The seed
-resets the encounter random generator at run start, so repeated runs with the same seed reproduce
-spawn positions and enemy choices for the same simulation steps. Changing it during a paused run
-affects the next run. Compact controls and paginated runtime checks adapt to short landscape windows.
+- **Hero Classes**: Selectable on the main menu:
+  - **Warrior** (`Knight.glb`): High starting vitality (100 HP), tempered sword (+1 Potion of Healing, higher base strike).
+  - **Mage** (`Mage.glb`): Rapid magic missile staff bolts (+1 Scroll of Upgrade, 16% faster cast delay).
+  - **Rogue** (`Rogue_Hooded.glb`): Swift movement speed, starting Invisibility Potion, bonus stealth strikes.
+  - **Huntress** (`Barbarian.glb`): Master of ranged combat and area devastation (+1 Liquid Flame, Food Ration).
+- **Surprise Attacks**: Attacking an enemy from behind pillar cover or while cloaked in invisibility guarantees a Surprise Attack (+50% critical damage).
+- **Backpack Inventory & Alchemy**:
+  - `Potion of Healing`: Restores 45 Vitality and cures caustic ooze.
+  - `Liquid Flame`: Deals 35 explosive damage to surrounding foes.
+  - `Potion of Invisibility`: Cloaks hero for 6s with guaranteed surprise attacks.
+  - `Potion of Strength`: Permanently grants +4 base damage.
+  - `Scroll of Upgrade`: Upgrades equipped gear (+8 damage, +20 Max HP).
+  - `Scroll of Magic Mapping`: Magnetizes all crystals on the floor directly to the hero.
+  - `Food Ration`: Fully satisfies hunger and restores 15 Vitality.
+- **Hunger System**: Hunger status progresses from `SATIATED` (<60s) to `HUNGRY` (60-120s) to `STARVING` (>120s). Starvation slowly drains vitality unless food is consumed.
+- **The Warden: Goo**: At Depth 5, Goo emerges with 500 HP, caustic ooze debuffs, and charged pump-up shockwaves. Pillars provide cover from its explosive blasts.
 
-Completed wins/losses record the highest score, finished-run count, wins and fastest victory once.
-Abandoned runs are not counted. The current combat encounter is not serialized for resume.
-Data is written to the project's `profile` key in the platform-private save directory, separately
-from game assets. No files are written every frame. The game continues if the service is unavailable
-or a write fails; settings show the error and offer retry. An incompatible/corrupt existing save is
-preserved without automatic overwrite. Reset requires a second confirmation and affects only this
-game's saved progress/settings, leaving the current encounter intact.
+## Assets & Licensing
 
-The warden's health bar and casting warning clarify the final encounter. Hits show damage feedback
-and short-lived impact models. **REDUCED FX** suppresses impact models and vitality color changes;
-damage information remains visible.
+- 3D Character Models: [KayKit Adventurers](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0) by Kay Lousberg (CC0-1.0).
+- Sprites and UI Art: [Shattered Pixel Dungeon](https://github.com/00-Evan/shattered-pixel-dungeon) by Evan Debenham & Oleg Dolya (GPL-3.0). Official assets include `amulet.png`, `goo.png`, `rat.png`, `gnoll.png`, `crab.png`, `items.png`, `banners.png`, `badges.png`, `hero_icons.png`, and `sewers.jpg`.
+- Room geometry, pillars, projectiles, and crystal drops are generated by repository-owned TypeScript.
+- Complete license terms and checksums are stored under `game/assets/licenses/`.
 
-## Assets
-
-Characters are downloaded from the official [KayKit Adventurers repository](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0)
-by Kay Lousberg, under CC0-1.0. The source commit is pinned. Original license text, source URLs,
-and source SHA-256 digests are included under `game/assets/licenses/`.
-The preparation script retains `Walking_A` as animation 0 to match the runtime's current API;
-textures, skeletons, meshes, and binary animation data are preserved.
-Room geometry, pillars, projectiles and crystals are generated by repository-owned TypeScript.
-The small settings sprite comes from the repository template.
-
-To reproduce the assets (requires network on the first run):
+To reproduce the assets:
 
 ```bash
 npm --prefix projects/ember-arena run prepare:assets
