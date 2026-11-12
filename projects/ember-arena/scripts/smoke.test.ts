@@ -21,6 +21,7 @@ import { fontForText, measureText, wrapText } from "../modules/ember-arena/game/
 import { fontAdvances } from "./font-metrics.js";
 import { buffId, type BuffKind } from "../modules/ember-arena/game/src/effects.js";
 import { staffChargeId } from "../modules/ember-arena/game/src/staff.js";
+import { cloakBuffId, cloakId } from "../modules/ember-arena/game/src/cloak.js";
 
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
 type RecordValue = { [key: string]: unknown };
@@ -993,6 +994,153 @@ test("player buffs survive descending while environmental fire stays on the old 
   assert.ok(Number(game.entities.get("player")!.body!.health) >= 15);
   removeMonsters(game); const before = JSON.stringify([...game.entities]); game.tick(100);
   assert.equal(JSON.stringify([...game.entities]), before);
+});
+
+function rogue(game = harness()): Game {
+  game.click("start"); game.click("hero_rogue"); game.click("begin_run"); removeMonsters(game); return game;
+}
+
+test("only the Rogue starts with a real equipped cloak in the artifact slot and first quick slot", () => {
+  for (const hero of heroClassList) {
+    const game = harness(); game.click("start"); game.click(`hero_${hero}`); game.click("begin_run"); removeMonsters(game);
+    assert.equal(game.entities.has(cloakId), hero === "rogue");
+    assert.equal(game.ui.has("quick_cloak_of_shadows"), hero === "rogue");
+    game.key("KeyI"); assert.equal(game.ui.has("slot_cloak_of_shadows"), hero === "rogue");
+    if (hero === "rogue") {
+      const state = game.entities.get(cloakId)!.body!;
+      assert.deepEqual([state.health, state.power, state.lifetime, state.speed, state.velocity_x], [3, 0, 0, 0, 1]);
+      assert.ok(!game.ui.has("equipment_2")); assert.equal(game.ui.get("item_charge_cloak")!.text, "3/3");
+      game.click("slot_cloak_of_shadows"); assert.equal(game.ui.get("use_cloak_of_shadows__label")!.text, "Stealth");
+    }
+  }
+});
+
+test("cloak activation spends one tick and one charge before stealth can freeze indefinitely while idle", () => {
+  const game = rogue(); putActor(game, "target", "chaser", { x: 13, z: 12 });
+  game.key("KeyC"); const cloak = game.entities.get(cloakId)!.body!;
+  assert.equal(turnCount(game), 1); assert.equal(game.state().lives, 20);
+  assert.equal(cloak.health, 2); assert.equal(cloak.speed, 10); assert.equal(game.entities.get(cloakBuffId)!.body!.health, 4);
+  assert.ok(game.ui.has("hud_invisible"));
+  const before = JSON.stringify([...game.entities]); game.tick(100);
+  assert.equal(JSON.stringify([...game.entities]), before);
+  game.key("KeyC"); assert.equal(turnCount(game), 1); assert.ok(!game.entities.has(cloakBuffId));
+  assert.equal(cloak.health, 2); assert.ok(!game.ui.has("hud_invisible"));
+});
+
+test("the final cloak charge grants its full four ticks before exhaustion and empty activation is free", () => {
+  const game = rogue(); game.click("quick_cloak_of_shadows");
+  for (let tick = 1; tick < 12; tick++) game.click("wait");
+  const cloak = game.entities.get(cloakId)!.body!;
+  assert.equal(cloak.health, 0); assert.equal(cloak.speed, 30); assert.ok(game.entities.has(cloakBuffId));
+  game.click("wait"); assert.equal(turnCount(game), 13); assert.ok(!game.entities.has(cloakBuffId));
+  assert.ok(!game.ui.has("hud_invisible"));
+  const before = JSON.stringify([...game.entities]); game.key("KeyC");
+  assert.equal(turnCount(game), 13); assert.equal(JSON.stringify([...game.entities]), before);
+  assert.match([...game.ui.values()].flatMap((element) => element.text ?? []).join(" "), /run out of energy/);
+});
+
+test("cloak and potion invisibility remain independent and a melee attack dispels both", () => {
+  const game = rogue(), cloak = game.entities.get(cloakId)!.body!;
+  cloak.lifetime = 7; cloak.health = 10; // Enough legitimate capacity to outlast a potion.
+  game.key("Digit3"); game.key("KeyC");
+  for (let tick = 0; tick < 20; tick++) game.click("wait");
+  assert.ok(!game.entities.has(buffId("invisibility", "player"))); assert.ok(game.entities.has(cloakBuffId));
+  assert.ok(game.ui.has("hud_invisible"));
+  game.key("Digit3"); game.key("KeyC");
+  assert.ok(!game.entities.has(cloakBuffId)); assert.ok(game.entities.has(buffId("invisibility", "player")));
+  game.key("KeyC"); const charges = cloak.health;
+  putActor(game, "target", "chaser", { x: 13, z: 12 }); game.entities.get("target")!.body!.cooldown = 1000;
+  game.step(1, 0);
+  assert.ok(!game.entities.has(cloakBuffId)); assert.ok(!game.entities.has(buffId("invisibility", "player")));
+  assert.equal(cloak.health, charges, "attacking after a paid tick must not charge twice");
+  assert.match([...game.ui.values()].flatMap((element) => element.text ?? []).join(" "), /Surprise attack/);
+});
+
+test("unequipping cancels cloak stealth and freezes its passive phase until equipped again", () => {
+  const game = rogue(), cloak = game.entities.get(cloakId)!.body!;
+  cloak.health = 1; cloak.power = Math.fround(0.4); game.key("KeyC");
+  game.key("KeyI"); game.click("slot_cloak_of_shadows"); game.click("toggle_cloak_equipment");
+  assert.equal(turnCount(game), 2); assert.ok(!game.entities.has(cloakBuffId)); assert.equal(cloak.velocity_x, 0);
+  const deadline = cloak.cooldown, partial = cloak.power;
+  for (let tick = 0; tick < 10; tick++) game.click("wait");
+  assert.equal(cloak.cooldown, deadline); assert.equal(cloak.power, partial);
+  game.key("KeyC"); assert.equal(turnCount(game), 12);
+  assert.match([...game.ui.values()].flatMap((element) => element.text ?? []).join(" "), /Equip the cloak/);
+  game.key("KeyI"); assert.ok(game.ui.has("equipment_2")); game.click("slot_cloak_of_shadows"); game.click("toggle_cloak_equipment");
+  assert.equal(turnCount(game), 13); assert.equal(cloak.velocity_x, 1); assert.equal(cloak.cooldown, 13);
+  assert.ok(Number(cloak.power) > Number(partial));
+});
+
+test("inactive equipped cloak recharges using float action ticks rather than wall-clock time", () => {
+  const game = rogue(), cloak = game.entities.get(cloakId)!.body!;
+  game.key("KeyC"); game.key("KeyC");
+  const before = JSON.stringify([...game.entities]); game.tick(100);
+  assert.equal(JSON.stringify([...game.entities]), before);
+  for (let tick = 0; tick < 44; tick++) game.click("wait");
+  assert.equal(cloak.health, 2); game.click("wait"); assert.equal(cloak.health, 3); assert.equal(cloak.power, 0);
+});
+
+test("using cloak energy grows its level and displayed capacity without accepting upgrade scrolls", () => {
+  const game = rogue(), cloak = game.entities.get(cloakId)!.body!;
+  for (let use = 0; use < 5; use++) {
+    cloak.health = 3; // Isolate use-XP progression from separately tested recharge waits.
+    game.key("KeyC"); game.key("KeyC");
+  }
+  assert.equal(cloak.lifetime, 1); assert.equal(cloak.speed, 0); assert.equal(cloak.health, 2);
+  assert.equal(game.ui.get("quick_count_0")!.text, "2/4");
+  game.key("Digit5"); assert.ok(![...game.ui.values()].some((entry) => entry.text?.includes("Cloak of Shadows")));
+  game.click("upgrade_cancel"); game.key("Escape"); game.key("KeyI");
+  assert.equal(game.ui.get("item_level_cloak")!.text, "+1"); game.click("slot_cloak_of_shadows");
+  assert.match(game.ui.get("item_detail_desc")!.text!.replace(/\n/g, " "), /Experience: 0\/100/);
+});
+
+test("starvation allows cloak recharge while an exhausted boss window pauses it", () => {
+  const game = rogue(), cloak = game.entities.get(cloakId)!.body!;
+  cloak.health = 1; game.entities.get(buffId("hunger", "player"))!.body!.health = 450;
+  game.click("wait"); assert.ok(Number(cloak.power) > 0);
+  exhaustBossWindow(game); cloak.health = 1; cloak.power = 0.5;
+  for (let tick = 0; tick < 5; tick++) game.click("wait");
+  assert.equal(cloak.power, 0.5);
+  putActor(game, "warden", "boss", { x: 13, z: 12 }, 100); game.entities.get("warden")!.body!.cooldown = 1000;
+  game.step(1, 0); assert.ok(Number(cloak.power) > 0.5);
+});
+
+test("descent retains cloak item and active-buff identity, energy and deadlines", () => {
+  const game = rogue(), map = generateFloor(1337, 1); walk(game, map, map.exit);
+  game.key("KeyC"); const item = game.entities.get(cloakId)!.body!, active = game.entities.get(cloakBuffId)!.body!;
+  const before = turnCount(game); game.click("descend");
+  assert.equal(turnCount(game), before + 1); assert.equal(game.entities.get(cloakId)!.body, item);
+  assert.equal(game.entities.get(cloakBuffId)!.body, active); assert.equal(item.health, 2); assert.equal(active.health, 3);
+  assert.equal(item.cooldown, turnCount(game)); assert.equal(active.cooldown, turnCount(game));
+  game.key("KeyC"); assert.ok(!game.ui.has("hud_invisible"));
+});
+
+test("death removes cloak state and a restarted Rogue cannot inherit the previous cloak", () => {
+  const game = rogue(); game.key("KeyC"); game.entities.get("player")!.body!.health = 1;
+  const burn = putBuff(game, "burning", "player", 8); game.entities.get(burn)!.body!.power = 3;
+  game.click("wait"); assert.equal(game.state().message, "LOST"); assert.ok(!game.entities.has(cloakId)); assert.ok(!game.entities.has(cloakBuffId));
+  game.tick(100); assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
+  game.click("restart"); game.click("begin_run");
+  const cloak = game.entities.get(cloakId)!.body!;
+  assert.deepEqual([cloak.health, cloak.speed, cloak.lifetime, cloak.power], [3, 0, 0, 0]);
+  assert.ok(!game.entities.has(cloakBuffId));
+});
+
+test("Chinese cloak controls fit portrait and short landscape and held activation spends one tick", () => {
+  for (const [width, height, mobile] of [[450, 800, true], [800, 320, false]] as const) {
+    const game = rogue(harness(width, height, mobile, new Map(), false, "zh-CN"));
+    game.key("KeyI"); game.click("slot_cloak_of_shadows");
+    assert.equal(game.ui.get("item_detail_title")!.text, "暗影斗篷");
+    const bounds = game.ui.get("item_window")!.style!, text = game.ui.get("item_detail_desc")!;
+    assert.ok(Number(bounds.top) >= 0); assert.ok(Number(bounds.top) + Number(bounds.height) <= Number(game.ui.get("safe_root")!.style!.height));
+    for (const line of text.text!.split("\n")) assert.ok(measureText("zh-CN", line, text.fontSize!) <= Number(text.style!.width) + 0.01);
+    game.holdButton("use_cloak_of_shadows"); game.tick(30); game.releaseButton();
+    assert.equal(turnCount(game), 1); assert.equal(game.entities.get(cloakId)!.body!.health, 2);
+    game.key("KeyI"); game.click("slot_cloak_of_shadows");
+    assert.equal(game.ui.get("use_cloak_of_shadows__label")!.text, "停止潜行");
+    game.holdButton("use_cloak_of_shadows"); game.tick(30); game.releaseButton();
+    assert.equal(turnCount(game), 1); assert.ok(!game.entities.has(cloakBuffId));
+  }
 });
 
 function mage(game = harness()): Game {

@@ -56,10 +56,10 @@
       splash: "sprites/spd/avatar_rogue.png",
       sprite: "sprites/spd/rogue.png",
       icon: "sprites/spd/hero_icons.png",
-      description: "A stealthy fighter. Starts with an extra invisibility potion for surprise attacks.",
+      description: "A stealthy fighter with a rechargeable cloak of shadows. Starts with an extra invisibility potion for surprise attacks.",
       baseHealth: 20,
       baseSpeed: 1,
-      perks: "Dagger / cloth armor / extra invisibility potion"
+      perks: "Cloak of shadows / dagger / cloth armor / extra invisibility potion"
     },
     huntress: {
       id: "huntress",
@@ -93,7 +93,8 @@
     "shortsword",
     "cloth_armor",
     "leather_armor",
-    "spirit_bow"
+    "spirit_bow",
+    "cloak_of_shadows"
   ];
   var itemCatalog = {
     potion_healing: {
@@ -158,6 +159,14 @@
       category: "weapon",
       description: "Fires unlimited spirit arrows and grows with hero level. Shooting does not replace your melee weapon. Cannot be upgraded with scrolls.",
       effectText: "The spirit arrow fades away.",
+      sprite: "sprites/spd/items.png"
+    },
+    cloak_of_shadows: {
+      id: "cloak_of_shadows",
+      name: "Cloak of Shadows",
+      category: "artifact",
+      description: "Activate for 1 turn; stop for free. Each charge grants 4 turns of stealth. Recharges while equipped and inactive; grows through use.",
+      effectText: "You blend into the shadows.",
       sprite: "sprites/spd/items.png"
     }
   };
@@ -427,7 +436,7 @@
     "hero.huntress.name": ["Huntress", "\u5973\u730E\u624B"],
     "hero.warrior.description": [heroClasses.warrior.description, "\u575A\u97E7\u7684\u8FD1\u6218\u6218\u58EB\u3002\u521D\u59CB\u6B66\u5668\u66F4\u5F3A\uFF0C\u5E76\u989D\u5916\u643A\u5E26\u4E00\u74F6\u6CBB\u7597\u836F\u6C34\u3002"],
     "hero.mage.description": [heroClasses.mage.description, "\u6301\u6709\u53E4\u8001\u6CD5\u6756\u7684\u5B66\u8005\u3002\u521D\u59CB\u989D\u5916\u643A\u5E26\u5347\u7EA7\u5377\u8F74\u548C\u63A2\u5730\u5377\u8F74\u3002"],
-    "hero.rogue.description": [heroClasses.rogue.description, "\u64C5\u957F\u6F5C\u884C\u7684\u6218\u6597\u8005\u3002\u521D\u59CB\u989D\u5916\u643A\u5E26\u4E00\u74F6\u9690\u5F62\u836F\u6C34\uFF0C\u7528\u4E8E\u53D1\u52A8\u4F0F\u51FB\u3002"],
+    "hero.rogue.description": [heroClasses.rogue.description, "\u62E5\u6709\u53EF\u5145\u80FD\u6697\u5F71\u6597\u7BF7\u7684\u6F5C\u884C\u8005\u3002\u521D\u59CB\u989D\u5916\u643A\u5E26\u4E00\u74F6\u9690\u5F62\u836F\u6C34\uFF0C\u7528\u4E8E\u53D1\u52A8\u4F0F\u51FB\u3002"],
     "hero.huntress.description": [heroClasses.huntress.description, "\u8352\u91CE\u4E2D\u7684\u63A2\u7D22\u8005\uFF0C\u643A\u5E26\u968F\u7B49\u7EA7\u6210\u957F\u7684\u7075\u80FD\u77ED\u5F13\u3002\u521D\u59CB\u989D\u5916\u643A\u5E26\u98DF\u7269\u548C\u6DB2\u706B\u836F\u5242\u3002"],
     "hero.unlockDuelist": ["To unlock the Duelist equip a tier 2 or higher weapon with no strength penalty.", "\u88C5\u5907\u4E00\u4EF6\u4E8C\u9636\u6216\u66F4\u9AD8\u9636\u7684\u6B66\u5668\uFF0C\u4E14\u4E0D\u53D7\u5230\u529B\u91CF\u4E0D\u8DB3\u7684\u60E9\u7F5A\uFF0C\u5373\u53EF\u89E3\u9501\u51B3\u6597\u5BB6\u3002"],
     "hero.unlockCleric": ["To unlock the Cleric fully cleanse the curse on any piece of cursed equipment.", "\u5F7B\u5E95\u51C0\u5316\u4EFB\u610F\u4E00\u4EF6\u53D7\u8BC5\u5492\u88C5\u5907\u4E0A\u7684\u8BC5\u5492\uFF0C\u5373\u53EF\u89E3\u9501\u7267\u5E08\u3002"],
@@ -506,6 +515,15 @@
     "item.spirit_bow.name": [itemCatalog.spirit_bow.name, "\u7075\u80FD\u77ED\u5F13"],
     "item.spirit_bow.description": [itemCatalog.spirit_bow.description, "\u53D1\u5C04\u65E0\u9650\u7075\u80FD\u7BAD\u77E2\uFF0C\u968F\u82F1\u96C4\u7B49\u7EA7\u6210\u957F\u3002\u5C04\u51FB\u4E0D\u66FF\u6362\u8FD1\u6218\u6B66\u5668\uFF0C\u65E0\u6CD5\u4F7F\u7528\u5347\u7EA7\u5377\u8F74\u5F3A\u5316\u3002"],
     "item.spirit_bow.effect": [itemCatalog.spirit_bow.effectText, "\u7075\u80FD\u7BAD\u77E2\u6D88\u6563\u4E86\u3002"],
+    "item.cloak_of_shadows.name": [itemCatalog.cloak_of_shadows.name, "\u6697\u5F71\u6597\u7BF7"],
+    "item.cloak_of_shadows.description": [itemCatalog.cloak_of_shadows.description, "\u5F00\u542F\u6F5C\u884C\u6D88\u80171\u56DE\u5408\uFF0C\u5173\u95ED\u514D\u8D39\u3002\u6BCF\u683C\u80FD\u91CF\u7EF4\u63014\u56DE\u5408\uFF0C\u88C5\u5907\u540E\u5728\u672A\u6F5C\u884C\u65F6\u5145\u80FD\uFF0C\u968F\u4F7F\u7528\u6210\u957F\u3002"],
+    "item.cloak_of_shadows.effect": [itemCatalog.cloak_of_shadows.effectText, "\u4F60\u878D\u5165\u4E86\u9634\u5F71\u3002"],
+    "cloak.stealth": ["Stealth", "\u6F5C\u884C"],
+    "cloak.stop": ["Stop stealth", "\u505C\u6B62\u6F5C\u884C"],
+    "cloak.needEquip": ["Equip the cloak before activating stealth.", "\u8BF7\u5148\u88C5\u5907\u6597\u7BF7\u518D\u5F00\u542F\u6F5C\u884C\u3002"],
+    "cloak.empty": ["The cloak has run out of energy.", "\u6597\u7BF7\u80FD\u91CF\u5DF2\u7ECF\u8017\u5C3D\u3002"],
+    "cloak.levelup": ["Your cloak grows stronger through use.", "\u4F60\u7684\u6597\u7BF7\u5728\u4F7F\u7528\u4E2D\u53D8\u5F3A\u4E86\u3002"],
+    "cloak.stats": ["Level: +{level}\nEnergy: {charges}/{capacity}\nExperience: {experience}/{target}", "\u7B49\u7EA7\uFF1A+{level}\n\u80FD\u91CF\uFF1A{charges}/{capacity}\n\u7ECF\u9A8C\uFF1A{experience}/{target}"],
     "bow.stats": ["Bow level: +{level}\nDamage: {min}\u2013{max}\nStrength required: {strength}\nAttack time: {delay}", "\u77ED\u5F13\u7B49\u7EA7\uFF1A+{level}\n\u4F24\u5BB3\uFF1A{min}\u2013{max}\n\u529B\u91CF\u9700\u6C42\uFF1A{strength}\n\u5C04\u51FB\u8017\u65F6\uFF1A{delay}"],
     "monster.chaser": ["Marsupial Rat", "\u98DF\u8150\u8001\u9F20"],
     "monster.ranger": ["Gnoll Scout", "\u8C7A\u72FC\u4EBA\u4FA6\u5BDF\u5175"],
@@ -857,7 +875,7 @@
   var spd_pixel_metrics_default = { "0": 0.537109375, "1": 0.341796875, "2": 0.537109375, "3": 0.537109375, "4": 0.537109375, "5": 0.537109375, "6": 0.537109375, "7": 0.537109375, "8": 0.537109375, "9": 0.537109375, " ": 0.244140625, "!": 0.1953125, '"': 0.390625, "#": 0.537109375, $: 0.5859375, "%": 0.68359375, "&": 0.634765625, "'": 0.1953125, "(": 0.390625, ")": 0.390625, "*": 0.634765625, "+": 0.48828125, ",": 0.1953125, "-": 0.390625, ".": 0.1953125, "/": 0.48828125, ":": 0.1953125, ";": 0.1953125, "<": 0.439453125, "=": 0.390625, ">": 0.439453125, "?": 0.48828125, "@": 0.537109375, A: 0.537109375, B: 0.537109375, C: 0.537109375, D: 0.537109375, E: 0.537109375, F: 0.537109375, G: 0.537109375, H: 0.537109375, I: 0.29296875, J: 0.48828125, K: 0.537109375, L: 0.48828125, M: 0.634765625, N: 0.537109375, O: 0.537109375, P: 0.537109375, Q: 0.537109375, R: 0.537109375, S: 0.537109375, T: 0.48828125, U: 0.537109375, V: 0.537109375, W: 0.634765625, X: 0.537109375, Y: 0.48828125, Z: 0.537109375, "[": 0.29296875, "\\": 0.634765625, "]": 0.29296875, "^": 0.537109375, _: 0.48828125, "`": 0.29296875, a: 0.48828125, b: 0.48828125, c: 0.48828125, d: 0.48828125, e: 0.48828125, f: 0.390625, g: 0.48828125, h: 0.48828125, i: 0.1953125, j: 0.29296875, k: 0.48828125, l: 0.29296875, m: 0.5859375, n: 0.48828125, o: 0.48828125, p: 0.48828125, q: 0.48828125, r: 0.390625, s: 0.48828125, t: 0.390625, u: 0.48828125, v: 0.48828125, w: 0.5859375, x: 0.48828125, y: 0.48828125, z: 0.537109375, "{": 0.390625, "|": 0.1953125, "}": 0.390625, "~": 0.68359375 };
 
   // modules/ember-arena/game/assets/fonts/noto-sans-sc-metrics.json
-  var noto_sans_sc_metrics_default = { "0": 0.555, "1": 0.555, "2": 0.555, "3": 0.555, "4": 0.555, "5": 0.555, "6": 0.555, "7": 0.555, "8": 0.555, "9": 0.555, " ": 0.224, "!": 0.323, '"': 0.474, "#": 0.555, $: 0.555, "%": 0.921, "&": 0.68, "'": 0.278, "(": 0.338, ")": 0.338, "*": 0.467, "+": 0.555, ",": 0.278, "-": 0.347, ".": 0.278, "/": 0.392, ":": 0.278, ";": 0.278, "<": 0.555, "=": 0.555, ">": 0.555, "?": 0.474, "@": 0.946, A: 0.608, B: 0.657, C: 0.638, D: 0.688, E: 0.589, F: 0.552, G: 0.689, H: 0.728, I: 0.293, J: 0.535, K: 0.646, L: 0.543, M: 0.812, N: 0.723, O: 0.742, P: 0.633, Q: 0.742, R: 0.635, S: 0.596, T: 0.599, U: 0.721, V: 0.575, W: 0.878, X: 0.573, Y: 0.531, Z: 0.603, "[": 0.338, "\\": 0.392, "]": 0.338, "^": 0.555, _: 0.559, "`": 0.606, a: 0.563, b: 0.618, c: 0.51, d: 0.62, e: 0.554, f: 0.325, g: 0.564, h: 0.607, i: 0.275, j: 0.275, k: 0.552, l: 0.284, m: 0.926, n: 0.61, o: 0.606, p: 0.62, q: 0.62, r: 0.388, s: 0.468, t: 0.377, u: 0.607, v: 0.521, w: 0.802, x: 0.498, y: 0.521, z: 0.475, "{": 0.338, "|": 0.27, "}": 0.338, "~": 0.555, \u7834: 1, \u788E: 1, \u7684: 1, \u50CF: 1, \u7D20: 1, \u5730: 1, \u7262: 1, \u7B80: 1, \u4F53: 1, \u4E2D: 1, \u6587: 1, \u8FDB: 1, \u5165: 1, \u652F: 1, \u6301: 1, \u6E38: 1, \u620F: 1, \u6392: 1, \u884C: 1, \u699C: 1, \u65E5: 1, \u5FD7: 1, \u65B0: 1, \u95FB: 1, \u8BBE: 1, \u7F6E: 1, \u66F4: 1, \u8BB0: 1, \u5F55: 1, \u5173: 1, \u4E8E: 1, \u4E3B: 1, \u83DC: 1, \u5355: 1, \u5F00: 1, \u59CB: 1, \u95ED: 1, \u8FD4: 1, \u56DE: 1, \u4E0B: 1, \u4E00: 1, \u9875: 1, \u662F: 1, \u5426: 1, \u9009: 1, \u62E9: 1, \u4F60: 1, \u82F1: 1, \u96C4: 1, \u6218: 1, \u58EB: 1, \u6CD5: 1, \u5E08: 1, \u76D7: 1, \u8D3C: 1, \u5973: 1, \u730E: 1, \u624B: 1, \u575A: 1, \u97E7: 1, \u8FD1: 1, "\u3002": 1, \u521D: 1, \u6B66: 1, \u5668: 1, \u5F3A: 1, "\uFF0C": 1, \u5E76: 1, \u989D: 1, \u5916: 1, \u643A: 1, \u5E26: 1, \u74F6: 1, \u6CBB: 1, \u7597: 1, \u836F: 1, \u6C34: 1, \u6709: 1, \u53E4: 1, \u8001: 1, \u6756: 1, \u5B66: 1, \u8005: 1, \u5347: 1, \u7EA7: 1, \u5377: 1, \u8F74: 1, \u548C: 1, \u63A2: 1, \u64C5: 1, \u957F: 1, \u6F5C: 1, \u6597: 1, \u9690: 1, \u5F62: 1, \u7528: 1, \u53D1: 1, \u52A8: 1, \u4F0F: 1, \u51FB: 1, \u8352: 1, \u91CE: 1, \u7D22: 1, \u968F: 1, \u7B49: 1, \u6210: 1, \u7075: 1, \u80FD: 1, \u77ED: 1, \u5F13: 1, \u98DF: 1, \u7269: 1, \u6DB2: 1, \u706B: 1, \u5242: 1, \u88C5: 1, \u5907: 1, \u4EF6: 1, \u4E8C: 1, \u9636: 1, \u6216: 1, \u9AD8: 1, \u4E14: 1, \u4E0D: 1, \u53D7: 1, \u5230: 1, \u529B: 1, \u91CF: 1, \u8DB3: 1, \u60E9: 1, \u7F5A: 1, \u5373: 1, \u53EF: 1, \u89E3: 1, \u9501: 1, \u51B3: 1, \u5BB6: 1, \u5F7B: 1, \u5E95: 1, \u51C0: 1, \u5316: 1, \u4EFB: 1, \u610F: 1, \u8BC5: 1, \u5492: 1, \u4E0A: 1, \u7267: 1, \u751F: 1, \u547D: 1, "\uFF1A": 1, \u7ECF: 1, \u9A8C: 1, \u91D1: 1, \u5E01: 1, \u5C5E: 1, \u6027: 1, \u5929: 1, \u8D4B: 1, \u80CC: 1, \u5305: 1, \u9605: 1, \u8BFB: 1, \u996E: 1, \u6295: 1, \u63B7: 1, \u5C04: 1, \u65BD: 1, \u89C1: 1, \u683C: 1, \u5B50: 1, \u7784: 1, \u51C6: 1, \u9B54: 1, \u5F39: 1, \u4F1A: 1, \u98DE: 1, \u8FC7: 1, \u7A7A: 1, \u6309: 1, \u53D6: 1, \u6D88: 1, \u8017: 1, \u5C3D: 1, \u8BF7: 1, \u5F85: 1, \u5145: 1, \u5BF9: 1, \u81EA: 1, \u5DF1: 1, \u9020: 1, \u4E86: 1, \u70B9: 1, \u4F24: 1, \u5BB3: 1, \u6563: 1, \u8EAB: 1, \u76EE: 1, \u6807: 1, \u8F83: 1, \u96BE: 1, \u7130: 1, \u4E5F: 1, \u707C: 1, \u5F53: 1, \u524D: 1, \u89C6: 1, \u5185: 1, \u65E7: 1, \u5251: 1, \u5315: 1, \u9996: 1, \u9576: 1, \u9489: 1, \u5957: 1, \u5E03: 1, \u7532: 1, \u76AE: 1, "\u2013": 0.536, \u9700: 1, \u6C42: 1, \u653B: 1, \u65F6: 1, \u6539: 1, \u5584: 1, \u8FD9: 1, \u51CF: 1, \u514D: 1, \u62A4: 1, \u9632: 1, \u4E0E: 1, \u901F: 1, \u95EA: 1, \u907F: 1, \u79FB: 1, \u5EA6: 1, \u5408: 1, \u5378: 1, \u4F5C: 1, \u8981: 1, \u94A5: 1, \u5319: 1, \u542F: 1, \u7B2C: 1, \u5C42: 1, \u9053: 1, \u51FA: 1, \u53E3: 1, \u5728: 1, \u697C: 1, \u68AF: 1, \u5904: 1, \u4F7F: 1, \u9ECF: 1, \u56E2: 1, \u7C98: 1, \u5495: 1, \u7559: 1, \u70BC: 1, \u6750: 1, \u6599: 1, \u672C: 1, \u690D: 1, \u7248: 1, \u6682: 1, \u672A: 1, \u653E: 1, \u4EA4: 1, \u6613: 1, \u5899: 1, \u58C1: 1, \u677F: 1, \u9762: 1, \u95E8: 1, \u6253: 1, \u5411: 1, \u5DF2: 1, \u67E5: 1, \u770B: 1, \u8BE6: 1, \u60C5: 1, "\uFF1B": 1, \u518D: 1, \u6B21: 1, \u641C: 1, \u5468: 1, \u56F4: 1, "\uFF08": 1, "\uFF09": 1, \u9010: 1, \u6B65: 1, \u6062: 1, \u590D: 1, \u8150: 1, \u8680: 1, \u6E05: 1, \u9664: 1, \u6E29: 1, \u6696: 1, \u800C: 1, \u8212: 1, \u7F13: 1, \u6D41: 1, \u904D: 1, \u5168: 1, "\xD7": 1, \u540E: 1, \u71C3: 1, \u533A: 1, \u57DF: 1, \u88C2: 1, \u4E3A: 1, \u718A: 1, \u70C8: 1, "\uFF01": 1, \u4ECE: 1, \u654C: 1, \u4EBA: 1, \u5931: 1, \u6C38: 1, \u4E45: 1, \u589E: 1, \u52A0: 1, \u6D8C: 1, \u808C: 1, \u8089: 1, \u786E: 1, \u8BA4: 1, \u7B26: 1, \u878D: 1, \u63ED: 1, \u793A: 1, \u4F46: 1, \u5176: 1, \u5C40: 1, \u8111: 1, \u6D77: 1, \u6670: 1, \u8D77: 1, \u6765: 1, \u7CAE: 1, \u9965: 1, \u997F: 1, \u5403: 1, \u611F: 1, \u6E10: 1, \u9000: 1, \u65E0: 1, \u9650: 1, \u7BAD: 1, \u77E2: 1, \u66FF: 1, \u6362: 1, \u9F20: 1, \u8C7A: 1, \u72FC: 1, \u4FA6: 1, \u5BDF: 1, \u5175: 1, \u8783: 1, \u87F9: 1, \u6781: 1, \u70E7: 1, \u505C: 1, \u663E: 1, \u754C: 1, \u8F93: 1, \u6570: 1, \u636E: 1, \u97F3: 1, \u9891: 1, \u8BED: 1, \u8A00: 1, \u6BD4: 1, \u4F8B: 1, \u6A2A: 1, \u5C4F: 1, \u7AD6: 1, \u64CD: 1, \u63D0: 1, \u5C11: 1, \u6001: 1, \u6548: 1, \u679C: 1, \u6307: 1, \u9488: 1, \u654F: 1, \u500D: 1, \u65B9: 1, \u952E: 1, \u53E5: 1, \u53F7: 1, \u7EDD: 1, \u5750: 1, \u8C03: 1, \u8282: 1, \u6700: 1, \u5206: 1, \u80DC: 1, \u5229: 1, \u5192: 1, \u9669: 1, \u673A: 1, \u79CD: 1, \u4FDD: 1, \u5B58: 1, \u5417: 1, "\uFF1F": 1, \u4E50: 1, \u7ACB: 1, \u6863: 1, \u4ECD: 1, \u8BDD: 1, \u6B63: 1, \u5E38: 1, \u73A9: 1, \u73B0: 1, \u517C: 1, \u5BB9: 1, \u8986: 1, \u76D6: 1, \u8BE5: 1, \u8D25: 1, \u4EE5: 1, \u91CD: 1, \u8BD5: 1, \u539F: 1, \u5F71: 1, \u54CD: 1, \u91CC: 1, \u7A0B: 1, \u7891: 1, \u5B8C: 1, \u76D1: 1, \u72F1: 1, \u53CA: 1, \u7EED: 1, \u5C1A: 1, \u6B7B: 1, "\u2026": 1, \u9886: 1, \u88AB: 1, \u7ED3: 1, \u675F: 1, \u6DF1: 1, \u5357: 1, \u6536: 1, \u96C6: 1, \u54C1: 1, \u672F: 1, \u5236: 1, \u906D: 1, \u9047: 1, \u57FA: 1, \u521B: 1, \u8FD0: 1, \u7531: 1, \u6B22: 1, \u8FCE: 1, \u6BCF: 1, \u627E: 1, \u6361: 1, \u5C06: 1, \u679A: 1, \u6389: 1, \u843D: 1, \u62FE: 1, \u5148: 1, \u6BB5: 1, \u6247: 1, \u85CF: 1, \u5FEB: 1, \u4E9B: 1, \u5427: 1, \u8EB2: 1, \u7EE7: 1, \u81A8: 1, \u80C0: 1, \u79BB: 1, \u5B83: 1, \u8303: 1, \u84C4: 1, \u64A4: 1, \u7206: 1, \u7AD9: 1, \u6321: 1, \u4F4F: 1, \u53BB: 1, \u8DEF: 1, \u5DE2: 1, \u7A74: 1, \u68C0: 1, \u6240: 1, \u5B9E: 1, "\u3001": 1, \u53CD: 1, \u7EC4: 1, \u8BE2: 1, \u62D2: 1, \u503C: 1, \u7EF4: 1, \u7CBE: 1, \u5B57: 1, \u53D8: 1, \u76F8: 1, \u5207: 1, \u9500: 1, \u6BC1: 1, \u6821: 1, \u7406: 1, \u76D8: 1, \u89E6: 1, \u6478: 1, \u5B89: 1, \u77E5: 1, \u72B6: 1, \u5199: 1, \u5220: 1, \u50A8: 1, \u79C1: 1, \u6574: 1, \u753B: 1, \u89C9: 1, \u9F50: 1, \u63A5: 1, \u7F3A: 1, \u4ED6: 1, \u5E73: 1, \u53F0: 1, \u70ED: 1, \u8F7D: 1, \u7F51: 1, \u7EDC: 1, \u94AE: 1 };
+  var noto_sans_sc_metrics_default = { "0": 0.555, "1": 0.555, "2": 0.555, "3": 0.555, "4": 0.555, "5": 0.555, "6": 0.555, "7": 0.555, "8": 0.555, "9": 0.555, " ": 0.224, "!": 0.323, '"': 0.474, "#": 0.555, $: 0.555, "%": 0.921, "&": 0.68, "'": 0.278, "(": 0.338, ")": 0.338, "*": 0.467, "+": 0.555, ",": 0.278, "-": 0.347, ".": 0.278, "/": 0.392, ":": 0.278, ";": 0.278, "<": 0.555, "=": 0.555, ">": 0.555, "?": 0.474, "@": 0.946, A: 0.608, B: 0.657, C: 0.638, D: 0.688, E: 0.589, F: 0.552, G: 0.689, H: 0.728, I: 0.293, J: 0.535, K: 0.646, L: 0.543, M: 0.812, N: 0.723, O: 0.742, P: 0.633, Q: 0.742, R: 0.635, S: 0.596, T: 0.599, U: 0.721, V: 0.575, W: 0.878, X: 0.573, Y: 0.531, Z: 0.603, "[": 0.338, "\\": 0.392, "]": 0.338, "^": 0.555, _: 0.559, "`": 0.606, a: 0.563, b: 0.618, c: 0.51, d: 0.62, e: 0.554, f: 0.325, g: 0.564, h: 0.607, i: 0.275, j: 0.275, k: 0.552, l: 0.284, m: 0.926, n: 0.61, o: 0.606, p: 0.62, q: 0.62, r: 0.388, s: 0.468, t: 0.377, u: 0.607, v: 0.521, w: 0.802, x: 0.498, y: 0.521, z: 0.475, "{": 0.338, "|": 0.27, "}": 0.338, "~": 0.555, \u7834: 1, \u788E: 1, \u7684: 1, \u50CF: 1, \u7D20: 1, \u5730: 1, \u7262: 1, \u7B80: 1, \u4F53: 1, \u4E2D: 1, \u6587: 1, \u8FDB: 1, \u5165: 1, \u652F: 1, \u6301: 1, \u6E38: 1, \u620F: 1, \u6392: 1, \u884C: 1, \u699C: 1, \u65E5: 1, \u5FD7: 1, \u65B0: 1, \u95FB: 1, \u8BBE: 1, \u7F6E: 1, \u66F4: 1, \u8BB0: 1, \u5F55: 1, \u5173: 1, \u4E8E: 1, \u4E3B: 1, \u83DC: 1, \u5355: 1, \u5F00: 1, \u59CB: 1, \u95ED: 1, \u8FD4: 1, \u56DE: 1, \u4E0B: 1, \u4E00: 1, \u9875: 1, \u662F: 1, \u5426: 1, \u9009: 1, \u62E9: 1, \u4F60: 1, \u82F1: 1, \u96C4: 1, \u6218: 1, \u58EB: 1, \u6CD5: 1, \u5E08: 1, \u76D7: 1, \u8D3C: 1, \u5973: 1, \u730E: 1, \u624B: 1, \u575A: 1, \u97E7: 1, \u8FD1: 1, "\u3002": 1, \u521D: 1, \u6B66: 1, \u5668: 1, \u5F3A: 1, "\uFF0C": 1, \u5E76: 1, \u989D: 1, \u5916: 1, \u643A: 1, \u5E26: 1, \u74F6: 1, \u6CBB: 1, \u7597: 1, \u836F: 1, \u6C34: 1, \u6709: 1, \u53E4: 1, \u8001: 1, \u6756: 1, \u5B66: 1, \u8005: 1, \u5347: 1, \u7EA7: 1, \u5377: 1, \u8F74: 1, \u548C: 1, \u63A2: 1, \u62E5: 1, \u53EF: 1, \u5145: 1, \u80FD: 1, \u6697: 1, \u5F71: 1, \u6597: 1, \u7BF7: 1, \u6F5C: 1, \u9690: 1, \u5F62: 1, \u7528: 1, \u53D1: 1, \u52A8: 1, \u4F0F: 1, \u51FB: 1, \u8352: 1, \u91CE: 1, \u7D22: 1, \u968F: 1, \u7B49: 1, \u6210: 1, \u957F: 1, \u7075: 1, \u77ED: 1, \u5F13: 1, \u98DF: 1, \u7269: 1, \u6DB2: 1, \u706B: 1, \u5242: 1, \u88C5: 1, \u5907: 1, \u4EF6: 1, \u4E8C: 1, \u9636: 1, \u6216: 1, \u9AD8: 1, \u4E14: 1, \u4E0D: 1, \u53D7: 1, \u5230: 1, \u529B: 1, \u91CF: 1, \u8DB3: 1, \u60E9: 1, \u7F5A: 1, \u5373: 1, \u89E3: 1, \u9501: 1, \u51B3: 1, \u5BB6: 1, \u5F7B: 1, \u5E95: 1, \u51C0: 1, \u5316: 1, \u4EFB: 1, \u610F: 1, \u8BC5: 1, \u5492: 1, \u4E0A: 1, \u7267: 1, \u751F: 1, \u547D: 1, "\uFF1A": 1, \u7ECF: 1, \u9A8C: 1, \u91D1: 1, \u5E01: 1, \u5C5E: 1, \u6027: 1, \u5929: 1, \u8D4B: 1, \u80CC: 1, \u5305: 1, \u9605: 1, \u8BFB: 1, \u996E: 1, \u6295: 1, \u63B7: 1, \u5C04: 1, \u65BD: 1, \u89C1: 1, \u683C: 1, \u5B50: 1, \u7784: 1, \u51C6: 1, \u9B54: 1, \u5F39: 1, \u4F1A: 1, \u98DE: 1, \u8FC7: 1, \u7A7A: 1, \u6309: 1, \u53D6: 1, \u6D88: 1, \u8017: 1, \u5C3D: 1, \u8BF7: 1, \u5F85: 1, \u5BF9: 1, \u81EA: 1, \u5DF1: 1, \u9020: 1, \u4E86: 1, \u70B9: 1, \u4F24: 1, \u5BB3: 1, \u6563: 1, \u8EAB: 1, \u76EE: 1, \u6807: 1, \u8F83: 1, \u96BE: 1, \u7130: 1, \u4E5F: 1, \u707C: 1, \u5F53: 1, \u524D: 1, \u89C6: 1, \u5185: 1, \u65E7: 1, \u5251: 1, \u5315: 1, \u9996: 1, \u9576: 1, \u9489: 1, \u5957: 1, \u5E03: 1, \u7532: 1, \u76AE: 1, "\u2013": 0.536, \u9700: 1, \u6C42: 1, \u653B: 1, \u65F6: 1, \u6539: 1, \u5584: 1, \u8FD9: 1, \u51CF: 1, \u514D: 1, \u62A4: 1, \u9632: 1, \u4E0E: 1, \u901F: 1, \u95EA: 1, \u907F: 1, \u79FB: 1, \u5EA6: 1, \u5408: 1, \u5378: 1, \u4F5C: 1, \u8981: 1, \u94A5: 1, \u5319: 1, \u542F: 1, \u7B2C: 1, \u5C42: 1, \u9053: 1, \u51FA: 1, \u53E3: 1, \u5728: 1, \u697C: 1, \u68AF: 1, \u5904: 1, \u4F7F: 1, \u9ECF: 1, \u56E2: 1, \u7C98: 1, \u5495: 1, \u7559: 1, \u70BC: 1, \u6750: 1, \u6599: 1, \u672C: 1, \u690D: 1, \u7248: 1, \u6682: 1, \u672A: 1, \u653E: 1, \u4EA4: 1, \u6613: 1, \u5899: 1, \u58C1: 1, \u677F: 1, \u9762: 1, \u95E8: 1, \u6253: 1, \u5411: 1, \u5DF2: 1, \u67E5: 1, \u770B: 1, \u8BE6: 1, \u60C5: 1, "\uFF1B": 1, \u518D: 1, \u6B21: 1, \u641C: 1, \u5468: 1, \u56F4: 1, "\uFF08": 1, "\uFF09": 1, \u9010: 1, \u6B65: 1, \u6062: 1, \u590D: 1, \u8150: 1, \u8680: 1, \u6E05: 1, \u9664: 1, \u6E29: 1, \u6696: 1, \u800C: 1, \u8212: 1, \u7F13: 1, \u6D41: 1, \u904D: 1, \u5168: 1, "\xD7": 1, \u540E: 1, \u71C3: 1, \u533A: 1, \u57DF: 1, \u88C2: 1, \u4E3A: 1, \u718A: 1, \u70C8: 1, "\uFF01": 1, \u4ECE: 1, \u654C: 1, \u4EBA: 1, \u5931: 1, \u6C38: 1, \u4E45: 1, \u589E: 1, \u52A0: 1, \u6D8C: 1, \u808C: 1, \u8089: 1, \u786E: 1, \u8BA4: 1, \u7B26: 1, \u878D: 1, \u63ED: 1, \u793A: 1, \u4F46: 1, \u5176: 1, \u5C40: 1, \u8111: 1, \u6D77: 1, \u6670: 1, \u8D77: 1, \u6765: 1, \u7CAE: 1, \u9965: 1, \u997F: 1, \u5403: 1, \u611F: 1, \u6E10: 1, \u9000: 1, \u65E0: 1, \u9650: 1, \u7BAD: 1, \u77E2: 1, \u66FF: 1, \u6362: 1, \u8D39: 1, \u6BCF: 1, \u7EF4: 1, \u9634: 1, \u505C: 1, \u6B62: 1, \u5148: 1, \u53D8: 1, \u9F20: 1, \u8C7A: 1, \u72FC: 1, \u4FA6: 1, \u5BDF: 1, \u5175: 1, \u8783: 1, \u87F9: 1, \u6781: 1, \u70E7: 1, \u663E: 1, \u754C: 1, \u8F93: 1, \u6570: 1, \u636E: 1, \u97F3: 1, \u9891: 1, \u8BED: 1, \u8A00: 1, \u6BD4: 1, \u4F8B: 1, \u6A2A: 1, \u5C4F: 1, \u7AD6: 1, \u64CD: 1, \u63D0: 1, \u5C11: 1, \u6001: 1, \u6548: 1, \u679C: 1, \u6307: 1, \u9488: 1, \u654F: 1, \u500D: 1, \u65B9: 1, \u952E: 1, \u53E5: 1, \u53F7: 1, \u7EDD: 1, \u5750: 1, \u8C03: 1, \u8282: 1, \u6700: 1, \u5206: 1, \u80DC: 1, \u5229: 1, \u5192: 1, \u9669: 1, \u673A: 1, \u79CD: 1, \u4FDD: 1, \u5B58: 1, \u5417: 1, "\uFF1F": 1, \u4E50: 1, \u7ACB: 1, \u6863: 1, \u4ECD: 1, \u8BDD: 1, \u6B63: 1, \u5E38: 1, \u73A9: 1, \u73B0: 1, \u517C: 1, \u5BB9: 1, \u8986: 1, \u76D6: 1, \u8BE5: 1, \u8D25: 1, \u4EE5: 1, \u91CD: 1, \u8BD5: 1, \u539F: 1, \u54CD: 1, \u91CC: 1, \u7A0B: 1, \u7891: 1, \u5B8C: 1, \u76D1: 1, \u72F1: 1, \u53CA: 1, \u7EED: 1, \u5C1A: 1, \u6B7B: 1, "\u2026": 1, \u9886: 1, \u88AB: 1, \u7ED3: 1, \u675F: 1, \u6DF1: 1, \u5357: 1, \u6536: 1, \u96C6: 1, \u54C1: 1, \u672F: 1, \u5236: 1, \u906D: 1, \u9047: 1, \u57FA: 1, \u521B: 1, \u8FD0: 1, \u7531: 1, \u6B22: 1, \u8FCE: 1, \u627E: 1, \u6361: 1, \u5C06: 1, \u679A: 1, \u6389: 1, \u843D: 1, \u62FE: 1, \u6BB5: 1, \u6247: 1, \u85CF: 1, \u5FEB: 1, \u4E9B: 1, \u5427: 1, \u8EB2: 1, \u7EE7: 1, \u81A8: 1, \u80C0: 1, \u79BB: 1, \u5B83: 1, \u8303: 1, \u84C4: 1, \u64A4: 1, \u7206: 1, \u7AD9: 1, \u6321: 1, \u4F4F: 1, \u53BB: 1, \u8DEF: 1, \u5DE2: 1, \u7A74: 1, \u68C0: 1, \u6240: 1, \u5B9E: 1, "\u3001": 1, \u53CD: 1, \u7EC4: 1, \u8BE2: 1, \u62D2: 1, \u503C: 1, \u7CBE: 1, \u5B57: 1, \u76F8: 1, \u5207: 1, \u9500: 1, \u6BC1: 1, \u6821: 1, \u7406: 1, \u76D8: 1, \u89E6: 1, \u6478: 1, \u5B89: 1, \u77E5: 1, \u72B6: 1, \u5199: 1, \u5220: 1, \u50A8: 1, \u79C1: 1, \u6574: 1, \u753B: 1, \u89C9: 1, \u9F50: 1, \u63A5: 1, \u7F3A: 1, \u4ED6: 1, \u5E73: 1, \u53F0: 1, \u70ED: 1, \u8F7D: 1, \u7F51: 1, \u7EDC: 1, \u94AE: 1 };
 
   // modules/ember-arena/game/src/text-layout.ts
   var hasCjk = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/u;
@@ -956,6 +974,205 @@
   }
   function upgradeStaffCharge(gear) {
     if (gear.kind === "mages_staff") change(staffChargeId(gear.id), "health", Math.min(staffCharges(gear.id) + 1, staffCapacity(gear.level)));
+  }
+
+  // modules/ember-arena/game/src/survival.ts
+  var hungryAt = 300;
+  var starvingAt = 450;
+  var lockedFloorDuration = 50;
+  function starvation(partialDamage, maxHealth2, turns2 = 1) {
+    const total = Math.fround(partialDamage + Math.fround(turns2 * Math.fround(maxHealth2 / 1e3)));
+    const damage = total > 1 ? Math.trunc(total) : 0;
+    return { partialDamage: Math.fround(total - damage), damage };
+  }
+  function hungerStep(level2, partialDamage, maxHealth2) {
+    if (level2 >= starvingAt) return { level: level2, ...starvation(partialDamage, maxHealth2) };
+    const next = Math.min(starvingAt, Math.fround(level2 + 1));
+    return {
+      level: next,
+      partialDamage,
+      damage: next >= starvingAt ? 1 : 0,
+      notice: next >= starvingAt ? "starving" : level2 < hungryAt && next >= hungryAt ? "hungry" : void 0
+    };
+  }
+  function affectHunger(level2, partialDamage, energy, maxHealth2) {
+    const changed = Math.fround(level2 - energy), next = Math.max(0, Math.min(starvingAt, changed));
+    const overflow = changed > starvingAt ? starvation(partialDamage, maxHealth2, Math.fround(changed - starvingAt)) : { partialDamage, damage: 0 };
+    const notice = level2 < hungryAt && next >= hungryAt ? "hungry" : level2 < starvingAt && next >= starvingAt ? "starving" : void 0;
+    return {
+      level: next,
+      partialDamage: overflow.partialDamage,
+      damage: overflow.damage + (notice === "starving" ? 1 : 0),
+      notice
+    };
+  }
+  function regenerationStep(partial) {
+    const total = Math.fround(partial + Math.fround(1 / 10)), healing = Math.trunc(total);
+    return { partial: Math.fround(total - healing), healing };
+  }
+  var lockedFloorStep = (left) => left >= 1 ? Math.fround(left - 1) : left;
+  var extendLockedFloor = (left, damage) => Math.min(lockedFloorDuration, Math.fround(left + Math.fround(damage * 1.5)));
+
+  // modules/ember-arena/game/src/effects.ts
+  var buffKinds = ["healing", "burning", "ooze", "invisibility", "hunger", "regeneration", "locked_floor", "cloak"];
+  var fireRoot = "blob_fire";
+  var buffId = (type, target) => `buff_${type}:${target}`;
+  var buffTarget = (id) => id.slice(id.indexOf(":") + 1);
+  function buffKind(tag) {
+    switch (tag) {
+      case "buff_healing":
+        return "healing";
+      case "buff_burning":
+        return "burning";
+      case "buff_ooze":
+        return "ooze";
+      case "buff_invisibility":
+        return "invisibility";
+      case "buff_hunger":
+        return "hunger";
+      case "buff_regeneration":
+        return "regeneration";
+      case "buff_locked_floor":
+        return "locked_floor";
+      case "buff_cloak":
+        return "cloak";
+      default:
+        return void 0;
+    }
+  }
+  var hasBuff = (type, target) => !!scene_actor(buffId(type, target));
+  var remainingBuff = (type, target) => hasBuff(type, target) ? field(buffId(type, target), "health") : 0;
+  function removeBuffs(target) {
+    for (const type of buffKinds) scene_despawn(buffId(type, target));
+  }
+  function create(id, tag, remaining, now) {
+    if (!scene_spawn(id, 0, 0, -20) || !scene_actor_set(id, tag, remaining, 0, 1)) throw new Error(`Cannot create effect: ${id}`);
+    change(id, "cooldown", Math.fround(now));
+  }
+  function ensureBuff(type, target, now) {
+    if (!scene_actor(target)) throw new Error(`Missing effect target: ${target}`);
+    const id = buffId(type, target);
+    if (!scene_actor(id)) create(id, `buff_${type}`, 0, now);
+    return id;
+  }
+  function healingAmount(maxHealth2) {
+    return Math.trunc(Math.fround(Math.fround(Math.fround(0.8) * maxHealth2) + 14));
+  }
+  function healingStep(remaining, rate = 0.25) {
+    return remaining > 0 ? Math.min(remaining, Math.max(1, Math.round(remaining * rate))) : 0;
+  }
+  function oozeDamage(depth2, remaining) {
+    return depth2 > 5 ? 1 + Math.floor(depth2 / 5) : depth2 === 5 || Math.trunc(remaining) % 2 === 0 ? 1 : 0;
+  }
+  function applyHealing(target, maxHealth2, now) {
+    const id = ensureBuff("healing", target, now);
+    change(id, "health", Math.max(field(id, "health"), healingAmount(maxHealth2)));
+    change(id, "power", Math.max(field(id, "power"), 0.25));
+  }
+  function applyBurning(target, now) {
+    const id = ensureBuff("burning", target, now);
+    change(id, "health", Math.max(field(id, "health"), 8));
+    change(id, "lifetime", 0);
+  }
+  function applyOoze(target, now) {
+    const id = ensureBuff("ooze", target, now);
+    change(id, "health", 20);
+    change(id, "lifetime", 0);
+  }
+  function applyInvisibility(target, now) {
+    const id = ensureBuff("invisibility", target, now);
+    change(id, "health", 20);
+    change(id, "cooldown", Math.max(field(id, "cooldown"), timeAfter(now, 20)));
+  }
+  function startVitals(target, now) {
+    ensureBuff("regeneration", target, now);
+    ensureBuff("hunger", target, now);
+  }
+  function applyLockedFloor(target, now) {
+    if (!hasBuff("locked_floor", target)) change(ensureBuff("locked_floor", target, now), "health", lockedFloorDuration);
+  }
+  function effectPriority(tag) {
+    if (tag === "buff_healing" || tag === "buff_regeneration") return -1;
+    if (tag === "blob_fire") return -10;
+    return buffKind(tag) ? -30 : void 0;
+  }
+  function playerBuff(id) {
+    return buffKind(kind(id)) !== void 0 && buffTarget(id) === "player";
+  }
+  var fireId = (floor2, point) => `fire_${floor2.depth}_${cellKey(floor2, point)}`;
+  function fireVolume(floor2, point) {
+    const id = fireId(floor2, point);
+    return scene_actor(id) ? field(id, "health") : 0;
+  }
+  function seedFireCell(floor2, point, volume, now) {
+    const id = fireId(floor2, point);
+    if (scene_actor(id)) change(id, "health", field(id, "health") + volume);
+    else {
+      create(id, "fire_cell", volume, now);
+      placeCell(id, point, 2.5);
+    }
+    if (!scene_actor(fireRoot)) create(fireRoot, "blob_fire", 1, now);
+  }
+  function seedLiquidFlame(floor2, impact, now) {
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      const point = { x: impact.x + dx, z: impact.z + dz }, tile = terrainAt(floor2, point);
+      if (tile !== "wall" && tile !== "secret_door") seedFireCell(floor2, point, 2, now);
+    }
+  }
+
+  // modules/ember-arena/game/src/cloak.ts
+  var cloakId = "artifact_cloak";
+  var cloakKind = "cloak_recharge";
+  var cloakBuffId = buffId("cloak", "player");
+  var cloakCapacity = (level2) => Math.min(level2 + 3, 10);
+  var cloakValue = (name) => scene_actor(cloakId) ? field(cloakId, name) : 0;
+  var cloakEquipped = () => cloakValue("velocity_x") === 1;
+  var cloakActive = () => !!scene_actor(cloakBuffId);
+  function createCloak(equipped, now) {
+    if (scene_actor(cloakId)) return;
+    if (!scene_spawn(cloakId, 0, 0, -20) || !scene_actor_set(cloakId, cloakKind, 3, 0, 1)) throw new Error("Cannot create cloak");
+    change(cloakId, "velocity_x", equipped ? 1 : 0);
+    change(cloakId, "cooldown", now);
+  }
+  function startCloak(now) {
+    if (!scene_spawn(cloakBuffId, 0, 0, -20) || !scene_actor_set(cloakBuffId, "buff_cloak", 0, 0, 1)) throw new Error("Cannot activate cloak");
+    change(cloakBuffId, "cooldown", now);
+  }
+  function stopCloak(dispel = false) {
+    if (dispel && cloakActive() && field(cloakBuffId, "health") <= 0 && cloakValue("health") > 0) change(cloakId, "health", cloakValue("health") - 1);
+    scene_despawn(cloakBuffId);
+  }
+  function cloakExperience(heroLevel, cloakLevel) {
+    const difference = heroLevel - (1 + cloakLevel * 2) - (cloakLevel >= 7 ? cloakLevel - 6 : 0);
+    return Math.round(10 * Math.pow(difference >= 0 ? Math.fround(1.1) : 0.75, Math.abs(difference)));
+  }
+  function cloakStealthStep(charges, level2, experience2, left, heroLevel) {
+    left--;
+    if (left <= 0) {
+      if (charges <= 0) return { charges: 0, level: level2, experience: experience2, left: 0, active: false };
+      charges--;
+      experience2 += cloakExperience(heroLevel, level2);
+      if (level2 < 10 && experience2 >= (level2 + 1) * 50) {
+        level2++;
+        experience2 -= level2 * 50;
+      }
+      left = 4;
+    }
+    return { charges, level: level2, experience: experience2, left, active: true };
+  }
+  function cloakRechargeStep(charges, partial, level2, active, regenOn) {
+    const capacity = cloakCapacity(level2);
+    if (charges >= capacity) return { charges, partial: 0 };
+    if (!active && regenOn) {
+      const missing = Math.fround(capacity - charges + (level2 > 7 ? Math.fround(5 * (level2 - 7) / 3) : 0));
+      const delay = Math.fround(45 - missing);
+      partial = Math.fround(partial + Math.fround(1 / delay));
+    }
+    while (partial >= 1 && charges < capacity) {
+      charges++;
+      partial = Math.fround(partial - 1);
+    }
+    return { charges, partial: charges === capacity ? 0 : partial };
   }
 
   // modules/ember-arena/game/src/spd-ui.ts
@@ -1107,13 +1324,13 @@
       const quantity = (key) => key === "worn_key" ? state.wornKeys : key === "goo_blob" ? state.gooBlobs : state.inventory[key];
       const items = [...Object.keys(itemCatalog), "worn_key", "goo_blob"];
       const carried = [
-        ...items.filter((key) => quantity(key) > 0).map((key) => ({ type: "supply", key })),
+        ...items.filter((key) => quantity(key) > 0 && !(key === "cloak_of_shadows" && cloakEquipped())).map((key) => ({ type: "supply", key })),
         ...state.equipment.filter((item) => !item.equipped).map((item) => ({ type: "gear", item }))
       ];
       for (let index = 0; index < 25; index++) {
         const x = index % 5 * (slotWidth + 1), y = 14 + Math.floor(index / 5) * (slotHeight + 1);
         const entry = carried[index - 5];
-        const key = entry?.type === "supply" ? entry.key : void 0;
+        const key = index === 2 && state.inventory.cloak_of_shadows > 0 && cloakEquipped() ? "cloak_of_shadows" : entry?.type === "supply" ? entry.key : void 0;
         const equipped = index < 5;
         const worn = index === 0 ? equippedGear(state.equipment, "weapon") : index === 1 ? equippedGear(state.equipment, "armor") : void 0;
         const gear = worn ?? (entry?.type === "gear" ? entry.item : void 0);
@@ -1122,12 +1339,15 @@
           childrenSlot.push(image(`gear_icon_${gear.id}`, `sprites/dungeon/${gear.kind}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
           if (gear.level) childrenSlot.push(label(`gear_level_${gear.id}`, `+${gear.level}`, 1, 1, slotWidth - 2, 6, titleColor));
           if (gear.kind === "mages_staff") childrenSlot.push(label(`gear_charge_${gear.id}`, `${staffCharges(gear.id)}/${staffCapacity(gear.level)}`, 1, slotHeight - 8, slotWidth - 2, 5));
-        } else if (equipped) {
+        } else if (equipped && !key) {
           childrenSlot.push(art(`equipment_${index}`, ["empty_weapon", "empty_armor", "empty_artifact", "empty_ring", "empty_ring"][index], (slotWidth - 16) / 2, (slotHeight - 16) / 2));
         } else if (key) {
           childrenSlot.push(image(`item_ico_${key}`, `sprites/dungeon/${key}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
           if (key === "spirit_bow") {
             if (spiritBowLevel(state.level)) childrenSlot.push(label("item_level_spirit_bow", `+${spiritBowLevel(state.level)}`, 1, 1, slotWidth - 2, 6));
+          } else if (key === "cloak_of_shadows") {
+            if (cloakValue("lifetime")) childrenSlot.push(label("item_level_cloak", `+${cloakValue("lifetime")}`, 1, 1, slotWidth - 2, 6));
+            childrenSlot.push(label("item_charge_cloak", `${cloakValue("health")}/${cloakCapacity(cloakValue("lifetime"))}`, 1, slotHeight - 8, slotWidth - 2, 5));
           } else childrenSlot.push(label(`item_count_${key}`, `${quantity(key)}`, 1, 1, slotWidth - 2, 6));
         }
         children.push({
@@ -1209,14 +1429,14 @@
         elements.push(label("hud_hint", lines.join("\n"), 2, 44, w - 4, 6, grey, lines.length * 8));
       }
       const staff = state.equipment.find((gear) => gear.kind === "mages_staff");
-      const quick = staff ? [staff, "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null] : state.inventory.spirit_bow > 0 ? ["spirit_bow", "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null] : ["potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null, null];
+      const quick = state.inventory.cloak_of_shadows > 0 ? ["cloak_of_shadows", "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null] : staff ? [staff, "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null] : state.inventory.spirit_bow > 0 ? ["spirit_bow", "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null] : ["potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null, null];
       const count = 4 + Number(w > 152) + Number(w > 170);
       let quickRight = m.large ? searchX : toolbarX;
       for (let offset = 0; offset < count; offset++) {
         const index = m.large ? count - 1 - offset : offset, entry = quick[index];
         const gear = entry && typeof entry === "object" ? entry : void 0, item = typeof entry === "string" ? entry : void 0;
         const name = gear?.kind ?? item;
-        const quantity = gear ? `${staffCharges(gear.id)}/${staffCapacity(gear.level)}` : item === "spirit_bow" ? spiritBowLevel(state.level) ? `+${spiritBowLevel(state.level)}` : "" : item ? `${state.inventory[item]}` : "";
+        const quantity = gear ? `${staffCharges(gear.id)}/${staffCapacity(gear.level)}` : item === "cloak_of_shadows" ? `${cloakValue("health")}/${cloakCapacity(cloakValue("lifetime"))}` : item === "spirit_bow" ? spiritBowLevel(state.level) ? `+${spiritBowLevel(state.level)}` : "" : item ? `${state.inventory[item]}` : "";
         const side = m.large ? index === 0 ? "left" : index === count - 1 ? "right" : "middle" : index === 0 ? "right" : index === count - 1 ? "left" : "middle";
         const width = side === "left" ? 20 : side === "right" ? 19 : 18;
         quickRight -= width;
@@ -1271,13 +1491,24 @@ ${t("bow.stats", {
           delay: spiritBowDelay(state.level, state.strength, true).toFixed(2),
           level: spiritBowLevel(state.level)
         })}` : "";
-        const lines = wrappedText(t(`item.${state.item}.description`) + bowStats, 120, 6), descriptionHeight = Math.ceil(lines.length * 7.2);
+        const cloakStats = state.item === "cloak_of_shadows" ? `
+${t("cloak.stats", {
+          level: cloakValue("lifetime"),
+          charges: cloakValue("health"),
+          capacity: cloakCapacity(cloakValue("lifetime")),
+          experience: cloakValue("speed"),
+          target: (cloakValue("lifetime") + 1) * 50
+        })}` : "";
+        const lines = wrappedText(t(`item.${state.item}.description`) + bowStats + cloakStats, 120, 6), descriptionHeight = Math.ceil(lines.length * 7.2);
         const buttonY = 20 + descriptionHeight;
         window("item_window", 120, buttonY + 16, [
           image("item_detail_icon", `sprites/dungeon/${state.item}.png`, rect(0, 0, 16, 16)),
           label("item_detail_title", t(`item.${state.item}.name`), 20, 1, 100, 9, titleColor, 26),
           label("item_detail_desc", lines.join("\n"), 0, 18, 120, 6, white, descriptionHeight),
-          control(`use_${state.item}`, state.item === "spirit_bow" ? t("item.shoot") : state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", void 0, `use_${state.item}`, true, 8)
+          ...state.item === "cloak_of_shadows" ? [
+            control("toggle_cloak_equipment", t(cloakEquipped() ? "gear.remove" : "gear.equip"), 0, buttonY, 58, 16, "red", void 0, "toggle_cloak_equipment", true, 8),
+            control("use_cloak_of_shadows", t(cloakActive() ? "cloak.stop" : "cloak.stealth"), 62, buttonY, 58, 16, "red", void 0, "use_cloak_of_shadows", cloakEquipped() && (cloakValue("health") > 0 || cloakActive()), 8)
+          ] : [control(`use_${state.item}`, state.item === "spirit_bow" ? t("item.shoot") : state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", void 0, `use_${state.item}`, true, 8)]
         ]);
       } else if (state.phase === "equipment") {
         const gear = state.equipment.find((item) => item.id === state.selectedGear);
@@ -1392,148 +1623,6 @@ ${t("gear.staffMagic", {
     return node("safe_root", { position: "absolute", left: m.left, top: m.top, width: Math.round(w * s), height: Math.round(h * s) }, elements);
   }
 
-  // modules/ember-arena/game/src/survival.ts
-  var hungryAt = 300;
-  var starvingAt = 450;
-  var lockedFloorDuration = 50;
-  function starvation(partialDamage, maxHealth2, turns2 = 1) {
-    const total = Math.fround(partialDamage + Math.fround(turns2 * Math.fround(maxHealth2 / 1e3)));
-    const damage = total > 1 ? Math.trunc(total) : 0;
-    return { partialDamage: Math.fround(total - damage), damage };
-  }
-  function hungerStep(level2, partialDamage, maxHealth2) {
-    if (level2 >= starvingAt) return { level: level2, ...starvation(partialDamage, maxHealth2) };
-    const next = Math.min(starvingAt, Math.fround(level2 + 1));
-    return {
-      level: next,
-      partialDamage,
-      damage: next >= starvingAt ? 1 : 0,
-      notice: next >= starvingAt ? "starving" : level2 < hungryAt && next >= hungryAt ? "hungry" : void 0
-    };
-  }
-  function affectHunger(level2, partialDamage, energy, maxHealth2) {
-    const changed = Math.fround(level2 - energy), next = Math.max(0, Math.min(starvingAt, changed));
-    const overflow = changed > starvingAt ? starvation(partialDamage, maxHealth2, Math.fround(changed - starvingAt)) : { partialDamage, damage: 0 };
-    const notice = level2 < hungryAt && next >= hungryAt ? "hungry" : level2 < starvingAt && next >= starvingAt ? "starving" : void 0;
-    return {
-      level: next,
-      partialDamage: overflow.partialDamage,
-      damage: overflow.damage + (notice === "starving" ? 1 : 0),
-      notice
-    };
-  }
-  function regenerationStep(partial) {
-    const total = Math.fround(partial + Math.fround(1 / 10)), healing = Math.trunc(total);
-    return { partial: Math.fround(total - healing), healing };
-  }
-  var lockedFloorStep = (left) => left >= 1 ? Math.fround(left - 1) : left;
-  var extendLockedFloor = (left, damage) => Math.min(lockedFloorDuration, Math.fround(left + Math.fround(damage * 1.5)));
-
-  // modules/ember-arena/game/src/effects.ts
-  var buffKinds = ["healing", "burning", "ooze", "invisibility", "hunger", "regeneration", "locked_floor"];
-  var fireRoot = "blob_fire";
-  var buffId = (type, target) => `buff_${type}:${target}`;
-  var buffTarget = (id) => id.slice(id.indexOf(":") + 1);
-  function buffKind(tag) {
-    switch (tag) {
-      case "buff_healing":
-        return "healing";
-      case "buff_burning":
-        return "burning";
-      case "buff_ooze":
-        return "ooze";
-      case "buff_invisibility":
-        return "invisibility";
-      case "buff_hunger":
-        return "hunger";
-      case "buff_regeneration":
-        return "regeneration";
-      case "buff_locked_floor":
-        return "locked_floor";
-      default:
-        return void 0;
-    }
-  }
-  var hasBuff = (type, target) => !!scene_actor(buffId(type, target));
-  var remainingBuff = (type, target) => hasBuff(type, target) ? field(buffId(type, target), "health") : 0;
-  function removeBuffs(target) {
-    for (const type of buffKinds) scene_despawn(buffId(type, target));
-  }
-  function create(id, tag, remaining, now) {
-    if (!scene_spawn(id, 0, 0, -20) || !scene_actor_set(id, tag, remaining, 0, 1)) throw new Error(`Cannot create effect: ${id}`);
-    change(id, "cooldown", Math.fround(now));
-  }
-  function ensureBuff(type, target, now) {
-    if (!scene_actor(target)) throw new Error(`Missing effect target: ${target}`);
-    const id = buffId(type, target);
-    if (!scene_actor(id)) create(id, `buff_${type}`, 0, now);
-    return id;
-  }
-  function healingAmount(maxHealth2) {
-    return Math.trunc(Math.fround(Math.fround(Math.fround(0.8) * maxHealth2) + 14));
-  }
-  function healingStep(remaining, rate = 0.25) {
-    return remaining > 0 ? Math.min(remaining, Math.max(1, Math.round(remaining * rate))) : 0;
-  }
-  function oozeDamage(depth2, remaining) {
-    return depth2 > 5 ? 1 + Math.floor(depth2 / 5) : depth2 === 5 || Math.trunc(remaining) % 2 === 0 ? 1 : 0;
-  }
-  function applyHealing(target, maxHealth2, now) {
-    const id = ensureBuff("healing", target, now);
-    change(id, "health", Math.max(field(id, "health"), healingAmount(maxHealth2)));
-    change(id, "power", Math.max(field(id, "power"), 0.25));
-  }
-  function applyBurning(target, now) {
-    const id = ensureBuff("burning", target, now);
-    change(id, "health", Math.max(field(id, "health"), 8));
-    change(id, "lifetime", 0);
-  }
-  function applyOoze(target, now) {
-    const id = ensureBuff("ooze", target, now);
-    change(id, "health", 20);
-    change(id, "lifetime", 0);
-  }
-  function applyInvisibility(target, now) {
-    const id = ensureBuff("invisibility", target, now);
-    change(id, "health", 20);
-    change(id, "cooldown", Math.max(field(id, "cooldown"), timeAfter(now, 20)));
-  }
-  function startVitals(target, now) {
-    ensureBuff("regeneration", target, now);
-    ensureBuff("hunger", target, now);
-  }
-  function applyLockedFloor(target, now) {
-    if (!hasBuff("locked_floor", target)) change(ensureBuff("locked_floor", target, now), "health", lockedFloorDuration);
-  }
-  function effectPriority(tag) {
-    if (tag === "buff_healing" || tag === "buff_regeneration") return -1;
-    if (tag === "blob_fire") return -10;
-    return buffKind(tag) ? -30 : void 0;
-  }
-  function playerBuff(id) {
-    return buffKind(kind(id)) !== void 0 && buffTarget(id) === "player";
-  }
-  var fireId = (floor2, point) => `fire_${floor2.depth}_${cellKey(floor2, point)}`;
-  function fireVolume(floor2, point) {
-    const id = fireId(floor2, point);
-    return scene_actor(id) ? field(id, "health") : 0;
-  }
-  function seedFireCell(floor2, point, volume, now) {
-    const id = fireId(floor2, point);
-    if (scene_actor(id)) change(id, "health", field(id, "health") + volume);
-    else {
-      create(id, "fire_cell", volume, now);
-      placeCell(id, point, 2.5);
-    }
-    if (!scene_actor(fireRoot)) create(fireRoot, "blob_fire", 1, now);
-  }
-  function seedLiquidFlame(floor2, impact, now) {
-    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
-      const point = { x: impact.x + dx, z: impact.z + dz }, tile = terrainAt(floor2, point);
-      if (tile !== "wall" && tile !== "secret_door") seedFireCell(floor2, point, 2, now);
-    }
-  }
-
   // modules/ember-arena/game/src/projectiles.ts
   function projectileImpact(floor2, from, to, occupied, stopAtTarget = true) {
     if (sameCell(from, to)) return { ...from };
@@ -1619,11 +1708,13 @@ ${t("gear.staffMagic", {
     scroll_upgrade: 1,
     scroll_magic_mapping: 0,
     food_ration: 1,
-    spirit_bow: 0
+    spirit_bow: 0,
+    cloak_of_shadows: 0
   };
   var uid = (prefix) => `${prefix}_${nextId++}`;
   var health = () => Math.max(0, field("player", "health"));
   var hungerLevel = () => remainingBuff("hunger", "player");
+  var isInvisible = () => hasBuff("invisibility", "player") || cloakActive();
   var targetExperience = () => 5 + level * 5;
   function pushLog(entry) {
     dungeonLogs.unshift(entry);
@@ -1689,7 +1780,7 @@ ${t("gear.staffMagic", {
       score,
       turns,
       hunger: getHungerStatus(hungerLevel()),
-      invisible: hasBuff("invisibility", "player") ? 1 : 0,
+      invisible: isInvisible() ? 1 : 0,
       ooze: remainingBuff("ooze", "player"),
       healing: remainingBuff("healing", "player"),
       burning: remainingBuff("burning", "player"),
@@ -1806,6 +1897,9 @@ ${t("gear.staffMagic", {
         return;
       case "toggle_equipment":
         changeEquipment();
+        return;
+      case "toggle_cloak_equipment":
+        changeCloakEquipment();
         return;
       case "upgrade_page":
         upgradePage++;
@@ -1991,12 +2085,14 @@ ${t("gear.staffMagic", {
       scroll_upgrade: selectedClass === "mage" ? 2 : 1,
       scroll_magic_mapping: selectedClass === "mage" ? 1 : 0,
       food_ration: selectedClass === "huntress" ? 2 : 1,
-      spirit_bow: selectedClass === "huntress" ? 1 : 0
+      spirit_bow: selectedClass === "huntress" ? 1 : 0,
+      cloak_of_shadows: selectedClass === "rogue" ? 1 : 0
     };
     dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) })];
     room();
     startVitals("player", 0);
     for (const gear of equipment) createStaffCharger(gear, 0);
+    if (inventory.cloak_of_shadows) createCloak(true, 0);
     enterFloor();
     setPhase("playing");
   }
@@ -2004,7 +2100,7 @@ ${t("gear.staffMagic", {
     examining = false;
     targeting = null;
     unsealFloor();
-    for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id) && kind(id) !== staffChargerKind) scene_despawn(id);
+    for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id) && kind(id) !== staffChargerKind && id !== cloakId) scene_despawn(id);
     for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
     for (const key of renderedFog) scene_despawn(`fog_${key}`);
     renderedTiles.clear();
@@ -2095,7 +2191,10 @@ ${t("gear.staffMagic", {
           equipment.push(gear);
           createStaffCharger(gear, field("player", "cooldown"));
         } else if (item === "spirit_bow") inventory.spirit_bow = 1;
-        else inventory[item]++;
+        else if (item === "cloak_of_shadows") {
+          inventory.cloak_of_shadows = 1;
+          createCloak(false, field("player", "cooldown"));
+        } else inventory[item]++;
         pushLog(message("log.item", { item: message(`item.${item}.name`) }));
       } else {
         const coins = 3 + Math.floor(random() * 8);
@@ -2107,6 +2206,10 @@ ${t("gear.staffMagic", {
   }
   function useInventoryItem(kindKey) {
     if (phase !== "playing" && phase !== "inventory" || inventory[kindKey] <= 0) return false;
+    if (kindKey === "cloak_of_shadows") {
+      toggleCloak();
+      return true;
+    }
     if (kindKey === "scroll_upgrade") {
       upgradePage = 0;
       setPhase("upgrade");
@@ -2138,6 +2241,46 @@ ${t("gear.staffMagic", {
       spendTurns(kindKey === "food_ration" ? 3 : 1);
     }
     return true;
+  }
+  function toggleCloak() {
+    if (!inventory.cloak_of_shadows) return;
+    queuedPath = [];
+    targeting = null;
+    examining = false;
+    if (cloakActive()) {
+      stopCloak();
+      phase = "playing";
+      publish();
+      drawUi();
+      return;
+    }
+    if (!cloakEquipped()) {
+      pushLog(message("cloak.needEquip"));
+      drawUi();
+      return;
+    }
+    if (cloakValue("health") <= 0) {
+      pushLog(message("cloak.empty"));
+      drawUi();
+      return;
+    }
+    startCloak(field("player", "cooldown"));
+    pushLog(message("item.cloak_of_shadows.effect"));
+    phase = "playing";
+    spendTurns();
+  }
+  function changeCloakEquipment() {
+    if (!inventory.cloak_of_shadows) return;
+    const takingOff = cloakEquipped();
+    if (takingOff) stopCloak();
+    change(cloakId, "velocity_x", takingOff ? 0 : 1);
+    if (!takingOff) change(cloakId, "cooldown", field("player", "cooldown"));
+    phase = "playing";
+    spendTurns();
+  }
+  function dispelInvisibility() {
+    scene_despawn(buffId("invisibility", "player"));
+    stopCloak(true);
   }
   function changeEquipment() {
     if (phase !== "equipment") return;
@@ -2216,11 +2359,11 @@ ${t("gear.staffMagic", {
     const type = kind(id), spec = mobCombat[type];
     const weapon = equippedGear(equipment, "weapon");
     const encumbrance = ranged ? Math.max(0, spiritBowStrength(level) - strength) : strengthDeficit(weapon, strength);
-    const surprised = (hasBuff("invisibility", "player") || field(id, "lifetime") === 0) && encumbrance === 0;
+    const surprised = (isInvisible() || field(id, "lifetime") === 0) && encumbrance === 0;
     const enraged = type === "boss" && field(id, "health") <= enemySpecs.boss.health / 2;
     const accuracy = ranged ? spiritBowAccuracy(level, strength, cellDistance(cellPosition("player"), cellPosition(id))) : attackSkill(weapon, strength, level);
     const hit = surprised || random() * accuracy >= random() * Math.floor(spec.defense * (enraged ? 1.5 : 1));
-    scene_despawn(buffId("invisibility", "player"));
+    dispelInvisibility();
     change(id, "lifetime", 1);
     if (hit) {
       const damage = ranged ? spiritBowDamage(level, strength, roll) : weaponDamage(weapon, strength, surprised, roll);
@@ -2235,6 +2378,7 @@ ${t("gear.staffMagic", {
     if (health() <= 0) {
       removeBuffs("player");
       for (const id of scene_actor_ids()) if (kind(id) === staffChargerKind) scene_despawn(id);
+      scene_despawn(cloakId);
       setPhase("lost");
     }
   }
@@ -2283,6 +2427,13 @@ ${t("gear.staffMagic", {
       fireAction(now);
       return 1;
     }
+    if (id === cloakId) {
+      const regenOn = !hasBuff("locked_floor", "player") || remainingBuff("locked_floor", "player") >= 1;
+      const next = cloakRechargeStep(cloakValue("health"), cloakValue("power"), cloakValue("lifetime"), cloakActive(), regenOn);
+      change(cloakId, "health", next.charges);
+      change(cloakId, "power", next.partial);
+      return 1;
+    }
     if (kind(id) === staffChargerKind) {
       const gear = equipment.find((gear2) => gear2.id === staffGearId(id) && gear2.kind === "mages_staff");
       if (!gear || health() <= 0) {
@@ -2298,6 +2449,23 @@ ${t("gear.staffMagic", {
     const type = buffKind(kind(id)), target = buffTarget(id);
     if (!type || !scene_actor(target) || field(target, "health") <= 0) {
       scene_despawn(id);
+      return 1;
+    }
+    if (type === "cloak") {
+      if (!cloakEquipped()) {
+        stopCloak();
+        return 1;
+      }
+      const oldLevel = cloakValue("lifetime"), step = cloakStealthStep(cloakValue("health"), oldLevel, cloakValue("speed"), field(id, "health"), level);
+      change(cloakId, "health", step.charges);
+      change(cloakId, "lifetime", step.level);
+      change(cloakId, "speed", step.experience);
+      if (step.level > oldLevel) pushLog(message("cloak.levelup"));
+      if (!step.active) {
+        stopCloak();
+        queuedPath = [];
+        pushLog(message("cloak.empty"));
+      } else change(id, "health", step.left);
       return 1;
     }
     if (type === "invisibility") {
@@ -2406,7 +2574,7 @@ ${t("gear.staffMagic", {
         pushLog(message("staff.hit", { damage }));
         damageMonster(enemy, damage);
       } else pushLog(message("staff.miss"));
-      scene_despawn(buffId("invisibility", "player"));
+      dispelInvisibility();
       spendTurns();
       return;
     }
@@ -2439,7 +2607,7 @@ ${t("gear.staffMagic", {
     const hero = cellPosition("player");
     const type = kind(id), spec = mobCombat[type];
     let current = cellPosition(id);
-    const seesHero = !hasBuff("invisibility", "player") && cellDistance(current, hero) <= 7 && lineOfSight(floor, current, hero);
+    const seesHero = !isInvisible() && cellDistance(current, hero) <= 7 && lineOfSight(floor, current, hero);
     if (seesHero) {
       change(id, "lifetime", 1);
       change(id, "velocity_x", hero.x);
@@ -2519,7 +2687,7 @@ ${t("gear.staffMagic", {
     while (phase === "playing") {
       let next = null, earliest = ready, priority = 0;
       for (const id of scene_actor_ids()) {
-        const tag = kind(id), candidatePriority = tag in mobSprites ? -20 : tag === staffChargerKind ? -30 : effectPriority(tag);
+        const tag = kind(id), candidatePriority = tag in mobSprites ? -20 : tag === staffChargerKind ? -30 : tag === cloakKind ? cloakEquipped() ? -30 : void 0 : effectPriority(tag);
         if (candidatePriority === void 0) continue;
         const time = Math.max(start, field(id, "cooldown"));
         if (time < earliest || time === earliest && candidatePriority > priority) {
@@ -2639,6 +2807,10 @@ ${t("gear.staffMagic", {
     if (input_key_just_pressed("Space")) {
       queuedPath = [];
       spendTurns();
+      return;
+    }
+    if (input_key_just_pressed("KeyC")) {
+      toggleCloak();
       return;
     }
     if (input_key_just_pressed("KeyZ")) {

@@ -15,6 +15,7 @@ import { applyBurning, applyHealing, applyInvisibility, applyLockedFloor, applyO
 import { projectileImpact, type TargetKind } from "./projectiles.js";
 import { spiritBowAccuracy, spiritBowDamage, spiritBowDelay, spiritBowStrength } from "./spirit-bow.js";
 import { createStaffCharger, rechargeStaff, staffCapacity, staffChargeId, staffChargerKind, staffCharges, staffDamageRange, staffGearId, upgradeStaffCharge } from "./staff.js";
+import { cloakActive, cloakEquipped, cloakId, cloakKind, cloakRechargeStep, cloakStealthStep, cloakValue, createCloak, startCloak, stopCloak } from "./cloak.js";
 import { affectHunger, extendLockedFloor, hungerStep, lockedFloorStep, regenerationStep, starvingAt, type HungerStep } from "./survival.js";
 
 type Phase = UiPhase;
@@ -78,11 +79,13 @@ let inventory: Record<ItemKind, number> = {
   scroll_magic_mapping: 0,
   food_ration: 1,
   spirit_bow: 0,
+  cloak_of_shadows: 0,
 };
 
 const uid = (prefix: string): string => `${prefix}_${nextId++}`;
 const health = (): number => Math.max(0, field("player", "health"));
 const hungerLevel = (): number => remainingBuff("hunger", "player");
+const isInvisible = (): boolean => hasBuff("invisibility", "player") || cloakActive();
 const targetExperience = (): number => 5 + level * 5;
 
 function pushLog(entry: Message): void {
@@ -142,7 +145,7 @@ function drawUi(): void {
   mountUi(renderSpdUi({
     phase: previewPhase ?? phase, selectedClass, item: selectedItem, health: previewPhase === "lost" ? 0 : health(), maxHealth, level, strength, experience,
     targetExperience: targetExperience(), depth, gold, score, turns, hunger: getHungerStatus(hungerLevel()),
-    invisible: hasBuff("invisibility", "player") ? 1 : 0, ooze: remainingBuff("ooze", "player"),
+    invisible: isInvisible() ? 1 : 0, ooze: remainingBuff("ooze", "player"),
     healing: remainingBuff("healing", "player"), burning: remainingBuff("burning", "player"), targeting,
     lockedFloor: hasBuff("locked_floor", "player") ? remainingBuff("locked_floor", "player") : null,
     bossHealth: scene_actor("warden") ? field("warden", "health") : null,
@@ -194,6 +197,7 @@ function uiAction(id: string, value?: string | number): void {
     case "bag_btn": setPhase("inventory"); return;
     case "item": selectedItem = value as ItemKind; setPhase("item"); return;
     case "toggle_equipment": changeEquipment(); return;
+    case "toggle_cloak_equipment": changeCloakEquipment(); return;
     case "upgrade_page": upgradePage++; drawUi(); return;
     case "quick": useInventoryItem(value as ItemKind); return;
     case "hero_info": overlayReturn = phase; setPhase("hero"); return;
@@ -303,18 +307,20 @@ function startRun(): void {
     scroll_magic_mapping: selectedClass === "mage" ? 1 : 0,
     food_ration: selectedClass === "huntress" ? 2 : 1,
     spirit_bow: selectedClass === "huntress" ? 1 : 0,
+    cloak_of_shadows: selectedClass === "rogue" ? 1 : 0,
   };
   dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) })];
   room();
   startVitals("player", 0);
   for (const gear of equipment) createStaffCharger(gear, 0);
+  if (inventory.cloak_of_shadows) createCloak(true, 0);
   enterFloor();
   setPhase("playing");
 }
 
 function enterFloor(): void {
   examining = false; targeting = null; unsealFloor();
-  for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id) && kind(id) !== staffChargerKind) scene_despawn(id);
+  for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id) && kind(id) !== staffChargerKind && id !== cloakId) scene_despawn(id);
   for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
   for (const key of renderedFog) scene_despawn(`fog_${key}`);
   renderedTiles.clear(); renderedFog.clear(); queuedPath = [];
@@ -406,6 +412,7 @@ function collectLoot(): void {
         equipment.push(gear); createStaffCharger(gear, field("player", "cooldown"));
       }
       else if (item === "spirit_bow") inventory.spirit_bow = 1;
+      else if (item === "cloak_of_shadows") { inventory.cloak_of_shadows = 1; createCloak(false, field("player", "cooldown")); }
       else inventory[item]++;
       pushLog(message("log.item", { item: message(`item.${item}.name`) }));
     }
@@ -416,6 +423,7 @@ function collectLoot(): void {
 
 function useInventoryItem(kindKey: ItemKind): boolean {
   if ((phase !== "playing" && phase !== "inventory") || inventory[kindKey] <= 0) return false;
+  if (kindKey === "cloak_of_shadows") { toggleCloak(); return true; }
   if (kindKey === "scroll_upgrade") { upgradePage = 0; setPhase("upgrade"); return true; }
   if (kindKey === "potion_liquid_flame" || kindKey === "spirit_bow") {
     queuedPath = []; examining = false; phase = "playing"; targeting = kindKey === "spirit_bow" ? "bow" : "flame";
@@ -438,6 +446,29 @@ function useInventoryItem(kindKey: ItemKind): boolean {
     spendTurns(kindKey === "food_ration" ? 3 : 1);
   }
   return true;
+}
+
+function toggleCloak(): void {
+  if (!inventory.cloak_of_shadows) return;
+  queuedPath = []; targeting = null; examining = false;
+  if (cloakActive()) { stopCloak(); phase = "playing"; publish(); drawUi(); return; }
+  if (!cloakEquipped()) { pushLog(message("cloak.needEquip")); drawUi(); return; }
+  if (cloakValue("health") <= 0) { pushLog(message("cloak.empty")); drawUi(); return; }
+  startCloak(field("player", "cooldown")); pushLog(message("item.cloak_of_shadows.effect"));
+  phase = "playing"; spendTurns();
+}
+
+function changeCloakEquipment(): void {
+  if (!inventory.cloak_of_shadows) return;
+  const takingOff = cloakEquipped();
+  if (takingOff) stopCloak();
+  change(cloakId, "velocity_x", takingOff ? 0 : 1);
+  if (!takingOff) change(cloakId, "cooldown", field("player", "cooldown"));
+  phase = "playing"; spendTurns();
+}
+
+function dispelInvisibility(): void {
+  scene_despawn(buffId("invisibility", "player")); stopCloak(true);
 }
 
 function changeEquipment(): void {
@@ -518,11 +549,11 @@ function attackMonster(id: string, ranged = false): void {
   const type = kind(id) as EnemyKind, spec = mobCombat[type];
   const weapon = equippedGear(equipment, "weapon");
   const encumbrance = ranged ? Math.max(0, spiritBowStrength(level) - strength) : strengthDeficit(weapon, strength);
-  const surprised = (hasBuff("invisibility", "player") || field(id, "lifetime") === 0) && encumbrance === 0;
+  const surprised = (isInvisible() || field(id, "lifetime") === 0) && encumbrance === 0;
   const enraged = type === "boss" && field(id, "health") <= enemySpecs.boss.health / 2;
   const accuracy = ranged ? spiritBowAccuracy(level, strength, cellDistance(cellPosition("player"), cellPosition(id))) : attackSkill(weapon, strength, level);
   const hit = surprised || random() * accuracy >= random() * Math.floor(spec.defense * (enraged ? 1.5 : 1));
-  scene_despawn(buffId("invisibility", "player")); change(id, "lifetime", 1);
+  dispelInvisibility(); change(id, "lifetime", 1);
   if (hit) {
     const damage = ranged ? spiritBowDamage(level, strength, roll) : weaponDamage(weapon, strength, surprised, roll);
     const power = Math.max(0, damage - roll(0, spec.armor));
@@ -537,6 +568,7 @@ function hurtPlayer(power: number): void {
   if (health() <= 0) {
     removeBuffs("player");
     for (const id of scene_actor_ids()) if (kind(id) === staffChargerKind) scene_despawn(id);
+    scene_despawn(cloakId);
     setPhase("lost");
   }
 }
@@ -587,6 +619,11 @@ function fireAction(now: number): void {
 
 function effectAction(id: string, now: number): number {
   if (kind(id) === "blob_fire") { fireAction(now); return 1; }
+  if (id === cloakId) {
+    const regenOn = !hasBuff("locked_floor", "player") || remainingBuff("locked_floor", "player") >= 1;
+    const next = cloakRechargeStep(cloakValue("health"), cloakValue("power"), cloakValue("lifetime"), cloakActive(), regenOn);
+    change(cloakId, "health", next.charges); change(cloakId, "power", next.partial); return 1;
+  }
   if (kind(id) === staffChargerKind) {
     const gear = equipment.find((gear) => gear.id === staffGearId(id) && gear.kind === "mages_staff");
     if (!gear || health() <= 0) { scene_despawn(id); return 1; }
@@ -596,6 +633,15 @@ function effectAction(id: string, now: number): number {
   }
   const type = buffKind(kind(id)), target = buffTarget(id);
   if (!type || !scene_actor(target) || field(target, "health") <= 0) { scene_despawn(id); return 1; }
+  if (type === "cloak") {
+    if (!cloakEquipped()) { stopCloak(); return 1; }
+    const oldLevel = cloakValue("lifetime"), step = cloakStealthStep(cloakValue("health"), oldLevel, cloakValue("speed"), field(id, "health"), level);
+    change(cloakId, "health", step.charges); change(cloakId, "lifetime", step.level); change(cloakId, "speed", step.experience);
+    if (step.level > oldLevel) pushLog(message("cloak.levelup"));
+    if (!step.active) { stopCloak(); queuedPath = []; pushLog(message("cloak.empty")); }
+    else change(id, "health", step.left);
+    return 1;
+  }
   if (type === "invisibility") { scene_despawn(id); return 1; }
   if (type === "hunger") {
     if (!floorSealed) recordHunger(hungerStep(field(id, "health"), field(id, "power"), maxHealth));
@@ -662,7 +708,7 @@ function fireAtTarget(target: Point): void {
       const [min, max] = staffDamageRange(gear.level), damage = roll(min, max);
       change(enemy, "lifetime", 1); pushLog(message("staff.hit", { damage })); damageMonster(enemy, damage);
     } else pushLog(message("staff.miss"));
-    scene_despawn(buffId("invisibility", "player")); spendTurns(); return;
+    dispelInvisibility(); spendTurns(); return;
   }
   const item = targeting === "bow" ? "spirit_bow" : "potion_liquid_flame";
   if (inventory[item] <= 0) { targeting = null; drawUi(); return; }
@@ -685,7 +731,7 @@ function monsterAction(id: string, now: number): number {
   const hero = cellPosition("player");
   const type = kind(id) as EnemyKind, spec = mobCombat[type];
   let current = cellPosition(id);
-  const seesHero = !hasBuff("invisibility", "player") && cellDistance(current, hero) <= 7 && lineOfSight(floor!, current, hero);
+  const seesHero = !isInvisible() && cellDistance(current, hero) <= 7 && lineOfSight(floor!, current, hero);
   if (seesHero) {
     change(id, "lifetime", 1); change(id, "velocity_x", hero.x); change(id, "velocity_z", hero.z);
   }
@@ -756,7 +802,8 @@ function spendTurns(duration = 1): void {
   while (phase === "playing") {
     let next: string | null = null, earliest = ready, priority = 0;
     for (const id of scene_actor_ids()) {
-      const tag = kind(id), candidatePriority = tag in mobSprites ? -20 : tag === staffChargerKind ? -30 : effectPriority(tag);
+      const tag = kind(id), candidatePriority = tag in mobSprites ? -20 : tag === staffChargerKind ? -30
+        : tag === cloakKind ? (cloakEquipped() ? -30 : undefined) : effectPriority(tag);
       if (candidatePriority === undefined) continue;
       const time = Math.max(start, field(id, "cooldown"));
       if (time < earliest || (time === earliest && candidatePriority > priority)) {
@@ -842,6 +889,7 @@ function playerInput(dt: number, pointer: RuneweavePointerState): void {
   if (input_key_just_pressed("KeyF")) { toggleExamine(); return; }
   if (input_key_just_pressed("KeyE") || input_key_just_pressed("Period")) { descend(); return; }
   if (input_key_just_pressed("Space")) { queuedPath = []; spendTurns(); return; }
+  if (input_key_just_pressed("KeyC")) { toggleCloak(); return; }
   if (input_key_just_pressed("KeyZ")) { const staff = equipment.find((gear) => gear.kind === "mages_staff"); if (staff) beginStaffZap(staff.id); return; }
   const shortcuts: ItemKind[] = ["potion_healing", "potion_liquid_flame", "potion_invisibility", "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration", "spirit_bow"];
   for (const [index, item] of shortcuts.entries()) if (input_key_just_pressed(`Digit${index + 1}`)) { queuedPath = []; useInventoryItem(item); return; }

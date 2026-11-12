@@ -565,6 +565,47 @@ mod tests {
                 assert_eq!(charger.cooldown, 1.0);
                 let player = super::super::find_owned_entity(world, &attachment, "player").unwrap();
                 assert_eq!(world.get::<ScriptActor>(player).unwrap().cooldown, 1.0);
+                world.resource_mut::<ButtonInput<MouseButton>>().reset_all();
+            })?;
+            call("on_script_reloaded", &mut context)?;
+            click("start")?;
+            call("on_update", &mut context)?;
+            click("hero_rogue")?;
+            call("on_update", &mut context)?;
+            click("begin_run")?;
+            call("on_update", &mut context)?;
+            click("quick_cloak_of_shadows")?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                let cloak =
+                    super::super::find_owned_entity(world, &attachment, "artifact_cloak").unwrap();
+                let cloak = world.get::<ScriptActor>(cloak).unwrap();
+                assert_eq!(cloak.health, 2.0);
+                assert_eq!(cloak.speed, 10.0);
+                assert_eq!(cloak.velocity_x, 1.0);
+                assert_eq!(cloak.cooldown, 1.0);
+                let active =
+                    super::super::find_owned_entity(world, &attachment, "buff_cloak:player")
+                        .unwrap();
+                let active = world.get::<ScriptActor>(active).unwrap();
+                assert_eq!(active.health, 4.0);
+                assert_eq!(active.cooldown, 1.0);
+                assert!(
+                    super::super::find_owned_entity(world, &attachment, "hud_invisible").is_some()
+                );
+            })?;
+            click("quick_cloak_of_shadows")?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                assert!(
+                    super::super::find_owned_entity(world, &attachment, "buff_cloak:player")
+                        .is_none()
+                );
+                assert!(
+                    super::super::find_owned_entity(world, &attachment, "hud_invisible").is_none()
+                );
+                let player = super::super::find_owned_entity(world, &attachment, "player").unwrap();
+                assert_eq!(world.get::<ScriptActor>(player).unwrap().cooldown, 1.0);
             })?;
             Ok(())
         })

@@ -328,6 +328,11 @@
       "sha256": "f16f2cfb77c57e99a86a8017a316a0ab166c8e3fba6b2516018172174abe3ecd"
     },
     {
+      "file": "sprites/dungeon/cloak_of_shadows.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "sha256": "50e50c4418be51eec5170254fe78d132a5c95a18f37e4607d7a827839e6d18b3"
+    },
+    {
       "file": "sprites/dungeon/worn_shortsword.png",
       "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
       "sha256": "9d7652579e8c9180fabf05376e1bfa10256640149c9f775069e56585854a9704"

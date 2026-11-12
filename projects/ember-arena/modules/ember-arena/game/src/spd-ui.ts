@@ -8,6 +8,7 @@ import { fontForText, measureText, wrapText } from "./text-layout.js";
 import { spiritBowDelay, spiritBowLevel, spiritBowRange, spiritBowStrength } from "./spirit-bow.js";
 import type { TargetKind } from "./projectiles.js";
 import { staffCapacity, staffCharges, staffDamageRange } from "./staff.js";
+import { cloakActive, cloakCapacity, cloakEquipped, cloakValue } from "./cloak.js";
 
 export type UiPhase = "menu" | "heroes" | "playing" | "paused" | "won" | "lost" | "inventory" | "item" | "equipment" | "upgrade" | "hero" | "settings" | "checks" | "rankings" | "journal" | "news" | "changes" | "about" | "support" | "message";
 export interface SpdUiState {
@@ -195,12 +196,12 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     type Entry = { type: "supply"; key: Supply } | { type: "gear"; item: GearItem };
     const quantity = (key: Supply): number => key === "worn_key" ? state.wornKeys : key === "goo_blob" ? state.gooBlobs : state.inventory[key];
     const items: Supply[] = [...Object.keys(itemCatalog) as ItemKind[], "worn_key", "goo_blob"];
-    const carried: Entry[] = [...items.filter((key) => quantity(key) > 0).map((key): Entry => ({ type: "supply", key })),
+    const carried: Entry[] = [...items.filter((key) => quantity(key) > 0 && !(key === "cloak_of_shadows" && cloakEquipped())).map((key): Entry => ({ type: "supply", key })),
       ...state.equipment.filter((item) => !item.equipped).map((item): Entry => ({ type: "gear", item }))];
     for (let index = 0; index < 25; index++) {
       const x = index % 5 * (slotWidth + 1), y = 14 + Math.floor(index / 5) * (slotHeight + 1);
       const entry = carried[index - 5];
-      const key = entry?.type === "supply" ? entry.key : undefined;
+      const key = index === 2 && state.inventory.cloak_of_shadows > 0 && cloakEquipped() ? "cloak_of_shadows" : entry?.type === "supply" ? entry.key : undefined;
       const equipped = index < 5;
       const worn = index === 0 ? equippedGear(state.equipment, "weapon") : index === 1 ? equippedGear(state.equipment, "armor") : undefined;
       const gear = worn ?? (entry?.type === "gear" ? entry.item : undefined);
@@ -209,12 +210,15 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
         childrenSlot.push(image(`gear_icon_${gear.id}`, `sprites/dungeon/${gear.kind}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
         if (gear.level) childrenSlot.push(label(`gear_level_${gear.id}`, `+${gear.level}`, 1, 1, slotWidth - 2, 6, titleColor));
         if (gear.kind === "mages_staff") childrenSlot.push(label(`gear_charge_${gear.id}`, `${staffCharges(gear.id)}/${staffCapacity(gear.level)}`, 1, slotHeight - 8, slotWidth - 2, 5));
-      } else if (equipped) {
+      } else if (equipped && !key) {
         childrenSlot.push(art(`equipment_${index}`, ["empty_weapon", "empty_armor", "empty_artifact", "empty_ring", "empty_ring"][index]!, (slotWidth - 16) / 2, (slotHeight - 16) / 2));
       } else if (key) {
         childrenSlot.push(image(`item_ico_${key}`, `sprites/dungeon/${key}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
         if (key === "spirit_bow") {
           if (spiritBowLevel(state.level)) childrenSlot.push(label("item_level_spirit_bow", `+${spiritBowLevel(state.level)}`, 1, 1, slotWidth - 2, 6));
+        } else if (key === "cloak_of_shadows") {
+          if (cloakValue("lifetime")) childrenSlot.push(label("item_level_cloak", `+${cloakValue("lifetime")}`, 1, 1, slotWidth - 2, 6));
+          childrenSlot.push(label("item_charge_cloak", `${cloakValue("health")}/${cloakCapacity(cloakValue("lifetime"))}`, 1, slotHeight - 8, slotWidth - 2, 5));
         } else childrenSlot.push(label(`item_count_${key}`, `${quantity(key)}`, 1, 1, slotWidth - 2, 6));
       }
       children.push({ kind: "button", id: gear ? `gear_slot_${gear.id}` : key ? `slot_${key}` : `bag_slot_${index}`, onClick: gear ? () => on(`gear:${gear.id}`) : key ? () => on(key === "worn_key" || key === "goo_blob" ? key : "item", key) : undefined,
@@ -283,7 +287,9 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       elements.push(label("hud_hint", lines.join("\n"), 2, 44, w - 4, 6, grey, lines.length * 8));
     }
     const staff = state.equipment.find((gear) => gear.kind === "mages_staff");
-    const quick: (ItemKind | GearItem | null)[] = staff
+    const quick: (ItemKind | GearItem | null)[] = state.inventory.cloak_of_shadows > 0
+      ? ["cloak_of_shadows", "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null]
+      : staff
       ? [staff, "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null]
       : state.inventory.spirit_bow > 0
       ? ["spirit_bow", "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null]
@@ -294,7 +300,8 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       const index = m.large ? count - 1 - offset : offset, entry = quick[index];
       const gear = entry && typeof entry === "object" ? entry : undefined, item = typeof entry === "string" ? entry : undefined;
       const name = gear?.kind ?? item;
-      const quantity = gear ? `${staffCharges(gear.id)}/${staffCapacity(gear.level)}` : item === "spirit_bow"
+      const quantity = gear ? `${staffCharges(gear.id)}/${staffCapacity(gear.level)}` : item === "cloak_of_shadows"
+        ? `${cloakValue("health")}/${cloakCapacity(cloakValue("lifetime"))}` : item === "spirit_bow"
         ? (spiritBowLevel(state.level) ? `+${spiritBowLevel(state.level)}` : "") : item ? `${state.inventory[item]}` : "";
       const side = m.large ? (index === 0 ? "left" : index === count - 1 ? "right" : "middle") : (index === 0 ? "right" : index === count - 1 ? "left" : "middle");
       const width = side === "left" ? 20 : side === "right" ? 19 : 18;
@@ -339,13 +346,18 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       const def = itemCatalog[state.item];
       const bowStats = state.item === "spirit_bow" ? `\n${t("bow.stats", { min: spiritBowRange(state.level)[0], max: spiritBowRange(state.level)[1],
         strength: spiritBowStrength(state.level), delay: spiritBowDelay(state.level, state.strength, true).toFixed(2), level: spiritBowLevel(state.level) })}` : "";
-      const lines = wrappedText(t(`item.${state.item}.description`) + bowStats, 120, 6), descriptionHeight = Math.ceil(lines.length * 7.2);
+      const cloakStats = state.item === "cloak_of_shadows" ? `\n${t("cloak.stats", { level: cloakValue("lifetime"), charges: cloakValue("health"),
+        capacity: cloakCapacity(cloakValue("lifetime")), experience: cloakValue("speed"), target: (cloakValue("lifetime") + 1) * 50 })}` : "";
+      const lines = wrappedText(t(`item.${state.item}.description`) + bowStats + cloakStats, 120, 6), descriptionHeight = Math.ceil(lines.length * 7.2);
       const buttonY = 20 + descriptionHeight;
       window("item_window", 120, buttonY + 16, [
         image("item_detail_icon", `sprites/dungeon/${state.item}.png`, rect(0, 0, 16, 16)),
         label("item_detail_title", t(`item.${state.item}.name`), 20, 1, 100, 9, titleColor, 26),
         label("item_detail_desc", lines.join("\n"), 0, 18, 120, 6, white, descriptionHeight),
-        control(`use_${state.item}`, state.item === "spirit_bow" ? t("item.shoot") : state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", undefined, `use_${state.item}`, true, 8),
+        ...(state.item === "cloak_of_shadows" ? [
+          control("toggle_cloak_equipment", t(cloakEquipped() ? "gear.remove" : "gear.equip"), 0, buttonY, 58, 16, "red", undefined, "toggle_cloak_equipment", true, 8),
+          control("use_cloak_of_shadows", t(cloakActive() ? "cloak.stop" : "cloak.stealth"), 62, buttonY, 58, 16, "red", undefined, "use_cloak_of_shadows", cloakEquipped() && (cloakValue("health") > 0 || cloakActive()), 8),
+        ] : [control(`use_${state.item}`, state.item === "spirit_bow" ? t("item.shoot") : state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", undefined, `use_${state.item}`, true, 8)]),
       ]);
     } else if (state.phase === "equipment") {
       const gear = state.equipment.find((item) => item.id === state.selectedGear);

@@ -80,10 +80,10 @@ export const heroClasses: Record<HeroClass, HeroClassSpec> = {
     splash: "sprites/spd/avatar_rogue.png",
     sprite: "sprites/spd/rogue.png",
     icon: "sprites/spd/hero_icons.png",
-    description: "A stealthy fighter. Starts with an extra invisibility potion for surprise attacks.",
+    description: "A stealthy fighter with a rechargeable cloak of shadows. Starts with an extra invisibility potion for surprise attacks.",
     baseHealth: 20,
     baseSpeed: 1,
-    perks: "Dagger / cloth armor / extra invisibility potion",
+    perks: "Cloak of shadows / dagger / cloth armor / extra invisibility potion",
   },
   huntress: {
     id: "huntress",
@@ -149,18 +149,19 @@ export type ItemKind =
   | "scroll_upgrade"
   | "scroll_magic_mapping"
   | "food_ration"
-  | "spirit_bow";
+  | "spirit_bow"
+  | "cloak_of_shadows";
 
 export type LootKind = ItemKind | "worn_key" | "goo_blob" | GearKind;
 // Stable indices stored in reflected ScriptActor.power, shared by spawning and pickup.
 export const lootKinds: readonly LootKind[] = ["potion_healing", "potion_liquid_flame", "potion_invisibility",
   "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration", "worn_key", "goo_blob",
-  "worn_shortsword", "mages_staff", "dagger", "gloves", "shortsword", "cloth_armor", "leather_armor", "spirit_bow"];
+  "worn_shortsword", "mages_staff", "dagger", "gloves", "shortsword", "cloth_armor", "leather_armor", "spirit_bow", "cloak_of_shadows"];
 
 export interface ItemDef {
   id: ItemKind;
   name: string;
-  category: "potion" | "scroll" | "food" | "weapon";
+  category: "potion" | "scroll" | "food" | "weapon" | "artifact";
   description: string;
   effectText: string;
   sprite: string;
@@ -229,6 +230,14 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     category: "weapon",
     description: "Fires unlimited spirit arrows and grows with hero level. Shooting does not replace your melee weapon. Cannot be upgraded with scrolls.",
     effectText: "The spirit arrow fades away.",
+    sprite: "sprites/spd/items.png",
+  },
+  cloak_of_shadows: {
+    id: "cloak_of_shadows",
+    name: "Cloak of Shadows",
+    category: "artifact",
+    description: "Activate for 1 turn; stop for free. Each charge grants 4 turns of stealth. Recharges while equipped and inactive; grows through use.",
+    effectText: "You blend into the shadows.",
     sprite: "sprites/spd/items.png",
   },
 };

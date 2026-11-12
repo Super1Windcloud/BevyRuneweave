@@ -6,6 +6,7 @@ import { prepareUiAssets } from "./prepare-ui-assets.js";
 import { spdUiRevision } from "../modules/ember-arena/game/src/spd-ui-atlas.js";
 import { gearDefinitions } from "../modules/ember-arena/game/src/equipment.js";
 import { spiritBowImage } from "../modules/ember-arena/game/src/spirit-bow.js";
+import { cloakImage } from "../modules/ember-arena/game/src/cloak.js";
 
 const root = resolve(import.meta.dirname, "../../..");
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
@@ -507,6 +508,7 @@ for (const [name, index] of Object.entries({ gold: 18, food_ration: 437, worn_ke
   cropSprite(name, "items.png", (index % 16) * 16, Math.floor(index / 16) * 16, 16, 16);
 }
 const obsoleteKey = join(dungeonSpritesDir, "skeleton_key.png");
+cropSprite("cloak_of_shadows", "items.png", (cloakImage % 16) * 16, Math.floor(cloakImage / 16) * 16, 9, 15);
 if (existsSync(obsoleteKey)) unlinkSync(obsoleteKey);
 for (const [name, spec] of Object.entries(gearDefinitions)) {
   cropSprite(name, "items.png", (spec.image % 16) * 16, Math.floor(spec.image / 16) * 16, 16, 16);
