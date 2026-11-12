@@ -66,9 +66,10 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
   cloak, seal, talents and original starting-supply parity remain pending.
 - Heroes, mobs and the supported effects use independent fractional timestamps in real reflected
   components, with f32 precision matching both Bevy and the original Java Actor. Hero wins
-  timestamp ties; healing precedes fire, then mobs, then ordinary buffs. Crab movement costs
-  0.5 ticks and attacks cost 1. Hunger/regeneration still share a tick; the complete original
-  Actor framework is not yet migrated.
+  timestamp ties; healing/regeneration precede fire, then mobs, then ordinary buffs. Hunger,
+  regeneration and LockedFloor each have their own deadlines and reflected accumulators.
+  Crab movement costs 0.5 ticks and attacks cost 1. The complete original Actor framework
+  and exact same-priority tie ordering are not yet migrated.
 - Backpack equipment slots open actual item details. Equip/unequip costs one tick; replacing
   an occupied slot also spends the old item's unequip tick. Weapon damage/accuracy/attack time
   and armor reduction/evasion/movement depend on the equipped items and strength requirements.
@@ -77,9 +78,11 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
 - Upgrade scrolls select a carried weapon or armor, including unequipped items. Opening or
   cancelling the chooser costs nothing. Confirming consumes one scroll and one tick, improving
   that particular item's stats. Required strength drops at +1/+3/+6/+10 as in the original.
-- Hunger begins at 300 turns and starvation at 450. A ration satisfies 300 hunger and takes
-  three turns. Waiting does not instantly heal; basic regeneration is gradual and stops
-  during starvation. Several potion/scroll effects remain simplified; see the parity table.
+- Hunger begins at 300 and starvation at 450. Crossing into starvation deals one damage;
+  later ticks accumulate maximum HP/1000, dealing damage only when the remainder exceeds one.
+  A ration satisfies 300 hunger and takes three turns without resetting that remainder.
+  Natural regeneration accumulates 0.1 HP per eligible wounded tick and pauses its accumulator
+  at full health or while starving. Several advanced item/status modifiers remain pending.
 - Healing potions grant a diminishing budget: at 20 maximum HP the first ticks heal 8, 6,
   then 4. Reapplying keeps the larger budget, including its existing tick phase; it does not
   cure ooze or burning. Invisibility has an independent twenty-tick expiry. Goo ooze lasts
@@ -99,8 +102,11 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
   revealing hidden occupants; tap Search again to search nearby visible tiles. Searching
   spends two turns and six hunger units outside a sealed boss fight. Starting Rogue search
   range is two tiles; the other classes search one tile. Traps, passive detection and search
-  talents remain pending. Goo seals the encounter after noticing or being attacked; hunger
-  and basic regeneration pause until its defeat. The original timed LockedFloor buff is pending.
+  talents remain pending. Goo seals the encounter after noticing or being attacked, pausing
+  hunger until its defeat. Natural regeneration remains enabled for an initial fifty-tick
+  window; damage to Goo restores 1.5 times the damage as ticks, capped at fifty. Once depleted,
+  regeneration pauses until more damage restores time. The HUD shows the remaining window or
+  "Regen off". Healing potions still work, and Goo's death immediately removes the lock.
 
 | Input | Action |
 | --- | --- |
@@ -195,6 +201,28 @@ hashes are checked before reusing that revision's cached bytes. The game runs of
 preparation. The old misnamed `skeleton_key.png` crop is replaced by `worn_key.png`.
 
 ## Verification boundaries
+
+### Hunger, regeneration and LockedFloor on 2026-11-12
+
+- Upstream master still resolves to `57a4e06a4caf162446d1c28caa7983f0493fecf0` (`git ls-remote`).
+  This batch uses its base Hunger/Regeneration/LockedFloor rules, Food/search costs and Goo
+  damage/unseal behavior. Challenge, talent, artifact and trinket modifiers remain pending.
+- **103 tests pass**: sixteen source-rule tests and 87 gameplay/UI/asset tests. New coverage
+  checks f32 starvation thresholds and overflow, food/search remainder and phase preservation,
+  eligible-only regeneration, heal-before-DOT priority, fractional clocks, idle/menu freeze,
+  cross-floor component identity, the fifty-tick lock, damage extension/cap and boss-death
+  unsealing. Starvation death/restart and Chinese live/depleted window labels are covered.
+- Biome, independent TypeScript checks, bundle/font generation, Rust formatting and whitespace
+  checks pass. `npm run check` still invokes Biome; compiler type checks remain separate.
+- `cargo test --locked --offline -p bevy-runeweave --no-default-features --features typescript
+  --lib quickjs_arena_runs_with_real_actor_components_and_ui -- --nocapture`: **1 passed**
+  on macOS Debug. The existing test now verifies actual hunger/regeneration components,
+  hunger advancement and food's three scheduled ticks through real QuickJS/BMS calls.
+  Rust changes are confined to test assertions; runtime APIs and public ABI are unchanged.
+- The full new survival/Boss scheduler suite uses platform doubles. Native GPU rendering,
+  real input/lifecycle, touch and reference-client pixel comparison are **NOT_RUN for this
+  batch** on Windows, macOS, Linux, Android and iOS. Headless native evidence is limited to
+  the interactions explicitly checked above.
 
 ### Timed effects and liquid-flame targeting on 2026-11-12
 

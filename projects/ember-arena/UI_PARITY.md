@@ -11,7 +11,7 @@ This ledger separates source-based implementation from pixel-parity acceptance.
 | --- | --- | --- |
 | Title | `scenes/TitleScene.java`, `ui/TitleBackground.java`, `effects/BannerSprites.java` | Original landscape/portrait banner in English, localized text title in Chinese, eight entry buttons, chrome, icons and integer UI zoom. Background uses original layers but a static arrangement; original scrolling, flames and glow remain absent. |
 | Hero selection | `scenes/HeroSelectScene.java`, `sprites/HeroSprite.java`, `messages/actors/actors.properties` | Separate full-screen scene, six original hero icons, landscape grid / portrait strip, original splash, left fade and locked-class message windows. Duelist/Cleric remain locked because their gameplay kits are absent. The four playable classes retain truthful port descriptions, rather than claiming unimplemented powers. |
-| Status pane | `ui/StatusPane.java` | Original 82×38 and large 160×39 layouts, 128×9 / 50×4 health bars, source hero portrait, XP bar and level. Healing budget, Burning and Ooze have localized numeric text indicators. Compass, original buff icons, shields, DOT overlays and blink animations remain absent. |
+| Status pane | `ui/StatusPane.java` | Original 82×38 and large 160×39 layouts, 128×9 / 50×4 health bars, source hero portrait, XP bar and level. Healing budget, Burning, Ooze and the remaining/depleted LockedFloor regeneration window have localized text indicators. Compass, original buff icons, shields, DOT overlays and blink animations remain absent. |
 | Menu pane | `ui/MenuPane.java` | Source pane, menu/journal artwork, version and depth positions. Journal data/layout is still a subset. |
 | Toolbar | `ui/Toolbar.java` | Original 20/18/19-pixel joined slot frames, 4/5/6 visible-slot thresholds and desktop/mobile grouping. Search enters tile examination, a second click performs a two-turn search, and F exposes the same flow. Descent uses the HUD stairs, E/period or the hero's exit tile. Full quickslot assignment/targeting, swap and native long-press remain absent. |
 | Backpack | `windows/WndBag.java`, `ui/InventorySlot.java` | Five columns and 25 slots, adaptive layout, quantities and bag tab. Weapon/armor slots now reference actual item instances; removed gear remains in the backpack. Seven gear definitions, upgrade labels, key/blob descriptions and equip/unequip actions are present. Rings, artifacts, curses and full bag taxonomy remain pending. |
@@ -57,6 +57,12 @@ gaps. UI and scene images use nearest sampling. Source icons preserve their own 
   areas/touch and platform font rasterization remain unverified for this UI change.
 
 ## Visual inspection and acceptance
+
+The survival/LockedFloor batch passes 103 script tests, Biome and independent TypeScript checks.
+Portrait and short-landscape doubles cover Chinese window counts and the depleted label.
+The headless macOS QuickJS/Bevy test checks actual survival components and scheduled eating.
+The new labels and threshold messages have NOT_RUN native screenshot/input acceptance on
+all five platforms; the original LockedFloor buff icon/description window remains pending.
 
 The timed-effects batch passes 90 script tests, Biome and independent TypeScript checks.
 Chinese numeric effects and targeting/cancel controls are covered in portrait and short

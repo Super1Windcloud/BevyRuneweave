@@ -3,11 +3,13 @@ import { cellKey, terrainAt, type DungeonFloor } from "./dungeon.js";
 import { placeCell } from "./dungeon-actors.js";
 import { timeAfter } from "./equipment.js";
 import type { Point } from "./rules.js";
+import { lockedFloorDuration } from "./survival.js";
 
 // v4.0.2 Healing/Burning/Ooze/Invisibility and Fire. Effect state lives in
 // real, script-owned Bevy entities accessed through the existing BMS registry.
 // ScriptEntityId encodes the target relationship; no actor/status mirror is kept.
-export type BuffKind = "healing" | "burning" | "ooze" | "invisibility";
+const buffKinds = ["healing", "burning", "ooze", "invisibility", "hunger", "regeneration", "locked_floor"] as const;
+export type BuffKind = typeof buffKinds[number];
 export const fireRoot = "blob_fire";
 export const buffId = (type: BuffKind, target: string): string => `buff_${type}:${target}`;
 export const buffTarget = (id: string): string => id.slice(id.indexOf(":") + 1);
@@ -17,17 +19,22 @@ export function buffKind(tag: string): BuffKind | undefined {
     case "buff_burning": return "burning";
     case "buff_ooze": return "ooze";
     case "buff_invisibility": return "invisibility";
+    case "buff_hunger": return "hunger";
+    case "buff_regeneration": return "regeneration";
+    case "buff_locked_floor": return "locked_floor";
     default: return undefined;
   }
 }
 export const hasBuff = (type: BuffKind, target: string): boolean => !!scene_actor(buffId(type, target));
 export const remainingBuff = (type: BuffKind, target: string): number => hasBuff(type, target) ? field(buffId(type, target), "health") : 0;
 export function removeBuffs(target: string): void {
-  for (const type of ["healing", "burning", "ooze", "invisibility"] as const) scene_despawn(buffId(type, target));
+  for (const type of buffKinds) scene_despawn(buffId(type, target));
 }
 
 // health = remaining healing/duration, power = heal rate or cached next burn
 // damage, lifetime = acted flag, cooldown = next absolute action timestamp.
+// Hunger uses health for level and power for partial damage; Regeneration uses
+// power for partial healing. LockedFloor uses health for its remaining window.
 function create(id: string, tag: string, remaining: number, now: number): void {
   if (!scene_spawn(id, 0, 0, -20) || !scene_actor_set(id, tag, remaining, 0, 1)) throw new Error(`Cannot create effect: ${id}`);
   change(id, "cooldown", Math.fround(now));
@@ -65,8 +72,14 @@ export function applyInvisibility(target: string, now: number): void {
   change(id, "health", 20);
   change(id, "cooldown", Math.max(field(id, "cooldown"), timeAfter(now, 20)));
 }
+export function startVitals(target: string, now: number): void {
+  ensureBuff("regeneration", target, now); ensureBuff("hunger", target, now);
+}
+export function applyLockedFloor(target: string, now: number): void {
+  if (!hasBuff("locked_floor", target)) change(ensureBuff("locked_floor", target, now), "health", lockedFloorDuration);
+}
 export function effectPriority(tag: string): number | undefined {
-  if (tag === "buff_healing") return -1;
+  if (tag === "buff_healing" || tag === "buff_regeneration") return -1;
   if (tag === "blob_fire") return -10;
   return buffKind(tag) ? -30 : undefined;
 }

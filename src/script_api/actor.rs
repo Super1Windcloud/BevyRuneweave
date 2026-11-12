@@ -320,6 +320,17 @@ mod tests {
             click("begin_run")?;
             call("on_update", &mut context)?;
             guard.with_world_mut(|world| {
+                for (id, kind) in [
+                    ("buff_hunger:player", "buff_hunger"),
+                    ("buff_regeneration:player", "buff_regeneration"),
+                ] {
+                    let entity = super::super::find_owned_entity(world, &attachment, id).unwrap();
+                    let actor = world.get::<ScriptActor>(entity).unwrap();
+                    assert_eq!(actor.kind, kind);
+                    assert_eq!(actor.health, 0.0);
+                    assert_eq!(actor.power, 0.0);
+                    assert_eq!(actor.cooldown, 0.0);
+                }
                 world
                     .resource_mut::<ButtonInput<KeyCode>>()
                     .press(KeyCode::KeyD);
@@ -331,6 +342,16 @@ mod tests {
                 let entity = super::super::find_owned_entity(world, &attachment, "player").unwrap();
                 assert!(world.get::<Transform>(entity).unwrap().translation.x > 0.0);
                 assert_eq!(world.resource::<ScriptGameState>().message, "PLAYING");
+                let hunger =
+                    super::super::find_owned_entity(world, &attachment, "buff_hunger:player")
+                        .unwrap();
+                let hunger = world.get::<ScriptActor>(hunger).unwrap();
+                assert!(hunger.health > 0.0);
+                assert_eq!(
+                    hunger.health,
+                    world.get::<ScriptActor>(entity).unwrap().cooldown
+                );
+                assert_eq!(hunger.cooldown, hunger.health);
                 world.resource_mut::<ButtonInput<KeyCode>>().clear();
             })?;
             click("pause")?;
@@ -401,6 +422,19 @@ mod tests {
                     super::super::find_owned_entity(world, &attachment, "use_food_ration")
                         .is_some()
                 );
+                let hunger =
+                    super::super::find_owned_entity(world, &attachment, "buff_hunger:player")
+                        .unwrap();
+                world.get_mut::<ScriptActor>(hunger).unwrap().health = 300.0;
+            })?;
+            click("use_food_ration")?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                let hunger =
+                    super::super::find_owned_entity(world, &attachment, "buff_hunger:player")
+                        .unwrap();
+                assert_eq!(world.get::<ScriptActor>(hunger).unwrap().health, 3.0);
+                assert_eq!(world.resource::<ScriptGameState>().message, "PLAYING");
             })?;
             call("on_script_reloaded", &mut context)?;
             guard.with_world_mut(|world| {

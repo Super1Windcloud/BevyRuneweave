@@ -10,19 +10,20 @@ immutable revision; source and crop checksums are recorded in the asset manifest
 
 | Area | Implemented | Remaining difference |
 | --- | --- | --- |
-| Time | Fractional action times in reflected f32 components; independent healing/fire/mob/buff deadlines with source priorities 0/-1/-10/-20/-30; idle frames do not advance actors | Hunger/regeneration still share a tick; exact same-priority actor ordering and the rest of the Actor framework remain pending |
+| Time | Fractional action times in reflected f32 components; independent healing/regeneration/fire/mob/buff deadlines with source priorities 0/-1/-10/-20/-30; hunger and LockedFloor have their own actors; idle frames do not advance actors | Exact same-priority actor ordering and the rest of the Actor framework remain pending |
 | Terrain | Rooms, corridors, doors, water, entrance/exit | Custom 25×25 connected-room generator, not upstream builders/painters |
 | Movement | Grid steps, bump melee, blocking, door action, known-tile click routes, real orthographic camera follow/zoom | Exact diagonal corner rules, auto-explore, running, upstream camera smoothing/deadzone and manual zoom controls pending |
 | Sight | Wall/door occlusion, explored memory, hidden mobs/loot | Bresenham rays, not upstream shadow casting; no lighting/grass/blindness system |
 | Search/examine | Turn-free tile examination; visible secret-door discovery; two-tick/six-hunger intentional search; Rogue radius 2, others 1 | Custom optional secret shortcut; no traps, passive discovery, talents or native long-press |
-| Stairs | Explicit descent through five floors; supplies/HP retained; Goo encounter sealing; key pickup and one-turn exit unlock | No return upstairs, floor persistence or prison transition; timed LockedFloor behavior pending |
+| Stairs | Explicit descent through five floors; supplies/HP and passive accumulators retained; Goo sealing creates a timed LockedFloor buff; key pickup and one-turn exit unlock | No return upstairs, floor persistence or prison transition; stronger-boss challenge variants pending |
 | Rendering | Correctly cropped native 2D hero, mob, item and sewer sprites | Static frames; no original sprite animations, stitched raised walls, particle effects or exact UI layout |
 | Native UI | Original atlas chrome/font, title and hero-selection scenes, joined toolbars, five-column backpack, item windows and tabbed settings | See [UI_PARITY.md](UI_PARITY.md); all original scenes/content and pixel-difference acceptance remain incomplete |
 | Heroes | Four starting melee weapons and cloth armor are real carried items; original base damage ranges, half-tick gloves and dagger surprise range; 20 starting HP, 10 strength | Staff spells/charges, spirit bow, cloak/seal, full starting supplies, other classes/subclasses/talents pending |
 | Rats/Gnolls/Crabs | Upstream base stats; melee gnolls; crab movement costs 0.5 ticks while attacks cost 1, with independent reflected action deadlines | Simplified sleeping/hunting/door behavior and custom loot distributions |
 | Goo | 100 HP, water healing, half-health enhancement, two-stage charge, range-2 burst, twenty-tick ooze with source sewer damage/water rules; real Worn Key and 2–4 blob drops; optional burst camera shake | Custom floor; simplified charge cancellation and hit processing, no boss badge/score rules |
 | Progression | Kill XP, +5 maximum HP per level; selected weapon/armor drive accuracy, damage, reduction, evasion and time, including strength penalties | Rings, enchantments, curses, talents, challenge modifiers and ascension pending |
-| Hunger | Hungry at 300, starving at 450, ration satisfies 300 and takes 3 turns | Simplified regeneration/starvation rates and locked-floor interaction |
+| Hunger | Hungry at 300, starving at 450 with one immediate damage; further damage accumulates HT/1000 per tick using f32 and a strict >1 threshold; food/search preserve actor phase and damage remainder; sealed floors pause hunger | WellFed, Shadows, Salt Cube, food talents, cursed Horn and challenge modifiers pending |
+| Regeneration/LockedFloor | Independent regeneration accumulates 0.1 HP on eligible wounded ticks before mobs/DOT; full health/starvation pause the accumulator; normal Goo lock grants 50 ticks, damage restores 1.5× dealt damage capped at 50; boss death immediately removes the lock | Chalice, rings, trinkets, stronger-boss variants and other passive charging effects pending |
 | Healing | One-turn potion applies a diminishing `(int)(0.8f*HT+14)` budget at 25% per tick; maximum-budget reapplication, priority before damage; does not cure ooze or burning | Other cured debuffs, challenges, trinkets and complete status interactions pending |
 | Invisibility | Independent twenty-tick expiry, blocks detection, attacks break it; surprise hits | Potion-only implementation, no complete cloak/artifact mechanics |
 | Strength/upgrade | Strength +1; scroll selects any owned weapon/armor; original damage/armor scaling and strength thresholds at +1/+3/+6/+10; cancel is free | No enchantment/curse handling or advanced upgrade interactions |
@@ -41,7 +42,7 @@ All paths below are relative to the upstream repository's
 - `actors/hero/Hero.java`: starting 20 HP / 10 STR, level health growth, XP requirement and action handling.
 - `actors/hero/HeroClass.java`: class-specific equipment; used to identify the gaps above.
 - `actors/mobs/{Rat,Gnoll,Crab,Goo}.java`: basic stats, crab speed, Goo charge, water healing and enrage.
-- `actors/buffs/Hunger.java`: 300/450 hunger thresholds.
+- `actors/buffs/{Hunger,Regeneration,LockedFloor}.java`: 300/450 thresholds, fractional starvation/regeneration accumulators, actor priorities and the fifty-tick passive window. `items/food/Food.java`, `actors/hero/Hero.java#search`, `actors/mobs/Goo.java#damage` and `levels/Level.java#seal` supply food/search costs, window extension and seal/unseal behavior.
 - `actors/Actor.java`: f32 action times, rounding near whole ticks and hero/mob/buff priorities.
 - `actors/buffs/{Healing,Ooze,Burning,Invisibility,FlavourBuff,Buff}.java`, `items/potions/{PotionOfHealing,PotionOfInvisibility}.java`: effect budgets, reapplication, expiry, water behavior and priorities.
 - `items/{Item,potions/PotionOfLiquidFlame}.java`, `mechanics/Ballistica.java`, `actors/blobs/Fire.java`: one-turn throws, first impact, fire seeding, decay and spread. `effects/particles/FlameParticle.java` supplies the static marker's color/size only; its emitter animation is not ported.
@@ -56,15 +57,16 @@ All paths below are relative to the upstream repository's
 
 New behavior should cite an upstream source and add a focused behavior test. Tests using
 platform doubles and a custom generator must not be described as proof of one-to-one parity.
-The timed-effects batch passes 90 tests, Biome and independent TypeScript checks.
+The survival/LockedFloor batch passes 103 tests, Biome and independent TypeScript checks.
 The platform doubles round reflected numbers to f32. The existing headless macOS Debug
-QuickJS/Bevy test also passes, including a real reflected healing entity and one healing tick.
+QuickJS/Bevy test also passes, checking real hunger/regeneration entities, hunger advancement,
+three-tick eating and the existing healing diagnostic.
 This does not establish GPU rendering, real input/lifecycle or reference-client pixel parity;
 those checks are NOT_RUN for this batch on all five platforms. No runtime API or public ABI changed.
 
 ## Next migration order
 
-1. Finish hunger/regeneration/LockedFloor actors and advanced status/item interactions; add staff/spirit-bow targeting
+1. Add advanced status/item interactions, staff/spirit-bow targeting
    and charges, cloak/seal behavior, rings/curses and upstream starting inventories.
 2. Port sewer builders/painters, entrance/boss room rules, returnable persistent floors,
    stitched tile visuals, upstream camera smoothing/zoom controls and sprite animation.

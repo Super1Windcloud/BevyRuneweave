@@ -689,7 +689,149 @@ test("hunger advances with turns, food takes three turns, and waiting grants no 
   assert.equal(game.ui.get("hud_hunger")!.text, "Starving");
   game.entities.get("player")!.body!.health = 20;
   for (let turn = 0; turn < 10; turn++) game.click("wait");
+  assert.equal(game.state().lives, 20, "starvation accumulates maximum HP/1000 per tick instead of one damage per ten turns");
+});
+
+test("survival actors keep independent fractional deadlines and freeze while idle or in menus", () => {
+  const game = harness(); game.click("start"); game.click("hero_huntress"); game.click("begin_run"); removeMonsters(game);
+  const hunger = game.entities.get(buffId("hunger", "player"))!.body!, regen = game.entities.get(buffId("regeneration", "player"))!.body!;
+  hunger.cooldown = 0.25; regen.cooldown = 0.5; regen.power = Math.fround(0.9);
+  game.entities.get("player")!.body!.health = 4;
+  putActor(game, "target", "chaser", { x: 13, z: 12 }); game.entities.get("target")!.body!.cooldown = 100;
+  game.step(1, 0);
+  assert.equal(turnCount(game), 0.5); assert.equal(hunger.health, 1); assert.equal(hunger.cooldown, 1.25);
+  assert.equal(game.state().lives, 4, "the hero wins a tie with regeneration at 0.5");
+  game.step(1, 0);
+  assert.equal(turnCount(game), 1); assert.equal(regen.cooldown, 1.5); assert.equal(game.state().lives, 5);
+  const before = JSON.stringify([...game.entities]);
+  game.tick(100); game.key("KeyI"); game.tick(100); game.key("Escape"); game.key("Escape"); game.tick(100); game.key("Escape");
+  assert.equal(JSON.stringify([...game.entities]), before);
+});
+
+test("natural regeneration counts eligible wounded ticks and runs before lethal damage", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const regen = game.entities.get(buffId("regeneration", "player"))!.body!;
+  for (let tick = 0; tick < 9; tick++) game.click("wait");
+  assert.equal(regen.power, 0, "full health must not build up healing credit");
+  game.entities.get("player")!.body!.health = 4;
+  for (let tick = 0; tick < 9; tick++) game.click("wait");
+  assert.equal(game.state().lives, 4);
+  game.click("wait"); assert.equal(game.state().lives, 5);
+  game.entities.get("player")!.body!.health = 1; regen.power = Math.fround(0.9);
+  const burn = putBuff(game, "burning", "player", 1); game.entities.get(burn)!.body!.power = 1;
+  game.click("wait"); assert.equal(game.state().message, "PLAYING"); assert.equal(game.state().lives, 1);
+  game.entities.get(buffId("hunger", "player"))!.body!.health = 450; regen.power = Math.fround(0.9);
+  game.click("wait"); assert.equal(game.state().lives, 1); assert.equal(regen.power, Math.fround(0.9), "starvation pauses the accumulator");
+});
+
+test("entering starvation hurts once and subsequent damage follows maximum-health accumulation", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const hunger = game.entities.get(buffId("hunger", "player"))!.body!;
+  hunger.health = 449; game.click("wait");
+  assert.equal(game.state().lives, 19); assert.equal(hunger.health, 450);
+  assert.match([...game.ui.values()].flatMap((element) => element.text ?? []).join(" "), /starving/);
+  for (let tick = 0; tick < 50; tick++) game.click("wait");
   assert.equal(game.state().lives, 19);
+  game.click("wait"); assert.equal(game.state().lives, 18); assert.equal(hunger.health, 450);
+});
+
+test("eating preserves the hunger actor phase and remainder, while searching applies overflow damage", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const hunger = game.entities.get(buffId("hunger", "player"))!.body!;
+  hunger.health = 450; hunger.power = Math.fround(0.9); hunger.cooldown = 0.5;
+  game.key("Digit7");
+  assert.equal(turnCount(game), 3); assert.equal(hunger.health, 153);
+  assert.equal(hunger.power, Math.fround(0.9)); assert.equal(hunger.cooldown, 3.5);
+  hunger.health = 448; hunger.power = Math.fround(0.99);
+  game.click("search"); game.click("search");
+  assert.equal(turnCount(game), 5); assert.equal(hunger.health, 450);
+  assert.equal(game.state().lives, 18, "crossing the threshold and converting excess hunger both deal damage");
+  assert.ok(Math.abs(Number(hunger.power) - 0.07) < 1e-6);
+});
+
+function exhaustBossWindow(game: Game): void {
+  removeMonsters(game);
+  // Let Goo notice naturally, then defer its next action to isolate passive time.
+  putActor(game, "warden", "boss", { x: 12, z: 10 }, 100);
+  game.entities.get("player")!.body!.health = 4;
+  const hunger = game.entities.get(buffId("hunger", "player"))!.body!;
+  hunger.health = 200; hunger.power = Math.fround(0.4);
+  game.click("wait"); assert.ok(game.entities.has(buffId("locked_floor", "player")));
+  game.entities.get("warden")!.body!.cooldown = 1000;
+  for (let tick = 1; tick < 60; tick++) game.click("wait");
+}
+
+test("a noticed boss grants fifty regeneration ticks while hunger stays frozen after the window expires", () => {
+  const game = harness(); game.start(); exhaustBossWindow(game);
+  const lock = game.entities.get(buffId("locked_floor", "player"))!.body!, hunger = game.entities.get(buffId("hunger", "player"))!.body!;
+  assert.equal(lock.health, 0); assert.equal(game.state().lives, 9);
+  assert.equal(hunger.health, 200); assert.equal(hunger.power, Math.fround(0.4));
+  assert.equal(game.ui.get("hud_locked_floor")!.text, "Regen off");
+  const before = JSON.stringify([...game.entities]); game.tick(100);
+  assert.equal(JSON.stringify([...game.entities]), before);
+  game.click("search"); game.click("search");
+  assert.equal(hunger.health, 200, "intentional search also spends no hunger on a locked floor");
+  assert.equal(lock.health, 0, "searching does not reset the depleted window");
+  game.key("Digit1"); assert.equal(game.state().lives, 17, "a spent passive window must not suppress healing potions");
+  assert.equal(hunger.health, 200);
+});
+
+test("hurting Goo restores the passive window without resetting it and killing Goo immediately unseals", () => {
+  const game = harness(); game.start(); exhaustBossWindow(game);
+  const lockId = buffId("locked_floor", "player"), lock = game.entities.get(lockId)!.body!;
+  const regen = game.entities.get(buffId("regeneration", "player"))!.body!, hunger = game.entities.get(buffId("hunger", "player"))!.body!;
+  putActor(game, "warden", "boss", { x: 13, z: 12 }, 100); game.entities.get("warden")!.body!.cooldown = 1000;
+  regen.power = Math.fround(0.9);
+  let damage = 0;
+  for (let attempt = 0; attempt < 10 && !damage; attempt++) {
+    const before = Number(game.entities.get("warden")!.body!.health);
+    game.entities.get("warden")!.body!.lifetime = 0; game.step(1, 0);
+    damage = before - Number(game.entities.get("warden")!.body!.health);
+  }
+  assert.ok(damage > 0); assert.equal(lock.health, Math.min(50, damage * 1.5) - 1);
+  assert.equal(game.state().lives, 10, "damage re-enables the waiting partial regeneration");
+  lock.health = 49;
+  let capped = false;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const before = Number(game.entities.get("warden")!.body!.health);
+    game.entities.get("warden")!.body!.lifetime = 0; game.step(1, 0);
+    if (Number(game.entities.get("warden")!.body!.health) < before) {
+      assert.equal(lock.health, 49, "damage caps the window at fifty before its next tick"); capped = true; break;
+    }
+  }
+  assert.ok(capped);
+  game.entities.get("warden")!.body!.health = 1;
+  for (let attempt = 0; attempt < 10 && game.entities.has("warden"); attempt++) {
+    game.entities.get("warden")!.body!.lifetime = 0; game.step(1, 0);
+  }
+  assert.ok(!game.entities.has("warden")); assert.ok(!game.entities.has(lockId)); assert.ok(!game.ui.has("hud_locked_floor"));
+  assert.equal(hunger.health, 201, "hunger resumes during the action that defeats Goo");
+});
+
+test("descent preserves the actual hunger and regeneration components and their accumulated values", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const map = generateFloor(1337, 1); walk(game, map, map.exit);
+  const hungerId = buffId("hunger", "player"), regenId = buffId("regeneration", "player");
+  const hunger = game.entities.get(hungerId)!.body!, regen = game.entities.get(regenId)!.body!;
+  hunger.health = 200; hunger.power = Math.fround(0.7); regen.power = Math.fround(0.6);
+  game.click("descend");
+  assert.equal(game.entities.get(hungerId)!.body, hunger); assert.equal(game.entities.get(regenId)!.body, regen);
+  assert.equal(hunger.health, 201); assert.equal(hunger.power, Math.fround(0.7)); assert.equal(regen.power, Math.fround(0.6));
+  assert.equal(hunger.cooldown, game.entities.get("player")!.body!.cooldown);
+});
+
+test("lethal starvation removes all scheduled buffs and a new run starts with fresh survival state", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  game.entities.get("player")!.body!.health = 1;
+  game.entities.get(buffId("hunger", "player"))!.body!.health = 449;
+  game.click("wait"); assert.equal(game.state().message, "LOST");
+  assert.ok(![...game.entities.values()].some((entity) => entity.body?.kind?.toString().startsWith("buff_")));
+  game.tick(100); assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
+  game.click("restart"); game.click("begin_run");
+  for (const type of ["hunger", "regeneration"] as const) {
+    const body = game.entities.get(buffId(type, "player"))!.body!;
+    assert.equal(body.health, 0); assert.equal(body.power, 0); assert.equal(body.cooldown, 0);
+  }
 });
 
 test("generated native sprites retain upstream frame sizes and manifest checksums", () => {
@@ -873,8 +1015,9 @@ test("Chinese effect amounts and flame targeting remain usable in portrait and s
     const game = harness(width, height, mobile, new Map(), false, "zh-CN");
     game.start(); removeMonsters(game);
     putBuff(game, "healing", "player", 22); putBuff(game, "burning", "player", 7); putBuff(game, "ooze", "player", 19);
+    putBuff(game, "locked_floor", "player", 50);
     game.key("Digit2");
-    for (const [id, amount] of [["hud_healing", 22], ["hud_burning", 7], ["hud_ooze", 19]] as const) {
+    for (const [id, amount] of [["hud_healing", 22], ["hud_burning", 7], ["hud_ooze", 19], ["hud_locked_floor", 50]] as const) {
       const label = game.ui.get(id)!;
       assert.match(label.text!, /[\u4e00-\u9fff]/); assert.ok(label.text!.includes(`${amount}`));
       assert.ok(measureText("zh-CN", label.text!, label.fontSize!) <= Number(label.style!.width));
@@ -886,6 +1029,9 @@ test("Chinese effect amounts and flame targeting remain usable in portrait and s
     game.holdButton("cancel_target"); game.tick(30); game.releaseButton();
     assert.ok(!game.ui.has("target_prompt")); assert.equal(turnCount(game), 0);
     assert.equal(JSON.stringify([...game.entities]), before);
+    game.entities.get(buffId("locked_floor", "player"))!.body!.health = 0;
+    game.resize(width + 1, height); game.tick();
+    assert.equal(game.ui.get("hud_locked_floor")!.text, "恢复暂停");
   }
 });
 
@@ -969,7 +1115,9 @@ test("burning death removes pending buffs and restart cannot inherit the previou
   game.tick(100); assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
   game.click("restart"); game.click("begin_run");
   assert.equal(game.state().lives, 20);
-  assert.ok(![...game.entities.values()].some((entity) => entity.body?.kind?.toString().startsWith("buff_")));
+  const buffs = [...game.entities.values()].filter((entity) => entity.body?.kind?.toString().startsWith("buff_"));
+  assert.deepEqual(buffs.map((entity) => entity.body!.kind).sort(), ["buff_hunger", "buff_regeneration"]);
+  for (const buff of buffs) assert.equal(buff.body!.power, 0);
 });
 
 test("real starting equipment can be inspected, removed and equipped without duplicating the item", () => {

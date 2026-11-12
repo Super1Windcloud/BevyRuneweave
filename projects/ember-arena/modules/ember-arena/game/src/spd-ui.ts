@@ -26,6 +26,7 @@ export interface SpdUiState {
   ooze: number;
   healing: number;
   burning: number;
+  lockedFloor: number | null;
   targeting: boolean;
   bossHealth: number | null;
   inventory: Record<ItemKind, number>;
@@ -254,6 +255,9 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     statuses.filter(([, amount]) => amount > 0).forEach(([name, amount], index) => {
       elements.push(label(`hud_${name}`, t(`hud.${name}`, { amount }), large ? 162 : 86, 2 + index * 9, large ? 82 : 40, 6, titleColor, 9));
     });
+    if (state.lockedFloor !== null) elements.push(label("hud_locked_floor", state.lockedFloor >= 1
+      ? t("hud.lockedFloor", { amount: Math.ceil(state.lockedFloor) }) : t("hud.lockedFloorOff"),
+      large ? 162 : 86, 29, large ? 82 : 40, 6, titleColor, 9));
     const toolbarX = !m.large && m.landscape ? w - 64 : w - 24, toolbarY = h - 26;
     const waitX = m.large ? w - 44 : m.landscape ? w - 20 : 0;
     const searchX = m.large ? w - 64 : m.landscape ? w - 40 : 20;

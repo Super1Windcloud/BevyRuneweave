@@ -10,9 +10,10 @@ import { mountUi, updateUi } from "../../api/ui.js";
 import { renderSpdUi, uiMetrics, type UiPhase } from "./spd-ui.js";
 import { armorReduction, attackDelay, attackSkill, defenseSkill, equippedGear, gearDefinitions, isGearKind,
   moveDelay, startingEquipment, strengthDeficit, timeAfter, weaponDamage } from "./equipment.js";
-import { applyBurning, applyHealing, applyInvisibility, applyOoze, buffId, buffKind, buffTarget, effectPriority,
-  fireRoot, fireVolume, hasBuff, healingStep, oozeDamage, playerBuff, remainingBuff, removeBuffs, seedFireCell, seedLiquidFlame } from "./effects.js";
+import { applyBurning, applyHealing, applyInvisibility, applyLockedFloor, applyOoze, buffId, buffKind, buffTarget, effectPriority,
+  fireRoot, fireVolume, hasBuff, healingStep, oozeDamage, playerBuff, remainingBuff, removeBuffs, seedFireCell, seedLiquidFlame, startVitals } from "./effects.js";
 import { projectileImpact } from "./projectiles.js";
+import { affectHunger, extendLockedFloor, hungerStep, lockedFloorStep, regenerationStep, starvingAt, type HungerStep } from "./survival.js";
 
 type Phase = UiPhase;
 
@@ -62,12 +63,9 @@ let floorSealed = false;
 let equipment = startingEquipment(selectedClass);
 let selectedGear = 1;
 let upgradePage = 0;
-let nextStatusAt = 0;
-let statusTicks = 0;
 
 // Shattered Pixel Dungeon core state
 let gold = 0;
-let hungerTimer = 0;
 let dungeonLogs: Message[] = [];
 let inventory: Record<ItemKind, number> = {
   potion_healing: 1,
@@ -81,6 +79,7 @@ let inventory: Record<ItemKind, number> = {
 
 const uid = (prefix: string): string => `${prefix}_${nextId++}`;
 const health = (): number => Math.max(0, field("player", "health"));
+const hungerLevel = (): number => remainingBuff("hunger", "player");
 const targetExperience = (): number => 5 + level * 5;
 
 function pushLog(entry: Message): void {
@@ -139,9 +138,10 @@ function drawUi(): void {
   const localized = (value: Message): string => renderMessage(profile.language, value);
   mountUi(renderSpdUi({
     phase: previewPhase ?? phase, selectedClass, item: selectedItem, health: previewPhase === "lost" ? 0 : health(), maxHealth, level, strength, experience,
-    targetExperience: targetExperience(), depth, gold, score, turns, hunger: getHungerStatus(hungerTimer),
+    targetExperience: targetExperience(), depth, gold, score, turns, hunger: getHungerStatus(hungerLevel()),
     invisible: hasBuff("invisibility", "player") ? 1 : 0, ooze: remainingBuff("ooze", "player"),
     healing: remainingBuff("healing", "player"), burning: remainingBuff("burning", "player"), targeting,
+    lockedFloor: hasBuff("locked_floor", "player") ? remainingBuff("locked_floor", "player") : null,
     bossHealth: scene_actor("warden") ? field("warden", "health") : null,
     inventory, equipment, selectedGear, upgradePage, wornKeys, gooBlobs, examining, logs: dungeonLogs.map(localized), profile, settingsTab, gameBehind: phase === "settings" ? !["menu", "heroes"].includes(settingsReturn) : phase === "journal" ? overlayReturn !== "menu" : ["hero", "message"].includes(phase) ? overlayReturn !== "heroes" : true,
     saveNotice: saveNotice ? localized(saveNotice) : "", resetPending, checks: checks.map(localized), checkPage,
@@ -279,11 +279,10 @@ function loadMenu(): void {
 }
 
 function startRun(): void {
-  elapsed = score = experience = nextId = gold = hungerTimer = turns = 0;
+  elapsed = score = experience = nextId = gold = turns = 0;
   level = depth = 1;
   strength = 10;
   equipment = startingEquipment(selectedClass); selectedGear = 1;
-  nextStatusAt = statusTicks = 0;
   wornKeys = gooBlobs = 0;
   gooDefeated = exitUnlocked = floorSealed = false;
   maxHealth = heroClasses[selectedClass].baseHealth;
@@ -302,12 +301,13 @@ function startRun(): void {
   };
   dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) })];
   room();
+  startVitals("player", 0);
   enterFloor();
   setPhase("playing");
 }
 
 function enterFloor(): void {
-  examining = targeting = false; floorSealed = false;
+  examining = targeting = false; unsealFloor();
   for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id)) scene_despawn(id);
   for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
   for (const key of renderedFog) scene_despawn(`fog_${key}`);
@@ -421,7 +421,7 @@ function useInventoryItem(kindKey: ItemKind): boolean {
       floor!.explored.add(key);
       if (floor!.tiles[key] === "secret_door") floor!.tiles[key] = "door";
     }
-  } else if (kindKey === "food_ration") hungerTimer = Math.max(0, hungerTimer - 300);
+  } else if (kindKey === "food_ration") changeHunger(300);
   if ((phase as Phase) !== "won") {
     phase = "playing";
     spendTurns(kindKey === "food_ration" ? 3 : 1);
@@ -453,9 +453,22 @@ function upgradeEquipment(id: number): void {
   phase = "playing"; spendTurns();
 }
 
-function damageMonster(id: string, power: number): void {
+function sealFloor(now: number): void {
+  if (floorSealed) return;
+  floorSealed = true; applyLockedFloor("player", now);
+}
+
+function unsealFloor(): void {
+  floorSealed = false; scene_despawn(buffId("locked_floor", "player"));
+}
+
+function damageMonster(id: string, power: number, now = field("player", "cooldown")): void {
   const type = kind(id) as EnemyKind;
-  if (type === "boss") floorSealed = true;
+  if (type === "boss") {
+    sealFloor(now);
+    const lock = buffId("locked_floor", "player");
+    change(lock, "health", extendLockedFloor(field(lock, "health"), power));
+  }
   const hp = field(id, "health") - power;
   change(id, "health", hp);
   if (hp > 0) return;
@@ -466,7 +479,7 @@ function damageMonster(id: string, power: number): void {
   if (level <= spec.maxLevel) experience += spec.experience;
   pushLog(message("log.defeated", { monster: message(`monster.${type}`) }));
   if (type === "boss") {
-    gooDefeated = true; floorSealed = false;
+    gooDefeated = true; unsealFloor();
     spawnLoot(point, "worn_key");
     const chance = random(), count = chance < 0.6 ? 2 : chance < 0.9 ? 3 : 4;
     const neighbours: Point[] = [];
@@ -509,9 +522,9 @@ function hurtPlayer(power: number): void {
   if (health() <= 0) { removeBuffs("player"); setPhase("lost"); }
 }
 
-function damageActor(target: string, amount: number): void {
+function damageActor(target: string, amount: number, now: number): void {
   if (target === "player") hurtPlayer(amount);
-  else if (scene_actor(target) && kind(target) in mobSprites) damageMonster(target, amount);
+  else if (scene_actor(target) && kind(target) in mobSprites) damageMonster(target, amount, now);
 }
 
 function flammable(point: Point): boolean {
@@ -558,6 +571,23 @@ function effectAction(id: string, now: number): number {
   const type = buffKind(kind(id)), target = buffTarget(id);
   if (!type || !scene_actor(target) || field(target, "health") <= 0) { scene_despawn(id); return 1; }
   if (type === "invisibility") { scene_despawn(id); return 1; }
+  if (type === "hunger") {
+    if (!floorSealed) recordHunger(hungerStep(field(id, "health"), field(id, "power"), maxHealth));
+    return 1;
+  }
+  if (type === "regeneration") {
+    const regenOn = !hasBuff("locked_floor", target) || remainingBuff("locked_floor", target) >= 1;
+    if (regenOn && hungerLevel() < starvingAt && health() < maxHealth) {
+      const step = regenerationStep(field(id, "power"));
+      change(id, "power", step.partial); change(target, "health", Math.min(maxHealth, health() + step.healing));
+    }
+    return 1;
+  }
+  if (type === "locked_floor") {
+    if (!floorSealed) scene_despawn(id);
+    else change(id, "health", lockedFloorStep(field(id, "health")));
+    return 1;
+  }
   const left = field(id, "health");
   if (type === "healing") {
     const amount = healingStep(left, field(id, "power"));
@@ -574,7 +604,7 @@ function effectAction(id: string, now: number): number {
     damage = field(id, "power") || roll(1, 3 + Math.floor(depth / 4));
     change(id, "power", roll(1, 3 + Math.floor(depth / 4)));
   }
-  if (damage > 0) damageActor(target, damage);
+  if (damage > 0) damageActor(target, damage, now);
   if (!scene_actor(id)) return 1; // Death may have removed this target's buffs.
   if (type === "burning" && flammable(point) && fireVolume(floor!, point) === 0) seedFireCell(floor!, point, 4, now);
   if (water || left <= 1) scene_despawn(id); else change(id, "health", left - 1);
@@ -601,7 +631,7 @@ function monsterAction(id: string, now: number): number {
   if (seesHero) {
     change(id, "lifetime", 1); change(id, "velocity_x", hero.x); change(id, "velocity_z", hero.z);
   }
-  if (type === "boss" && field(id, "lifetime")) floorSealed = true;
+  if (type === "boss" && field(id, "lifetime")) sealFloor(now);
   if (type === "boss" && terrainAt(floor!, current) === "water") change(id, "health", Math.min(100, field(id, "health") + 1));
   if (!field(id, "lifetime")) return 1;
   const charged = type === "boss" && field(id, "power") >= 2;
@@ -646,11 +676,16 @@ function monsterAction(id: string, now: number): number {
   return 1 / Math.max(0.1, field(id, "speed"));
 }
 
-function statusTick(): void {
-  statusTicks++;
-  if (!floorSealed) hungerTimer++;
-  if (!floorSealed && hungerTimer >= 450 && statusTicks % 10 === 0) hurtPlayer(1);
-  else if (!floorSealed && hungerTimer < 450 && statusTicks % 10 === 0) change("player", "health", Math.min(maxHealth, health() + 1));
+function recordHunger(step: HungerStep): void {
+  const id = buffId("hunger", "player");
+  change(id, "health", step.level); change(id, "power", step.partialDamage);
+  if (step.notice) pushLog(message(`log.${step.notice}`));
+  if (step.damage) hurtPlayer(step.damage);
+}
+
+function changeHunger(energy: number): void {
+  const id = buffId("hunger", "player");
+  recordHunger(affectHunger(field(id, "health"), field(id, "power"), energy, maxHealth));
 }
 
 function spendTurns(duration = 1): void {
@@ -670,9 +705,7 @@ function spendTurns(duration = 1): void {
         next = id; earliest = time; priority = candidatePriority;
       }
     }
-    if (nextStatusAt < earliest) {
-      statusTick(); nextStatusAt = timeAfter(nextStatusAt, 1);
-    } else if (next !== null) {
+    if (next !== null) {
       const delay = kind(next) in mobSprites ? monsterAction(next, earliest) : effectAction(next, earliest);
       if (scene_actor(next)) change(next, "cooldown", timeAfter(earliest, delay));
     } else break;
@@ -725,9 +758,9 @@ function toggleExamine(): void {
   if (!examining) { examining = true; drawUi(); return; }
   const found = searchFloor(floor, cellPosition("player"), selectedClass === "rogue" ? 2 : 1);
   // v4.0.2 Hero.search: two action ticks and six hunger units, before talents.
-  if (!floorSealed) hungerTimer += 4;
+  if (!floorSealed) changeHunger(-4);
   pushLog(message(found ? "log.secretFound" : "log.searched"));
-  spendTurns(2);
+  if (phase === "playing") spendTurns(2);
 }
 
 function examineCell(point: Point): void {
