@@ -321,6 +321,41 @@
       "file": "sprites/dungeon/scroll_magic_mapping.png",
       "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
       "sha256": "daa29eaa8b3f1809404137bc3e5bd278224960321b80018bcdd5790c4ab7321c"
+    },
+    {
+      "file": "sprites/dungeon/worn_shortsword.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "sha256": "9d7652579e8c9180fabf05376e1bfa10256640149c9f775069e56585854a9704"
+    },
+    {
+      "file": "sprites/dungeon/mages_staff.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "sha256": "3bfa3d987b8c168f9fc153b69387ab5c522e81dcee121de8dced4cfdd049364a"
+    },
+    {
+      "file": "sprites/dungeon/dagger.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "sha256": "052a69c84a40dc2b9d9caa6150364783e0e42d9950042ab637413f36603dcfa9"
+    },
+    {
+      "file": "sprites/dungeon/gloves.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "sha256": "66d5c0f8df94a56650b25bf4ced39a7cb042b6f331a635522f682e80ef2ef0e2"
+    },
+    {
+      "file": "sprites/dungeon/shortsword.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "sha256": "c49a559a97000bde2353e26c7cdb83ed51ab0a95511156103008b755f5da4190"
+    },
+    {
+      "file": "sprites/dungeon/cloth_armor.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "sha256": "8340644c9b6fea17e8339fe67185f12140e8a5e46117d7a55bd4e2d0c738bfbd"
+    },
+    {
+      "file": "sprites/dungeon/leather_armor.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "sha256": "82c86829eebade32e1f4a3fa4703920153e9a21a3bfc07970b6af55261a871b2"
     }
   ]
 }

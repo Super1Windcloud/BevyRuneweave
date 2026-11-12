@@ -1,6 +1,6 @@
 const callbacks = globalThis as unknown as RuneweaveCallbacks;
 import { actor, change, field, kind, position } from "./actors.js";
-import { clamp, enemySpecs, getHungerStatus, heroClasses, heroClassList, itemCatalog, lootKinds, mobCombat, seededRandom,
+import { clamp, enemySpecs, getHungerStatus, heroClasses, heroClassList, lootKinds, mobCombat, seededRandom,
   type EnemyKind, type HeroClass, type ItemKind, type LootKind, type Point } from "./rules.js";
 import { canStep, cellDistance, cellKey, findPath, generateFloor, lineOfSight, passable, reveal, sameCell, searchFloor, terrainAt, type DungeonFloor, type Terrain } from "./dungeon.js";
 import { actorSprite, cellPosition, cellSize, mobSprites, monsterIds, placeCell, sprite } from "./dungeon-actors.js";
@@ -8,14 +8,10 @@ import { defaultProfile, parseProfile, type Profile } from "./profile.js";
 import { message, renderMessage, type Message, type MessageKey } from "./i18n.js";
 import { mountUi, updateUi } from "../../api/ui.js";
 import { renderSpdUi, uiMetrics, type UiPhase } from "./spd-ui.js";
+import { armorReduction, attackDelay, attackSkill, defenseSkill, equippedGear, gearDefinitions, isGearKind,
+  moveDelay, startingEquipment, strengthDeficit, timeAfter, weaponDamage } from "./equipment.js";
 
 type Phase = UiPhase;
-
-const ink = [0.055, 0.05, 0.04, 0.97] as const;
-const amber = [1, 0.60, 0.20, 1] as const;
-const muted = [0.55, 0.69, 0.71, 1] as const;
-const teal = [0.17, 0.83, 0.65, 1] as const;
-const crimson = [0.95, 0.25, 0.20, 1] as const;
 
 let phase: Phase = "menu";
 let returnPhase: Phase = "menu";
@@ -24,7 +20,6 @@ let elapsed = 0;
 let score = 0;
 let level = 1;
 let experience = 0;
-let damage = 6;
 let maxHealth = 20;
 let strength = 10;
 let depth = 1;
@@ -60,6 +55,11 @@ let gooBlobs = 0;
 let gooDefeated = false;
 let exitUnlocked = false;
 let floorSealed = false;
+let equipment = startingEquipment(selectedClass);
+let selectedGear = 1;
+let upgradePage = 0;
+let nextStatusAt = 0;
+let statusTicks = 0;
 
 // Shattered Pixel Dungeon core state
 let gold = 0;
@@ -77,7 +77,6 @@ let inventory: Record<ItemKind, number> = {
   food_ration: 1,
 };
 
-const compactUi = (): boolean => window_metrics().height > 0 && window_metrics().height < 650;
 const uid = (prefix: string): string => `${prefix}_${nextId++}`;
 const health = (): number => Math.max(0, field("player", "health"));
 const targetExperience = (): number => 5 + level * 5;
@@ -140,7 +139,7 @@ function drawUi(): void {
     phase: previewPhase ?? phase, selectedClass, item: selectedItem, health: previewPhase === "lost" ? 0 : health(), maxHealth, level, strength, experience,
     targetExperience: targetExperience(), depth, gold, score, turns, hunger: getHungerStatus(hungerTimer),
     invisible: invisTimer, ooze: causticOozeTimer, bossHealth: scene_actor("warden") ? field("warden", "health") : null,
-    inventory, wornKeys, gooBlobs, examining, logs: dungeonLogs.map(localized), profile, settingsTab, gameBehind: phase === "settings" ? !["menu", "heroes"].includes(settingsReturn) : phase === "journal" ? overlayReturn !== "menu" : ["hero", "message"].includes(phase) ? overlayReturn !== "heroes" : true,
+    inventory, equipment, selectedGear, upgradePage, wornKeys, gooBlobs, examining, logs: dungeonLogs.map(localized), profile, settingsTab, gameBehind: phase === "settings" ? !["menu", "heroes"].includes(settingsReturn) : phase === "journal" ? overlayReturn !== "menu" : ["hero", "message"].includes(phase) ? overlayReturn !== "heroes" : true,
     saveNotice: saveNotice ? localized(saveNotice) : "", resetPending, checks: checks.map(localized), checkPage,
     networkStatus: networkLines.length ? networkLines.map(localized).join("\n") : localized(networkStatus),
     notice: uiNotice ? localized(uiNotice) : "",
@@ -149,7 +148,7 @@ function drawUi(): void {
 
 function closeModal(): void {
   if (phase === "settings" && resetPending) { resetPending = false; drawUi(); return; }
-  if (phase === "item") setPhase("inventory");
+  if (phase === "item" || phase === "equipment" || phase === "upgrade") setPhase("inventory");
   else if (phase === "settings") setPhase(settingsReturn);
   else if (phase === "hero" || phase === "message" || phase === "journal") setPhase(overlayReturn);
   else if (phase === "checks") setPhase(returnPhase);
@@ -169,6 +168,12 @@ function uiAction(id: string, value?: string | number): void {
     selectedClass = hero; room(); setPhase("heroes"); return;
   }
   if (id.startsWith("tab:")) { settingsTab = Number(id.slice(4)); drawUi(); return; }
+  if (id.startsWith("gear:")) {
+    const idNumber = Number(id.slice(5));
+    if (!equipment.some((item) => item.id === idNumber)) return;
+    selectedGear = idNumber; setPhase("equipment"); return;
+  }
+  if (id.startsWith("upgrade:")) { upgradeEquipment(Number(id.slice(8))); return; }
   if (id.startsWith("use_")) { phase = "inventory"; useInventoryItem(id.slice(4) as ItemKind); return; }
   if (id === "journal" || id === "game_journal") { overlayReturn = phase === "menu" ? "menu" : "playing"; setPhase("journal"); return; }
   if (["rankings", "journal", "news", "changes", "about", "support"].includes(id)) { setPhase(id as Phase); return; }
@@ -180,6 +185,8 @@ function uiAction(id: string, value?: string | number): void {
     case "pause": setPhase("paused"); return;
     case "bag_btn": setPhase("inventory"); return;
     case "item": selectedItem = value as ItemKind; setPhase("item"); return;
+    case "toggle_equipment": changeEquipment(); return;
+    case "upgrade_page": upgradePage++; drawUi(); return;
     case "quick": useInventoryItem(value as ItemKind); return;
     case "hero_info": overlayReturn = phase; setPhase("hero"); return;
     case "settings": openSettings(); return;
@@ -269,9 +276,10 @@ function startRun(): void {
   elapsed = score = experience = nextId = gold = hungerTimer = invisTimer = causticOozeTimer = turns = 0;
   level = depth = 1;
   strength = 10;
+  equipment = startingEquipment(selectedClass); selectedGear = 1;
+  nextStatusAt = statusTicks = 0;
   wornKeys = gooBlobs = 0;
   gooDefeated = exitUnlocked = floorSealed = false;
-  damage = heroClasses[selectedClass].baseDamage;
   maxHealth = heroClasses[selectedClass].baseHealth;
   runRecorded = false;
   actionCooldown = 0;
@@ -312,6 +320,9 @@ function enterFloor(): void {
     const room = rooms[index]!;
     spawnLoot({ x: room.x + 1, z: room.z }, item as ItemKind);
   }
+  if (depth >= 2 && depth < 5) {
+    spawnLoot(rooms[5]!, "leather_armor"); spawnLoot(rooms[6]!, "shortsword");
+  }
   refreshDungeon();
 }
 
@@ -319,8 +330,8 @@ function spawnMonster(id: string, type: EnemyKind, point: Point): void {
   const spec = enemySpecs[type];
   sprite(id, mobSprites[type], point, 2, type === "boss" ? 1.4 : 1);
   scene_actor_set(id, type, spec.health, spec.speed, spec.radius);
-  // lifetime = awareness, cooldown = accumulated movement credit, power = Goo charge.
-  change(id, "lifetime", 0); change(id, "cooldown", 0); change(id, "power", 0);
+  // lifetime = awareness, cooldown = next action time, power = Goo charge.
+  change(id, "lifetime", 0); change(id, "cooldown", field("player", "cooldown")); change(id, "power", 0);
 }
 
 function spawnLoot(point: Point, item?: LootKind): void {
@@ -373,6 +384,7 @@ function collectLoot(): void {
     if (item) {
       if (item === "worn_key") wornKeys++;
       else if (item === "goo_blob") gooBlobs++;
+      else if (isGearKind(item)) equipment.push({ id: Math.max(0, ...equipment.map((gear) => gear.id)) + 1, kind: item, level: 0, equipped: false });
       else inventory[item]++;
       pushLog(message("log.item", { item: message(`item.${item}.name`) }));
     }
@@ -383,6 +395,7 @@ function collectLoot(): void {
 
 function useInventoryItem(kindKey: ItemKind): boolean {
   if ((phase !== "playing" && phase !== "inventory") || inventory[kindKey] <= 0) return false;
+  if (kindKey === "scroll_upgrade") { upgradePage = 0; setPhase("upgrade"); return true; }
   inventory[kindKey]--;
   pushLog(message(`item.${kindKey}.effect`));
   if (kindKey === "potion_healing") {
@@ -393,7 +406,6 @@ function useInventoryItem(kindKey: ItemKind): boolean {
     }
   } else if (kindKey === "potion_invisibility") invisTimer = 21;
   else if (kindKey === "potion_strength") strength++;
-  else if (kindKey === "scroll_upgrade") damage++;
   else if (kindKey === "scroll_magic_mapping") {
     for (let key = 0; key < floor!.tiles.length; key++) {
       floor!.explored.add(key);
@@ -405,6 +417,30 @@ function useInventoryItem(kindKey: ItemKind): boolean {
     spendTurns(kindKey === "food_ration" ? 3 : 1);
   }
   return true;
+}
+
+function changeEquipment(): void {
+  if (phase !== "equipment") return;
+  const item = equipment.find((gear) => gear.id === selectedGear);
+  if (!item) return;
+  const slot = gearDefinitions[item.kind].slot, old = equippedGear(equipment, slot);
+  const takingOff = item.equipped;
+  // EquipableItem.timeToEquip is one tick; replacing an occupied slot also
+  // spends the old item's unequip tick. Talents and cursed items are pending.
+  const cost = !takingOff && old ? 2 : 1;
+  if (old) old.equipped = false;
+  item.equipped = !takingOff;
+  pushLog(message(takingOff ? "log.gearRemoved" : "log.gearEquipped", { item: message(`item.${item.kind}.name`) }));
+  phase = "playing"; spendTurns(cost);
+}
+
+function upgradeEquipment(id: number): void {
+  if (phase !== "upgrade" || inventory.scroll_upgrade <= 0) return;
+  const item = equipment.find((gear) => gear.id === id);
+  if (!item) return;
+  item.level++; inventory.scroll_upgrade--;
+  pushLog(message("log.gearUpgraded", { item: message(`item.${item.kind}.name`), level: item.level }));
+  phase = "playing"; spendTurns();
 }
 
 function damageMonster(id: string, power: number): void {
@@ -444,12 +480,13 @@ function roll(min: number, max: number): number {
 
 function attackMonster(id: string): void {
   const type = kind(id) as EnemyKind, spec = mobCombat[type];
-  const surprised = invisTimer > 0 || field(id, "lifetime") === 0;
+  const weapon = equippedGear(equipment, "weapon");
+  const surprised = (invisTimer > 0 || field(id, "lifetime") === 0) && strengthDeficit(weapon, strength) === 0;
   const enraged = type === "boss" && field(id, "health") <= enemySpecs.boss.health / 2;
-  const hit = surprised || random() * (9 + level) >= random() * spec.defense * (enraged ? 1.5 : 1);
+  const hit = surprised || random() * attackSkill(weapon, strength, level) >= random() * Math.floor(spec.defense * (enraged ? 1.5 : 1));
   invisTimer = 0; change(id, "lifetime", 1);
   if (hit) {
-    const power = Math.max(0, roll(1, damage + Math.max(0, strength - 10)) - roll(0, spec.armor));
+    const power = Math.max(0, weaponDamage(weapon, strength, surprised, roll) - roll(0, spec.armor));
     pushLog(message(surprised ? "log.surprise" : "log.hit", { monster: message(`monster.${type}`), damage: power }));
     damageMonster(id, power);
   } else pushLog(message("log.enemyDodged", { monster: message(`monster.${type}`) }));
@@ -461,73 +498,88 @@ function hurtPlayer(power: number): void {
   if (health() <= 0) setPhase("lost");
 }
 
-function monstersTurn(): void {
+function monsterAction(id: string): number {
   const hero = cellPosition("player");
-  for (const id of monsterIds()) {
-    const type = kind(id) as EnemyKind, spec = mobCombat[type];
-    let current = cellPosition(id);
-    const seesHero = invisTimer <= 0 && cellDistance(current, hero) <= 7 && lineOfSight(floor!, current, hero);
-    if (seesHero) {
-      change(id, "lifetime", 1); change(id, "velocity_x", hero.x); change(id, "velocity_z", hero.z);
-    }
-    if (type === "boss" && field(id, "lifetime")) floorSealed = true;
-    if (type === "boss" && terrainAt(floor!, current) === "water") change(id, "health", Math.min(100, field(id, "health") + 1));
-    if (!field(id, "lifetime")) continue;
-    const charged = type === "boss" && field(id, "power") >= 2;
-    const canAttack = seesHero && cellDistance(current, hero) <= (charged ? 2 : 1)
-      && (charged || canStep(floor!, current, hero));
-    if (canAttack) {
-      if (type === "boss") {
-        if (field(id, "power") === 1) { change(id, "power", 2); pushLog(message("log.gooSwells")); continue; }
-        const enraged = field(id, "health") <= 50;
-        if (!charged && random() < (enraged ? 0.5 : 0.2)) {
-          change(id, "power", 1); pushLog(message("log.gooCharging")); continue;
-        }
-      }
-      const enraged = type === "boss" && field(id, "health") <= 50;
-      const attack = (enraged ? 15 : spec.attack) * (charged ? 2 : 1);
-      if (random() * attack >= random() * (4 + level)) {
-        const max = enraged ? 12 : spec.maxDamage;
-        const power = Math.max(0, roll(spec.minDamage * (charged ? 3 : 1), max * (charged ? 3 : 1)) - roll(0, 2));
-        pushLog(message(charged ? "log.enemyBurst" : "log.enemyHit", { monster: message(`monster.${type}`), damage: power }));
-        hurtPlayer(power);
-        if (type === "boss" && random() < 1 / 3) causticOozeTimer = 5;
-      } else pushLog(message("log.dodged", { monster: message(`monster.${type}`) }));
-      if (charged && !profile.reducedMotion) cameraShake = 0.2;
-      change(id, "power", 0);
-      if (phase !== "playing") return;
-      continue; // Crab moves twice, but its attack delay is still one turn.
-    }
-    change(id, "power", 0);
-    const destination = seesHero ? hero : { x: field(id, "velocity_x"), z: field(id, "velocity_z") };
-    for (let step = 0; step < field(id, "speed"); step++) {
-      const blocked = new Set(monsterIds().filter((other) => other !== id).map((other) => cellKey(floor!, cellPosition(other))));
-      blocked.add(cellKey(floor!, hero));
-      // Path to the last seen cell; the hero's cell may terminate the path.
-      blocked.delete(cellKey(floor!, destination));
-      const next = findPath(floor!, current, destination, blocked)[0];
-      if (!next || sameCell(next, hero) || monsterIds().some((other) => other !== id && sameCell(cellPosition(other), next))) break;
-      if (terrainAt(floor!, next) === "door") { floor!.tiles[cellKey(floor!, next)] = "open_door"; break; }
-      placeCell(id, next); current = next;
-    }
-    if (!seesHero && sameCell(current, destination)) change(id, "lifetime", 0);
+  const type = kind(id) as EnemyKind, spec = mobCombat[type];
+  let current = cellPosition(id);
+  const seesHero = invisTimer <= 0 && cellDistance(current, hero) <= 7 && lineOfSight(floor!, current, hero);
+  if (seesHero) {
+    change(id, "lifetime", 1); change(id, "velocity_x", hero.x); change(id, "velocity_z", hero.z);
   }
+  if (type === "boss" && field(id, "lifetime")) floorSealed = true;
+  if (type === "boss" && terrainAt(floor!, current) === "water") change(id, "health", Math.min(100, field(id, "health") + 1));
+  if (!field(id, "lifetime")) return 1;
+  const charged = type === "boss" && field(id, "power") >= 2;
+  const canAttack = seesHero && cellDistance(current, hero) <= (charged ? 2 : 1)
+    && (charged || canStep(floor!, current, hero));
+  if (canAttack) {
+    if (type === "boss") {
+      if (field(id, "power") === 1) { change(id, "power", 2); pushLog(message("log.gooSwells")); return 1; }
+      const enraged = field(id, "health") <= 50;
+      if (!charged && random() < (enraged ? 0.5 : 0.2)) {
+        change(id, "power", 1); pushLog(message("log.gooCharging")); return 1;
+      }
+    }
+    const enraged = type === "boss" && field(id, "health") <= 50;
+    const attack = (enraged ? 15 : spec.attack) * (charged ? 2 : 1);
+    const armor = equippedGear(equipment, "armor");
+    if (random() * attack >= random() * defenseSkill(armor, strength, level)) {
+      const max = enraged ? 12 : spec.maxDamage;
+      const power = Math.max(0, roll(spec.minDamage * (charged ? 3 : 1), max * (charged ? 3 : 1)) - armorReduction(armor, strength, roll));
+      pushLog(message(charged ? "log.enemyBurst" : "log.enemyHit", { monster: message(`monster.${type}`), damage: power }));
+      hurtPlayer(power);
+      if (type === "boss" && random() < 1 / 3) causticOozeTimer = 5;
+    } else pushLog(message("log.dodged", { monster: message(`monster.${type}`) }));
+    if (charged && !profile.reducedMotion) cameraShake = 0.2;
+    change(id, "power", 0);
+    return 1; // Crab attacks use one tick; only its movement uses half ticks.
+  }
+  change(id, "power", 0);
+  const destination = seesHero ? hero : { x: field(id, "velocity_x"), z: field(id, "velocity_z") };
+  {
+    const blocked = new Set(monsterIds().filter((other) => other !== id).map((other) => cellKey(floor!, cellPosition(other))));
+    blocked.add(cellKey(floor!, hero));
+    // Path to the last seen cell; the hero's cell may terminate the path.
+    blocked.delete(cellKey(floor!, destination));
+    const next = findPath(floor!, current, destination, blocked)[0];
+    if (!next || sameCell(next, hero) || monsterIds().some((other) => other !== id && sameCell(cellPosition(other), next))) return 1;
+    if (terrainAt(floor!, next) === "door") { floor!.tiles[cellKey(floor!, next)] = "open_door"; return 1; }
+    placeCell(id, next); current = next;
+  }
+  if (!seesHero && sameCell(current, destination)) change(id, "lifetime", 0);
+  return 1 / Math.max(0.1, field(id, "speed"));
 }
 
-function spendTurns(count = 1): void {
+function statusTick(): void {
+  statusTicks++;
+  if (!floorSealed) hungerTimer++;
+  if (invisTimer > 0) invisTimer--;
+  if (terrainAt(floor!, cellPosition("player")) === "water") causticOozeTimer = 0;
+  if (causticOozeTimer > 0) { causticOozeTimer--; hurtPlayer(1); }
+  if (phase !== "playing") return;
+  if (!floorSealed && hungerTimer >= 450 && statusTicks % 10 === 0) hurtPlayer(1);
+  else if (!floorSealed && hungerTimer < 450 && statusTicks % 10 === 0) change("player", "health", Math.min(maxHealth, health() + 1));
+}
+
+function spendTurns(duration = 1): void {
   examining = false;
-  queuedPath = count > 1 ? [] : queuedPath;
-  for (let turn = 0; turn < count && phase === "playing"; turn++) {
-    turns++; change("player", "lifetime", turns);
-    if (!floorSealed) hungerTimer++;
-    if (invisTimer > 0) invisTimer--;
-    if (terrainAt(floor!, cellPosition("player")) === "water") causticOozeTimer = 0;
-    if (causticOozeTimer > 0) { causticOozeTimer--; hurtPlayer(1); }
-    if (phase !== "playing") break;
-    if (!floorSealed && hungerTimer >= 450 && turns % 10 === 0) hurtPlayer(1);
-    else if (!floorSealed && hungerTimer < 450 && turns % 10 === 0) change("player", "health", Math.min(maxHealth, health() + 1));
-    if (phase !== "playing") break;
-    monstersTurn();
+  queuedPath = duration > 1 ? [] : queuedPath;
+  const start = field("player", "cooldown"), ready = timeAfter(start, duration);
+  turns = ready; change("player", "lifetime", ready); change("player", "cooldown", ready);
+  // Actor.process: earliest timestamp wins; hero wins ties, then mobs, then
+  // buffs. Each mob's next timestamp stays in its real reflected component.
+  while (phase === "playing") {
+    let next: string | null = null, earliest = ready;
+    for (const id of monsterIds()) {
+      const time = Math.max(start, field(id, "cooldown"));
+      if (time < earliest) { next = id; earliest = time; }
+    }
+    if (nextStatusAt < earliest) {
+      statusTick(); nextStatusAt = timeAfter(nextStatusAt, 1);
+    } else if (next !== null) {
+      const delay = monsterAction(next);
+      change(next, "cooldown", timeAfter(earliest, delay));
+    } else break;
   }
   refreshDungeon();
   publish(); drawUi();
@@ -538,12 +590,14 @@ function movePlayer(dx: number, dz: number): boolean {
   const current = cellPosition("player"), next = { x: current.x + dx, z: current.z + dz };
   if (!canStep(floor, current, next)) return false;
   const target = monsterIds().find((id) => sameCell(cellPosition(id), next));
+  const duration = target ? attackDelay(equippedGear(equipment, "weapon"), strength)
+    : terrainAt(floor, next) === "door" ? 1 : moveDelay(equippedGear(equipment, "armor"), strength);
   if (target) { attackMonster(target); queuedPath = []; }
   else if (terrainAt(floor, next) === "door") {
     floor.tiles[cellKey(floor, next)] = "open_door";
     pushLog(message("log.door"));
   } else { placeCell("player", next); collectLoot(); }
-  if (phase === "playing") spendTurns();
+  if (phase === "playing") spendTurns(duration);
   return true;
 }
 
@@ -561,7 +615,9 @@ function descend(): void {
     // Explicit boundary for the current content package; the prison is not ported.
     pushLog(message("log.milestone")); setPhase("won"); return;
   }
-  depth++; turns++; change("player", "lifetime", turns); hungerTimer++;
+  spendTurns();
+  if (phase !== "playing") return;
+  depth++;
   pushLog(message(depth === 5 ? "log.lair" : "log.descend", { depth }));
   enterFloor(); publish(); drawUi();
 }
@@ -781,7 +837,7 @@ callbacks.on_update = (delta: number): void => {
   if (input_key_just_pressed("Escape")) {
     if (phase === "playing" && examining) { examining = false; drawUi(); }
     else if (phase === "playing") setPhase("paused");
-    else if (phase === "inventory" || phase === "item" || phase === "hero" || phase === "message") closeModal();
+    else if (phase === "inventory" || phase === "item" || phase === "equipment" || phase === "upgrade" || phase === "hero" || phase === "message") closeModal();
     else if (phase === "paused") setPhase("playing");
     else if (phase === "checks") setPhase(returnPhase);
     else if (phase === "settings") setPhase(settingsReturn);

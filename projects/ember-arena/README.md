@@ -20,11 +20,17 @@ From the repository root:
 just run-ember-arena
 just run-ember-arena --release
 just test-ember-arena
+npm --prefix projects/ember-arena run check
+npm --prefix projects/ember-arena run typecheck
 npm --prefix projects/ember-arena run watch
 ```
 
 The Rust launcher builds the TypeScript bundle before starting. Cargo builds reuse the
 repository `target/`; root tooling supplies the TypeScript dependencies.
+`check` uses root-installed Biome 2.6.7 for fast parsing and correctness/suspicious lint rules.
+Generated JavaScript, assets, caches and lockfiles are outside that scan. Formatting and import
+rewrites are disabled to preserve the existing style. Full compiler checks remain available
+through `typecheck`; `test` runs Biome, rebuilds the bundle and runs all TypeScript test files.
 
 The desktop window starts at **800×600 logical pixels**, centered on the primary monitor.
 `assets/engineConfig.json` declares that size before native window creation; script load/reload
@@ -54,8 +60,22 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
   twice as fast. Goo heals in water, becomes more dangerous below half health, charges a
   short-range attack, and can inflict ooze that washes off in water.
 - Heroes start with 20 HP and 10 strength. Kills grant experience; leveling adds 5 maximum HP.
-  The four selectable classes currently differ in basic weapon damage and initial supplies;
-  their complete equipment, ranged attacks, talents and artifacts remain pending.
+  The four starting melee weapons and cloth armor are real equipment with the original base
+  ranges: worn shortsword 1–10, staff 1–6, dagger 1–8, gloves 1–5. Gloves attack in 0.5 ticks;
+  dagger surprise rolls use the upper quarter of their damage range. Staff casting, bow,
+  cloak, seal, talents and original starting-supply parity remain pending.
+- The current hero/mob subset uses independent fractional timestamps in real reflected
+  components, with f32 precision matching both Bevy and the original Java Actor. Hero wins
+  timestamp ties; mobs precede shared status ticks. Crab movement costs 0.5 ticks and attacks
+  cost 1. The independent original Buff/Blob scheduler is not yet fully migrated.
+- Backpack equipment slots open actual item details. Equip/unequip costs one tick; replacing
+  an occupied slot also spends the old item's unequip tick. Weapon damage/accuracy/attack time
+  and armor reduction/evasion/movement depend on the equipped items and strength requirements.
+  Leather armor and shortsword pickups are added to the custom floor-2–4 loot fixtures; their
+  generation distribution is not upstream-equivalent.
+- Upgrade scrolls select a carried weapon or armor, including unequipped items. Opening or
+  cancelling the chooser costs nothing. Confirming consumes one scroll and one tick, improving
+  that particular item's stats. Required strength drops at +1/+3/+6/+10 as in the original.
 - Hunger begins at 300 turns and starvation at 450. A ration satisfies 300 hunger and takes
   three turns. Waiting does not instantly heal; basic regeneration is gradual and stops
   during starvation. Several potion/scroll effects remain simplified; see the parity table.
@@ -160,6 +180,22 @@ hashes are checked before reusing that revision's cached bytes. The game runs of
 preparation. The old misnamed `skeleton_key.png` crop is replaced by `worn_key.png`.
 
 ## Verification boundaries
+
+### Equipment, action time and Biome batch on 2026-11-12
+
+- **74 tests pass**: six source-rule tests plus 68 gameplay/UI/asset tests. New coverage checks
+  actual equipment pickup, inspect/remove/equip, upgrade cancel/selection, heavy-armor movement,
+  dagger damage, half-tick gloves, crab event timing and f32 rounding. Existing sewer-exit,
+  search, locale and save-error regressions still pass.
+- Biome fast checks and independent TypeScript compiler checks pass. Biome reports roughly
+  50–80 ms for the 29-file scan on this machine; this is a local observation, not a portable
+  performance guarantee. Temporary valid/syntax-error/duplicate-key files verified the check
+  accepts valid input and rejects both error classes, and were removed after verification.
+- Seven equipment sprite crops and Chinese metrics were regenerated through asset preparation;
+  crop hashes are included in the pinned manifest. No Rust, BMS registry or public ABI changed.
+- Windows/macOS/Linux/Android/iOS native execution, real touch/lifecycle, screenshots and
+  matching reference-client pixel comparison are **NOT_RUN for this batch**. Script doubles
+  model f32 reflection but cannot establish native rendering or complete original-game parity.
 
 ### Search and Goo exit interaction batch on 2026-11-12
 

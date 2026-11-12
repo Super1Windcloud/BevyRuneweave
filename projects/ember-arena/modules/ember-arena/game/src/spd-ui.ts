@@ -1,11 +1,12 @@
 import { image, node, text, type UiElement, type UiStyle, type UiColor } from "../../api/ui.js";
 import { chromeFrames, uiFrames } from "./spd-ui-atlas.js";
-import { heroClassList, itemCatalog, type HeroClass, type ItemKind, type LootKind } from "./rules.js";
+import { heroClassList, itemCatalog, type HeroClass, type ItemKind } from "./rules.js";
+import { armorRange, attackDelay, attackSkill, defenseSkill, equippedGear, gearDefinitions, strengthRequired, weaponRange, type GearItem } from "./equipment.js";
 import type { Profile } from "./profile.js";
 import { translate, type MessageKey, type MessageParameters } from "./i18n.js";
 import { fontForText, measureText, wrapText } from "./text-layout.js";
 
-export type UiPhase = "menu" | "heroes" | "playing" | "paused" | "won" | "lost" | "inventory" | "item" | "hero" | "settings" | "checks" | "rankings" | "journal" | "news" | "changes" | "about" | "support" | "message";
+export type UiPhase = "menu" | "heroes" | "playing" | "paused" | "won" | "lost" | "inventory" | "item" | "equipment" | "upgrade" | "hero" | "settings" | "checks" | "rankings" | "journal" | "news" | "changes" | "about" | "support" | "message";
 export interface SpdUiState {
   phase: UiPhase;
   selectedClass: HeroClass;
@@ -25,6 +26,9 @@ export interface SpdUiState {
   ooze: number;
   bossHealth: number | null;
   inventory: Record<ItemKind, number>;
+  equipment: readonly GearItem[];
+  selectedGear: number;
+  upgradePage: number;
   wornKeys: number;
   gooBlobs: number;
   examining: boolean;
@@ -180,21 +184,30 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     }
     const width = slotWidth * 5 + 4, height = 14 + slotHeight * 5 + 4;
     const children: UiElement[] = [label("bag_title", t("bag.title"), 0, 2, width - 25, 8, titleColor), image("bag_gold", "sprites/dungeon/gold.png", rect(width - 15, 0, 12, 12)), label("bag_gold_count", `${state.gold}`, width - 38, 3, 23, 6, titleColor)];
-    const quantity = (key: LootKind): number => key === "worn_key" ? state.wornKeys : key === "goo_blob" ? state.gooBlobs : state.inventory[key];
-    const items: LootKind[] = [...Object.keys(itemCatalog) as ItemKind[], "worn_key", "goo_blob"];
-    const carried = items.filter((key) => quantity(key) > 0);
+    type Supply = ItemKind | "worn_key" | "goo_blob";
+    type Entry = { type: "supply"; key: Supply } | { type: "gear"; item: GearItem };
+    const quantity = (key: Supply): number => key === "worn_key" ? state.wornKeys : key === "goo_blob" ? state.gooBlobs : state.inventory[key];
+    const items: Supply[] = [...Object.keys(itemCatalog) as ItemKind[], "worn_key", "goo_blob"];
+    const carried: Entry[] = [...items.filter((key) => quantity(key) > 0).map((key): Entry => ({ type: "supply", key })),
+      ...state.equipment.filter((item) => !item.equipped).map((item): Entry => ({ type: "gear", item }))];
     for (let index = 0; index < 25; index++) {
       const x = index % 5 * (slotWidth + 1), y = 14 + Math.floor(index / 5) * (slotHeight + 1);
-      const key = carried[index - 5];
+      const entry = carried[index - 5];
+      const key = entry?.type === "supply" ? entry.key : undefined;
       const equipped = index < 5;
+      const worn = index === 0 ? equippedGear(state.equipment, "weapon") : index === 1 ? equippedGear(state.equipment, "armor") : undefined;
+      const gear = worn ?? (entry?.type === "gear" ? entry.item : undefined);
       const childrenSlot: UiElement[] = [];
-      if (equipped) {
-        childrenSlot.push(art(`equipment_${index}`, [state.selectedClass === "warrior" ? "sword" : `weapon_${state.selectedClass}`, "armor", "empty_artifact", "empty_ring", "empty_ring"][index]!, (slotWidth - 16) / 2, (slotHeight - 16) / 2));
+      if (gear) {
+        childrenSlot.push(image(`gear_icon_${gear.id}`, `sprites/dungeon/${gear.kind}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
+        if (gear.level) childrenSlot.push(label(`gear_level_${gear.id}`, `+${gear.level}`, 1, 1, slotWidth - 2, 6, titleColor));
+      } else if (equipped) {
+        childrenSlot.push(art(`equipment_${index}`, ["empty_weapon", "empty_armor", "empty_artifact", "empty_ring", "empty_ring"][index]!, (slotWidth - 16) / 2, (slotHeight - 16) / 2));
       } else if (key) {
         childrenSlot.push(image(`item_ico_${key}`, `sprites/dungeon/${key}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
         childrenSlot.push(label(`item_count_${key}`, `${quantity(key)}`, 1, 1, slotWidth - 2, 6));
       }
-      children.push({ kind: "button", id: key ? `slot_${key}` : `bag_slot_${index}`, onClick: key ? () => on(key === "worn_key" || key === "goo_blob" ? key : "item", key) : equipped ? () => on("hero_info") : undefined,
+      children.push({ kind: "button", id: gear ? `gear_slot_${gear.id}` : key ? `slot_${key}` : `bag_slot_${index}`, onClick: gear ? () => on(`gear:${gear.id}`) : key ? () => on(key === "worn_key" || key === "goo_blob" ? key : "item", key) : undefined,
         style: { ...rect(x, y, slotWidth, slotHeight), background: equipped ? [145 / 255, 147 / 255, 140 / 255, 153 / 255] : [83 / 255, 86 / 255, 77 / 255, 153 / 255] }, children: childrenSlot });
     }
     children.push(control("close_bag", "", -3, height + 2, 25, 17, "toast", "bag_icon"));
@@ -287,7 +300,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     control("settings", t("menu.settings"), 0, 0, 120, 20, "red", "settings"),
     control("home", t("menu.home"), 0, 22, 120, 20, "red", "display"),
   ]);
-  else if (state.phase === "inventory" || state.phase === "item") {
+  else if (state.phase === "inventory" || state.phase === "item" || state.phase === "equipment" || state.phase === "upgrade") {
     const bag = inventoryContent(); window("bag_window", bag.width, bag.height, bag.children);
     if (state.phase === "item") {
       const def = itemCatalog[state.item];
@@ -299,12 +312,41 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
         label("item_detail_desc", lines.join("\n"), 0, 18, 120, 6, white, descriptionHeight),
         control(`use_${state.item}`, def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", undefined, `use_${state.item}`, true, 8),
       ]);
+    } else if (state.phase === "equipment") {
+      const gear = state.equipment.find((item) => item.id === state.selectedGear);
+      if (gear) {
+        const spec = gearDefinitions[gear.kind], range = spec.slot === "weapon" ? weaponRange(gear) : armorRange(gear);
+        const description = t(spec.slot === "weapon" ? "gear.weaponStats" : "gear.armorStats", {
+          min: range[0], max: range[1], strength: strengthRequired(gear), delay: attackDelay(gear, state.strength).toFixed(2),
+        }) + (state.strength < strengthRequired(gear) ? `\n${t("gear.tooHeavy")}` : "")
+          + (gear.kind === "mages_staff" ? `\n${t("gear.staffPending")}` : "");
+        const lines = wrappedText(description, 132, 6), buttonY = 26 + Math.ceil(lines.length * 7.2);
+        const cost = !gear.equipped && equippedGear(state.equipment, spec.slot) ? 2 : 1;
+        window("equipment_window", 132, buttonY + 30, [
+          image("gear_detail_icon", `sprites/dungeon/${gear.kind}.png`, rect(0, 0, 16, 16)),
+          label("gear_detail_title", `${t(`item.${gear.kind}.name`)}${gear.level ? ` +${gear.level}` : ""}`, 20, 1, 112, 8, titleColor, 24),
+          label("gear_detail_stats", lines.join("\n"), 0, 24, 132, 6, white, buttonY - 24),
+          control("toggle_equipment", t(gear.equipped ? "gear.remove" : "gear.equip"), 0, buttonY, 132, 16),
+          label("gear_action_cost", t("gear.cost", { cost }), 0, buttonY + 19, 132, 6, grey, 10),
+        ]);
+      }
+    } else if (state.phase === "upgrade") {
+      const perPage = Math.max(1, Math.min(5, Math.floor((h - 60) / 18)));
+      const pages = Math.max(1, Math.ceil(state.equipment.length / perPage));
+      const page = state.upgradePage % pages, choices = state.equipment.slice(page * perPage, (page + 1) * perPage);
+      window("upgrade_window", 132, 34 + choices.length * 18, [
+        label("upgrade_title", t("gear.chooseUpgrade"), 0, 0, 132, 8, titleColor),
+        ...choices.map((item, index) => control(`upgrade_${item.id}`, `${t(`item.${item.kind}.name`)} +${item.level}`, 0, 14 + index * 18, 132, 16, "red", undefined, `upgrade:${item.id}`, true, 7)),
+        control("upgrade_cancel", t("common.close"), 0, 16 + choices.length * 18, pages > 1 ? 64 : 132, 16, "toast", undefined, "modal_close"),
+        ...(pages > 1 ? [control("upgrade_page", t("common.next"), 68, 16 + choices.length * 18, 64, 16, "toast")] : []),
+      ]);
     }
   } else if (state.phase === "hero") {
     window("hero_window", 120, 126, [
       art("hero_detail_icon", `avatar_${state.selectedClass}`, 0, 0, 22, 30),
       label("hero_detail_title", t("hero.level", { level: state.level, hero: t(`hero.${state.selectedClass}.name`) }), 28, 4, 92, 9, titleColor, 22),
       label("hero_stats", t("hero.stats", { health: Math.ceil(state.health), maxHealth: state.maxHealth, strength: state.strength, experience: state.experience, target: state.targetExperience, gold: state.gold }), 0, 34, 120, 8, white, 60),
+      label("hero_combat", t("gear.heroCombat", { attack: attackSkill(equippedGear(state.equipment, "weapon"), state.strength, state.level), defense: defenseSkill(equippedGear(state.equipment, "armor"), state.strength, state.level), delay: attackDelay(equippedGear(state.equipment, "weapon"), state.strength).toFixed(2) }), 0, 96, 120, 6, grey, 10),
       control("hero_stats_tab", t("hero.statsTab"), 0, 108, 58, 16, "grey"), control("hero_talents_tab", t("hero.talents"), 60, 108, 60, 16, "toast", undefined, "hero_talents_tab", false),
     ]);
   } else if (state.phase === "settings") {
@@ -312,7 +354,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     const headings = ["settings.display", "settings.ui", "settings.input", "settings.data", "settings.audio", "settings.language"] as const;
     content.push(label("settings_title", t(headings[state.settingsTab]!), 0, 0, width, 9, titleColor));
     const names = ["display", "settings", "input", "data", "audio", "langs"];
-    names.forEach((name, index) => content.push(control(`settings_tab_${index}`, "", index * (width / 6), height - 18, width / 6 - 1, 18, state.settingsTab === index ? "grey" : "toast", name, `tab:${index}`)));
+    names.forEach((name, index) => { content.push(control(`settings_tab_${index}`, "", index * (width / 6), height - 18, width / 6 - 1, 18, state.settingsTab === index ? "grey" : "toast", name, `tab:${index}`)); });
     if (state.settingsTab === 0) {
       content.push(label("display_scale_label", t("settings.scale"), 0, 22, width, 8));
       content.push(control("window_landscape", t("settings.landscape"), 0, 38, width, 18));

@@ -1,3 +1,5 @@
+import type { GearKind } from "./equipment.js";
+
 export interface Point { x: number; z: number }
 export type EnemyKind = "chaser" | "ranger" | "charger" | "boss";
 
@@ -40,7 +42,6 @@ export interface HeroClassSpec {
   description: string;
   baseHealth: number;
   baseSpeed: number;
-  baseDamage: number;
   perks: string;
 }
 
@@ -56,7 +57,6 @@ export const heroClasses: Record<HeroClass, HeroClassSpec> = {
     description: "A sturdy melee fighter. Starts with a stronger blade and an extra healing potion.",
     baseHealth: 20,
     baseSpeed: 1,
-    baseDamage: 6,
     perks: "Worn shortsword / cloth armor / extra healing potion",
   },
   mage: {
@@ -70,7 +70,6 @@ export const heroClasses: Record<HeroClass, HeroClassSpec> = {
     description: "A scholar carrying an ancient staff. Starts with an extra upgrade and mapping scroll.",
     baseHealth: 20,
     baseSpeed: 1,
-    baseDamage: 5,
     perks: "Mage's staff / cloth armor / magic mapping scroll",
   },
   rogue: {
@@ -84,7 +83,6 @@ export const heroClasses: Record<HeroClass, HeroClassSpec> = {
     description: "A stealthy fighter. Starts with an extra invisibility potion for surprise attacks.",
     baseHealth: 20,
     baseSpeed: 1,
-    baseDamage: 5,
     perks: "Dagger / cloth armor / extra invisibility potion",
   },
   huntress: {
@@ -98,7 +96,6 @@ export const heroClasses: Record<HeroClass, HeroClassSpec> = {
     description: "A wilderness explorer. Starts with extra food and liquid flame. Bow abilities are pending.",
     baseHealth: 20,
     baseSpeed: 1,
-    baseDamage: 5,
     perks: "Gloves / cloth armor / extra food ration",
   },
 };
@@ -153,10 +150,11 @@ export type ItemKind =
   | "scroll_magic_mapping"
   | "food_ration";
 
-export type LootKind = ItemKind | "worn_key" | "goo_blob";
+export type LootKind = ItemKind | "worn_key" | "goo_blob" | GearKind;
 // Stable indices stored in reflected ScriptActor.power, shared by spawning and pickup.
 export const lootKinds: readonly LootKind[] = ["potion_healing", "potion_liquid_flame", "potion_invisibility",
-  "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration", "worn_key", "goo_blob"];
+  "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration", "worn_key", "goo_blob",
+  "worn_shortsword", "mages_staff", "dagger", "gloves", "shortsword", "cloth_armor", "leather_armor"];
 
 export interface ItemDef {
   id: ItemKind;
@@ -204,8 +202,8 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     id: "scroll_upgrade",
     name: "Scroll of Upgrade",
     category: "scroll",
-    description: "Upgrades the equipped weapon by 1. Costs 1 turn.",
-    effectText: "Ancient runes infuse your weapon (+1 upgrade)!",
+    description: "Choose a carried weapon or armor to upgrade by 1. Costs 1 turn after selection.",
+    effectText: "Ancient runes infuse the selected equipment (+1 upgrade)!",
     sprite: "sprites/spd/items.png",
   },
   scroll_magic_mapping: {

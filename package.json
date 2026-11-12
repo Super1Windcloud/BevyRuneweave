@@ -28,6 +28,7 @@
     "test": "npm run typecheck:scripts && npm run test:release-assets"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.7",
     "@types/node": "^26.1.2",
     "esbuild": "^0.28.1",
     "javascript-obfuscator": "^5.5.0",

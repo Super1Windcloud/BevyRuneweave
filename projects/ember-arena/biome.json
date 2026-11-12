@@ -1,0 +1,16 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.7/schema.json",
+  "files": {
+    "includes": ["modules/ember-arena/game/src/**/*.ts", "modules/ember-arena/api/**/*.ts", "scripts/**/*.ts", "*.json", "!package-lock.json"]
+  },
+  "formatter": { "enabled": false },
+  "assist": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "none",
+      "correctness": { "preset": "recommended" },
+      "suspicious": { "preset": "recommended" }
+    }
+  }
+}

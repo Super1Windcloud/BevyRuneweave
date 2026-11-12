@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
 import { prepareUiAssets } from "./prepare-ui-assets.js";
 import { spdUiRevision } from "../modules/ember-arena/game/src/spd-ui-atlas.js";
+import { gearDefinitions } from "../modules/ember-arena/game/src/equipment.js";
 
 const root = resolve(import.meta.dirname, "../../..");
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
@@ -506,6 +507,9 @@ for (const [name, index] of Object.entries({ gold: 18, food_ration: 437, worn_ke
 }
 const obsoleteKey = join(dungeonSpritesDir, "skeleton_key.png");
 if (existsSync(obsoleteKey)) unlinkSync(obsoleteKey);
+for (const [name, spec] of Object.entries(gearDefinitions)) {
+  cropSprite(name, "items.png", (spec.image % 16) * 16, Math.floor(spec.image / 16) * 16, 16, 16);
+}
 writeFileSync(join(dungeonSpritesDir, "fog.png"), encodePngRgba(1, 1, Buffer.from([0, 0, 0, 175])));
 writeFileSync(join(dungeonSpritesDir, "void.png"), encodePngRgba(1, 1, Buffer.from([7, 7, 6, 255])));
 await prepareUiAssets(assets, cache, decodePngRgba, encodePngRgba);

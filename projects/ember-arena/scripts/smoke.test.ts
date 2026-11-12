@@ -8,7 +8,6 @@ import {
   getHungerStatus,
   heroClasses,
   heroClassList,
-  itemCatalog,
   enemySpecs,
   mobCombat,
   seededRandom,
@@ -34,7 +33,8 @@ class Reference {
     const value = this.value[key];
     return value !== null && typeof value === "object" ? new Reference(value as RecordValue) : value;
   }
-  set(key: string, value: unknown): void { this.value[key] = value; }
+  // ScriptActor numbers and Transform members are f32 in the real Bevy world.
+  set(key: string, value: unknown): void { this.value[key] = typeof value === "number" ? Math.fround(value) : value; }
 }
 function harness(width = 1280, height = 800, mobile = false, saves = new Map<string, string>(), stickyUi = false, locale = "en-US") {
   const entities = new Map<string, Entity>();
@@ -373,10 +373,12 @@ function cell(game: Game, id = "player"): Point {
 }
 function putActor(game: Game, id: string, type: string, point: Point, health = 1000, speed = 1): void {
   const size = game.entities.get("terrain_312")!.sprite!.width;
+  const previous = game.entities.get(id)?.body;
   game.entities.set(id, {
     transform: { translation: { x: (point.x - 12) * size, y: (12 - point.z) * size - 40, z: 2 },
       rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } },
-    body: { kind: type, health, speed, radius: 0.4, cooldown: 0, lifetime: 0, power: 0, velocity_x: 0, velocity_z: 0 },
+    body: { kind: type, health, speed, radius: 0.4, cooldown: id === "player" ? previous?.cooldown ?? 0 : 0,
+      lifetime: id === "player" ? previous?.lifetime ?? 0 : 0, power: 0, velocity_x: 0, velocity_z: 0 },
   });
 }
 function removeMonsters(game: Game): void {
@@ -773,7 +775,6 @@ test("click walking stops at a door when a previously hidden enemy appears", () 
   const index = path.findIndex((point) => terrainAt(map, point) === "door");
   walk(game, map, path[index - 1]!);
   putActor(game, "hidden_rat", "chaser", path[index + 1]!);
-  const size = game.entities.get("terrain_312")!.sprite!.width;
   const door = path[index]!, before = cell(game);
   game.tapCell(door);
   game.tick(20);
@@ -784,6 +785,126 @@ test("click walking stops at a door when a previously hidden enemy appears", () 
 
 
 function turnCount(game: Game): number { return Number(game.entities.get("player")!.body!.lifetime); }
+
+test("real starting equipment can be inspected, removed and equipped without duplicating the item", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  game.key("KeyI"); game.click("gear_slot_1");
+  assert.equal(game.ui.get("gear_detail_title")!.text, "Worn Shortsword");
+  assert.match(game.ui.get("gear_detail_stats")!.text!, /1–10/); assert.equal(turnCount(game), 0);
+  game.key("Escape"); assert.equal(game.state().message, "INVENTORY"); assert.equal(turnCount(game), 0);
+  game.click("gear_slot_1"); game.click("toggle_equipment");
+  assert.equal(game.state().message, "PLAYING"); assert.equal(turnCount(game), 1);
+  game.key("KeyI");
+  assert.equal(game.ui.get("equipment_0")!.image, "sprites/spd-ui/empty_weapon.png");
+  assert.equal([...game.ui.keys()].filter((id) => id === "gear_slot_1").length, 1);
+  game.click("gear_slot_1"); assert.equal(game.ui.get("toggle_equipment__label")!.text, "Equip");
+  game.click("toggle_equipment"); assert.equal(turnCount(game), 2);
+  game.key("KeyI"); assert.ok(!game.ui.has("equipment_0"));
+  assert.equal(game.ui.get("gear_icon_1")!.image, "sprites/dungeon/worn_shortsword.png");
+});
+
+test("upgrade selection is free to cancel and changes only the chosen equipment on confirmation", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  game.key("Digit5"); assert.equal(game.state().message, "UPGRADE"); assert.equal(turnCount(game), 0);
+  game.click("upgrade_cancel"); assert.equal(game.state().message, "INVENTORY");
+  assert.equal(game.ui.get("item_count_scroll_upgrade")!.text, "1"); game.key("Escape");
+  game.key("Digit5"); game.click("upgrade_2");
+  assert.equal(game.state().message, "PLAYING"); assert.equal(turnCount(game), 1);
+  game.key("KeyI"); assert.equal(game.ui.get("gear_level_2")!.text, "+1");
+  assert.ok(!game.ui.has("gear_level_1")); assert.ok(!game.ui.has("slot_scroll_upgrade"));
+  game.click("gear_slot_2"); assert.match(game.ui.get("gear_detail_stats")!.text!, /1–3/);
+  game.key("Escape"); game.key("Escape"); game.key("Digit5");
+  assert.equal(game.state().message, "PLAYING"); assert.equal(turnCount(game), 1, "an absent scroll must not spend time");
+});
+
+test("an unequipped weapon can be upgraded without silently re-equipping it", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  game.key("KeyI"); game.click("gear_slot_1"); game.click("toggle_equipment");
+  game.key("Digit5"); game.click("upgrade_1");
+  assert.equal(turnCount(game), 2);
+  game.key("KeyI"); assert.ok(game.ui.has("equipment_0"));
+  game.click("gear_slot_1"); assert.match(game.ui.get("gear_detail_title")!.text!, /\+1/);
+  assert.equal(game.ui.get("toggle_equipment__label")!.text, "Equip");
+});
+
+test("glove attacks spend half ticks while a normal-speed enemy responds on its own timeline", () => {
+  const game = harness(); game.click("start"); game.click("hero_huntress"); game.click("begin_run"); removeMonsters(game);
+  putActor(game, "target", "chaser", { x: 13, z: 12 }, 1000);
+  game.step(1, 0); assert.equal(turnCount(game), 0.5);
+  assert.equal(game.entities.get("target")!.body!.cooldown, 1);
+  game.step(1, 0); assert.equal(turnCount(game), 1);
+  assert.equal(game.entities.get("target")!.body!.cooldown, 1, "the hero wins the timestamp tie");
+  const before = JSON.stringify([...game.entities]); game.tick(100);
+  assert.equal(JSON.stringify([...game.entities]), before);
+  game.step(1, 0); assert.equal(turnCount(game), 1.5);
+  assert.equal(game.entities.get("target")!.body!.cooldown, 2);
+});
+
+test("a crab uses its half-tick movement event before a full-tick attack event", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  putActor(game, "crab", "charger", { x: 10, z: 10 }, 15, 2);
+  game.click("wait");
+  assert.deepEqual(cell(game, "crab"), { x: 11, z: 11 });
+  assert.equal(game.entities.get("crab")!.body!.cooldown, 1.5);
+  assert.equal(turnCount(game), 1);
+});
+
+test("heavy armor found on the floor changes movement time and upgrades remove part of the penalty", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const first = generateFloor(1337, 1); walk(game, first, first.exit); game.click("descend"); removeMonsters(game);
+  const map = generateFloor(1337, 2);
+  const drop = [...game.entities].find(([, entity]) => entity.body?.kind === "loot" && lootKinds[Number(entity.body.power) - 1] === "leather_armor")!;
+  assert.ok(drop); walk(game, map, cell(game, drop[0])); assert.ok(!game.entities.has(drop[0]));
+  game.key("KeyI");
+  const icon = [...game.ui].find(([, element]) => element.image === "sprites/dungeon/leather_armor.png")!;
+  const id = Number(icon[0].slice("gear_icon_".length));
+  game.click(`gear_slot_${id}`); assert.match(game.ui.get("gear_detail_stats")!.text!, /Too heavy/);
+  const before = turnCount(game); game.click("toggle_equipment");
+  assert.equal(turnCount(game), before + 2, "swapping also spends the previous armor's removal tick");
+  const next = findPath(map, cell(game), map.entrance)[0]!, current = cell(game), start = turnCount(game);
+  game.step(next.x - current.x, next.z - current.z);
+  assert.ok(Math.abs(turnCount(game) - start - 1.44) < 1e-4);
+  game.key("Digit5"); game.click(`upgrade_${id}`);
+  game.key("KeyI"); game.click(`gear_slot_${id}`);
+  assert.match(game.ui.get("gear_detail_stats")!.text!, /required: 11/);
+  game.key("Escape"); game.key("Escape");
+  const nextAfter = findPath(map, cell(game), map.entrance)[0]!, currentAfter = cell(game), startAfter = turnCount(game);
+  game.step(nextAfter.x - currentAfter.x, nextAfter.z - currentAfter.z);
+  assert.ok(Math.abs(turnCount(game) - startAfter - 1.2) < 1e-4);
+});
+
+test("Chinese equipment and upgrade controls fit portrait and short landscape layouts with one action per hold", () => {
+  for (const [width, height, mobile] of [[450, 800, true], [800, 320, false]] as const) for (const hero of heroClassList) {
+    const game = harness(width, height, mobile, new Map(), false, "zh-CN");
+    game.click("start"); game.click(`hero_${hero}`); game.click("begin_run"); removeMonsters(game);
+    game.key("KeyI"); game.click("gear_slot_1");
+    assert.match(game.ui.get("gear_detail_title")!.text!, /短剑|魔杖|匕首|手套/);
+    assert.match(game.ui.get("gear_detail_stats")!.text!, /伤害/);
+    for (const id of ["equipment_window"]) {
+      const style = game.ui.get(id)!.style!;
+      assert.ok(Number(style.top) >= 0);
+      assert.ok(Number(style.top) + Number(style.height) <= Number(game.ui.get("safe_root")!.style!.height));
+    }
+    game.key("Escape"); game.key("Escape"); game.key("Digit5");
+    assert.equal(game.ui.get("upgrade_title")!.text, "选择要升级的装备");
+    game.holdButton("upgrade_2"); game.tick(30); game.releaseButton();
+    assert.equal(turnCount(game), 1);
+    game.key("KeyI"); assert.equal(game.ui.get("gear_level_2")!.text, "+1");
+  }
+});
+
+test("descending advances status time once and new monsters start at the current reflected clock", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const map = generateFloor(1337, 1); walk(game, map, map.exit);
+  game.key("Digit3"); const before = turnCount(game); game.click("descend");
+  assert.equal(turnCount(game), before + 1);
+  const ready = game.entities.get("player")!.body!.cooldown;
+  for (const entity of game.entities.values()) if (entity.body?.kind && String(entity.body.kind) in enemySpecs) assert.equal(entity.body.cooldown, ready);
+  removeMonsters(game);
+  for (let i = 0; i < 18; i++) game.click("wait");
+  assert.ok(game.ui.has("hud_invisible"));
+  game.click("wait"); assert.ok(!game.ui.has("hud_invisible"));
+});
 
 test("title uses upstream landscape banner, eight entrances, pixel font and integer zoom", () => {
   const game = harness();
@@ -802,10 +923,10 @@ test("title uses upstream landscape banner, eight entrances, pixel font and inte
 test("backpack has upstream five-column grid and requires an item action confirmation", () => {
   for (const [width, height] of [[1280, 800], [450, 800], [800, 400]]) {
     const game = harness(width, height); game.start(); game.click("bag_btn");
-    assert.equal([...game.ui.keys()].filter((key) => /^bag_slot_\d+$/.test(key) || key.startsWith("slot_")).length, 25);
+    assert.equal([...game.ui.keys()].filter((key) => /^bag_slot_\d+$/.test(key) || key.startsWith("slot_") || key.startsWith("gear_slot_")).length, 25);
     if (width === 450) {
-      assert.equal(game.ui.get("bag_slot_0")!.style!.width, 78);
-      assert.equal(game.ui.get("bag_slot_0")!.style!.height, 84);
+      assert.equal(game.ui.get("gear_slot_1")!.style!.width, 78);
+      assert.equal(game.ui.get("gear_slot_1")!.style!.height, 84);
       assert.equal(game.ui.get("bag_window")!.style!.height, 510);
     }
     assert.ok(!game.ui.has("bag_page"), "the original backpack is a grid in both orientations");
