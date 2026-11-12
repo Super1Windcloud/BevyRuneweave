@@ -356,6 +356,11 @@
       "file": "sprites/dungeon/leather_armor.png",
       "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
       "sha256": "82c86829eebade32e1f4a3fa4703920153e9a21a3bfc07970b6af55261a871b2"
+    },
+    {
+      "file": "sprites/dungeon/fire.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/effects/particles/FlameParticle.java",
+      "sha256": "111525f8d5e2b568957e35cf4ab64aea6862377289aeadf8349c5e62563dfb82"
     }
   ]
 }

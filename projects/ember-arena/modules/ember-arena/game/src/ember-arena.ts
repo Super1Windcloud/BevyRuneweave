@@ -10,6 +10,9 @@ import { mountUi, updateUi } from "../../api/ui.js";
 import { renderSpdUi, uiMetrics, type UiPhase } from "./spd-ui.js";
 import { armorReduction, attackDelay, attackSkill, defenseSkill, equippedGear, gearDefinitions, isGearKind,
   moveDelay, startingEquipment, strengthDeficit, timeAfter, weaponDamage } from "./equipment.js";
+import { applyBurning, applyHealing, applyInvisibility, applyOoze, buffId, buffKind, buffTarget, effectPriority,
+  fireRoot, fireVolume, hasBuff, healingStep, oozeDamage, playerBuff, remainingBuff, removeBuffs, seedFireCell, seedLiquidFlame } from "./effects.js";
+import { projectileImpact } from "./projectiles.js";
 
 type Phase = UiPhase;
 
@@ -49,6 +52,7 @@ let overlayReturn: Phase = "playing";
 let uiNotice: Message | null = null;
 let previewPhase: Phase | null = null;
 let examining = false;
+let targeting = false;
 let cameraShake = 0;
 let wornKeys = 0;
 let gooBlobs = 0;
@@ -64,8 +68,6 @@ let statusTicks = 0;
 // Shattered Pixel Dungeon core state
 let gold = 0;
 let hungerTimer = 0;
-let invisTimer = 0;
-let causticOozeTimer = 0;
 let dungeonLogs: Message[] = [];
 let inventory: Record<ItemKind, number> = {
   potion_healing: 1,
@@ -138,7 +140,9 @@ function drawUi(): void {
   mountUi(renderSpdUi({
     phase: previewPhase ?? phase, selectedClass, item: selectedItem, health: previewPhase === "lost" ? 0 : health(), maxHealth, level, strength, experience,
     targetExperience: targetExperience(), depth, gold, score, turns, hunger: getHungerStatus(hungerTimer),
-    invisible: invisTimer, ooze: causticOozeTimer, bossHealth: scene_actor("warden") ? field("warden", "health") : null,
+    invisible: hasBuff("invisibility", "player") ? 1 : 0, ooze: remainingBuff("ooze", "player"),
+    healing: remainingBuff("healing", "player"), burning: remainingBuff("burning", "player"), targeting,
+    bossHealth: scene_actor("warden") ? field("warden", "health") : null,
     inventory, equipment, selectedGear, upgradePage, wornKeys, gooBlobs, examining, logs: dungeonLogs.map(localized), profile, settingsTab, gameBehind: phase === "settings" ? !["menu", "heroes"].includes(settingsReturn) : phase === "journal" ? overlayReturn !== "menu" : ["hero", "message"].includes(phase) ? overlayReturn !== "heroes" : true,
     saveNotice: saveNotice ? localized(saveNotice) : "", resetPending, checks: checks.map(localized), checkPage,
     networkStatus: networkLines.length ? networkLines.map(localized).join("\n") : localized(networkStatus),
@@ -196,6 +200,7 @@ function uiAction(id: string, value?: string | number): void {
     case "wait": queuedPath = []; spendTurns(); return;
     case "search": toggleExamine(); return;
     case "cancel_examine": examining = false; drawUi(); return;
+    case "cancel_target": targeting = false; drawUi(); return;
     case "worn_key": uiNotice = message("item.worn_key.description"); overlayReturn = "inventory"; setPhase("message"); return;
     case "goo_blob": uiNotice = message("item.goo_blob.description"); overlayReturn = "inventory"; setPhase("message"); return;
     case "descend": descend(); return;
@@ -225,6 +230,7 @@ function publish(): void {
 function setPhase(next: Phase): void {
   previewPhase = null;
   examining = false;
+  targeting = false;
   cameraShake = 0;
   if ((next === "won" || next === "lost") && !runRecorded) {
     runRecorded = true;
@@ -245,7 +251,7 @@ function setPhase(next: Phase): void {
 
 function room(): void {
   floor = null;
-  examining = false; cameraShake = 0;
+  examining = targeting = false; cameraShake = 0;
   scene_clear();
   ui_clear();
   scene_set_3d_enabled(false);
@@ -273,7 +279,7 @@ function loadMenu(): void {
 }
 
 function startRun(): void {
-  elapsed = score = experience = nextId = gold = hungerTimer = invisTimer = causticOozeTimer = turns = 0;
+  elapsed = score = experience = nextId = gold = hungerTimer = turns = 0;
   level = depth = 1;
   strength = 10;
   equipment = startingEquipment(selectedClass); selectedGear = 1;
@@ -301,8 +307,8 @@ function startRun(): void {
 }
 
 function enterFloor(): void {
-  examining = false; floorSealed = false;
-  for (const id of scene_actor_ids()) if (id !== "player") scene_despawn(id);
+  examining = targeting = false; floorSealed = false;
+  for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id)) scene_despawn(id);
   for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
   for (const key of renderedFog) scene_despawn(`fog_${key}`);
   renderedTiles.clear(); renderedFog.clear(); queuedPath = [];
@@ -372,6 +378,11 @@ function refreshDungeon(): void {
       const scale = scene_transform(id)!.get("scale") as BmsReflectReference;
       const visible = floor.visible.has(cellKey(floor, cellPosition(id)));
       for (const axis of ["x", "y"]) scale.set(axis, visible ? 1 : 0);
+    } else if (kind(id) === "fire_cell") {
+      sprite(id, "fire", cellPosition(id), 2.5);
+      const scale = scene_transform(id)!.get("scale") as BmsReflectReference;
+      const visible = floor.visible.has(cellKey(floor, cellPosition(id)));
+      for (const axis of ["x", "y"]) scale.set(axis, visible ? 1 : 0);
     } else actorSprite(id, selectedClass, id === "player" || floor.visible.has(cellKey(floor, cellPosition(id))));
   }
 }
@@ -396,15 +407,14 @@ function collectLoot(): void {
 function useInventoryItem(kindKey: ItemKind): boolean {
   if ((phase !== "playing" && phase !== "inventory") || inventory[kindKey] <= 0) return false;
   if (kindKey === "scroll_upgrade") { upgradePage = 0; setPhase("upgrade"); return true; }
+  if (kindKey === "potion_liquid_flame") {
+    queuedPath = []; examining = false; phase = "playing"; targeting = true; publish(); drawUi(); return true;
+  }
   inventory[kindKey]--;
   pushLog(message(`item.${kindKey}.effect`));
   if (kindKey === "potion_healing") {
-    change("player", "health", maxHealth); causticOozeTimer = 0;
-  } else if (kindKey === "potion_liquid_flame") {
-    for (const id of monsterIds()) {
-      if (floor!.visible.has(cellKey(floor!, cellPosition(id))) && cellDistance(cellPosition("player"), cellPosition(id)) <= 2) damageMonster(id, 12);
-    }
-  } else if (kindKey === "potion_invisibility") invisTimer = 21;
+    applyHealing("player", maxHealth, field("player", "cooldown"));
+  } else if (kindKey === "potion_invisibility") applyInvisibility("player", field("player", "cooldown"));
   else if (kindKey === "potion_strength") strength++;
   else if (kindKey === "scroll_magic_mapping") {
     for (let key = 0; key < floor!.tiles.length; key++) {
@@ -450,6 +460,7 @@ function damageMonster(id: string, power: number): void {
   change(id, "health", hp);
   if (hp > 0) return;
   const point = cellPosition(id), spec = mobCombat[type];
+  removeBuffs(id);
   scene_despawn(id);
   score += type === "boss" ? 500 : 10;
   if (level <= spec.maxLevel) experience += spec.experience;
@@ -481,10 +492,10 @@ function roll(min: number, max: number): number {
 function attackMonster(id: string): void {
   const type = kind(id) as EnemyKind, spec = mobCombat[type];
   const weapon = equippedGear(equipment, "weapon");
-  const surprised = (invisTimer > 0 || field(id, "lifetime") === 0) && strengthDeficit(weapon, strength) === 0;
+  const surprised = (hasBuff("invisibility", "player") || field(id, "lifetime") === 0) && strengthDeficit(weapon, strength) === 0;
   const enraged = type === "boss" && field(id, "health") <= enemySpecs.boss.health / 2;
   const hit = surprised || random() * attackSkill(weapon, strength, level) >= random() * Math.floor(spec.defense * (enraged ? 1.5 : 1));
-  invisTimer = 0; change(id, "lifetime", 1);
+  scene_despawn(buffId("invisibility", "player")); change(id, "lifetime", 1);
   if (hit) {
     const power = Math.max(0, weaponDamage(weapon, strength, surprised, roll) - roll(0, spec.armor));
     pushLog(message(surprised ? "log.surprise" : "log.hit", { monster: message(`monster.${type}`), damage: power }));
@@ -495,14 +506,98 @@ function attackMonster(id: string): void {
 function hurtPlayer(power: number): void {
   change("player", "health", Math.max(0, health() - power));
   queuedPath = [];
-  if (health() <= 0) setPhase("lost");
+  if (health() <= 0) { removeBuffs("player"); setPhase("lost"); }
 }
 
-function monsterAction(id: string): number {
+function damageActor(target: string, amount: number): void {
+  if (target === "player") hurtPlayer(amount);
+  else if (scene_actor(target) && kind(target) in mobSprites) damageMonster(target, amount);
+}
+
+function flammable(point: Point): boolean {
+  return ["door", "open_door", "secret_door"].includes(terrainAt(floor!, point));
+}
+
+function exposeToFire(target: string, now: number): void {
+  if (scene_actor(target) && field(target, "health") > 0 && fireVolume(floor!, cellPosition(target)) > 0) applyBurning(target, now);
+}
+
+function fireAction(now: number): void {
+  const cells = scene_actor_ids().filter((id) => kind(id) === "fire_cell" && field(id, "health") > 0);
+  // Freeze just this tick's occupied cell keys before mutating the real field.
+  // Like Fire.evolve's cur/off arrays, new cells cannot cascade in this tick.
+  const current = new Set(cells.map((id) => cellKey(floor!, cellPosition(id))));
+  const spread = new Set<number>();
+  for (const id of cells) {
+    const point = cellPosition(id);
+    for (const [dx, dz] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
+      const neighbour = { x: point.x + dx, z: point.z + dz }, key = cellKey(floor!, neighbour);
+      if (!current.has(key) && flammable(neighbour)) spread.add(key);
+    }
+  }
+  const igniteOccupants = (point: Point): void => {
+    for (const target of ["player", ...monsterIds()]) if (sameCell(cellPosition(target), point)) applyBurning(target, now);
+  };
+  for (const id of cells) {
+    const point = cellPosition(id); igniteOccupants(point);
+    const left = field(id, "health") - 1;
+    if (left <= 0) {
+      if (flammable(point)) floor!.tiles[cellKey(floor!, point)] = "floor";
+      scene_despawn(id);
+    } else change(id, "health", left);
+  }
+  for (const key of spread) {
+    const point = { x: key % floor!.width, z: Math.floor(key / floor!.width) };
+    seedFireCell(floor!, point, 4, now); igniteOccupants(point);
+  }
+  if (!scene_actor_ids().some((id) => kind(id) === "fire_cell")) scene_despawn(fireRoot);
+}
+
+function effectAction(id: string, now: number): number {
+  if (kind(id) === "blob_fire") { fireAction(now); return 1; }
+  const type = buffKind(kind(id)), target = buffTarget(id);
+  if (!type || !scene_actor(target) || field(target, "health") <= 0) { scene_despawn(id); return 1; }
+  if (type === "invisibility") { scene_despawn(id); return 1; }
+  const left = field(id, "health");
+  if (type === "healing") {
+    const amount = healingStep(left, field(id, "power"));
+    const maximum = target === "player" ? maxHealth : enemySpecs[kind(target) as EnemyKind].health;
+    change(target, "health", Math.min(maximum, field(target, "health") + amount));
+    if (left <= amount) scene_despawn(id); else change(id, "health", left - amount);
+    return 1;
+  }
+  const point = cellPosition(target), water = terrainAt(floor!, point) === "water";
+  if (water && field(id, "lifetime") > 0) { scene_despawn(id); return 1; }
+  change(id, "lifetime", 1);
+  let damage = oozeDamage(depth, left);
+  if (type === "burning") {
+    damage = field(id, "power") || roll(1, 3 + Math.floor(depth / 4));
+    change(id, "power", roll(1, 3 + Math.floor(depth / 4)));
+  }
+  if (damage > 0) damageActor(target, damage);
+  if (!scene_actor(id)) return 1; // Death may have removed this target's buffs.
+  if (type === "burning" && flammable(point) && fireVolume(floor!, point) === 0) seedFireCell(floor!, point, 4, now);
+  if (water || left <= 1) scene_despawn(id); else change(id, "health", left - 1);
+  return 1;
+}
+
+function throwLiquidFlame(target: Point): void {
+  if (!floor || !targeting || phase !== "playing") return;
+  if (!floor.visible.has(cellKey(floor, target))) { pushLog(message("target.notVisible")); drawUi(); return; }
+  if (inventory.potion_liquid_flame <= 0) { targeting = false; drawUi(); return; }
+  const impact = projectileImpact(floor, cellPosition("player"), target,
+    (point) => monsterIds().some((id) => sameCell(cellPosition(id), point)));
+  inventory.potion_liquid_flame--;
+  pushLog(message("item.potion_liquid_flame.effect"));
+  seedLiquidFlame(floor, impact, field("player", "cooldown"));
+  spendTurns();
+}
+
+function monsterAction(id: string, now: number): number {
   const hero = cellPosition("player");
   const type = kind(id) as EnemyKind, spec = mobCombat[type];
   let current = cellPosition(id);
-  const seesHero = invisTimer <= 0 && cellDistance(current, hero) <= 7 && lineOfSight(floor!, current, hero);
+  const seesHero = !hasBuff("invisibility", "player") && cellDistance(current, hero) <= 7 && lineOfSight(floor!, current, hero);
   if (seesHero) {
     change(id, "lifetime", 1); change(id, "velocity_x", hero.x); change(id, "velocity_z", hero.z);
   }
@@ -528,7 +623,7 @@ function monsterAction(id: string): number {
       const power = Math.max(0, roll(spec.minDamage * (charged ? 3 : 1), max * (charged ? 3 : 1)) - armorReduction(armor, strength, roll));
       pushLog(message(charged ? "log.enemyBurst" : "log.enemyHit", { monster: message(`monster.${type}`), damage: power }));
       hurtPlayer(power);
-      if (type === "boss" && random() < 1 / 3) causticOozeTimer = 5;
+      if (phase === "playing" && type === "boss" && random() < 1 / 3) applyOoze("player", now);
     } else pushLog(message("log.dodged", { monster: message(`monster.${type}`) }));
     if (charged && !profile.reducedMotion) cameraShake = 0.2;
     change(id, "power", 0);
@@ -545,6 +640,7 @@ function monsterAction(id: string): number {
     if (!next || sameCell(next, hero) || monsterIds().some((other) => other !== id && sameCell(cellPosition(other), next))) return 1;
     if (terrainAt(floor!, next) === "door") { floor!.tiles[cellKey(floor!, next)] = "open_door"; return 1; }
     placeCell(id, next); current = next;
+    exposeToFire(id, now);
   }
   if (!seesHero && sameCell(current, destination)) change(id, "lifetime", 0);
   return 1 / Math.max(0.1, field(id, "speed"));
@@ -553,32 +649,32 @@ function monsterAction(id: string): number {
 function statusTick(): void {
   statusTicks++;
   if (!floorSealed) hungerTimer++;
-  if (invisTimer > 0) invisTimer--;
-  if (terrainAt(floor!, cellPosition("player")) === "water") causticOozeTimer = 0;
-  if (causticOozeTimer > 0) { causticOozeTimer--; hurtPlayer(1); }
-  if (phase !== "playing") return;
   if (!floorSealed && hungerTimer >= 450 && statusTicks % 10 === 0) hurtPlayer(1);
   else if (!floorSealed && hungerTimer < 450 && statusTicks % 10 === 0) change("player", "health", Math.min(maxHealth, health() + 1));
 }
 
 function spendTurns(duration = 1): void {
-  examining = false;
+  examining = targeting = false;
   queuedPath = duration > 1 ? [] : queuedPath;
   const start = field("player", "cooldown"), ready = timeAfter(start, duration);
   turns = ready; change("player", "lifetime", ready); change("player", "cooldown", ready);
-  // Actor.process: earliest timestamp wins; hero wins ties, then mobs, then
-  // buffs. Each mob's next timestamp stays in its real reflected component.
+  // Actor.process priorities: hero, healing, blobs, mobs, other buffs/status.
+  // Every scheduled effect/mob timestamp is read from its real Bevy component.
   while (phase === "playing") {
-    let next: string | null = null, earliest = ready;
-    for (const id of monsterIds()) {
+    let next: string | null = null, earliest = ready, priority = 0;
+    for (const id of scene_actor_ids()) {
+      const tag = kind(id), candidatePriority = tag in mobSprites ? -20 : effectPriority(tag);
+      if (candidatePriority === undefined) continue;
       const time = Math.max(start, field(id, "cooldown"));
-      if (time < earliest) { next = id; earliest = time; }
+      if (time < earliest || (time === earliest && candidatePriority > priority)) {
+        next = id; earliest = time; priority = candidatePriority;
+      }
     }
     if (nextStatusAt < earliest) {
       statusTick(); nextStatusAt = timeAfter(nextStatusAt, 1);
     } else if (next !== null) {
-      const delay = monsterAction(next);
-      change(next, "cooldown", timeAfter(earliest, delay));
+      const delay = kind(next) in mobSprites ? monsterAction(next, earliest) : effectAction(next, earliest);
+      if (scene_actor(next)) change(next, "cooldown", timeAfter(earliest, delay));
     } else break;
   }
   refreshDungeon();
@@ -596,14 +692,14 @@ function movePlayer(dx: number, dz: number): boolean {
   else if (terrainAt(floor, next) === "door") {
     floor.tiles[cellKey(floor, next)] = "open_door";
     pushLog(message("log.door"));
-  } else { placeCell("player", next); collectLoot(); }
+  } else { placeCell("player", next); collectLoot(); exposeToFire("player", field("player", "cooldown")); }
   if (phase === "playing") spendTurns(duration);
   return true;
 }
 
 function descend(): void {
   queuedPath = [];
-  examining = false;
+  examining = targeting = false;
   if (!floor || !sameCell(cellPosition("player"), floor.exit)) { pushLog(message("log.stairs")); drawUi(); return; }
   if (depth === 5) {
     if (!gooDefeated || floorSealed) { pushLog(message("log.gooBlocks")); drawUi(); return; }
@@ -624,6 +720,7 @@ function descend(): void {
 
 function toggleExamine(): void {
   if (!floor || phase !== "playing") return;
+  targeting = false;
   queuedPath = [];
   if (!examining) { examining = true; drawUi(); return; }
   const found = searchFloor(floor, cellPosition("player"), selectedClass === "rogue" ? 2 : 1);
@@ -659,7 +756,7 @@ function playerInput(dt: number, pointer: RuneweavePointerState): void {
   const dx = Number(input_key_pressed("KeyD") || input_key_pressed("ArrowRight")) - Number(input_key_pressed("KeyA") || input_key_pressed("ArrowLeft"));
   const dz = Number(input_key_pressed("KeyS") || input_key_pressed("ArrowDown")) - Number(input_key_pressed("KeyW") || input_key_pressed("ArrowUp"));
   if (dx || dz) {
-    if (examining) { examining = false; drawUi(); }
+    if (examining || targeting) { examining = targeting = false; drawUi(); }
     queuedPath = [];
     if (actionCooldown <= 0) { movePlayer(dx, dz); actionCooldown = 0.16; }
     return;
@@ -673,6 +770,7 @@ function playerInput(dt: number, pointer: RuneweavePointerState): void {
     const worldY = (translation.get("y") as number) + 10 + pointer.y / pointerScale;
     const target = { x: Math.round(worldX / cellSize + 12), z: Math.round(12 - (worldY + 40) / cellSize) };
     if (target.x < 0 || target.z < 0 || target.x >= floor!.width || target.z >= floor!.height) return;
+    if (targeting) { throwLiquidFlame(target); return; }
     if (!floor!.explored.has(cellKey(floor!, target))) return;
     if (examining) { examineCell(target); return; }
     if (sameCell(target, cellPosition("player"))) { if (sameCell(target, floor!.exit)) descend(); return; }
@@ -710,7 +808,15 @@ function openChecks(): void {
     actor("probe").set("health", 3);
     const reference = scene_transform("probe")!.get("translation") as BmsReflectReference;
     reference.set("x", 2);
-    return field("probe", "health") === 3 && position("probe").x === 2 && scene_actor_ids().includes("probe");
+    const actorOk = field("probe", "health") === 3 && position("probe").x === 2 && scene_actor_ids().includes("probe");
+    try {
+      actor("probe").set("kind", "chaser");
+      applyHealing("probe", 8, 0);
+      const effect = buffId("healing", "probe");
+      const reflected = field(effect, "health") === 20 && field(effect, "power") === 0.25;
+      effectAction(effect, 0);
+      return actorOk && reflected && field("probe", "health") === 8 && field(effect, "health") === 15;
+    } finally { removeBuffs("probe"); }
   });
   check("checks.values", () =>
     !scene_actor_set("missing", "probe", 1, 1, 1) &&
@@ -835,7 +941,8 @@ callbacks.on_update = (delta: number): void => {
 
   // Shortcut keys
   if (input_key_just_pressed("Escape")) {
-    if (phase === "playing" && examining) { examining = false; drawUi(); }
+    if (phase === "playing" && targeting) { targeting = false; drawUi(); }
+    else if (phase === "playing" && examining) { examining = false; drawUi(); }
     else if (phase === "playing") setPhase("paused");
     else if (phase === "inventory" || phase === "item" || phase === "equipment" || phase === "upgrade" || phase === "hero" || phase === "message") closeModal();
     else if (phase === "paused") setPhase("playing");

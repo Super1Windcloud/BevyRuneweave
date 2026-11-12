@@ -512,6 +512,13 @@ for (const [name, spec] of Object.entries(gearDefinitions)) {
 }
 writeFileSync(join(dungeonSpritesDir, "fog.png"), encodePngRgba(1, 1, Buffer.from([0, 0, 0, 175])));
 writeFileSync(join(dungeonSpritesDir, "void.png"), encodePngRgba(1, 1, Buffer.from([7, 7, 6, 255])));
+// FlameParticle is procedural: 0xEE7722, initial size 4. This static marker
+// exposes hazardous cells; the upstream shrinking particle emitter is pending.
+const fireBytes = encodePngRgba(1, 1, Buffer.from([0xee, 0x77, 0x22, 255]));
+writeFileSync(join(dungeonSpritesDir, "fire.png"), fireBytes);
+spriteRecords.push({ file: "sprites/dungeon/fire.png",
+  source: `https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/${spdUiRevision}/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/effects/particles/FlameParticle.java`,
+  sha256: createHash("sha256").update(fireBytes).digest("hex") });
 await prepareUiAssets(assets, cache, decodePngRgba, encodePngRgba);
 
 // ---------------------------------------------------------------------------

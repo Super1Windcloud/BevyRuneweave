@@ -65,3 +65,9 @@ extend to every edge, while foreground text, sprites, and controls remain inside
 
 The native launcher's tab container ends at the bottom safe-area boundary, keeping the complete
 Home and Settings navigation bar above the Home Indicator area.
+
+The launcher shares a sage-and-teal visual palette with Android. Home separates the installed game,
+release downloads, and custom package links into rounded sections. Settings persists the light/dark
+appearance choice. The centered content column adapts to iPad widths, text supports Dynamic Type,
+and release names wrap without fixed row heights. Keyboard avoidance and download busy states keep
+the package import flow accessible.

@@ -5,6 +5,10 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
@@ -33,12 +37,15 @@ import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
+import kotlin.math.max
 
 class MainActivity : Activity() {
     private val executor = Executors.newSingleThreadExecutor()
     private val primaryLabels = mutableListOf<TextView>()
     private val secondaryLabels = mutableListOf<TextView>()
     private val themedButtons = mutableListOf<Button>()
+    private val cards = mutableListOf<View>()
+    private val accentLabels = mutableListOf<TextView>()
     private lateinit var urlField: EditText
     private lateinit var downloadButton: Button
     private lateinit var launchButton: Button
@@ -47,16 +54,29 @@ class MainActivity : Activity() {
     private lateinit var remoteAssetsStatus: TextView
     private lateinit var progress: ProgressBar
     private lateinit var status: TextView
+    private lateinit var statusRow: LinearLayout
+    private lateinit var installedTitle: TextView
+    private lateinit var installedDetail: TextView
+    private lateinit var appearanceSwitch: Switch
     private lateinit var rootView: LinearLayout
     private lateinit var homePage: View
     private lateinit var settingsPage: View
-    private lateinit var settingsRow: LinearLayout
     private lateinit var bottomNavigation: LinearLayout
     private lateinit var homeNavigation: TextView
     private lateinit var settingsNavigation: TextView
     private var darkMode = false
     private var selectedPage = Page.HOME
     private var statusIsError = false
+    private var busy = false
+
+    private val backgroundColor get() = Color.parseColor(if (darkMode) "#101C1B" else "#F3F5F1")
+    private val surfaceColor get() = Color.parseColor(if (darkMode) "#1B2B29" else "#FFFFFF")
+    private val primaryColor get() = Color.parseColor(if (darkMode) "#EDF5F1" else "#172F2B")
+    private val secondaryColor get() = Color.parseColor(if (darkMode) "#ADBFBA" else "#526A64")
+    private val accentColor get() = Color.parseColor(if (darkMode) "#87DBC1" else "#006B54")
+    private val softAccentColor get() = Color.parseColor(if (darkMode) "#28483F" else "#E4F2EB")
+    private val navigationHeight get() = dp(BOTTOM_NAVIGATION_HEIGHT_DP) +
+        dp((16 * (resources.configuration.fontScale - 1f)).coerceAtLeast(0f).toInt())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,15 +103,8 @@ class MainActivity : Activity() {
             1f,
         ))
 
-        homePage = ScrollView(this).apply {
-            isFillViewport = true
-            addView(createHomeContent())
-        }
-        settingsPage = ScrollView(this).apply {
-            isFillViewport = true
-            visibility = View.GONE
-            addView(createSettingsContent())
-        }
+        homePage = scrollPage(createHomeContent())
+        settingsPage = scrollPage(createSettingsContent()).apply { visibility = View.GONE }
         pages.addView(homePage, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -105,23 +118,23 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        homeNavigation = navigationItem("Home", android.R.drawable.ic_menu_view, Page.HOME)
+        homeNavigation = navigationItem("Home", R.drawable.ic_home, Page.HOME)
         settingsNavigation = navigationItem(
             "Settings",
-            android.R.drawable.ic_menu_preferences,
+            R.drawable.ic_settings,
             Page.SETTINGS,
         )
         bottomNavigation.addView(
             homeNavigation,
-            LinearLayout.LayoutParams(0, dp(BOTTOM_NAVIGATION_HEIGHT_DP), 1f),
+            LinearLayout.LayoutParams(0, navigationHeight, 1f),
         )
         bottomNavigation.addView(
             settingsNavigation,
-            LinearLayout.LayoutParams(0, dp(BOTTOM_NAVIGATION_HEIGHT_DP), 1f),
+            LinearLayout.LayoutParams(0, navigationHeight, 1f),
         )
         rootView.addView(bottomNavigation, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            dp(BOTTOM_NAVIGATION_HEIGHT_DP),
+            navigationHeight,
         ))
         return rootView
     }
@@ -142,10 +155,14 @@ class MainActivity : Activity() {
                     insets.systemWindowInsetBottom,
                 )
             }
-            rootView.setPadding(safeInsets[0], safeInsets[1], safeInsets[2], 0)
+            val keyboardInset = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                insets.getInsets(WindowInsets.Type.ime()).bottom
+            } else 0
+            rootView.setPadding(safeInsets[0], safeInsets[1], safeInsets[2],
+                max(0, keyboardInset - safeInsets[3]))
             bottomNavigation.setPadding(0, 0, 0, safeInsets[3])
             bottomNavigation.layoutParams = bottomNavigation.layoutParams.apply {
-                height = dp(BOTTOM_NAVIGATION_HEIGHT_DP) + safeInsets[3]
+                height = navigationHeight + safeInsets[3]
             }
             insets
         }
@@ -166,91 +183,210 @@ class MainActivity : Activity() {
             View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
             View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
 
-    private fun createHomeContent() = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER_HORIZONTAL
-        setPadding(dp(24), dp(48), dp(24), dp(24))
-
-        addView(label("Bevy RuneWeave", 28f), matchWrap())
-        addView(label("Android host", 15f, secondary = true).apply {
-            setPadding(0, dp(4), 0, dp(24))
-        }, matchWrap())
-        addView(label("GitHub release assets", 16f), matchWrap())
-
-        remoteAssetsStatus = label("Loading latest release...", 14f, secondary = true)
-        addView(remoteAssetsStatus, matchWrap())
-        remoteAssetsContainer = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
+    private fun scrollPage(content: LinearLayout) = ScrollView(this).apply {
+        isFillViewport = true
+        clipToPadding = false
+        addView(content)
+        addOnLayoutChangeListener { _, left, _, right, _, _, _, _, _ ->
+            val inset = max(dp(20), (right - left - dp(640)) / 2)
+            if (content.paddingLeft != inset) content.setPadding(inset, dp(24), inset, dp(28))
         }
-        addView(remoteAssetsContainer, matchWrap())
-
-        urlField = EditText(context).apply {
-            hint = "HTTPS asset package URL"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_VARIATION_URI
-            setSingleLine(true)
-        }
-        addView(urlField, ViewGroup.LayoutParams.MATCH_PARENT, dp(56))
-
-        downloadButton = themedButton("Download and start").apply {
-            setOnClickListener { installFromUrl() }
-        }
-        addView(downloadButton, ViewGroup.LayoutParams.MATCH_PARENT, dp(52))
-
-        launchButton = themedButton("Start installed game").apply {
-            setOnClickListener { launchGame() }
-        }
-        addView(launchButton, ViewGroup.LayoutParams.MATCH_PARENT, dp(52))
-
-        progress = ProgressBar(context).apply { visibility = ProgressBar.GONE }
-        addView(progress, dp(48), dp(48))
-
-        status = label("", 14f, secondary = true).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(12), 0, 0)
-        }
-        addView(status, matchWrap())
     }
 
-    private fun createSettingsContent() = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(dp(24), dp(48), dp(24), dp(24))
-        addView(label("Settings", 28f), matchWrap())
-        addView(label("Appearance", 15f, secondary = true).apply {
-            setPadding(0, dp(28), 0, dp(8))
-        }, matchWrap())
+    private fun column() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
-        settingsRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
+    private fun createHomeContent() = column().apply {
+        setPadding(dp(20), dp(24), dp(20), dp(28))
+        addView(label("RUNEWEAVE  /  ANDROID", 12f).apply {
+            letterSpacing = 0.14f
+            accentLabels += this
+        }, spaced(12))
+
+        val hero = column().apply {
+            setPadding(dp(24), dp(26), dp(24), dp(26))
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.parseColor("#164E40"), Color.parseColor("#102F2C"))).apply {
+                cornerRadius = dp(28).toFloat()
+            }
+            addView(TextView(context).apply {
+                text = "PLAY. CREATE. EXPLORE."
+                textSize = 11f
+                letterSpacing = 0.16f
+                setTextColor(Color.parseColor("#A8DDC8"))
+            }, spaced(12))
+            addView(TextView(context).apply {
+                text = "A little world.\nEndless possibilities."
+                textSize = 30f
+                setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL))
+                setTextColor(Color.WHITE)
+                setLineSpacing(dp(2).toFloat(), 1f)
+                markAsHeading()
+            }, spaced(12))
+            addView(TextView(context).apply {
+                text = "Discover a game and make it your own."
+                textSize = 15f
+                setTextColor(Color.parseColor("#C1DCD1"))
+            }, matchWrap())
+        }
+        addView(hero, spaced(24))
+
+        statusRow = LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), 0, dp(12), 0)
-            addView(label("Dark mode", 16f), LinearLayout.LayoutParams(0, dp(56), 1f).apply {
-                gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            setPadding(0, 0, 0, dp(16))
+        }
+        progress = ProgressBar(context).apply { visibility = View.GONE }
+        statusRow.addView(progress, LinearLayout.LayoutParams(dp(24), dp(24)).apply {
+            marginEnd = dp(12)
+        })
+        status = label("", 14f, secondary = true).apply {
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        statusRow.addView(status, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        addView(statusRow, matchWrap())
+
+        addView(sectionHeading("Your space"), spaced(12))
+        addView(card().apply {
+            installedTitle = label("Your next adventure awaits", 19f)
+            installedDetail = label("Choose a release below to get started.", 14f, secondary = true)
+            addView(installedTitle, spaced(6))
+            addView(installedDetail, spaced(18))
+            launchButton = themedButton("Start installed game", R.drawable.ic_play).apply {
+                setOnClickListener { launchGame() }
+            }
+            addView(launchButton, matchWrap())
+        }, spaced(28))
+
+        addView(sectionHeading("Discover"), spaced(6))
+        remoteAssetsStatus = label("Finding the latest release…", 13f, secondary = true).apply {
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        addView(remoteAssetsStatus, spaced(12))
+        remoteAssetsContainer = column()
+        addView(remoteAssetsContainer, spaced(18))
+
+        addView(card().apply {
+            addView(label("Have a package link?", 19f), spaced(6))
+            addView(label("Bring your own game with an HTTPS ZIP link.", 14f, secondary = true), spaced(16))
+            urlField = EditText(context).apply {
+                hint = "https://…/game.zip"
+                textSize = 15f
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                    android.text.InputType.TYPE_TEXT_VARIATION_URI
+                imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_GO
+                setSingleLine(true)
+                minHeight = dp(56)
+                setPadding(dp(14), dp(14), dp(14), dp(14))
+                contentDescription = "HTTPS asset package URL"
+                setOnEditorActionListener { _, action, _ ->
+                    if (action == android.view.inputmethod.EditorInfo.IME_ACTION_GO) {
+                        if (!busy) installFromUrl()
+                        true
+                    } else false
+                }
+            }
+            addView(urlField, spaced(12))
+            downloadButton = themedButton("Download and start", R.drawable.ic_download).apply {
+                setOnClickListener { installFromUrl() }
+            }
+            addView(downloadButton, matchWrap())
+        }, spaced(24))
+        addView(label("Powered by Bevy RuneWeave", 12f, secondary = true).apply {
+            gravity = Gravity.CENTER
+        }, matchWrap())
+    }
+
+    private fun createSettingsContent() = column().apply {
+        setPadding(dp(20), dp(24), dp(20), dp(28))
+        addView(label("MAKE IT YOURS", 12f).apply {
+            letterSpacing = 0.14f
+            accentLabels += this
+        }, spaced(12))
+        addView(label("Settings", 32f).apply { markAsHeading() }, spaced(8))
+        addView(label("A comfortable space to play.", 15f, secondary = true), spaced(28))
+        addView(sectionHeading("Appearance"), spaced(12))
+        addView(card().apply {
+            val row = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
+            row.addView(column().apply {
+                addView(label("Dark mode", 17f), spaced(4))
+                addView(label("A softer glow after hours.", 14f, secondary = true), matchWrap())
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(12)
             })
-            addView(Switch(context).apply {
+            appearanceSwitch = Switch(context).apply {
+                contentDescription = "Dark mode"
+                minHeight = dp(48)
                 isChecked = darkMode
                 setOnCheckedChangeListener { _, enabled ->
                     darkMode = enabled
-                    getSharedPreferences(PREFERENCES, MODE_PRIVATE)
-                        .edit()
-                        .putBoolean(DARK_MODE, enabled)
-                        .apply()
+                    getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit()
+                        .putBoolean(DARK_MODE, enabled).apply()
                     applyTheme()
                 }
-            })
-        }
-        addView(settingsRow, matchWrap())
+            }
+            row.addView(appearanceSwitch)
+            addView(row, matchWrap())
+        }, spaced(28))
+        addView(label("Bevy RuneWeave", 16f), spaced(4))
+        addView(label("A home for small worlds and big ideas.", 14f, secondary = true), matchWrap())
     }
+
+    private fun TextView.markAsHeading() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) setAccessibilityHeading(true)
+    }
+
+    private fun sectionHeading(text: String) = label(text, 21f).apply { markAsHeading() }
+
+    private fun card() = column().apply {
+        setPadding(dp(20), dp(20), dp(20), dp(20))
+        background = rounded(surfaceColor, 24)
+        cards += this
+    }
+
+    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
+        setColor(color)
+        cornerRadius = dp(radius).toFloat()
+    }
+
+    private fun spaced(bottom: Int) = matchWrap().apply { bottomMargin = dp(bottom) }
 
     private fun label(text: String, size: Float, secondary: Boolean = false) = TextView(this).apply {
         this.text = text
         textSize = size
+        setTextColor(if (secondary) secondaryColor else primaryColor)
+        if (!secondary) typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        setLineSpacing(dp(2).toFloat(), 1f)
         if (secondary) secondaryLabels += this else primaryLabels += this
     }
 
-    private fun themedButton(title: String) = Button(this).apply {
+    private fun themedButton(title: String, icon: Int? = null) = Button(this).apply {
         text = title
+        textSize = 15f
+        isAllCaps = false
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        gravity = Gravity.CENTER_VERTICAL or Gravity.START
+        minHeight = dp(54)
+        minimumHeight = dp(54)
+        setPadding(dp(16), dp(14), dp(16), dp(14))
+        stateListAnimator = null
+        icon?.let {
+            setCompoundDrawablesRelativeWithIntrinsicBounds(it, 0, 0, 0)
+            compoundDrawablePadding = dp(12)
+        }
         themedButtons += this
+        styleButton(this)
+    }
+
+    private fun styleButton(button: Button, primary: Boolean = false) {
+        val foreground = if (primary) backgroundColor else accentColor
+        button.setTextColor(ColorStateList(
+            arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf()),
+            intArrayOf(secondaryColor, foreground),
+        ))
+        button.background = RippleDrawable(ColorStateList.valueOf(0x2287DBC1),
+            rounded(if (primary) accentColor else softAccentColor, 16), null)
+        button.compoundDrawableTintList = button.textColors
+        button.alpha = if (button.isEnabled) 1f else 0.5f
     }
 
     private fun navigationItem(title: String, icon: Int, page: Page) = TextView(this).apply {
@@ -262,6 +398,7 @@ class MainActivity : Activity() {
         isClickable = true
         isFocusable = true
         setOnClickListener { showPage(page) }
+        setPadding(dp(12), dp(10), dp(12), dp(10))
     }
 
     private fun showPage(page: Page) {
@@ -272,50 +409,53 @@ class MainActivity : Activity() {
     }
 
     private fun applyTheme() {
-        val background = if (darkMode) Color.rgb(18, 20, 23) else Color.rgb(244, 245, 247)
-        val surface = if (darkMode) Color.rgb(34, 38, 43) else Color.WHITE
-        val primary = if (darkMode) Color.rgb(239, 242, 245) else Color.rgb(28, 32, 36)
-        val secondary = if (darkMode) Color.rgb(173, 181, 190) else Color.rgb(83, 90, 98)
-        val accent = if (darkMode) Color.rgb(88, 166, 255) else Color.rgb(35, 105, 194)
+        rootView.setBackgroundColor(backgroundColor)
+        homePage.setBackgroundColor(backgroundColor)
+        settingsPage.setBackgroundColor(backgroundColor)
+        bottomNavigation.setBackgroundColor(surfaceColor)
+        cards.forEach { it.background = rounded(surfaceColor, 24) }
+        primaryLabels.forEach { it.setTextColor(primaryColor) }
+        secondaryLabels.forEach { it.setTextColor(secondaryColor) }
+        accentLabels.forEach { it.setTextColor(accentColor) }
+        refreshButtons()
+        urlField.setTextColor(primaryColor)
+        urlField.setHintTextColor(secondaryColor)
+        urlField.background = rounded(backgroundColor, 14)
+        urlField.backgroundTintList = null
+        status.setTextColor(if (statusIsError) errorColor() else secondaryColor)
+        progress.indeterminateTintList = ColorStateList.valueOf(accentColor)
+        appearanceSwitch.thumbTintList = ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+            intArrayOf(accentColor, secondaryColor),
+        )
+        appearanceSwitch.trackTintList = ColorStateList.valueOf(softAccentColor)
 
-        rootView.setBackgroundColor(background)
-        homePage.setBackgroundColor(background)
-        settingsPage.setBackgroundColor(background)
-        bottomNavigation.setBackgroundColor(surface)
-        settingsRow.setBackgroundColor(surface)
-        primaryLabels.forEach { it.setTextColor(primary) }
-        secondaryLabels.forEach { it.setTextColor(secondary) }
-        themedButtons.forEach {
-            it.setTextColor(primary)
-            it.backgroundTintList = ColorStateList.valueOf(surface)
-        }
-        downloadButton.setTextColor(Color.WHITE)
-        downloadButton.backgroundTintList = ColorStateList.valueOf(accent)
-        urlField.setTextColor(primary)
-        urlField.setHintTextColor(secondary)
-        urlField.backgroundTintList = ColorStateList.valueOf(accent)
-        status.setTextColor(if (statusIsError) Color.rgb(220, 80, 85) else secondary)
-        progress.indeterminateTintList = ColorStateList.valueOf(accent)
-
-        window.statusBarColor = background
-        window.navigationBarColor = surface
+        window.statusBarColor = backgroundColor
+        window.navigationBarColor = surfaceColor
         window.decorView.systemUiVisibility = edgeToEdgeSystemUiFlags() or if (darkMode) 0 else
             View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         applyNavigationTheme()
     }
 
     private fun applyNavigationTheme() {
-        val selected = if (darkMode) Color.rgb(88, 166, 255) else Color.rgb(35, 105, 194)
-        val unselected = if (darkMode) Color.rgb(173, 181, 190) else Color.rgb(83, 90, 98)
-        homeNavigation.setTextColor(if (selectedPage == Page.HOME) selected else unselected)
-        settingsNavigation.setTextColor(if (selectedPage == Page.SETTINGS) selected else unselected)
-        homeNavigation.compoundDrawables.filterNotNull().forEach {
-            it.setTint(if (selectedPage == Page.HOME) selected else unselected)
-        }
-        settingsNavigation.compoundDrawables.filterNotNull().forEach {
-            it.setTint(if (selectedPage == Page.SETTINGS) selected else unselected)
+        listOf(homeNavigation to Page.HOME, settingsNavigation to Page.SETTINGS).forEach { (item, page) ->
+            val selected = selectedPage == page
+            val color = if (selected) accentColor else secondaryColor
+            item.isSelected = selected
+            item.setTextColor(color)
+            item.typeface = Typeface.create(if (selected) "sans-serif-medium" else "sans-serif", Typeface.NORMAL)
+            item.compoundDrawables.filterNotNull().forEach { it.setTint(color) }
+            item.background = InsetDrawable(RippleDrawable(ColorStateList.valueOf(0x2287DBC1),
+                rounded(if (selected) softAccentColor else surfaceColor, 18), null),
+                dp(20), dp(6), dp(20), dp(6))
         }
     }
+
+    private fun refreshButtons() {
+        themedButtons.forEach { styleButton(it, it === downloadButton) }
+    }
+
+    private fun errorColor() = Color.parseColor(if (darkMode) "#FFA9A3" else "#AF3036")
 
     private fun matchWrap() = LinearLayout.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT,
@@ -325,8 +465,9 @@ class MainActivity : Activity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     private fun loadRemoteAssets() {
-        remoteAssetsStatus.text = "Loading latest release..."
+        remoteAssetsStatus.text = "Finding the latest release…"
         remoteAssetsContainer.removeAllViews()
+        themedButtons.removeAll(remoteAssetButtons.toSet())
         remoteAssetButtons.clear()
         executor.execute {
             val result = runCatching { fetchRemoteAssets() }
@@ -334,30 +475,35 @@ class MainActivity : Activity() {
             runOnUiThread {
                 result.onSuccess(::showRemoteAssets).onFailure { error ->
                     remoteAssetsStatus.text = error.message ?: "Could not load release assets"
-                    remoteAssetsContainer.addView(
-                        themedButton("Refresh").apply { setOnClickListener { loadRemoteAssets() } },
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        dp(48),
-                    )
+                    val retry = themedButton("Try again", R.drawable.ic_download).apply {
+                        isEnabled = !busy
+                        setOnClickListener { loadRemoteAssets() }
+                    }
+                    remoteAssetButtons += retry
+                    remoteAssetsContainer.addView(retry, spaced(10))
+                    refreshButtons()
                 }
             }
         }
     }
 
     private fun showRemoteAssets(release: RemoteRelease) {
-        remoteAssetsStatus.text = "Latest release ${release.tag}"
+        remoteAssetsStatus.text = "Latest release · ${release.tag}"
         release.assets.forEach { asset ->
-            val detail = if (asset.size > 0) " (${formatSize(asset.size)})" else ""
-            val button = themedButton("Download ${asset.name}$detail").apply {
+            val detail = if (asset.size > 0) "${formatSize(asset.size)} · Download" else "Download release asset"
+            val button = themedButton("${asset.name}\n$detail", R.drawable.ic_download).apply {
+                isEnabled = !busy
+                textSize = 14f
                 setOnClickListener {
                     urlField.setText(asset.url)
                     installFromUrl()
                 }
             }
             remoteAssetButtons += button
-            remoteAssetsContainer.addView(button, ViewGroup.LayoutParams.MATCH_PARENT, dp(48))
+            remoteAssetsContainer.addView(button, spaced(10))
         }
-        if (release.assets.isEmpty()) remoteAssetsStatus.text = "Latest release has no assets"
+        if (release.assets.isEmpty()) remoteAssetsStatus.text = "No assets in this release. You can use a package link below."
+        refreshButtons()
     }
 
     private fun fetchRemoteAssets(): RemoteRelease {
@@ -421,12 +567,19 @@ class MainActivity : Activity() {
     }
 
     private fun installFromUrl() {
+        if (busy) return
         val rawUrl = urlField.text.toString().trim()
         val url = runCatching { URL(rawUrl) }.getOrNull()
         if (url == null || url.protocol != "https") {
             showError("Enter a valid HTTPS URL")
+            urlField.requestFocus()
+            urlField.error = "Enter a valid HTTPS URL"
             return
         }
+        urlField.error = null
+        (getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
+            .hideSoftInputFromWindow(urlField.windowToken, 0)
+        urlField.clearFocus()
         setBusy(true, "Downloading package...")
         executor.execute {
             val result = runCatching { downloadAndInstall(url) }
@@ -555,27 +708,40 @@ class MainActivity : Activity() {
     }
 
     private fun updateInstalledState() {
-        launchButton.isEnabled = installedGameAvailable()
+        val config = runCatching {
+            val assets = File(filesDir, "assets")
+            validatePackage(assets)
+            JSONObject(File(assets, "engineConfig.json").readText())
+        }.getOrNull()
+        launchButton.isEnabled = !busy && config != null
+        installedTitle.text = config?.getString("name") ?: "Your next adventure awaits"
+        installedDetail.text = if (config != null) {
+            "Ready to play · v${config.getString("version")} · ${config.getJSONObject("script").getString("language")}"
+        } else "Choose a release below to get started."
+        refreshButtons()
     }
 
-    private fun installedGameAvailable() = runCatching {
-        validatePackage(File(filesDir, "assets"))
-    }.isSuccess
-
     private fun setBusy(busy: Boolean, message: String) {
+        this.busy = busy
         remoteAssetButtons.forEach { it.isEnabled = !busy }
         urlField.isEnabled = !busy
         downloadButton.isEnabled = !busy
-        launchButton.isEnabled = !busy && launchButton.isEnabled
+        updateInstalledState()
         progress.visibility = if (busy) ProgressBar.VISIBLE else ProgressBar.GONE
+        statusRow.visibility = if (message.isEmpty()) View.GONE else View.VISIBLE
         statusIsError = false
-        status.setTextColor(if (darkMode) Color.rgb(173, 181, 190) else Color.rgb(73, 80, 87))
+        status.setTextColor(secondaryColor)
         status.text = message
+        refreshButtons()
+        if (busy) statusRow.post {
+            statusRow.requestRectangleOnScreen(android.graphics.Rect(0, 0, statusRow.width, statusRow.height))
+        }
     }
 
     private fun showError(message: String) {
         statusIsError = true
-        status.setTextColor(Color.rgb(176, 39, 45))
+        statusRow.visibility = View.VISIBLE
+        status.setTextColor(errorColor())
         status.text = message
     }
 

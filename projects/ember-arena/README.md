@@ -64,10 +64,11 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
   ranges: worn shortsword 1–10, staff 1–6, dagger 1–8, gloves 1–5. Gloves attack in 0.5 ticks;
   dagger surprise rolls use the upper quarter of their damage range. Staff casting, bow,
   cloak, seal, talents and original starting-supply parity remain pending.
-- The current hero/mob subset uses independent fractional timestamps in real reflected
+- Heroes, mobs and the supported effects use independent fractional timestamps in real reflected
   components, with f32 precision matching both Bevy and the original Java Actor. Hero wins
-  timestamp ties; mobs precede shared status ticks. Crab movement costs 0.5 ticks and attacks
-  cost 1. The independent original Buff/Blob scheduler is not yet fully migrated.
+  timestamp ties; healing precedes fire, then mobs, then ordinary buffs. Crab movement costs
+  0.5 ticks and attacks cost 1. Hunger/regeneration still share a tick; the complete original
+  Actor framework is not yet migrated.
 - Backpack equipment slots open actual item details. Equip/unequip costs one tick; replacing
   an occupied slot also spends the old item's unequip tick. Weapon damage/accuracy/attack time
   and armor reduction/evasion/movement depend on the equipped items and strength requirements.
@@ -79,6 +80,16 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
 - Hunger begins at 300 turns and starvation at 450. A ration satisfies 300 hunger and takes
   three turns. Waiting does not instantly heal; basic regeneration is gradual and stops
   during starvation. Several potion/scroll effects remain simplified; see the parity table.
+- Healing potions grant a diminishing budget: at 20 maximum HP the first ticks heal 8, 6,
+  then 4. Reapplying keeps the larger budget, including its existing tick phase; it does not
+  cure ooze or burning. Invisibility has an independent twenty-tick expiry. Goo ooze lasts
+  twenty ticks and washes off in water; a fresh application can hurt once before washing off.
+- Liquid flame opens a free, cancellable tile selector. Confirming a visible target spends
+  one potion and one tick; the projectile stops at the first character or obstacle and seeds
+  a 3×3 fire field. Fire decays, spreads to adjacent doors and ignites occupants with an
+  eight-tick Burning effect. Water extinguishes an active burn. Fire is shown with a static
+  source-color marker; original particles, inventory/heap burning and other terrain effects
+  remain pending.
 - Depth changes require standing on downward stairs and explicitly descending. Health and
   supplies carry forward. Defeating Goo drops a real Worn Key and 2–4 blobs of goo, without
   ending the run. Collect the key, use the stairs to unlock the exit (one turn), then use
@@ -104,7 +115,7 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
 
 The title opens a separate six-icon hero selection screen; the four implemented classes are
 playable, while Duelist/Cleric show their upstream unlock-message presentation. Selecting a
-backpack slot opens an item-detail window before Drink/Read/Eat is confirmed.
+backpack slot opens an item-detail window before Drink/Throw/Read/Eat is confirmed.
 Inventory browsing and pausing cost no turns. Successfully using an item returns to play and
 allows monster responses. Empty item slots and blocked moves cost no turns. Keyboard holds
 repeat at a bounded rate; clicks never path through unexplored terrain.
@@ -150,6 +161,10 @@ requires regenerating metrics; tests verify that every catalog glyph exists in t
 Gameplay, floor generation, input and UI flow live in TypeScript. Reflected `ScriptActor`
 components and real Bevy `Transform` components remain authoritative for actor health,
 positions, awareness and combat state. References are reacquired within script callbacks.
+Supported buffs and fire cells are also real script-owned entities: reflected fields hold
+remaining budget/duration, effect parameters and action deadlines, and entity IDs encode
+buff targets. Fire spread uses transient query results for one evolution step, not a second
+persistent actor store. Player buffs survive descent; old-floor environmental effects do not.
 TypeScript retains only terrain, exploration, inventory, progression and presentation metadata;
 there is no second actor/ECS store and no new language-specific business global.
 
@@ -180,6 +195,25 @@ hashes are checked before reusing that revision's cached bytes. The game runs of
 preparation. The old misnamed `skeleton_key.png` crop is replaced by `worn_key.png`.
 
 ## Verification boundaries
+
+### Timed effects and liquid-flame targeting on 2026-11-12
+
+- **90 tests pass**: eleven source-rule tests plus 79 gameplay/UI/asset tests. Coverage includes
+  diminishing healing, maximum-budget reapplication, fractional effect phase, heal-before-DOT
+  priority, twenty-tick ooze, fresh/active water interactions, targeting cancellation, projectile
+  interception, real effect/fire entities, spread, idle freeze, descent and death/restart cleanup.
+  Chinese effect amounts and target controls are checked in portrait and short landscape.
+- `npm run check` remains Biome (about 40–70 ms locally for 32 files). Independent
+  `npm run typecheck` and bundle generation pass. Asset preparation regenerates the static
+  fire marker/provenance and Chinese font metrics using the pinned source/cache.
+- `cargo test --locked --offline -p bevy-runeweave --no-default-features --features typescript
+  --lib quickjs_arena_runs_with_real_actor_components_and_ui -- --nocapture`: **1 passed**
+  on macOS Debug. This runs the actual bundle in QuickJS against real Bevy/BMS components;
+  the entity diagnostic now verifies creation, parameters and one tick of a healing buff.
+- No Rust implementation, shared BMS interface or public ABI changed. GPU rendering,
+  native input/lifecycle, real mobile touch and reference-client pixel comparison are
+  **NOT_RUN for this batch** on Windows, macOS, Linux, Android and iOS. The headless test
+  validates a narrow native path, not the entire effect scheduler or complete original game.
 
 ### Equipment, action time and Biome batch on 2026-11-12
 
@@ -262,10 +296,11 @@ preparation. The old misnamed `skeleton_key.png` crop is replaced by `worn_key.p
 
 ### Existing gameplay and UI evidence
 
-`npm --prefix projects/ember-arena test` typechecks, rebuilds the bundle, and runs deterministic
+`npm --prefix projects/ember-arena test` runs Biome, rebuilds the bundle, and runs deterministic
 tests with platform doubles. Tests cover floor connectivity across 200 seed/depth combinations,
 doors and visibility, idle/turn behavior, five-depth transitions, combat, mapping, hunger,
 portrait input, resizing, asset provenance, settings, reset and error recovery.
+Run `npm --prefix projects/ember-arena run typecheck` separately for compiler type checking.
 
 `cargo test --locked --offline -p bevy-runeweave --lib` includes execution of the actual game
 bundle through QuickJS and real Bevy components, Lua/QuickJS actor and storage parity,

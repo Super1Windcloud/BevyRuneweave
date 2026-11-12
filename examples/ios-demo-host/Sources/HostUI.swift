@@ -1,5 +1,94 @@
 import UIKit
 
+private enum HostStyle {
+    static let background = color(light: 0xF3F5F1, dark: 0x101C1B)
+    static let surface = color(light: 0xFFFFFF, dark: 0x1B2B29)
+    static let primary = color(light: 0x172F2B, dark: 0xEDF5F1)
+    static let secondary = color(light: 0x526A64, dark: 0xADBFBA)
+    static let accent = color(light: 0x006B54, dark: 0x87DBC1)
+    static let softAccent = color(light: 0xE4F2EB, dark: 0x28483F)
+
+    static func color(light: UInt32, dark: UInt32) -> UIColor {
+        UIColor { traits in
+            let value = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat((value >> 16) & 255) / 255,
+                           green: CGFloat((value >> 8) & 255) / 255,
+                           blue: CGFloat(value & 255) / 255, alpha: 1)
+        }
+    }
+
+    static func label(_ text: String, size: CGFloat = 15, color: UIColor = secondary,
+                      weight: UIFont.Weight = .regular, heading: Bool = false) -> UILabel {
+        let label = UILabel()
+        label.text = text
+        label.font = UIFontMetrics(forTextStyle: heading ? .title2 : .body)
+            .scaledFont(for: .systemFont(ofSize: size, weight: weight))
+        label.adjustsFontForContentSizeCategory = true
+        label.textColor = color
+        label.numberOfLines = 0
+        if heading { label.accessibilityTraits.insert(.header) }
+        return label
+    }
+
+    static func stack(spacing: CGFloat = 12) -> UIStackView {
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = spacing
+        return stack
+    }
+
+    static func card(_ content: UIStackView, color: UIColor = surface, inset: CGFloat = 20) -> UIView {
+        let card = UIView()
+        card.backgroundColor = color
+        card.layer.cornerRadius = 24
+        card.layer.cornerCurve = .continuous
+        content.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(content)
+        NSLayoutConstraint.activate([
+            content.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: inset),
+            content.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -inset),
+            content.topAnchor.constraint(equalTo: card.topAnchor, constant: inset),
+            content.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -inset),
+        ])
+        return card
+    }
+}
+
+// Constraints let long release filenames and accessibility text determine the row height.
+private final class HostActionButton: UIButton {
+    func configure(title: String, symbol: String, primary: Bool = false) {
+        backgroundColor = primary ? HostStyle.accent : HostStyle.softAccent
+        layer.cornerRadius = 16
+        layer.cornerCurve = .continuous
+        let foreground = primary ? HostStyle.background : HostStyle.accent
+        let text = HostStyle.label(title, color: foreground, weight: .semibold)
+        let icon = UIImageView(image: UIImage(systemName: symbol))
+        icon.tintColor = foreground
+        icon.contentMode = .scaleAspectFit
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        icon.widthAnchor.constraint(equalToConstant: 22).isActive = true
+        icon.heightAnchor.constraint(equalToConstant: 22).isActive = true
+        let row = UIStackView(arrangedSubviews: [icon, text])
+        row.alignment = .center
+        row.spacing = 12
+        row.isUserInteractionEnabled = false
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+            row.topAnchor.constraint(equalTo: topAnchor, constant: 16),
+            row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
+            heightAnchor.constraint(greaterThanOrEqualToConstant: 54),
+        ])
+        accessibilityLabel = title
+        isAccessibilityElement = true
+    }
+
+    override var isEnabled: Bool { didSet { alpha = isEnabled ? 1 : 0.45 } }
+    override var isHighlighted: Bool { didSet { alpha = isHighlighted ? 0.65 : (isEnabled ? 1 : 0.45) } }
+}
+
 final class HostCoordinator {
     static let shared = HostCoordinator()
 
@@ -26,9 +115,17 @@ final class HostCoordinator {
             settings.tabBarItem = UITabBarItem(title: "Settings", image: UIImage(systemName: "gearshape"), tag: 1)
             let tabs = UITabBarController()
             tabs.viewControllers = [launcher, settings]
+            tabs.tabBar.tintColor = HostStyle.accent
+            tabs.tabBar.unselectedItemTintColor = HostStyle.secondary
+            let appearance = UITabBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = HostStyle.surface
+            appearance.shadowColor = .clear
+            tabs.tabBar.standardAppearance = appearance
+            if #available(iOS 15.0, *) { tabs.tabBar.scrollEdgeAppearance = appearance }
 
             let root = UIViewController()
-            root.view.backgroundColor = .systemBackground
+            root.view.backgroundColor = HostStyle.background
             root.addChild(tabs)
             tabs.view.translatesAutoresizingMaskIntoConstraints = false
             root.view.addSubview(tabs.view)
@@ -98,12 +195,30 @@ final class HostSettingsViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Settings"
-        tableView.backgroundColor = .systemGroupedBackground
-        let heading = UILabel(frame: CGRect(x: 24, y: 0, width: UIScreen.main.bounds.width - 48, height: 72))
-        heading.text = "Settings"
-        heading.font = .systemFont(ofSize: 28, weight: .semibold)
-        heading.textColor = .label
-        tableView.tableHeaderView = heading
+        tableView.backgroundColor = HostStyle.background
+        tableView.separatorStyle = .none
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = 88
+        let heading = HostStyle.stack(spacing: 10)
+        heading.addArrangedSubview(HostStyle.label("MAKE IT YOURS", size: 12, color: HostStyle.accent,
+                                                 weight: .semibold))
+        heading.addArrangedSubview(HostStyle.label("Settings", size: 32, color: HostStyle.primary,
+                                                 weight: .semibold, heading: true))
+        heading.addArrangedSubview(HostStyle.label("A comfortable space to play."))
+        tableView.tableHeaderView = HostStyle.card(heading, color: HostStyle.background, inset: 24)
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard let header = tableView.tableHeaderView else { return }
+        let width = tableView.bounds.width
+        let size = header.systemLayoutSizeFitting(
+            CGSize(width: width, height: 0), withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel)
+        if header.frame.width != width || header.frame.height != size.height {
+            header.frame = CGRect(x: 0, y: 0, width: width, height: size.height)
+            tableView.tableHeaderView = header
+        }
     }
 
     override func numberOfSections(in tableView: UITableView) -> Int { 1 }
@@ -112,16 +227,32 @@ final class HostSettingsViewController: UITableViewController {
         "Appearance"
     }
 
+    override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
+        "Bevy RuneWeave\nA home for small worlds and big ideas."
+    }
+
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let identifier = "DarkModeCell"
         let cell = tableView.dequeueReusableCell(withIdentifier: identifier) ??
-            UITableViewCell(style: .default, reuseIdentifier: identifier)
+            UITableViewCell(style: .subtitle, reuseIdentifier: identifier)
         let toggle = (cell.accessoryView as? UISwitch) ?? UISwitch()
         toggle.removeTarget(nil, action: nil, for: .valueChanged)
         toggle.addTarget(self, action: #selector(darkModeChanged(_:)), for: .valueChanged)
         toggle.isOn = UserDefaults.standard.bool(forKey: hostDarkModeDefaultsKey)
+        toggle.onTintColor = HostStyle.accent
+        toggle.accessibilityLabel = "Dark mode"
         cell.accessoryView = toggle
+        cell.backgroundColor = HostStyle.surface
         cell.textLabel?.text = "Dark mode"
+        cell.textLabel?.textColor = HostStyle.primary
+        cell.textLabel?.font = .preferredFont(forTextStyle: .headline)
+        cell.textLabel?.adjustsFontForContentSizeCategory = true
+        cell.textLabel?.numberOfLines = 0
+        cell.detailTextLabel?.text = "A softer glow after hours."
+        cell.detailTextLabel?.textColor = HostStyle.secondary
+        cell.detailTextLabel?.font = .preferredFont(forTextStyle: .subheadline)
+        cell.detailTextLabel?.adjustsFontForContentSizeCategory = true
+        cell.detailTextLabel?.numberOfLines = 0
         cell.selectionStyle = .none
         return cell
     }
@@ -135,14 +266,20 @@ final class HostSettingsViewController: UITableViewController {
 final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     private let store: PackageStore
     private var remoteAssets: [RemoteAsset] = []
-    private var remoteButtons: [UIButton] = []
+    private var remoteButtons: [HostActionButton] = []
     private let remoteAssetsStack = UIStackView()
     private let remoteAssetsStatus = UILabel()
     private let urlField = UITextField()
-    private let downloadButton = UIButton(type: .system)
-    private let launchButton = UIButton(type: .system)
+    private let downloadButton = HostActionButton(type: .custom)
+    private let launchButton = HostActionButton(type: .custom)
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let statusLabel = UILabel()
+    private let installedTitle = HostStyle.label("Your next adventure awaits", size: 19,
+                                                color: HostStyle.primary, weight: .semibold)
+    private let installedDetail = HostStyle.label("Choose a release below to get started.", size: 14)
+    private let statusRow = UIStackView()
+    private let scroll = UIScrollView()
+    private var busy = false
 
     init(store: PackageStore) {
         self.store = store
@@ -154,103 +291,152 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemGroupedBackground
-
-        let scroll = UIScrollView()
+        view.backgroundColor = HostStyle.background
+        view.tintColor = HostStyle.accent
         scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.keyboardDismissMode = .interactive
         view.addSubview(scroll)
-        let content = UIStackView()
+        let canvas = UIView()
+        canvas.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(canvas)
+        let content = HostStyle.stack(spacing: 0)
         content.translatesAutoresizingMaskIntoConstraints = false
-        content.axis = .vertical
-        content.spacing = 10
-        scroll.addSubview(content)
+        canvas.addSubview(content)
 
-        let title = label("Bevy RuneWeave", size: 28, color: .label)
-        title.font = .systemFont(ofSize: 28, weight: .semibold)
-        content.addArrangedSubview(title)
-        let subtitle = label("iOS host", size: 15, color: .secondaryLabel)
-        content.addArrangedSubview(subtitle)
-        content.setCustomSpacing(28, after: subtitle)
-        let section = label("GitHub release assets", size: 16, color: .label)
-        section.font = .systemFont(ofSize: 16, weight: .medium)
-        content.addArrangedSubview(section)
+        let brand = HostStyle.label("RUNEWEAVE  /  iOS", size: 12, color: HostStyle.accent, weight: .semibold)
+        add(brand, to: content, spacing: 12)
+        let hero = HostStyle.stack(spacing: 12)
+        hero.addArrangedSubview(HostStyle.label("PLAY. CREATE. EXPLORE.", size: 11,
+                                              color: UIColor(red: 0.66, green: 0.87, blue: 0.78, alpha: 1),
+                                              weight: .semibold))
+        hero.addArrangedSubview(HostStyle.label("A little world.\nEndless possibilities.", size: 30,
+                                              color: .white, weight: .semibold, heading: true))
+        hero.addArrangedSubview(HostStyle.label("Discover a game and make it your own.",
+                                              color: UIColor(red: 0.76, green: 0.86, blue: 0.82, alpha: 1)))
+        add(HostStyle.card(hero, color: UIColor(red: 0.07, green: 0.24, blue: 0.20, alpha: 1), inset: 24),
+            to: content, spacing: 24)
 
-        remoteAssetsStatus.font = .systemFont(ofSize: 14)
-        remoteAssetsStatus.textColor = .secondaryLabel
+        spinner.hidesWhenStopped = true
+        spinner.color = HostStyle.accent
+        spinner.setContentHuggingPriority(.required, for: .horizontal)
+        statusLabel.font = .preferredFont(forTextStyle: .subheadline)
+        statusLabel.adjustsFontForContentSizeCategory = true
+        statusLabel.textColor = HostStyle.secondary
+        statusLabel.numberOfLines = 0
+        statusRow.axis = .horizontal
+        statusRow.alignment = .center
+        statusRow.spacing = 12
+        statusRow.addArrangedSubview(spinner)
+        statusRow.addArrangedSubview(statusLabel)
+        statusRow.isHidden = true
+        add(statusRow, to: content, spacing: 16)
+
+        add(section("Your space"), to: content, spacing: 12)
+        let installed = HostStyle.stack(spacing: 6)
+        installed.addArrangedSubview(installedTitle)
+        installed.addArrangedSubview(installedDetail)
+        installed.setCustomSpacing(18, after: installedDetail)
+        configureButton(launchButton, title: "Start installed game", symbol: "play",
+                        action: #selector(launchInstalled))
+        installed.addArrangedSubview(launchButton)
+        add(HostStyle.card(installed), to: content, spacing: 28)
+
+        add(section("Discover"), to: content, spacing: 6)
+        remoteAssetsStatus.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 13))
+        remoteAssetsStatus.adjustsFontForContentSizeCategory = true
+        remoteAssetsStatus.textColor = HostStyle.secondary
         remoteAssetsStatus.numberOfLines = 0
-        content.addArrangedSubview(remoteAssetsStatus)
+        add(remoteAssetsStatus, to: content, spacing: 12)
         remoteAssetsStack.axis = .vertical
         remoteAssetsStack.spacing = 10
-        content.addArrangedSubview(remoteAssetsStack)
+        add(remoteAssetsStack, to: content, spacing: 28)
 
-        urlField.placeholder = "HTTPS asset package URL"
+        let custom = HostStyle.stack(spacing: 12)
+        custom.addArrangedSubview(HostStyle.label("Have a package link?", size: 19,
+                                                color: HostStyle.primary, weight: .semibold))
+        custom.addArrangedSubview(HostStyle.label("Bring your own game with an HTTPS ZIP link.", size: 14))
+        urlField.placeholder = "https://…/game.zip"
+        urlField.accessibilityLabel = "HTTPS asset package URL"
         urlField.keyboardType = .URL
         urlField.autocapitalizationType = .none
         urlField.autocorrectionType = .no
         urlField.returnKeyType = .go
         urlField.clearButtonMode = .whileEditing
-        urlField.backgroundColor = .secondarySystemBackground
-        urlField.textColor = .label
-        urlField.layer.cornerRadius = 6
+        urlField.backgroundColor = HostStyle.background
+        urlField.textColor = HostStyle.primary
+        urlField.font = .preferredFont(forTextStyle: .body)
+        urlField.adjustsFontForContentSizeCategory = true
+        urlField.layer.cornerRadius = 14
         urlField.delegate = self
-        urlField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 1))
+        urlField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 14, height: 1))
         urlField.leftViewMode = .always
-        urlField.heightAnchor.constraint(equalToConstant: 52).isActive = true
-        content.addArrangedSubview(urlField)
+        urlField.heightAnchor.constraint(greaterThanOrEqualToConstant: 56).isActive = true
+        custom.addArrangedSubview(urlField)
+        configureButton(downloadButton, title: "Download and start", symbol: "arrow.down.to.line",
+                        primary: true, action: #selector(downloadCustom))
+        custom.addArrangedSubview(downloadButton)
+        add(HostStyle.card(custom), to: content, spacing: 24)
+        let footer = HostStyle.label("Powered by Bevy RuneWeave", size: 12)
+        footer.textAlignment = .center
+        content.addArrangedSubview(footer)
 
-        configureButton(downloadButton, title: "Download and start", action: #selector(downloadCustom))
-        downloadButton.backgroundColor = .systemBlue
-        downloadButton.setTitleColor(.white, for: .normal)
-        content.addArrangedSubview(downloadButton)
-        configureButton(launchButton, title: "Start installed game", action: #selector(launchInstalled))
-        content.addArrangedSubview(launchButton)
-
-        spinner.hidesWhenStopped = true
-        spinner.heightAnchor.constraint(equalToConstant: 42).isActive = true
-        content.addArrangedSubview(spinner)
-        statusLabel.font = .systemFont(ofSize: 14)
-        statusLabel.textColor = .secondaryLabel
-        statusLabel.textAlignment = .center
-        statusLabel.numberOfLines = 0
-        content.addArrangedSubview(statusLabel)
-
+        let preferredWidth = content.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor, constant: -40)
+        preferredWidth.priority = .defaultHigh
         NSLayoutConstraint.activate([
-            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scroll.topAnchor.constraint(equalTo: view.topAnchor),
+            scroll.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            content.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor, constant: 24),
-            content.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor, constant: -24),
-            content.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 48),
-            content.bottomAnchor.constraint(lessThanOrEqualTo: scroll.contentLayoutGuide.bottomAnchor, constant: -24),
-            content.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor, constant: -48),
+            canvas.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
+            canvas.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
+            canvas.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
+            canvas.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
+            canvas.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor),
+            content.centerXAnchor.constraint(equalTo: canvas.centerXAnchor),
+            content.leadingAnchor.constraint(greaterThanOrEqualTo: canvas.leadingAnchor, constant: 20),
+            content.trailingAnchor.constraint(lessThanOrEqualTo: canvas.trailingAnchor, constant: -20),
+            content.topAnchor.constraint(equalTo: canvas.topAnchor, constant: 24),
+            content.bottomAnchor.constraint(equalTo: canvas.bottomAnchor, constant: -28),
+            content.widthAnchor.constraint(lessThanOrEqualToConstant: 640), preferredWidth,
         ])
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged(_:)),
+                                               name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
         updateInstalledState()
         reloadRemoteAssets()
     }
 
-    private func label(_ text: String, size: CGFloat, color: UIColor) -> UILabel {
-        let label = UILabel()
-        label.text = text
-        label.font = .systemFont(ofSize: size)
-        label.textColor = color
-        label.numberOfLines = 0
-        return label
+    private func section(_ title: String) -> UILabel {
+        HostStyle.label(title, size: 21, color: HostStyle.primary, weight: .semibold, heading: true)
     }
 
-    private func configureButton(_ button: UIButton, title: String, action: Selector) {
-        button.setTitle(title, for: .normal)
-        button.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
-        button.titleLabel?.numberOfLines = 2
-        button.titleLabel?.textAlignment = .center
-        button.backgroundColor = .secondarySystemBackground
-        button.layer.cornerRadius = 6
+    private func add(_ child: UIView, to stack: UIStackView, spacing: CGFloat) {
+        stack.addArrangedSubview(child)
+        stack.setCustomSpacing(spacing, after: child)
+    }
+
+    @objc private func keyboardChanged(_ notification: Notification) {
+        guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+              let window = view.window else { return }
+        let local = scroll.convert(window.convert(frame, from: window.screen.coordinateSpace), from: window)
+        let overlap = scroll.bounds.intersection(local)
+        let bottom = overlap.isNull || local.maxY < scroll.bounds.maxY ? 0 : overlap.height
+        scroll.contentInset.bottom = bottom
+        scroll.verticalScrollIndicatorInsets.bottom = bottom
+        if urlField.isFirstResponder {
+            scroll.scrollRectToVisible(urlField.convert(urlField.bounds, to: scroll).insetBy(dx: 0, dy: -16),
+                                       animated: !UIAccessibility.isReduceMotionEnabled)
+        }
+    }
+
+    private func configureButton(_ button: HostActionButton, title: String,
+                                 symbol: String = "arrow.down.to.line", primary: Bool = false,
+                                 action: Selector) {
+        button.configure(title: title, symbol: symbol, primary: primary)
         button.addTarget(self, action: action, for: .touchUpInside)
-        button.heightAnchor.constraint(greaterThanOrEqualToConstant: 50).isActive = true
     }
 
     @objc private func reloadRemoteAssets() {
-        remoteAssetsStatus.text = "Loading latest release..."
+        remoteAssetsStatus.text = "Finding the latest release…"
         remoteAssetsStack.arrangedSubviews.forEach {
             remoteAssetsStack.removeArrangedSubview($0)
             $0.removeFromSuperview()
@@ -266,41 +452,54 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         case let .success(release):
             remoteAssets = release.assets
             remoteAssetsStatus.text = release.assets.isEmpty
-                ? "Latest release has no assets" : "Latest release \(release.tag)"
+                ? "No assets in this release. You can use a package link below." : "Latest release · \(release.tag)"
             for (index, asset) in release.assets.enumerated() {
-                let button = UIButton(type: .system)
-                let detail = asset.size > 0 ? " (\(formattedByteCount(asset.size)))" : ""
-                configureButton(button, title: "Download \(asset.name)\(detail)",
+                let button = HostActionButton(type: .custom)
+                let detail = asset.size > 0 ? "\(formattedByteCount(asset.size)) · Download" : "Download release asset"
+                configureButton(button, title: "\(asset.name)\n\(detail)",
                                 action: #selector(downloadPreset(_:)))
+                button.isEnabled = !busy
                 button.tag = index
                 remoteButtons.append(button)
                 remoteAssetsStack.addArrangedSubview(button)
             }
         case let .failure(error):
             remoteAssetsStatus.text = error.localizedDescription
-            let retry = UIButton(type: .system)
-            configureButton(retry, title: "Refresh", action: #selector(reloadRemoteAssets))
+            let retry = HostActionButton(type: .custom)
+            configureButton(retry, title: "Try again", action: #selector(reloadRemoteAssets))
+            retry.isEnabled = !busy
+            remoteButtons.append(retry)
             remoteAssetsStack.addArrangedSubview(retry)
         }
     }
 
     private func setBusy(_ busy: Bool, status: String) {
+        self.busy = busy
         urlField.isEnabled = !busy
         downloadButton.isEnabled = !busy
         launchButton.isEnabled = !busy && (try? store.installedConfig()) != nil
         remoteButtons.forEach { $0.isEnabled = !busy }
         busy ? spinner.startAnimating() : spinner.stopAnimating()
         statusLabel.text = status
+        statusRow.isHidden = status.isEmpty
+        if busy {
+            view.layoutIfNeeded()
+            scroll.scrollRectToVisible(statusRow.convert(statusRow.bounds, to: scroll),
+                                       animated: !UIAccessibility.isReduceMotionEnabled)
+            UIAccessibility.post(notification: .announcement, argument: status)
+        }
     }
 
     private func updateInstalledState() {
         guard let config = try? store.installedConfig() else {
             launchButton.isEnabled = false
-            statusLabel.text = "No game package installed"
+            installedTitle.text = "Your next adventure awaits"
+            installedDetail.text = "Choose a release below to get started."
             return
         }
-        launchButton.isEnabled = true
-        statusLabel.text = "Installed: \(config.name) \(config.version)"
+        launchButton.isEnabled = !busy
+        installedTitle.text = config.name
+        installedDetail.text = "Ready to play · v\(config.version) · \(config.script.language)"
     }
 
     private func showError(_ error: Error) {
@@ -330,6 +529,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     }
 
     private func download(url: URL) {
+        guard !busy else { return }
         view.endEditing(true)
         setBusy(true, status: "Downloading package...")
         ReleaseClient.shared.download(url) { [weak self] result in

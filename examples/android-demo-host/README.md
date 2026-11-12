@@ -60,3 +60,9 @@ bars while foreground text, sprites, and controls stay within safe bounds.
 The native launcher's bottom navigation adds the current navigation-bar or display-cutout inset
 below its fixed-height controls, so neither gesture navigation nor three-button navigation covers
 the Home and Settings actions.
+
+The launcher shares a sage-and-teal visual palette with iOS. Home separates the installed game,
+release downloads, and custom package links into rounded sections. Settings persists the light/dark
+appearance choice. Content stays centered on wide screens, release names wrap without fixed row
+heights, and navigation grows with the system font scale. Download controls expose disabled and
+busy states; keyboard insets keep the URL field accessible.

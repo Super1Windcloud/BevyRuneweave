@@ -11,11 +11,11 @@ This ledger separates source-based implementation from pixel-parity acceptance.
 | --- | --- | --- |
 | Title | `scenes/TitleScene.java`, `ui/TitleBackground.java`, `effects/BannerSprites.java` | Original landscape/portrait banner in English, localized text title in Chinese, eight entry buttons, chrome, icons and integer UI zoom. Background uses original layers but a static arrangement; original scrolling, flames and glow remain absent. |
 | Hero selection | `scenes/HeroSelectScene.java`, `sprites/HeroSprite.java`, `messages/actors/actors.properties` | Separate full-screen scene, six original hero icons, landscape grid / portrait strip, original splash, left fade and locked-class message windows. Duelist/Cleric remain locked because their gameplay kits are absent. The four playable classes retain truthful port descriptions, rather than claiming unimplemented powers. |
-| Status pane | `ui/StatusPane.java` | Original 82×38 and large 160×39 layouts, 128×9 / 50×4 health bars, source hero portrait, XP bar and level. Compass, complete buff icons, shields, DOT overlays and blink animations remain absent. |
+| Status pane | `ui/StatusPane.java` | Original 82×38 and large 160×39 layouts, 128×9 / 50×4 health bars, source hero portrait, XP bar and level. Healing budget, Burning and Ooze have localized numeric text indicators. Compass, original buff icons, shields, DOT overlays and blink animations remain absent. |
 | Menu pane | `ui/MenuPane.java` | Source pane, menu/journal artwork, version and depth positions. Journal data/layout is still a subset. |
 | Toolbar | `ui/Toolbar.java` | Original 20/18/19-pixel joined slot frames, 4/5/6 visible-slot thresholds and desktop/mobile grouping. Search enters tile examination, a second click performs a two-turn search, and F exposes the same flow. Descent uses the HUD stairs, E/period or the hero's exit tile. Full quickslot assignment/targeting, swap and native long-press remain absent. |
 | Backpack | `windows/WndBag.java`, `ui/InventorySlot.java` | Five columns and 25 slots, adaptive layout, quantities and bag tab. Weapon/armor slots now reference actual item instances; removed gear remains in the backpack. Seven gear definitions, upgrade labels, key/blob descriptions and equip/unequip actions are present. Rings, artifacts, curses and full bag taxonomy remain pending. |
-| Item window | `windows/WndInfoItem.java`, `windows/WndUseItem.java` | Original chrome, icon/title and measured wrapping. Consumables expose their actions; gear exposes actual damage/armor/strength/time values and equip/remove. Upgrade scrolls use a paginated owned-item chooser and are consumed only on confirmation. Throw/drop/quickslot dialogs remain absent; staff casting is explicitly identified as unavailable. |
+| Item window | `windows/WndInfoItem.java`, `windows/WndUseItem.java` | Original chrome, icon/title and measured wrapping. Consumables expose their actions; gear exposes actual damage/armor/strength/time values and equip/remove. Upgrade scrolls use a paginated owned-item chooser and are consumed only on confirmation. Liquid flame exposes Throw and a cancellable visible-tile targeting prompt. Generic throw/drop/quickslot dialogs remain absent; staff casting is explicitly identified as unavailable. |
 | Pause | `windows/WndGame.java` | Original 120-pixel content width, 20-pixel buttons, two-pixel gaps, Settings and Main Menu actions. Challenges are not present in the port. |
 | Settings | `windows/WndSettings.java` | Original content widths, six icon tabs, chrome and persisted English/Simplified Chinese selection. Hints affect the HUD; reduced effects disables burst camera shake. Sensitivity is explicitly disabled for absolute tile selection while preserving old settings. Full display, UI, keybinding, audio and broader locale support remain pending; audio controls are noninteractive. |
 | Hero info | `windows/WndHero.java` | Stats use actual hero/equipment values, including an accuracy/evasion/attack-time summary. Talent trees and complete original stat tabs remain absent. |
@@ -57,6 +57,14 @@ gaps. UI and scene images use nearest sampling. Source icons preserve their own 
   areas/touch and platform font rasterization remain unverified for this UI change.
 
 ## Visual inspection and acceptance
+
+The timed-effects batch passes 90 script tests, Biome and independent TypeScript checks.
+Chinese numeric effects and targeting/cancel controls are covered in portrait and short
+landscape doubles. The headless macOS QuickJS/Bevy integration test passes with a reflected
+healing entity. This is not screenshot/touch acceptance: new effect labels, target prompts
+and fire markers have NOT_RUN native visual/input acceptance on all five platforms.
+Fire is represented by a static four-unit orange marker derived from `FlameParticle.java`;
+the original particle emitter, character burning animation and buff icon strip remain absent.
 
 The equipment/action-time batch passes 74 script tests, Biome and TypeScript checks. Equipment
 detail windows, upgrade pages and actual slot contents have NOT_RUN native screenshot/touch

@@ -24,6 +24,9 @@ export interface SpdUiState {
   hunger: string;
   invisible: number;
   ooze: number;
+  healing: number;
+  burning: number;
+  targeting: boolean;
   bossHealth: number | null;
   inventory: Record<ItemKind, number>;
   equipment: readonly GearItem[];
@@ -245,13 +248,23 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     elements.push(label("hud_wave", `${state.depth}`, w - 38, 16, 7, 4));
     if (state.hunger !== "satiated") elements.push(label("hud_hunger", state.hunger === "starving" ? t("hud.starving") : t("hud.hungry"), large ? 32 : 33, large ? 4 : 10, 80, 6, titleColor));
     if (state.invisible) elements.push(label("hud_invisible", t("hud.invisible"), 33, large ? 10 : 18, 70, 6, titleColor));
+    const statuses = [
+      ["healing", state.healing], ["burning", state.burning], ["ooze", state.ooze],
+    ] as const;
+    statuses.filter(([, amount]) => amount > 0).forEach(([name, amount], index) => {
+      elements.push(label(`hud_${name}`, t(`hud.${name}`, { amount }), large ? 162 : 86, 2 + index * 9, large ? 82 : 40, 6, titleColor, 9));
+    });
     const toolbarX = !m.large && m.landscape ? w - 64 : w - 24, toolbarY = h - 26;
     const waitX = m.large ? w - 44 : m.landscape ? w - 20 : 0;
     const searchX = m.large ? w - 64 : m.landscape ? w - 40 : 20;
     elements.push({ kind: "button", id: "bag_btn", onClick: () => on("bag_btn"), style: rect(toolbarX, toolbarY, 24, 26), children: [art("bag_tool", "bag_tool", 0, 0), art("bag_tool_icon", "bag_tool_icon", 4, 5)] });
     elements.push({ kind: "button", id: "wait", onClick: () => on("wait"), style: rect(waitX, toolbarY, 20, 26), children: [art("wait_tool", "wait_tool", 0, 0), art("wait_tool_icon", "wait_tool_icon", 2, 5)] });
     elements.push({ kind: "button", id: "search", onClick: () => on("search"), style: rect(searchX, toolbarY, 20, 26), children: [art("search_tool", "search_tool", 0, 0), art("search_tool_icon", "search_tool_icon", 2, 5)] });
-    if (state.examining) {
+    if (state.targeting) {
+      const promptWidth = Math.max(90, w - 30), lines = wrappedText(t("target.flame"), promptWidth, 6);
+      elements.push(label("target_prompt", lines.join("\n"), 2, 44, promptWidth, 6, titleColor, lines.length * 8));
+      elements.push(control("cancel_target", t("common.close"), w - 28, 44, 26, 14, "toast", undefined, "cancel_target", true, 6));
+    } else if (state.examining) {
       const promptWidth = Math.max(90, w - 30), lines = wrappedText(t("examine.prompt"), promptWidth, 6);
       elements.push(label("examine_prompt", lines.join("\n"), 2, 44, promptWidth, 6, titleColor, lines.length * 8));
       elements.push(control("cancel_examine", t("common.close"), w - 28, 44, 26, 14, "toast", undefined, "cancel_examine", true, 6));
@@ -310,7 +323,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
         image("item_detail_icon", `sprites/dungeon/${state.item}.png`, rect(0, 0, 16, 16)),
         label("item_detail_title", t(`item.${state.item}.name`), 20, 1, 100, 9, titleColor, 26),
         label("item_detail_desc", lines.join("\n"), 0, 18, 120, 6, white, descriptionHeight),
-        control(`use_${state.item}`, def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", undefined, `use_${state.item}`, true, 8),
+        control(`use_${state.item}`, state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", undefined, `use_${state.item}`, true, 8),
       ]);
     } else if (state.phase === "equipment") {
       const gear = state.equipment.find((item) => item.id === state.selectedGear);

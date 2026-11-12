@@ -19,6 +19,7 @@ import { defaultProfile, parseProfile } from "../modules/ember-arena/game/src/pr
 import { message, messages, renderMessage, translate, type MessageKey } from "../modules/ember-arena/game/src/i18n.js";
 import { fontForText, measureText, wrapText } from "../modules/ember-arena/game/src/text-layout.js";
 import { fontAdvances } from "./font-metrics.js";
+import { buffId, type BuffKind } from "../modules/ember-arena/game/src/effects.js";
 
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
 type RecordValue = { [key: string]: unknown };
@@ -786,6 +787,191 @@ test("click walking stops at a door when a previously hidden enemy appears", () 
 
 function turnCount(game: Game): number { return Number(game.entities.get("player")!.body!.lifetime); }
 
+function putBuff(game: Game, type: BuffKind, target: string, left: number, acted = false): string {
+  const id = buffId(type, target);
+  putActor(game, id, `buff_${type}`, cell(game, target), left, 0);
+  game.entities.get(id)!.body!.cooldown = game.entities.get("player")!.body!.cooldown;
+  game.entities.get(id)!.body!.lifetime = acted ? 1 : 0;
+  return id;
+}
+
+test("healing acts before lethal ooze and healing potions do not cure that ooze", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  game.entities.get("player")!.body!.health = 1;
+  const ooze = putBuff(game, "ooze", "player", 20);
+  game.key("Digit1");
+  assert.equal(game.state().message, "PLAYING");
+  assert.equal(game.entities.get("player")!.body!.health, 8, "heal eight before ooze takes one");
+  assert.equal(game.entities.get(ooze)!.body!.health, 19);
+  assert.equal(game.entities.get(buffId("healing", "player"))!.body!.health, 22);
+  assert.ok(game.ui.has("hud_healing") && game.ui.has("hud_ooze"));
+});
+
+test("healing reapplication combines maximum budgets without stacking, and idle frames do not heal", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  game.entities.get("player")!.body!.health = 4;
+  game.key("Digit1");
+  assert.equal(game.entities.get("player")!.body!.health, 12);
+  const before = JSON.stringify([...game.entities]); game.tick(500);
+  assert.equal(JSON.stringify([...game.entities]), before);
+  game.key("Digit1");
+  const id = buffId("healing", "player");
+  assert.equal(game.entities.get("player")!.body!.health, 20);
+  assert.equal(game.entities.get(id)!.body!.health, 22, "max(22, 30), then one eight-point tick");
+  assert.equal([...game.entities.values()].filter((entity) => entity.body?.kind === "buff_healing").length, 1);
+  game.click("wait"); assert.equal(game.entities.get(id)!.body!.health, 16, "the budget still advances at full HP");
+});
+
+test("a healing buff attached between whole ticks keeps its own fractional phase", () => {
+  const game = harness(); game.click("start"); game.click("hero_huntress"); game.click("begin_run"); removeMonsters(game);
+  putActor(game, "target", "chaser", { x: 13, z: 12 }, 1000);
+  game.entities.get("target")!.body!.cooldown = 100;
+  game.step(1, 0); assert.equal(turnCount(game), 0.5);
+  game.entities.get("player")!.body!.health = 4;
+  game.key("Digit1");
+  const id = buffId("healing", "player");
+  assert.equal(game.entities.get(id)!.body!.cooldown, 1.5);
+  assert.equal(game.entities.get("player")!.body!.health, 12);
+  game.step(1, 0); assert.equal(turnCount(game), 2);
+  assert.equal(game.entities.get(id)!.body!.cooldown, 2.5);
+  assert.equal(game.entities.get("player")!.body!.health, 18);
+});
+
+test("player buffs survive descending while environmental fire stays on the old floor", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const map = generateFloor(1337, 1); walk(game, map, map.exit);
+  game.entities.get("player")!.body!.health = 1; game.key("Digit1");
+  const id = buffId("healing", "player");
+  assert.equal(game.entities.get(id)!.body!.health, 22);
+  putActor(game, "old_fire", "fire_cell", { x: 12, z: 12 }, 2, 0);
+  game.click("descend");
+  assert.ok(!game.entities.has("old_fire"));
+  assert.equal(game.entities.get(id)!.body!.health, 16);
+  assert.ok(Number(game.entities.get("player")!.body!.health) >= 15);
+  removeMonsters(game); const before = JSON.stringify([...game.entities]); game.tick(100);
+  assert.equal(JSON.stringify([...game.entities]), before);
+});
+
+test("liquid flame targeting can be cancelled and rejects unseen tiles without spending anything", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const before = JSON.stringify([...game.entities]);
+  game.key("Digit2"); assert.ok(game.ui.has("target_prompt")); assert.equal(turnCount(game), 0);
+  game.tick(100); assert.equal(JSON.stringify([...game.entities]), before);
+  game.tapCell({ x: 4, z: 12 });
+  assert.equal(turnCount(game), 0); assert.ok(game.ui.has("target_prompt"));
+  assert.match([...game.ui.values()].flatMap((element) => element.text ?? []).join(" "), /current field of view/);
+  game.key("Escape"); assert.equal(game.state().message, "PLAYING"); assert.ok(!game.ui.has("target_prompt"));
+  game.key("KeyI"); assert.equal(game.ui.get("item_count_potion_liquid_flame")!.text, "1");
+  game.click("slot_potion_liquid_flame"); assert.equal(game.ui.get("use_potion_liquid_flame__label")!.text, "Throw");
+  game.click("use_potion_liquid_flame"); game.click("cancel_target");
+  assert.equal(turnCount(game), 0);
+  assert.equal(JSON.stringify([...game.entities]), before);
+});
+
+test("Chinese effect amounts and flame targeting remain usable in portrait and short landscape", () => {
+  for (const [width, height, mobile] of [[450, 800, true], [800, 320, false]] as const) {
+    const game = harness(width, height, mobile, new Map(), false, "zh-CN");
+    game.start(); removeMonsters(game);
+    putBuff(game, "healing", "player", 22); putBuff(game, "burning", "player", 7); putBuff(game, "ooze", "player", 19);
+    game.key("Digit2");
+    for (const [id, amount] of [["hud_healing", 22], ["hud_burning", 7], ["hud_ooze", 19]] as const) {
+      const label = game.ui.get(id)!;
+      assert.match(label.text!, /[\u4e00-\u9fff]/); assert.ok(label.text!.includes(`${amount}`));
+      assert.ok(measureText("zh-CN", label.text!, label.fontSize!) <= Number(label.style!.width));
+    }
+    const prompt = game.ui.get("target_prompt")!;
+    assert.match(prompt.text!, /投掷/);
+    for (const line of prompt.text!.split("\n")) assert.ok(measureText("zh-CN", line, prompt.fontSize!) <= Number(prompt.style!.width));
+    const before = JSON.stringify([...game.entities]);
+    game.holdButton("cancel_target"); game.tick(30); game.releaseButton();
+    assert.ok(!game.ui.has("target_prompt")); assert.equal(turnCount(game), 0);
+    assert.equal(JSON.stringify([...game.entities]), before);
+  }
+});
+
+test("a thrown flame potion creates real fire and burning instead of a fixed twelve-damage blast", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  putActor(game, "target", "chaser", { x: 13, z: 12 }, 1000);
+  game.entities.get("target")!.body!.cooldown = 100;
+  game.key("Digit2"); game.tapCell({ x: 14, z: 12 });
+  assert.equal(turnCount(game), 1); assert.ok(!game.ui.has("target_prompt"));
+  const damage = 1000 - Number(game.entities.get("target")!.body!.health);
+  assert.ok(damage >= 1 && damage <= 3);
+  assert.equal(game.entities.get(buffId("burning", "target"))!.body!.health, 7);
+  assert.ok(game.entities.has(buffId("burning", "player")), "the intercepted blast can burn the thrower too");
+  const cells = [...game.entities].filter(([, entity]) => entity.body?.kind === "fire_cell");
+  assert.ok(cells.length > 0);
+  const map = generateFloor(1337, 1);
+  for (const [id, entity] of cells) {
+    const point = cell(game, id);
+    const initial = Math.abs(point.x - 13) <= 1 && Math.abs(point.z - 12) <= 1;
+    assert.equal(entity.body!.health, initial ? 1 : 4, "new flammable neighbours receive four turns of fire");
+    if (!initial) assert.ok(["door", "open_door", "secret_door"].includes(terrainAt(map, point)));
+    assert.equal(entity.sprite!.path, "sprites/dungeon/fire.png");
+  }
+  const before = JSON.stringify([...game.entities]); game.tick(100);
+  assert.equal(JSON.stringify([...game.entities]), before);
+  game.key("KeyI"); assert.ok(!game.ui.has("slot_potion_liquid_flame"));
+});
+
+test("entering a fire field ignites the hero and water removes an already active burn without another hit", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const map = generateFloor(1337, 1); reveal(map, map.entrance);
+  const direction = [[-1, 0], [0, -1], [-1, -1], [1, -1]].find(([dx, dz]) => {
+    const step = { x: 12 + dx!, z: 12 + dz! }, impact = { x: 12 + 2 * dx!, z: 12 + 2 * dz! };
+    return terrainAt(map, step) === "floor" && passable(map, impact) && map.visible.has(cellKey(map, impact));
+  })!;
+  assert.ok(direction);
+  const [dx, dz] = direction as [number, number];
+  game.key("Digit2"); game.tapCell({ x: 12 + 2 * dx, z: 12 + 2 * dz });
+  assert.ok(!game.entities.has(buffId("burning", "player")));
+  game.step(dx, dz); assert.ok(game.entities.has(buffId("burning", "player")));
+  const water = map.tiles.findIndex((tile) => tile === "water"); assert.ok(water >= 0);
+  // Fixture placement isolates the water interaction from travel distance.
+  putActor(game, "player", "player", { x: water % 25, z: Math.floor(water / 25) }, 12);
+  game.click("wait");
+  assert.ok(!game.entities.has(buffId("burning", "player")));
+  assert.equal(game.entities.get("player")!.body!.health, 12);
+});
+
+test("fresh ooze hurts once in water, while an already active ooze washes off before damage", () => {
+  for (const acted of [false, true]) {
+    const game = harness(); game.start(); removeMonsters(game);
+    const map = generateFloor(1337, 1), water = map.tiles.findIndex((tile) => tile === "water");
+    putActor(game, "player", "player", { x: water % 25, z: Math.floor(water / 25) }, 12);
+    const id = putBuff(game, "ooze", "player", 20, acted);
+    game.click("wait"); assert.ok(!game.entities.has(id));
+    assert.equal(game.entities.get("player")!.body!.health, acted ? 12 : 11);
+  }
+});
+
+test("Goo applies the original twenty-tick ooze through the normal attack proc", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  putActor(game, "warden", "boss", { x: 13, z: 12 }, 40);
+  const id = buffId("ooze", "player");
+  for (let i = 0; i < 30 && !game.entities.has(id); i++) {
+    game.entities.get("player")!.body!.health = 1000;
+    game.entities.get("warden")!.body!.power = 2;
+    game.click("wait");
+  }
+  assert.equal(game.state().message, "PLAYING");
+  assert.equal(game.entities.get(id)!.body!.health, 19);
+  assert.equal(game.entities.get(id)!.body!.lifetime, 1);
+});
+
+test("burning death removes pending buffs and restart cannot inherit the previous effects", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  game.entities.get("player")!.body!.health = 1;
+  const id = putBuff(game, "burning", "player", 8);
+  game.entities.get(id)!.body!.power = 3;
+  game.click("wait"); assert.equal(game.state().message, "LOST");
+  assert.ok(!game.entities.has(id));
+  game.tick(100); assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
+  game.click("restart"); game.click("begin_run");
+  assert.equal(game.state().lives, 20);
+  assert.ok(![...game.entities.values()].some((entity) => entity.body?.kind?.toString().startsWith("buff_")));
+});
+
 test("real starting equipment can be inspected, removed and equipped without duplicating the item", () => {
   const game = harness(); game.start(); removeMonsters(game);
   game.key("KeyI"); game.click("gear_slot_1");
@@ -938,7 +1124,8 @@ test("backpack has upstream five-column grid and requires an item action confirm
     game.key("Escape"); assert.equal(game.state().message, "INVENTORY");
     game.item("potion_healing");
     assert.equal(game.state().message, "PLAYING"); assert.equal(turnCount(game), 1);
-    assert.equal(game.entities.get("player")!.body!.health, 20);
+    assert.equal(game.entities.get("player")!.body!.health, 12, "the first healing tick restores eight HP, not a full heal");
+    assert.equal(game.entities.get(buffId("healing", "player"))!.body!.health, 22);
   }
 });
 

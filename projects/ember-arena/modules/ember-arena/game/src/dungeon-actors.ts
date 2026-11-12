@@ -6,6 +6,7 @@ export const mobSprites: Record<EnemyKind, string> = { chaser: "rat", ranger: "g
 const frameSizes: Record<string, readonly [number, number]> = {
   warrior: [12, 15], mage: [12, 15], rogue: [12, 15], huntress: [12, 15],
   rat: [16, 15], gnoll: [12, 15], crab: [16, 16], goo: [20, 14],
+  fire: [4, 4],
 };
 
 export function cellPosition(id: string): Point {
