@@ -8,8 +8,8 @@ use gpui_kit::{
     SharedString, Styled, Subscription, Task, TitlebarOptions, Window, WindowBounds, WindowOptions,
     assets::{AllAssets, IconName},
     component::{
-        ActiveTheme, Disableable, Icon, Sizable,
-        button::{Button, ButtonCustomVariant, ButtonVariants},
+        ActiveTheme, Disableable, Icon, Sizable, WindowExt,
+        button::{Button, ButtonCustomVariant, ButtonVariant, ButtonVariants},
         input::{Input, InputEvent, InputState},
         scroll::ScrollableElement,
         spinner::Spinner,
@@ -78,10 +78,13 @@ impl Launcher {
                 let pending = this.update(cx, |this, cx| {
                     let download_changed = this.state.poll_download();
                     let release_changed = this.state.poll_remote_assets();
-                    if download_changed || release_changed {
+                    let cleanup_changed = this.state.poll_cleanup();
+                    if download_changed || release_changed || cleanup_changed {
                         cx.notify();
                     }
-                    this.state.result.is_some() || this.state.remote_assets_result.is_some()
+                    this.state.result.is_some()
+                        || this.state.remote_assets_result.is_some()
+                        || this.state.cleanup_result.is_some()
                 });
                 if !matches!(pending, Ok(true)) {
                     break;
@@ -102,6 +105,34 @@ impl Launcher {
         self.state.start_download();
         self._updates = Self::watch_pending(cx);
         cx.notify();
+    }
+
+    fn confirm_cleanup(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.state.resources_busy() {
+            return;
+        }
+        let view = cx.weak_entity();
+        window.open_alert_dialog(cx, move |dialog, _, _| {
+            let view = view.clone();
+            dialog
+                .confirm()
+                .title("Clear local game resources?")
+                .description("Close running games first. This removes downloaded game assets and the current game selection. Logs, bundled demo resources, and other files outside asset folders are kept. You can download games again from Discover.")
+                .ok_text("Clear resources")
+                .ok_variant(ButtonVariant::Danger)
+                .cancel_text("Cancel")
+                .on_ok(move |_, _, cx| {
+                    view.update(cx, |this, cx| {
+                        if this.state.resources_busy() {
+                            return false;
+                        }
+                        this.state.start_cleanup();
+                        this._updates = Self::watch_pending(cx);
+                        cx.notify();
+                        true
+                    }).unwrap_or(false)
+                })
+        });
     }
 
     fn navigation(&self, compact: bool, cx: &mut Context<Self>) -> impl IntoElement {
@@ -174,6 +205,18 @@ impl Launcher {
                             cx.notify();
                         }
                     })),
+            )
+            .child(
+                Button::new("clear-resources")
+                    .custom(
+                        sidebar_button_style(false, cx)
+                            .foreground(tone(0xE6AA96, 0xE8A993, cx).into()),
+                    )
+                    .icon(IconName::Trash)
+                    .when(!compact, |button| button.label("Clear resources"))
+                    .tooltip("Clear downloaded game resources")
+                    .disabled(self.state.resources_busy())
+                    .on_click(cx.listener(|this, _, window, cx| this.confirm_cleanup(window, cx))),
             )
             .when(!compact, |view| {
                 view.child(
@@ -252,7 +295,9 @@ impl Launcher {
                     .icon(IconName::RefreshCw)
                     .when(!compact, |button| button.label("Refresh"))
                     .disabled(
-                        self.page == Page::Downloads && self.state.remote_assets_result.is_some(),
+                        self.state.resources_busy()
+                            || (self.page == Page::Downloads
+                                && self.state.remote_assets_result.is_some()),
                     )
                     .tooltip("Refresh this page")
                     .on_click(cx.listener(|this, _, _, cx| {
@@ -336,7 +381,7 @@ impl Launcher {
                                     .icon(IconName::Play)
                                     .label("Play now")
                                     .h(px(42.))
-                                    .disabled(self.state.downloading)
+                                    .disabled(self.state.resources_busy())
                                     .on_click(cx.listener(move |this, _, _, cx| {
                                         this.state.start_installed_game(&project);
                                         cx.notify();
@@ -451,7 +496,7 @@ impl Launcher {
                     .icon(IconName::Play)
                     .tooltip("Start this game")
                     .when(!compact, |button| button.label("Play"))
-                    .disabled(self.state.downloading)
+                    .disabled(self.state.resources_busy())
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.state.start_installed_game(&project);
                         cx.notify();
@@ -524,7 +569,7 @@ impl Launcher {
                 .child(
                     Input::new(&self.url_input)
                         .id("package-url")
-                        .disabled(self.state.downloading),
+                        .disabled(self.state.resources_busy()),
                 )
                 .child(
                     div()
@@ -538,7 +583,7 @@ impl Launcher {
                                 .primary()
                                 .icon(IconName::Download)
                                 .label("Install & play")
-                                .disabled(self.state.downloading)
+                                .disabled(self.state.resources_busy())
                                 .on_click(cx.listener(|this, _, _, cx| this.install_url(cx))),
                         ),
                 ),
@@ -596,7 +641,7 @@ impl Launcher {
                     .icon(IconName::Download)
                     .when(!compact, |button| button.label("Install & play"))
                     .tooltip(super::release_asset_label(asset))
-                    .disabled(self.state.downloading)
+                    .disabled(self.state.resources_busy())
                     .on_click(cx.listener(move |this, _, _, cx| this.install_asset(&download, cx))),
             )
     }
@@ -617,9 +662,18 @@ impl Launcher {
                 view.child(Spinner::new().small().color(cx.theme().primary))
                     .child("Downloading & installing. Your game will start when ready.")
             })
-            .when(!self.state.downloading, |view| {
+            .when(self.state.clearing, |view| {
+                view.child(Spinner::new().small().color(cx.theme().primary))
+                    .child("Clearing local game resources...")
+            })
+            .when(!self.state.resources_busy(), |view| {
                 view.child(div().size(px(6.)).rounded_full().bg(rgb(0x839571)))
-                    .child("Ready to play")
+                    .child(
+                        self.state
+                            .status_message
+                            .clone()
+                            .unwrap_or_else(|| "Ready to play".to_owned()),
+                    )
                     .child(div().flex_1())
                     .child("Bevy RuneWeave")
             })
@@ -848,12 +902,15 @@ mod tests {
         LauncherApp {
             url: String::new(),
             downloading: false,
+            clearing: false,
+            status_message: None,
             installed_games: Vec::new(),
             active_project: None,
             remote_release_tag: Some("test-release".to_owned()),
             remote_assets: super::super::fallback_release_assets(),
             error: None,
             result: None,
+            cleanup_result: None,
             remote_assets_result: None,
         }
     }
@@ -866,6 +923,7 @@ mod tests {
     ) -> (AnyWindowHandle, Entity<Launcher>) {
         cx.update(|cx| {
             gpui_kit::init(cx);
+            cx.set_reduce_motion(true);
             configure_theme(cx.window_appearance().into(), cx);
             gpui_kit::open_window(
                 WindowOptions {
@@ -911,6 +969,61 @@ mod tests {
             );
             window.click("dismiss-error", cx);
             assert!(content.read(cx).state.error.is_none());
+        })
+        .unwrap();
+    }
+
+    #[gpui_kit::test]
+    fn clearing_resources_requires_confirmation_and_cancel_keeps_state(cx: &mut TestAppContext) {
+        let (handle, content) = open(state(), 1040., 740., cx);
+        cx.update_window(handle, |_, window, cx| {
+            window.click("clear-resources", cx);
+        })
+        .unwrap();
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert!(window.has_active_dialog(cx));
+            assert!(!content.read(cx).state.clearing);
+            assert!(content.read(cx).state.cleanup_result.is_none());
+            window.within("dialog").click("cancel", cx);
+        })
+        .unwrap();
+        cx.update_window(handle, |_, window, cx| {
+            assert!(!window.has_active_dialog(cx));
+            assert!(!content.read(cx).state.clearing);
+            assert!(content.read(cx).state.cleanup_result.is_none());
+        })
+        .unwrap();
+    }
+
+    #[gpui_kit::test]
+    fn cleanup_blocks_installs_refresh_and_repeated_cleanup(cx: &mut TestAppContext) {
+        let mut initial = state();
+        initial.clearing = true;
+        let (handle, content) = open(initial, 560., 440., cx);
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert_eq!(window.find("clear-resources").disabled(), Some(true));
+            assert_eq!(window.find("refresh").disabled(), Some(true));
+            window.click("clear-resources", cx);
+            assert!(!window.has_active_dialog(cx));
+            window.click("Discover", cx);
+            assert_eq!(window.find("install-url").disabled(), Some(true));
+            assert_eq!(
+                window
+                    .find("download-script-squadron-typescript.zip")
+                    .disabled(),
+                Some(true)
+            );
+            content.update(cx, |view, _| {
+                view.state.url = "https://example.com/game.zip".to_owned();
+                view.state.start_download();
+                view.state.start_installed_game("demo");
+                view.state.start_cleanup();
+                assert!(view.state.result.is_none());
+                assert!(view.state.cleanup_result.is_none());
+                assert!(view.state.active_project.is_none());
+            });
         })
         .unwrap();
     }

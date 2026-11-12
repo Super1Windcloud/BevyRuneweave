@@ -115,12 +115,15 @@ struct InstalledGame {
 struct LauncherApp {
     url: String,
     downloading: bool,
+    clearing: bool,
+    status_message: Option<String>,
     installed_games: Vec<InstalledGame>,
     active_project: Option<String>,
     remote_release_tag: Option<String>,
     remote_assets: Vec<ReleaseAsset>,
     error: Option<String>,
     result: Option<Receiver<Result<(), String>>>,
+    cleanup_result: Option<Receiver<Result<(), String>>>,
     remote_assets_result: Option<Receiver<RemoteAssetsResult>>,
 }
 
@@ -129,12 +132,15 @@ impl LauncherApp {
         let mut app = Self {
             url: String::new(),
             downloading: false,
+            clearing: false,
+            status_message: None,
             installed_games: Vec::new(),
             active_project: None,
             remote_release_tag: None,
             remote_assets: Vec::new(),
             error: None,
             result: None,
+            cleanup_result: None,
             remote_assets_result: Some(fetch_remote_assets()),
         };
         if let Err(error) = app.refresh_installed_games() {
@@ -151,6 +157,10 @@ impl LauncherApp {
     }
 
     fn start_installed_game(&mut self, project: &str) {
+        if self.resources_busy() {
+            return;
+        }
+        self.status_message = None;
         let result = platform_data_root()
             .and_then(|root| write_active_project(&root, project))
             .and_then(|()| launch_runtime_process());
@@ -164,9 +174,10 @@ impl LauncherApp {
     }
 
     fn start_download(&mut self) {
-        if self.downloading {
+        if self.resources_busy() {
             return;
         }
+        self.status_message = None;
         let url = self.url.trim().to_owned();
         if url.is_empty() {
             self.error = Some("Enter an asset package URL".to_owned());
@@ -214,6 +225,47 @@ impl LauncherApp {
         self.error = None;
     }
 
+    fn resources_busy(&self) -> bool {
+        self.downloading || self.clearing
+    }
+
+    fn start_cleanup(&mut self) {
+        if self.resources_busy() {
+            return;
+        }
+        let (sender, receiver) = mpsc::channel();
+        self.clearing = true;
+        self.error = None;
+        self.status_message = None;
+        self.cleanup_result = Some(receiver);
+        thread::spawn(move || {
+            let result = platform_data_root().and_then(|root| clear_local_game_resources_at(&root));
+            let _ = sender.send(result);
+        });
+    }
+
+    fn poll_cleanup(&mut self) -> bool {
+        let Some(receiver) = &self.cleanup_result else {
+            return false;
+        };
+        let result = match receiver.try_recv() {
+            Ok(result) => result,
+            Err(mpsc::TryRecvError::Empty) => return false,
+            Err(mpsc::TryRecvError::Disconnected) => {
+                Err("Cleanup worker stopped unexpectedly".to_owned())
+            }
+        };
+        self.cleanup_result = None;
+        self.clearing = false;
+        // A failed deletion may have removed some assets; always reconcile the list.
+        let refreshed = self.refresh_installed_games();
+        self.error = result.and(refreshed).err();
+        if self.error.is_none() {
+            self.status_message = Some("Local game resources cleared".to_owned());
+        }
+        true
+    }
+
     fn poll_remote_assets(&mut self) -> bool {
         let Some(receiver) = &self.remote_assets_result else {
             return false;
@@ -235,6 +287,80 @@ impl LauncherApp {
             Err(error) => self.error = Some(format!("Could not load release assets: {error}")),
         }
         true
+    }
+}
+
+fn clear_local_game_resources_at(root: &Path) -> Result<(), String> {
+    let metadata = match fs::symlink_metadata(root) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(format!("Could not inspect resource directory: {error}")),
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err("Resource directory must be a regular directory, not a link".to_owned());
+    }
+
+    let marker = root.join(ACTIVE_PROJECT_FILE);
+    match fs::symlink_metadata(&marker) {
+        Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {
+            return Err(
+                "Active project marker is a directory; resources were not cleared".to_owned(),
+            );
+        }
+        Err(error) if error.kind() != io::ErrorKind::NotFound => {
+            return Err(format!("Could not inspect active project marker: {error}"));
+        }
+        _ => {}
+    }
+
+    // Inventory every owned asset folder before deleting anything. Leave parent
+    // directories, logs, unrelated files, staging/backup folders and bundled assets alone.
+    let mut targets = Vec::new();
+    for entry in fs::read_dir(root).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let file_type = entry.file_type().map_err(|error| error.to_string())?;
+        if file_type.is_symlink()
+            && (name == "assets" || entry.path().join("assets").join(CONFIG_FILE).is_file())
+        {
+            return Err(format!(
+                "Resources at {name} are linked; resources were not cleared"
+            ));
+        }
+        if name == "assets" && entry.path().join(CONFIG_FILE).is_file() {
+            if file_type.is_dir() {
+                targets.push(entry.path());
+            }
+            continue;
+        }
+        if !file_type.is_dir() || project_directory_name(name).as_deref() != Ok(name) {
+            continue;
+        }
+        let assets = entry.path().join("assets");
+        match fs::symlink_metadata(&assets) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(format!(
+                    "Assets for {name} are linked; resources were not cleared"
+                ));
+            }
+            Ok(metadata) if metadata.is_dir() && assets.join(CONFIG_FILE).is_file() => {
+                targets.push(assets);
+            }
+            Err(error) if error.kind() != io::ErrorKind::NotFound => {
+                return Err(format!("Could not inspect assets for {name}: {error}"));
+            }
+            _ => {}
+        }
+    }
+    for assets in targets {
+        fs::remove_dir_all(&assets)
+            .map_err(|error| format!("Could not clear {}: {error}", assets.display()))?;
+    }
+    match fs::remove_file(&marker) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("Could not clear active project marker: {error}")),
     }
 }
 
@@ -1169,6 +1295,100 @@ mod tests {
     use flate2::{Compression, write::GzEncoder};
     use lzma_rust2::{XzOptions, XzWriter};
     use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
+
+    #[test]
+    fn clears_only_installed_assets_and_selection_while_preserving_other_files() {
+        let root = tempfile::tempdir().unwrap();
+        for name in ["Alpha", "Beta"] {
+            install_downloaded_package(
+                root.path(),
+                &asset_package_zip_for("", name, "1.0", "lua", "main.lua"),
+                "game.zip",
+            )
+            .unwrap();
+        }
+        fs::write(root.path().join("alpha/save.json"), b"keep saved progress").unwrap();
+        fs::create_dir_all(root.path().join("logs")).unwrap();
+        fs::write(root.path().join("logs/launcher.log"), b"keep logs").unwrap();
+        fs::write(root.path().join("preferences.json"), b"keep preferences").unwrap();
+        for directory in ["assets", "broken/assets", ".installing-hidden/assets"] {
+            fs::create_dir_all(root.path().join(directory)).unwrap();
+            fs::write(root.path().join(directory).join(CONFIG_FILE), b"{}").unwrap();
+        }
+        fs::create_dir_all(root.path().join("unrelated/assets")).unwrap();
+        fs::write(
+            root.path().join("unrelated/assets/notes.txt"),
+            b"keep unrelated files",
+        )
+        .unwrap();
+
+        clear_local_game_resources_at(root.path()).unwrap();
+
+        for directory in ["alpha/assets", "beta/assets", "assets", "broken/assets"] {
+            assert!(!root.path().join(directory).exists(), "{directory}");
+        }
+        assert!(!root.path().join(ACTIVE_PROJECT_FILE).exists());
+        for file in [
+            "alpha/save.json",
+            "logs/launcher.log",
+            "preferences.json",
+            "unrelated/assets/notes.txt",
+            ".installing-hidden/assets/engineConfig.json",
+        ] {
+            assert!(root.path().join(file).is_file(), "{file}");
+        }
+        let (games, active) = installed_games_at(root.path()).unwrap();
+        assert!(games.is_empty());
+        assert!(active.is_none());
+        clear_local_game_resources_at(root.path()).unwrap();
+    }
+
+    #[test]
+    fn cleanup_of_a_missing_directory_is_a_no_op() {
+        let parent = tempfile::tempdir().unwrap();
+        let root = parent.path().join("not-installed");
+        clear_local_game_resources_at(&root).unwrap();
+        assert!(!root.exists());
+    }
+
+    #[test]
+    fn cleanup_refuses_an_invalid_marker_before_removing_assets() {
+        let root = tempfile::tempdir().unwrap();
+        install_downloaded_package(root.path(), &asset_package_zip(""), "game.zip").unwrap();
+        fs::remove_file(root.path().join(ACTIVE_PROJECT_FILE)).unwrap();
+        fs::create_dir(root.path().join(ACTIVE_PROJECT_FILE)).unwrap();
+        assert!(clear_local_game_resources_at(root.path()).is_err());
+        assert!(root.path().join("test/assets/engineConfig.json").is_file());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cleanup_does_not_follow_links_outside_the_resource_directory() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        fs::write(external.path().join(CONFIG_FILE), b"{}").unwrap();
+        fs::write(external.path().join("keep.txt"), b"external resource").unwrap();
+        install_downloaded_package(root.path(), &asset_package_zip(""), "game.zip").unwrap();
+        fs::create_dir(root.path().join("linked")).unwrap();
+        symlink(external.path(), root.path().join("linked/assets")).unwrap();
+
+        assert!(clear_local_game_resources_at(root.path()).is_err());
+        assert!(root.path().join("test/assets/engineConfig.json").is_file());
+        assert!(root.path().join(ACTIVE_PROJECT_FILE).is_file());
+        assert!(external.path().join("keep.txt").is_file());
+
+        fs::remove_file(root.path().join("linked/assets")).unwrap();
+        symlink(external.path(), root.path().join("test/assets/external")).unwrap();
+        clear_local_game_resources_at(root.path()).unwrap();
+        assert!(!root.path().join("test/assets").exists());
+        assert!(external.path().join("keep.txt").is_file());
+
+        symlink(external.path(), root.path().join("assets")).unwrap();
+        assert!(clear_local_game_resources_at(root.path()).is_err());
+        assert!(external.path().join("keep.txt").is_file());
+    }
 
     #[test]
     fn release_logs_are_separate_for_launcher_and_runtime() {

@@ -19,6 +19,16 @@ The launcher lists every valid installed project with its name, version, and scr
 Starting a list item updates `active-project` before spawning the runtime process. Use the refresh
 command after changing the application-data directory outside the launcher.
 
+Use **Clear resources** beside **Resource folder** to remove downloaded game assets. A confirmation
+dialog asks you to close running games first. Cleanup removes installed `<project>/assets` folders
+identified by `engineConfig.json`, the legacy `assets` folder when it contains that file, and the
+`active-project` marker. It preserves project-parent files, logs, bundled resources, unrelated
+folders, and hidden installation staging/backup folders. Linked resource roots or asset folders
+are rejected before deletion; nested links are removed without following their targets.
+Cleanup runs in the background and blocks downloads, game launches, refresh, and repeated cleanup.
+The game list is refreshed afterward, including after a partial failure; errors stay visible and
+successful cleanup is reported in the status bar.
+
 Supported package formats:
 
 - ZIP and tar archives
