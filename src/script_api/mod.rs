@@ -31,8 +31,8 @@ use storage::{
     ScriptStorage, clear_detached_storage_bindings, storage_read, storage_remove, storage_write,
 };
 use ui::{
-    ScriptUiNode, ui_button_just_pressed, ui_clear, ui_despawn, ui_set_image, ui_set_style,
-    ui_set_text, ui_spawn,
+    ScriptUiNode, ui_button_just_pressed, ui_clear, ui_despawn, ui_set_font, ui_set_image,
+    ui_set_style, ui_set_text, ui_spawn,
 };
 
 const MAX_ENTITY_ID_LENGTH: usize = 128;
@@ -164,7 +164,12 @@ fn scene_set_sprite(
     let asset_server = world
         .with_world(|raw_world| raw_world.get_resource::<AssetServer>().cloned())?
         .ok_or_else(|| InteropError::invariant("scene sprite API requires Bevy AssetPlugin"))?;
-    let image = asset_server.load(path);
+    let image = asset_server
+        .load_builder()
+        .with_settings(|settings: &mut bevy::image::ImageLoaderSettings| {
+            settings.sampler = bevy::image::ImageSampler::nearest();
+        })
+        .load(path);
     world.with_world_mut(|world| {
         let Some(entity) = find_owned_entity(world, &owner, &id) else {
             return false;
@@ -294,6 +299,34 @@ fn scene_set_3d_enabled(context: FunctionCallContext, enabled: bool) -> Result<b
         } else if enabled {
             world.entity_mut(camera_3d).insert(IsDefaultUiCamera);
         }
+        true
+    })
+}
+
+fn scene_set_camera_2d(
+    context: FunctionCallContext,
+    x: f32,
+    y: f32,
+    viewport_height: f32,
+) -> Result<bool, InteropError> {
+    if ![x, y, viewport_height]
+        .iter()
+        .all(|value| value.is_finite())
+        || viewport_height <= 0.0
+    {
+        return Ok(false);
+    }
+    context.world()?.with_world_mut(|world| {
+        let mut query = world.query_filtered::<(&mut Transform, &mut Projection), With<Camera2d>>();
+        let Some((mut transform, mut projection)) = query.iter_mut(world).next() else {
+            return false;
+        };
+        let Projection::Orthographic(ref mut projection) = *projection else {
+            return false;
+        };
+        transform.translation.x = x;
+        transform.translation.y = y;
+        projection.scaling_mode = bevy::camera::ScalingMode::FixedVertical { viewport_height };
         true
     })
 }
@@ -652,6 +685,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("scene_set_transform_3d", scene_set_transform_3d)
             .register("scene_play_animation", scene_play_animation)
             .register("scene_set_3d_enabled", scene_set_3d_enabled)
+            .register("scene_set_camera_2d", scene_set_camera_2d)
             .register("scene_set_transform", scene_set_transform)
             .register("scene_set_text", scene_set_text)
             .register("scene_despawn", scene_despawn)
@@ -661,6 +695,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("ui_set_style", ui_set_style)
             .register("ui_set_text", ui_set_text)
             .register("ui_set_image", ui_set_image)
+            .register("ui_set_font", ui_set_font)
             .register("ui_button_just_pressed", ui_button_just_pressed)
             .register("ui_despawn", ui_despawn)
             .register("ui_clear", ui_clear)

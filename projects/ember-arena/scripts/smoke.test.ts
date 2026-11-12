@@ -20,7 +20,7 @@ import { defaultProfile, parseProfile } from "../modules/ember-arena/game/src/pr
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
 type RecordValue = { [key: string]: unknown };
 interface Entity { transform: RecordValue; body?: RecordValue; model?: string; sprite?: { path: string; width: number; height: number } }
-interface Ui { parent: string; text?: string; style?: RecordValue }
+interface Ui { parent: string; text?: string; style?: RecordValue; image?: string; font?: string }
 
 // Platform doubles for deterministic gameplay tests, not runtime acceptance.
 // Real BMS references and Lua/QuickJS parity are tested in Rust separately.
@@ -44,6 +44,7 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
   let exitRequested = false;
   let storageFailure = "";
   let pointer = { pressed: false, justPressed: false, x: 0, y: 0, viewportWidth: width / height * 800, viewportHeight: 800 };
+  let camera = { x: 0, y: 0, height: 800 };
   const despawnUi = (id: string): boolean => {
     if (!ui.has(id)) return false;
     for (const [child, element] of [...ui]) if (element.parent === id) despawnUi(child);
@@ -78,6 +79,7 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
     },
     scene_play_animation: (id: string, path: string) => entities.has(id) && existsSync(resolve(assets, path)),
     scene_set_3d_enabled: () => true,
+    scene_set_camera_2d: (x: number, y: number, height: number) => { camera = { x, y, height }; return true; },
     scene_set_sprite: (id: string, path: string, width: number, height: number) => {
       if (!entities.has(id) || !existsSync(resolve(assets, path))) return false;
       entities.get(id)!.sprite = { path, width, height }; return true;
@@ -108,7 +110,14 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
       if (!ui.has(id)) return false;
       ui.get(id)!.text = value; return true;
     },
-    ui_set_image: (id: string, path: string) => ui.has(id) && existsSync(resolve(assets, path)),
+    ui_set_image: (id: string, path: string) => {
+      if (!ui.has(id) || !existsSync(resolve(assets, path))) return false;
+      ui.get(id)!.image = path; return true;
+    },
+    ui_set_font: (id: string, path: string) => {
+      if (!ui.has(id) || !existsSync(resolve(assets, path))) return false;
+      ui.get(id)!.font = path; return true;
+    },
     ui_despawn: despawnUi,
     ui_button_just_pressed: (id: string) => {
       if (stickyUi && ++buttonPolls > 100) throw new Error("UI callbacks revisited a remounted tree");
@@ -135,10 +144,24 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
     for (let frame = 0; frame < count; frame++) { buttonPolls = 0; context.on_update(0.05); pressed.clear(); clicks.clear(); pointer.justPressed = false; }
   };
   return { entities, ui, keys, pressed, tick, context, saves,
+    start: () => { clicks.add("start"); tick(); clicks.add("begin_run"); tick(); },
+    item: (item: string) => { clicks.add(`slot_${item}`); tick(); clicks.add(`use_${item}`); tick(); },
+    setting: (id: string) => {
+      const tab = id === "sensitivity" ? 2 : ["hints", "motion"].includes(id) ? 1 : 3;
+      clicks.add(`settings_tab_${tab}`); tick(); assert.ok(ui.has(id), `Missing setting ${id}`); clicks.add(id); tick();
+    },
     failStorage: (error = "") => { storageFailure = error; },
     state: () => state,
     click: (id: string) => { assert.ok(ui.has(id), `Missing button ${id}`); clicks.add(id); tick(); },
     pointer: (value: Partial<typeof pointer>) => { pointer = { ...pointer, ...value }; },
+    camera: () => camera,
+    tapCell: (point: Point) => {
+      const size = entities.get("terrain_312")!.sprite!.width;
+      pointer = { ...pointer, pressed: true, justPressed: true,
+        x: ((point.x - 12) * size - camera.x) * 800 / camera.height,
+        y: ((12 - point.z) * size - 40 - camera.y) * 800 / camera.height };
+      tick();
+    },
     exitRequested: () => exitRequested,
     resize: (w: number, h: number) => { width = w; height = h; pointer.viewportWidth = w / h * 800; },
     key: (key: string) => { pressed.add(key); tick(); },
@@ -155,13 +178,13 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
 test("menu, movement, pause, restart, diagnostics and host exit", () => {
   const game = harness();
   assert.equal(game.state().message, "MENU");
-  game.click("start");
+  game.start();
   game.keys.add("KeyD"); game.tick(4); game.keys.clear();
   assert.ok((game.entities.get("player")!.transform.translation as { x: number }).x > 0);
   game.click("pause");
   const before = JSON.stringify([...game.entities]); game.tick(20);
   assert.equal(JSON.stringify([...game.entities]), before, "pause must freeze the world");
-  game.click("checks");
+  game.key("F12");
   const results: string[] = [];
   for (let page = 0; page < 2; page++) {
     results.push(...[...game.ui.values()].flatMap((element) => element.text ?? []));
@@ -172,24 +195,24 @@ test("menu, movement, pause, restart, diagnostics and host exit", () => {
   game.click("network"); game.tick();
   assert.match(game.ui.get("network_status")!.text!, /PASS GET 200/);
   assert.match(game.ui.get("network_status")!.text!, /PASS POST 200/);
-  game.click("back"); game.click("restart");
+  game.click("back"); game.click("home"); game.start();
   assert.equal(game.state().lives, 20);
   assert.equal([...game.entities.values()].filter((value) => value.body?.kind === "chaser").length, 8);
-  game.click("pause"); game.click("exit");
+  game.click("pause"); game.click("home"); game.click("exit");
   assert.ok(game.exitRequested());
 });
 test("portrait touch, native safe area and reload reset", () => {
   const game = harness(450, 800, true);
-  game.click("start");
+  game.start();
   assert.notEqual(game.ui.get("safe_root")!.style!.top, "0%");
-  game.pointer({ pressed: true, justPressed: true, x: game.entities.get("player")!.sprite!.width, y: -40 }); game.tick();
+  game.tapCell({ x: 13, z: 12 });
   assert.ok((game.entities.get("player")!.transform.translation as { x: number }).x > 0);
   game.context.on_script_reloaded();
   assert.equal(game.state().message, "MENU");
   assert.equal([...game.entities.values()].filter((value) => value.body).length, 1);
 });
 test("contact damage ends a run and restart removes hostile actors", () => {
-  const game = harness(); game.click("start");
+  const game = harness(); game.start();
   game.entities.get("player")!.body!.health = 1;
   game.entities.set("lethal", {
     transform: { translation: { x: 22, y: -40, z: 2 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } },
@@ -197,7 +220,7 @@ test("contact damage ends a run and restart removes hostile actors", () => {
   });
   for (let turn = 0; turn < 20 && game.state().message === "PLAYING"; turn++) game.click("wait");
   assert.equal(game.state().message, "LOST");
-  game.click("restart"); assert.ok(!game.entities.has("lethal"));
+  game.click("restart"); game.click("begin_run"); assert.ok(!game.entities.has("lethal"));
   assert.equal(game.state().lives, 20);
 });
 test("downloaded GLBs contain an embedded texture and walking clip", () => {
@@ -215,31 +238,32 @@ test("downloaded GLBs contain an embedded texture and walking clip", () => {
 test("settings persist across sessions, and reset requires confirmation", () => {
   const saves = new Map<string, string>();
   const game = harness(1280, 800, false, saves);
-  game.click("settings"); game.click("sensitivity"); game.click("hints"); game.click("motion"); game.click("seed");
+  game.click("settings"); game.setting("sensitivity"); game.setting("hints"); game.setting("motion"); game.setting("seed");
   const saved = parseProfile(saves.get("profile")!);
   assert.equal(saved.sensitivity, 1.25); assert.equal(saved.showHints, false);
   assert.equal(saved.reducedMotion, true); assert.equal(saved.seed, 1338);
   const reopened = harness(1280, 800, false, saves);
-  reopened.click("settings"); assert.match(reopened.ui.get("sensitivity__label")!.text!, /1.25x/);
-  reopened.click("reset_save"); assert.ok(saves.has("profile"));
+  reopened.click("settings"); reopened.click("settings_tab_2"); assert.match(reopened.ui.get("sensitivity__label")!.text!, /1.25x/);
+  reopened.setting("reset_save"); assert.ok(saves.has("profile"));
   reopened.click("cancel_reset"); assert.ok(saves.has("profile"));
-  reopened.click("reset_save"); reopened.click("confirm_reset"); assert.ok(!saves.has("profile"));
-  reopened.click("settings_back"); reopened.click("start");
-  assert.equal(reopened.ui.get("hint")!.style!.display, "flex");
+  reopened.setting("reset_save"); reopened.click("confirm_reset"); assert.ok(!saves.has("profile"));
+  reopened.key("Escape"); reopened.start();
+  assert.equal(reopened.state().message, "PLAYING");
 });
 test("incompatible saves are preserved until an explicit reset", () => {
   const saves = new Map([["profile", "{\"schemaVersion\":99,\"valuable\":true}"]]);
-  const game = harness(1280, 800, false, saves); game.click("settings");
+  const game = harness(1280, 800, false, saves); game.click("settings"); game.click("settings_tab_3");
   assert.match(game.ui.get("save_notice")!.text!, /will not be overwritten/);
-  game.click("hints"); game.click("retry_save");
+  game.setting("hints"); game.setting("retry_save");
   assert.equal(saves.get("profile"), "{\"schemaVersion\":99,\"valuable\":true}");
-  game.click("settings_back"); game.click("start"); assert.equal(game.state().message, "PLAYING");
+  game.key("Escape"); game.start(); assert.equal(game.state().message, "PLAYING");
 });
 test("failed saves can be retried and a finished run is counted once", () => {
-  const game = harness(); game.click("settings"); game.failStorage("io"); game.click("hints");
+  const game = harness(); game.click("settings"); game.failStorage("io"); game.setting("hints");
+  game.click("settings_tab_3");
   assert.match(game.ui.get("save_notice")!.text!, /Save failed/);
-  game.failStorage(); game.click("retry_save"); assert.equal(parseProfile(game.saves.get("profile")!).showHints, false);
-  game.click("settings_back"); game.click("start");
+  game.failStorage(); game.setting("retry_save"); assert.equal(parseProfile(game.saves.get("profile")!).showHints, false);
+  game.key("Escape"); game.start();
   game.entities.get("player")!.body!.health = 1;
   game.entities.set("lethal", {
     transform: { translation: { x: 22, y: -40, z: 2 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } },
@@ -254,11 +278,10 @@ test("seeded encounters replay exactly and landscape UI uses compact controls", 
   const first = seededRandom(1337); const second = seededRandom(1337);
   assert.deepEqual(Array.from({ length: 20 }, first), Array.from({ length: 20 }, second));
   assert.notEqual(seededRandom(1337)(), seededRandom(1338)());
-  const one = harness(); const two = harness(); one.click("start"); two.click("start"); one.tick(5); two.tick(5);
+  const one = harness(); const two = harness(); one.start(); two.start(); one.tick(5); two.tick(5);
   assert.deepEqual([...one.entities], [...two.entities]);
   const landscape = harness(800, 400, true); landscape.click("settings");
-  assert.equal(landscape.ui.get("settings_back")!.style!.height, 36);
-  assert.equal(landscape.ui.get("settings_input")!.style!.justifyContent, "space-between");
+  assert.equal(landscape.ui.get("settings_window")!.style!.width, 470);
 });
 test("save schema validation rejects bad statistics and nonfinite settings", () => {
   assert.deepEqual(parseProfile(JSON.stringify(defaultProfile())), defaultProfile());
@@ -266,37 +289,6 @@ test("save schema validation rejects bad statistics and nonfinite settings", () 
     { ...defaultProfile(), sensitivity: 100 }, { ...defaultProfile(), seed: 0x100000000 }, { ...defaultProfile(), showHints: "false" }]) {
     assert.throws(() => parseProfile(JSON.stringify(data)));
   }
-});
-
-test("in-game backpack inventory, item usage and hero class switching", () => {
-  const game = harness();
-  // Hero cycle in menu
-  assert.match(game.ui.get("hero_class_label")!.text!, /WARRIOR/);
-  game.click("hero_class");
-  assert.match(game.ui.get("hero_class_label")!.text!, /MAGE/);
-  game.click("hero_class");
-  assert.match(game.ui.get("hero_class_label")!.text!, /ROGUE/);
-  game.click("hero_class");
-  assert.match(game.ui.get("hero_class_label")!.text!, /HUNTRESS/);
-  game.click("hero_class");
-  assert.match(game.ui.get("hero_class_label")!.text!, /WARRIOR/);
-
-  // Start game and open backpack
-  game.click("start");
-  assert.equal(game.state().message, "PLAYING");
-  game.click("bag_btn");
-  assert.equal(game.state().message, "INVENTORY");
-  assert.match(game.ui.get("item_title_potion_healing")!.text!, /Potion of Healing/);
-
-  // Drink healing potion
-  game.entities.get("player")!.body!.health = 4;
-  game.click("use_potion_healing");
-  assert.equal(game.entities.get("player")!.body!.health, 20);
-
-  // Read upgrade scroll
-  game.click("bag_btn"); game.click("use_scroll_upgrade");
-  assert.equal(game.entities.get("player")!.body!.health, 20, "weapon upgrades do not grant HP");
-  assert.equal(game.state().message, "PLAYING");
 });
 
 test("official shattered pixel dungeon sprite assets exist and are valid", () => {
@@ -418,26 +410,26 @@ test("closed doors block vision, opening reveals the room, and memory retains te
 });
 
 test("waiting without input freezes actors, hunger and depth; blocked movement costs no turn", () => {
-  const game = harness(); game.click("start");
+  const game = harness(); game.start();
   const before = JSON.stringify([...game.entities]);
   game.tick(4000);
   assert.equal(JSON.stringify([...game.entities]), before);
-  assert.match(game.ui.get("hud_info")!.text!, /^TURN 0 /);
-  assert.match(game.ui.get("hud_wave")!.text!, /DEPTH 1/);
+  assert.equal(turnCount(game), 0);
+  assert.equal(game.ui.get("hud_wave")!.text, "1");
   removeMonsters(game);
   const map = generateFloor(1337, 1);
   const target = { x: 10, z: 10 };
   walk(game, map, target);
-  const turn = game.ui.get("hud_info")!.text;
+  const turn = turnCount(game);
   game.step(-1, -1); // The wall outside the north-west corner of the starting room.
   assert.deepEqual(cell(game), target);
-  assert.equal(game.ui.get("hud_info")!.text, turn);
+  assert.equal(turnCount(game), turn);
   game.key("Digit4");
-  assert.equal(game.ui.get("hud_info")!.text, turn, "an empty item slot consumes no turn");
+  assert.equal(turnCount(game), turn, "an empty item slot consumes no turn");
 });
 
 test("door opening costs one turn and keyboard movement lands exactly on a tile", () => {
-  const game = harness(); game.click("start"); removeMonsters(game);
+  const game = harness(); game.start(); removeMonsters(game);
   const map = generateFloor(1337, 1);
   const path = findPath(map, map.entrance, map.exit);
   const doorIndex = path.findIndex((point) => terrainAt(map, point) === "door");
@@ -452,8 +444,8 @@ test("door opening costs one turn and keyboard movement lands exactly on a tile"
 });
 
 test("stairs require the exit tile and preserve hero health and inventory across all five depths", () => {
-  const game = harness(); game.click("start");
-  game.click("descend"); assert.match(game.ui.get("hud_wave")!.text!, /DEPTH 1/);
+  const game = harness(); game.start();
+  game.click("descend"); assert.equal(game.ui.get("hud_wave")!.text, "1");
   game.entities.get("player")!.body!.health = 20;
   for (let depth = 1; depth < 5; depth++) {
     removeMonsters(game);
@@ -461,41 +453,41 @@ test("stairs require the exit tile and preserve hero health and inventory across
     walk(game, map, map.exit);
     game.click("descend");
     assert.deepEqual(cell(game), map.entrance);
-    assert.match(game.ui.get("hud_wave")!.text!, new RegExp(`DEPTH ${depth + 1}`));
+    assert.equal(game.ui.get("hud_wave")!.text, String(depth + 1));
     assert.equal(game.entities.get("player")!.body!.health, 20);
     assert.ok(game.entities.size < 200, "previous terrain and actors must be removed");
   }
   assert.equal(game.entities.get("warden")!.body!.health, 100);
-  assert.equal(game.ui.get("boss_panel")!.style!.display, "flex");
+  assert.ok(game.ui.has("boss_panel"));
   removeMonsters(game);
   putActor(game, "warden", "boss", { x: 13, z: 12 }, 1, 1);
   for (let attempt = 0; attempt < 5 && game.state().message === "PLAYING"; attempt++) game.step(1, 0);
   assert.equal(game.state().message, "WON");
-  assert.match(game.ui.get("victory_key_label")!.text!, /SKELETON KEY/);
+  assert.match(game.ui.get("result_title")!.text!, /Goo defeated/);
   assert.equal(parseProfile(game.saves.get("profile")!).wins, 1);
   game.tick(50); assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
-  game.click("restart");
-  assert.equal(game.state().lives, 20); assert.match(game.ui.get("hud_info")!.text!, /^TURN 0 /);
+  game.click("restart"); game.click("begin_run");
+  assert.equal(game.state().lives, 20); assert.equal(turnCount(game), 0);
 });
 
 test("bump attacks consume turns, break invisibility and never move into an occupied cell", () => {
-  const game = harness(); game.click("start"); removeMonsters(game);
+  const game = harness(); game.start(); removeMonsters(game);
   putActor(game, "target", "chaser", { x: 13, z: 12 });
   const health = game.state().lives;
   game.key("Digit3");
   assert.equal(game.state().lives, health, "invisible heroes cannot be attacked");
-  assert.match(game.ui.get("hud_info")!.text!, /INVISIBLE 20/);
+  assert.ok(game.ui.has("hud_invisible"));
   game.step(1, 0);
   assert.deepEqual(cell(game), { x: 12, z: 12 });
   assert.ok((game.entities.get("target")!.body!.health as number) < 1000);
-  assert.doesNotMatch(game.ui.get("hud_info")!.text!, /INVISIBLE/);
+  assert.ok(!game.ui.has("hud_invisible"));
   assert.ok([...game.ui.values()].some((node) => node.text?.includes("Surprise attack!")));
   const snapshot = JSON.stringify([...game.entities]); game.tick(100);
   assert.equal(JSON.stringify([...game.entities]), snapshot, "enemies only retaliate after an action");
 });
 
 test("magic mapping reveals terrain while hidden monsters and items stay hidden", () => {
-  const game = harness(); game.click("hero_class"); game.click("start"); game.key("Digit6");
+  const game = harness(); game.click("start"); game.click("hero_mage"); game.click("begin_run"); game.key("Digit6");
   const map = generateFloor(1337, 1);
   reveal(map, map.entrance);
   assert.equal([...game.entities.keys()].filter((id) => id.startsWith("terrain_")).length, 625);
@@ -507,13 +499,13 @@ test("magic mapping reveals terrain while hidden monsters and items stay hidden"
 });
 
 test("viewport changes preserve every real actor tile and update sprite dimensions", () => {
-  const game = harness(); game.click("start"); game.step(1, 0);
+  const game = harness(); game.start(); game.step(1, 0);
   const before = new Map([...game.entities].filter(([, entity]) => entity.body).map(([id]) => [id, cell(game, id)]));
   game.resize(450, 800); game.tick();
   assert.ok(game.entities.get("terrain_312")!.sprite!.width < 22);
   for (const [id, point] of before) assert.deepEqual(cell(game, id), point);
   game.resize(1280, 800); game.tick();
-  assert.equal(game.entities.get("terrain_312")!.sprite!.width, 22);
+  assert.equal(game.entities.get("terrain_312")!.sprite!.width, 16);
   for (const [id, point] of before) assert.deepEqual(cell(game, id), point);
 });
 
@@ -526,19 +518,19 @@ test("upstream basic sewer statistics, hero vitality and hunger boundaries", () 
 });
 
 test("hunger advances with turns, food takes three turns, and waiting grants no instant heal", () => {
-  const game = harness(); game.click("start"); removeMonsters(game);
+  const game = harness(); game.start(); removeMonsters(game);
   game.entities.get("player")!.body!.health = 4;
   game.click("wait");
   assert.equal(game.state().lives, 4);
   for (let turn = 1; turn < 301; turn++) game.click("wait");
-  assert.equal(game.ui.get("hud_hunger")!.text, "HUNGRY");
+  assert.equal(game.ui.get("hud_hunger")!.text, "Hungry");
   game.entities.get("player")!.body!.health = 4;
   game.key("Digit7");
   assert.equal(game.state().lives, 4, "food must not directly heal the hero");
-  assert.match(game.ui.get("hud_info")!.text!, /^TURN 304 /);
-  assert.equal(game.ui.get("hud_hunger")!.text, "SATIATED");
+  assert.equal(turnCount(game), 304);
+  assert.ok(!game.ui.has("hud_hunger"));
   for (let turn = 0; turn < 449; turn++) game.click("wait");
-  assert.equal(game.ui.get("hud_hunger")!.text, "STARVING");
+  assert.equal(game.ui.get("hud_hunger")!.text, "Starving");
   game.entities.get("player")!.body!.health = 20;
   for (let turn = 0; turn < 10; turn++) game.click("wait");
   assert.equal(game.state().lives, 19);
@@ -560,7 +552,7 @@ test("generated native sprites retain upstream frame sizes and manifest checksum
 });
 
 test("Goo charges before its burst and heals in water even while sleeping", () => {
-  const game = harness(); game.click("start"); removeMonsters(game);
+  const game = harness(); game.start(); removeMonsters(game);
   game.entities.get("player")!.body!.health = 100;
   putActor(game, "warden", "boss", { x: 13, z: 12 }, 40);
   game.entities.get("warden")!.body!.power = 1;
@@ -579,7 +571,7 @@ test("Goo charges before its burst and heals in water even while sleeping", () =
 });
 
 test("click walking stops at a door when a previously hidden enemy appears", () => {
-  const game = harness(); game.click("start"); removeMonsters(game);
+  const game = harness(); game.start(); removeMonsters(game);
   const map = generateFloor(1337, 1);
   const path = findPath(map, map.entrance, map.exit);
   const index = path.findIndex((point) => terrainAt(map, point) === "door");
@@ -587,42 +579,172 @@ test("click walking stops at a door when a previously hidden enemy appears", () 
   putActor(game, "hidden_rat", "chaser", path[index + 1]!);
   const size = game.entities.get("terrain_312")!.sprite!.width;
   const door = path[index]!, before = cell(game);
-  game.pointer({ justPressed: true, x: (door.x - 12) * size, y: (12 - door.z) * size - 40 });
+  game.tapCell(door);
   game.tick(20);
   assert.deepEqual(cell(game), before);
   assert.equal(game.entities.get(`terrain_${cellKey(map, door)}`)!.sprite!.path, "sprites/dungeon/open_door.png");
   assert.equal((game.entities.get("hidden_rat")!.transform.scale as { x: number }).x, 1);
 });
 
-test("compact landscape backpacks paginate every item without advancing turns", () => {
-  const game = harness(800, 400, true); game.click("start"); game.click("bag_btn");
-  const before = JSON.stringify([...game.entities]);
-  assert.ok(game.ui.has("use_potion_healing") && !game.ui.has("use_food_ration"));
-  assert.equal(game.ui.get("item_desc_potion_healing")!.style!.display, "none");
-  game.click("bag_page");
-  assert.ok(game.ui.has("use_food_ration") && game.ui.has("use_scroll_upgrade"));
-  assert.ok(!game.ui.has("use_potion_healing"));
-  assert.equal(JSON.stringify([...game.entities]), before);
-  game.click("bag_page"); assert.ok(game.ui.has("use_potion_healing"));
-  game.key("KeyI"); assert.equal(game.state().message, "PLAYING");
+
+function turnCount(game: Game): number { return Number(game.entities.get("player")!.body!.lifetime); }
+
+test("title uses upstream landscape banner, eight entrances, pixel font and integer zoom", () => {
+  const game = harness();
+  for (const id of ["start", "support", "rankings", "journal", "news", "settings", "changes", "about"]) assert.ok(game.ui.has(id));
+  assert.equal(game.ui.get("spd_banner")!.image, "sprites/spd-ui/title_land.png");
+  assert.deepEqual([game.ui.get("spd_banner")!.style!.width, game.ui.get("spd_banner")!.style!.height], [720, 171]);
+  assert.equal(game.ui.get("start__label")!.font, "fonts/spd-pixel.ttf");
+  assert.ok(!game.ui.has("panel_kicker") && !game.ui.has("hero_class_label"));
+  game.click("start"); assert.equal(game.state().message, "HEROES");
+  for (const hero of heroClassList) assert.equal(game.ui.get(`hero_icon_${hero}`)!.image, `sprites/spd-ui/hero_${hero}.png`);
+  game.click("hero_mage"); assert.equal(game.ui.get("hero_class_label")!.text, "Mage");
+  game.click("begin_run"); assert.equal(game.state().message, "PLAYING");
+  assert.equal(game.entities.get("player")!.sprite!.path, "sprites/dungeon/mage.png");
 });
 
-test("button callbacks can remount the same button without replaying a frame's press", () => {
-  const game = harness(800, 400, false, new Map(), true);
-  game.click("start"); game.click("bag_btn"); game.click("bag_page");
-  assert.equal(game.ui.get("bag_page__label")!.text, "PAGE 2 / 2 / NEXT");
-  assert.ok(game.ui.has("use_food_ration"));
-  game.tick(3);
-  assert.equal(game.ui.get("bag_page__label")!.text, "PAGE 2 / 2 / NEXT");
-  game.click("bag_page");
-  assert.equal(game.ui.get("bag_page__label")!.text, "PAGE 1 / 2 / NEXT");
+test("backpack has upstream five-column grid and requires an item action confirmation", () => {
+  for (const [width, height] of [[1280, 800], [450, 800], [800, 400]]) {
+    const game = harness(width, height); game.start(); game.click("bag_btn");
+    assert.equal([...game.ui.keys()].filter((key) => /^bag_slot_\d+$/.test(key) || key.startsWith("slot_")).length, 25);
+    if (width === 450) {
+      assert.equal(game.ui.get("bag_slot_0")!.style!.width, 78);
+      assert.equal(game.ui.get("bag_slot_0")!.style!.height, 84);
+      assert.equal(game.ui.get("bag_window")!.style!.height, 510);
+    }
+    assert.ok(!game.ui.has("bag_page"), "the original backpack is a grid in both orientations");
+    game.entities.get("player")!.body!.health = 4;
+    game.click("slot_potion_healing");
+    assert.equal(game.state().message, "ITEM"); assert.equal(turnCount(game), 0);
+    assert.equal(game.entities.get("player")!.body!.health, 4);
+    assert.equal(game.ui.get("item_detail_title")!.text, "Potion of Healing");
+    game.key("Escape"); assert.equal(game.state().message, "INVENTORY");
+    game.item("potion_healing");
+    assert.equal(game.state().message, "PLAYING"); assert.equal(turnCount(game), 1);
+    assert.equal(game.entities.get("player")!.body!.health, 20);
+  }
 });
 
-test("holding a pointer across a UI remount triggers one action until release", () => {
-  const game = harness(800, 400); game.click("start"); game.click("bag_btn");
-  game.holdButton("bag_page"); game.tick(10);
-  assert.equal(game.ui.get("bag_page__label")!.text, "PAGE 2 / 2 / NEXT");
-  game.releaseButton(); game.holdButton("bag_page"); game.tick(10);
-  assert.equal(game.ui.get("bag_page__label")!.text, "PAGE 1 / 2 / NEXT");
+test("status pane and toolbars use original pixel rectangles rather than full-width cards", () => {
+  const game = harness(); game.start();
+  assert.equal(game.ui.get("health_fill")!.image, "sprites/spd-ui/hp_large.png");
+  assert.equal(game.ui.get("health_fill")!.style!.left, 90);
+  assert.equal(game.ui.get("health_fill")!.style!.top, 57);
+  assert.equal(game.ui.get("health_fill")!.style!.width, 384);
+  game.entities.get("player")!.body!.health = 10; game.click("wait");
+  assert.equal(game.ui.get("health_fill")!.style!.width, 192);
+  assert.equal(game.ui.get("bag_tool_icon")!.image, "sprites/spd-ui/bag_tool_icon.png");
+  assert.ok(!game.ui.has("turn_controls") && !game.ui.has("hint"));
+});
+
+test("original chrome scales its center strips explicitly and preserves border pixel widths", () => {
+  const game = harness(); game.click("settings");
+  const corner = game.ui.get("settings_window_frame_0_0")!.style!;
+  const edge = game.ui.get("settings_window_frame_0_1")!.style!;
+  assert.equal(corner.width, 18); assert.equal(corner.height, 18);
+  assert.equal(edge.height, 18); assert.equal(edge.width, 669);
+  assert.equal(edge.imageMode, "stretch");
+  assert.equal(game.ui.get("settings_window_frame_0_0")!.image, "sprites/spd-ui/window_0_0.png");
+});
+
+test("held clicks cannot repeat a setting action after its UI tree is remounted", () => {
+  const game = harness(); game.click("settings"); game.click("settings_tab_1");
+  game.holdButton("hints"); game.tick(10);
+  assert.equal(parseProfile(game.saves.get("profile")!).showHints, false);
+  game.releaseButton(); game.holdButton("hints"); game.tick(10);
+  assert.equal(parseProfile(game.saves.get("profile")!).showHints, true);
   game.releaseButton();
+});
+
+test("original title secondary entrances and six settings tabs remain reachable", () => {
+  const game = harness();
+  for (const page of ["rankings", "journal", "news", "changes", "about", "support"]) {
+    game.click(page); assert.ok(game.ui.has(`${page}_window`)); game.click("back");
+    assert.equal(game.state().message, "MENU");
+  }
+  game.click("settings");
+  for (let tab = 0; tab < 6; tab++) { game.click(`settings_tab_${tab}`); assert.ok(game.ui.has("settings_title")); }
+  game.key("Escape"); assert.equal(game.state().message, "MENU");
+});
+
+test("UI atlas crops are pinned to the upstream revision with reproducible checksums", () => {
+  const manifest = JSON.parse(readFileSync(resolve(assets, "licenses/ui-sources.json"), "utf8")) as {
+    revision: string; records: { file: string; rect: number[]; sha256: string; source: string }[];
+  };
+  assert.equal(manifest.revision, "57a4e06a4caf162446d1c28caa7983f0493fecf0");
+  assert.ok(manifest.records.length > 100);
+  for (const record of manifest.records) {
+    const png = readFileSync(resolve(assets, record.file));
+    assert.equal(png.readUInt32BE(16), record.rect[2]); assert.equal(png.readUInt32BE(20), record.rect[3]);
+    assert.equal(createHash("sha256").update(png).digest("hex"), record.sha256);
+    assert.ok(record.source.includes(manifest.revision));
+  }
+});
+
+test("all six upstream class buttons exist and locked kits show the original unlock rule", () => {
+  const game = harness(); game.click("start");
+  for (const hero of ["warrior", "mage", "rogue", "huntress", "duelist", "cleric"]) assert.ok(game.ui.has(`hero_${hero}`));
+  game.click("hero_duelist"); assert.equal(game.state().message, "MESSAGE");
+  assert.match(game.ui.get("message_text")!.text!.replace(/\s+/g, " "), /tier 2 or higher weapon/);
+  game.key("Escape"); assert.equal(game.state().message, "HEROES");
+  game.click("hero_cleric"); assert.match(game.ui.get("message_text")!.text!.replace(/\s+/g, " "), /cleanse the curse/);
+  game.key("Escape"); game.click("begin_run"); assert.equal(game.state().message, "PLAYING");
+});
+
+test("camera zoom and following preserve real world actor positions across resizing", () => {
+  const game = harness(); game.start(); game.step(1, 0);
+  const player = game.entities.get("player")!.transform.translation as { x: number; y: number };
+  assert.equal(game.camera().x, player.x); assert.equal(game.camera().y, player.y + 10);
+  assert.equal(game.camera().height, 800 / 3);
+  const actors = [...game.entities].filter(([, entity]) => entity.body).map(([id, entity]) => [id, JSON.stringify(entity.transform)]);
+  game.resize(800, 400); game.tick();
+  assert.equal(game.camera().height, 200);
+  for (const [id, transform] of actors) assert.equal(JSON.stringify(game.entities.get(id!)!.transform), transform);
+  assert.equal(game.entities.get("terrain_312")!.sprite!.width, 16);
+});
+
+test("developer UI previews cover every existing core screen without recording a win or loss", () => {
+  const game = harness(); game.start(); const before = JSON.stringify([...game.entities]);
+  game.key("F12");
+  for (const digit of [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]) {
+    game.key(`Digit${digit}`); assert.equal(game.state().message, "CHECKS");
+    assert.ok(game.ui.size > 1);
+  }
+  assert.equal(game.saves.get("profile"), undefined);
+  assert.equal(JSON.stringify([...game.entities]), before);
+  game.key("F12"); assert.equal(game.state().message, "PLAYING");
+});
+
+test("desktop uses six joined quick slots on the right and portrait uses four split slots", () => {
+  const desktop = harness(); desktop.start();
+  const quickIds = (game: Game): string[] => [...game.ui.keys()].filter((id) => /^(quick_potion_|quick_scroll_|quick_empty_)/.test(id));
+  assert.equal(quickIds(desktop).length, 6);
+  assert.equal(desktop.ui.get("quick_frame_0")!.image, "sprites/spd-ui/quick_left.png");
+  assert.equal(desktop.ui.get("quick_potion_healing")!.style!.left, 755);
+  assert.equal(desktop.ui.get("quick_empty_5")!.style!.left, 1031);
+  assert.equal(desktop.ui.get("descend")!.style!.left, 1088);
+  const portrait = harness(450, 800); portrait.start();
+  assert.equal(quickIds(portrait).length, 4);
+  assert.equal(portrait.ui.get("wait")!.style!.left, 0);
+  assert.equal(portrait.ui.get("descend")!.style!.left, 60);
+  assert.equal(portrait.ui.get("quick_scroll_upgrade")!.style!.left, 153);
+  assert.equal(portrait.ui.get("bag_btn")!.style!.left, 378);
+});
+
+test("closing settings opened through the game menu returns to play and remembers its tab", () => {
+  const game = harness(); game.start(); game.click("pause"); game.click("settings");
+  game.click("settings_tab_2"); game.key("Escape");
+  assert.equal(game.state().message, "PLAYING");
+  game.click("pause"); game.click("settings");
+  assert.equal(game.ui.get("settings_title")!.text, "Input");
+});
+
+test("zero-sized minimized windows preserve the scene and restore the pixel UI safely", () => {
+  const game = harness(); game.start(); const before = JSON.stringify([...game.entities]);
+  game.resize(0, 0); game.tick(10);
+  assert.equal(JSON.stringify([...game.entities]), before);
+  assert.equal(game.state().message, "PLAYING");
+  game.resize(1280, 800); game.tick();
+  assert.equal(game.ui.get("health_fill")!.image, "sprites/spd-ui/hp_large.png");
+  assert.equal(game.camera().height, 800 / 3);
 });

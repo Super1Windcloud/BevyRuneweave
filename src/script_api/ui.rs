@@ -77,6 +77,8 @@ struct UiStyleSpec {
     flex_grow: Option<f32>,
     flex_shrink: Option<f32>,
     background: Option<[f32; 4]>,
+    image_mode: Option<String>,
+    image_tint: Option<[f32; 4]>,
 }
 
 fn find_ui_entity(world: &mut World, owner: &ScriptAttachment, id: &str) -> Option<Entity> {
@@ -263,6 +265,23 @@ pub(super) fn ui_set_style(
         if apply_style(&mut updated_node, &style).is_none() {
             return false;
         }
+        let image_mode = match style.image_mode.as_deref() {
+            None => None,
+            Some("auto") => Some(bevy::ui::widget::NodeImageMode::Auto),
+            Some("stretch") => Some(bevy::ui::widget::NodeImageMode::Stretch),
+            Some(_) => return false,
+        };
+        if (image_mode.is_some() || style.image_tint.is_some())
+            && world.get::<ImageNode>(entity).is_none()
+        {
+            return false;
+        }
+        if style
+            .image_tint
+            .is_some_and(|color| color.iter().any(|value| !value.is_finite()))
+        {
+            return false;
+        }
         if let Some([red, green, blue, alpha]) = style.background {
             if [red, green, blue, alpha]
                 .iter()
@@ -282,6 +301,17 @@ pub(super) fn ui_set_style(
             );
         }
         set_component_if_neq(world, entity, updated_node);
+        if let Some(mode) = image_mode {
+            world.get_mut::<ImageNode>(entity).unwrap().image_mode = mode;
+        }
+        if let Some([r, g, b, a]) = style.image_tint {
+            world.get_mut::<ImageNode>(entity).unwrap().color = Color::srgba(
+                r.clamp(0.0, 1.0),
+                g.clamp(0.0, 1.0),
+                b.clamp(0.0, 1.0),
+                a.clamp(0.0, 1.0),
+            );
+        }
         true
     })
 }
@@ -312,7 +342,12 @@ pub(super) fn ui_set_text(
             return false;
         };
         text.set_if_neq(Text(value));
-        set_component_if_neq(world, entity, TextFont::from_font_size(font_size.max(1.0)));
+        let font = world
+            .get::<TextFont>(entity)
+            .cloned()
+            .unwrap_or_default()
+            .with_font_size(font_size.max(1.0));
+        set_component_if_neq(world, entity, font);
         set_component_if_neq(
             world,
             entity,
@@ -339,7 +374,12 @@ pub(super) fn ui_set_image(
     let asset_server = world
         .with_world(|world| world.get_resource::<AssetServer>().cloned())?
         .ok_or_else(|| InteropError::invariant("UI image API requires Bevy AssetPlugin"))?;
-    let image = asset_server.load(path);
+    let image = asset_server
+        .load_builder()
+        .with_settings(|settings: &mut bevy::image::ImageLoaderSettings| {
+            settings.sampler = bevy::image::ImageSampler::nearest();
+        })
+        .load(path);
     world.with_world_mut(|world| {
         let Some(entity) = find_ui_entity(world, &owner, &id) else {
             return false;
@@ -350,6 +390,41 @@ pub(super) fn ui_set_image(
         if image_node.image != image {
             image_node.image = image;
         }
+        true
+    })
+}
+
+/// Selects a project-owned font through the same registry for every language.
+pub(super) fn ui_set_font(
+    context: FunctionCallContext,
+    id: String,
+    path: String,
+) -> Result<bool, InteropError> {
+    if !valid_asset_path(&path)
+        || !matches!(
+            Path::new(&path)
+                .extension()
+                .and_then(|extension| extension.to_str()),
+            Some("ttf" | "otf")
+        )
+    {
+        return Ok(false);
+    }
+    let (world, owner) = current_script(&context)?;
+    let server = world.with_world(|world| world.get_resource::<AssetServer>().cloned())?;
+    let Some(server) = server else {
+        return Ok(false);
+    };
+    let font = server.load(path);
+    world.with_world_mut(|world| {
+        let Some(entity) = find_ui_entity(world, &owner, &id) else {
+            return false;
+        };
+        let Some(mut text_font) = world.get_mut::<TextFont>(entity) else {
+            return false;
+        };
+        text_font.font = bevy::text::FontSource::Handle(font);
+        text_font.font_smoothing = bevy::text::FontSmoothing::None;
         true
     })
 }
@@ -409,6 +484,126 @@ mod tests {
     };
 
     use super::*;
+
+    #[cfg(all(feature = "lua", any(feature = "js", feature = "typescript")))]
+    #[test]
+    fn project_font_api_has_equivalent_lua_and_quickjs_behavior() -> Result<(), InteropError> {
+        use bevy::asset::AssetApp;
+        use bevy_mod_scripting::{
+            bindings::CoreScriptGlobalsPlugin,
+            core::{BMSScriptingInfrastructurePlugin, event::CallbackLabel},
+            lua::{LuaScriptingPlugin, lua_context_load, lua_handler},
+            quickjs::{QuickJsScriptingPlugin, quickjs_context_load, quickjs_handler},
+        };
+        let mut app = App::new();
+        app.add_plugins((
+            bevy::app::TaskPoolPlugin::default(),
+            bevy::asset::AssetPlugin::default(),
+            CoreScriptGlobalsPlugin::default(),
+            BMSScriptingInfrastructurePlugin::default(),
+            LuaScriptingPlugin::default(),
+            QuickJsScriptingPlugin::default(),
+            super::super::RuneweaveScriptApiPlugin,
+        ))
+        .init_asset::<Font>();
+        app.finish();
+        let camera = app
+            .world_mut()
+            .spawn((
+                Camera2d,
+                Projection::Orthographic(OrthographicProjection::default_2d()),
+                Transform::default(),
+            ))
+            .id();
+        let attachment = ScriptAttachment::StaticScript(Handle::<ScriptAsset>::default());
+        let world_id = app.world().id();
+        let cache = WorldGuard::setup_cache(
+            app.world(),
+            CurrentScriptAttachment(Some(attachment.clone())),
+        );
+        WorldGuard::with_static_guard(app.world_mut(), cache, |guard| {
+            let mut js = quickjs_context_load(&attachment, br#"
+                function on_script_loaded() {
+                    if (!ui_spawn("font_label", "", "text")) throw Error("spawn");
+                    if (!ui_set_text("font_label", "Pixel", 24, 1, 1, 1, 1)) throw Error("text");
+                    if (!ui_set_font("font_label", "fonts/spd-pixel.ttf")) throw Error("font");
+                    if (!scene_set_camera_2d(12, 24, 240) || scene_set_camera_2d(99, 99, 0)) throw Error("camera");
+                    if (!ui_spawn("pixel_image", "", "image") || !ui_set_style("pixel_image", '{"width":120,"height":18,"imageMode":"stretch","imageTint":[0.6,0.6,0.6,1]}')) throw Error("image mode");
+                    if (ui_set_style("pixel_image", '{"width":999,"imageMode":"invalid"}')) throw Error("invalid image mode");
+                    if (ui_set_font("font_label", "../secret.ttf") || ui_set_font("missing", "fonts/spd-pixel.ttf") || ui_set_font("font_label", "sprites/a.png")) throw Error("invalid font accepted");
+                    if (!ui_set_text("font_label", "Changed", 18, 1, 1, 1, 1)) throw Error("update");
+                }
+            "#, world_id)?;
+            quickjs_handler(
+                Vec::new(),
+                &attachment,
+                &CallbackLabel::from("on_script_loaded"),
+                &mut js,
+                world_id,
+            )?;
+            let assert_font = || {
+                guard.with_world_mut(|world| {
+                    let entity = find_ui_entity(world, &attachment, "font_label").unwrap();
+                    let font = world.get::<TextFont>(entity).unwrap();
+                    assert_eq!(font.font_smoothing, bevy::text::FontSmoothing::None);
+                    assert!(matches!(font.font, bevy::text::FontSource::Handle(_)));
+                    assert_eq!(world.get::<Text>(entity).unwrap().0, "Changed");
+                    let image = find_ui_entity(world, &attachment, "pixel_image").unwrap();
+                    assert_eq!(
+                        world.get::<ImageNode>(image).unwrap().image_mode,
+                        bevy::ui::widget::NodeImageMode::Stretch
+                    );
+                    assert_eq!(world.get::<Node>(image).unwrap().width, Val::Px(120.0));
+                    assert_eq!(
+                        world.get::<ImageNode>(image).unwrap().color,
+                        Color::srgba(0.6, 0.6, 0.6, 1.0)
+                    );
+                    assert_eq!(world.get::<Transform>(camera).unwrap().translation.x, 12.0);
+                    assert_eq!(world.get::<Transform>(camera).unwrap().translation.y, 24.0);
+                    let Projection::Orthographic(projection) =
+                        world.get::<Projection>(camera).unwrap()
+                    else {
+                        panic!("orthographic camera");
+                    };
+                    assert!(matches!(
+                        projection.scaling_mode,
+                        bevy::camera::ScalingMode::FixedVertical {
+                            viewport_height: 240.0
+                        }
+                    ));
+                })
+            };
+            assert_font()?;
+            let mut lua = lua_context_load(
+                &attachment,
+                br#"
+                function on_script_loaded()
+                    assert(ui_spawn("font_label", "", "text"))
+                    assert(ui_set_text("font_label", "Pixel", 24, 1, 1, 1, 1))
+                    assert(ui_set_font("font_label", "fonts/spd-pixel.ttf"))
+                    assert(scene_set_camera_2d(12, 24, 240))
+                    assert(not scene_set_camera_2d(99, 99, 0))
+                    assert(ui_spawn("pixel_image", "", "image"))
+                    assert(ui_set_style("pixel_image", '{"width":120,"height":18,"imageMode":"stretch","imageTint":[0.6,0.6,0.6,1]}'))
+                    assert(not ui_set_style("pixel_image", '{"width":999,"imageMode":"invalid"}'))
+                    assert(not ui_set_font("font_label", "../secret.ttf"))
+                    assert(not ui_set_font("missing", "fonts/spd-pixel.ttf"))
+                    assert(not ui_set_font("font_label", "sprites/a.png"))
+                    assert(ui_set_text("font_label", "Changed", 18, 1, 1, 1, 1))
+                end
+            "#,
+                world_id,
+            )?;
+            lua_handler(
+                Vec::new(),
+                &attachment,
+                &CallbackLabel::from("on_script_loaded"),
+                &mut lua,
+                world_id,
+            )?;
+            assert_font()
+        })
+    }
 
     #[test]
     fn ui_api_builds_flex_tree_and_reports_button_press() -> Result<(), InteropError> {

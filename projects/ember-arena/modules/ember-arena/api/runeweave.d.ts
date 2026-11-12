@@ -19,6 +19,8 @@ declare function scene_set_transform_3d(
 ): boolean;
 declare function scene_play_animation(id: string, path: string, repeat: boolean): boolean;
 declare function scene_set_3d_enabled(enabled: boolean): boolean;
+/** Moves the real 2D orthographic camera; viewportHeight is in world units. */
+declare function scene_set_camera_2d(x: number, y: number, viewportHeight: number): boolean;
 declare function scene_set_transform(id: string, x: number, y: number, z: number): boolean;
 declare function scene_set_text(
   id: string,
@@ -37,6 +39,8 @@ declare function ui_spawn(id: string, parentId: string, kind: "node" | "text" | 
 declare function ui_set_style(id: string, styleJson: string): boolean;
 declare function ui_set_text(id: string, value: string, fontSize: number, red: number, green: number, blue: number, alpha: number): boolean;
 declare function ui_set_image(id: string, path: string): boolean;
+/** Sets a project-relative TTF/OTF font with crisp pixel rasterization. */
+declare function ui_set_font(id: string, path: string): boolean;
 declare function ui_button_just_pressed(id: string): boolean;
 declare function ui_despawn(id: string): boolean;
 declare function ui_clear(): void;

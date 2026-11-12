@@ -1,0 +1,86 @@
+# UI parity ledger
+
+Reference: [Shattered Pixel Dungeon](https://github.com/00-Evan/shattered-pixel-dungeon/tree/57a4e06a4caf162446d1c28caa7983f0493fecf0),
+revision `57a4e06a4caf162446d1c28caa7983f0493fecf0`, reviewed 2026-11-12.
+This ledger separates source-based implementation from pixel-parity acceptance.
+**All original screens are not yet reproduced or accepted as pixel-identical.**
+
+## Implemented presentation
+
+| Surface | Source used | Current implementation / limit |
+| --- | --- | --- |
+| Title | `scenes/TitleScene.java`, `ui/TitleBackground.java`, `effects/BannerSprites.java` | Original landscape/portrait banner, eight entry buttons, chrome, icons and integer UI zoom. Background uses original layers but a static arrangement; original scrolling, flames and glow remain absent. |
+| Hero selection | `scenes/HeroSelectScene.java`, `sprites/HeroSprite.java`, `messages/actors/actors.properties` | Separate full-screen scene, six original hero icons, landscape grid / portrait strip, original splash, left fade and locked-class message windows. Duelist/Cleric remain locked because their gameplay kits are absent. The four playable classes retain truthful port descriptions, rather than claiming unimplemented powers. |
+| Status pane | `ui/StatusPane.java` | Original 82×38 and large 160×39 layouts, 128×9 / 50×4 health bars, source hero portrait, XP bar and level. Compass, complete buff icons, shields, DOT overlays and blink animations remain absent. |
+| Menu pane | `ui/MenuPane.java` | Source pane, menu/journal artwork, version and depth positions. Journal data/layout is still a subset. |
+| Toolbar | `ui/Toolbar.java` | Original 20/18/19-pixel joined slot frames, 4/5/6 visible-slot thresholds, desktop grouping, mobile landscape grouping and portrait split, source bag/wait/search icons. The port exposes its currently implemented consumables; full assignment/targeting and swap behavior remain absent. |
+| Backpack | `windows/WndBag.java`, `ui/InventorySlot.java` | Five columns and 25 slots, 28-pixel slot base, one-pixel margins, adaptive narrow/short layout, equipped/normal colors, quantity labels and bag tab. Full equipment/bag contents and equipment actions are not implemented. |
+| Item window | `windows/WndInfoItem.java`, `windows/WndUseItem.java` | Original window chrome, item icon/title, measured text wrapping, content-dependent height and Drink/Read/Eat action. Descriptions accurately reflect the existing simplified effects; throw/drop/equip/quickslot dialogs remain absent. |
+| Pause | `windows/WndGame.java` | Original 120-pixel content width, 20-pixel buttons, two-pixel gaps, Settings and Main Menu actions. Challenges are not present in the port. |
+| Settings | `windows/WndSettings.java` | Original landscape/portrait content widths, six icon tabs, original chrome, pixel font and functioning existing settings/save/reset controls. This is still a reduced settings implementation: full display, UI, keybinding, audio and localization controls are not equivalent to upstream. Audio controls are noninteractive because audio is absent. |
+| Hero info | `windows/WndHero.java` | Original-style stats window using actual current hero values. Talent trees and complete equipment/stat tabs remain absent. |
+| Results | `effects/BannerSprites.java`, `windows/WndGame.java` | Original Boss Slain / Game Over art and chrome. Completion remains a sewer milestone, not the upstream Amulet ending; result content and progression are different. |
+| Secondary title pages | `scenes/{Rankings,Journal,About}Scene.java`, title button sources | Original entry names/icons and common window art. Rankings currently shows local aggregates; journal/news/changes/about/support are reduced informational pages. Their full original scenes, services and data are not ported. |
+| Other original windows | Upstream `windows/` and game scenes | Shops, full alchemy, quest/NPC dialogs, badges, challenges, keybindings, subclasses/talents, resurrection, full save-slot management and region/interlevel scenes remain to be migrated. |
+
+## Pixel assets and text
+
+`spd-ui-atlas.ts` records source rectangles and nine-patch borders; `prepare-ui-assets.ts`
+downloads immutable-revision assets into the existing local cache. Crops and font source hashes
+are stored in `assets/licenses/ui-sources.json`. No AI-redrawn UI art is used.
+
+The native UI uses the original `pixel_font.ttf` with smoothing disabled. ASCII advance widths
+are extracted from its OpenType `cmap`/`hmtx` tables to measure and wrap text. This is not proof
+that LibGDX and Bevy produce identical glyph baselines or every rendered pixel.
+
+Nine-patch edges explicitly request `imageMode: "stretch"`; automatic aspect fitting would leave
+gaps. UI and scene images use nearest sampling. Source icons preserve their own pixel dimensions.
+
+## Runtime and platform contract
+
+- `ui_set_font(id, relativePath)` is defined once in the BMS function registry, validates project
+  paths/extensions and ownership, and preserves the selected font on later text updates.
+- `ui_set_style` accepts `imageMode: "auto" | "stretch"`; invalid values reject the style before
+  mutating layout. The default remains auto, preserving existing callers' behavior.
+- `imageTint` applies an RGBA tint to the image itself, preserving transparent pixels. Hero
+  selection uses the original 1.0 / 0.6 / 0.1 icon brightness levels, not opaque cover rectangles.
+- `scene_set_camera_2d(x, y, viewportHeight)` moves the actual orthographic Bevy camera. Inputs
+  must be finite and height positive; unavailable/nonorthographic cameras return false.
+- Game tiles remain 16 world units. Resizing and zooming do not rewrite actor positions. Pointer
+  coordinates are converted through the same camera scale used to display the level.
+- These services use portable Bevy components and project-relative assets. Lua and QuickJS share
+  the same registry implementation. The public C ABI and host ownership contracts are unchanged.
+- Windows Debug is built and exercised. macOS, Linux, Android, iOS, Release mode, real mobile safe
+  areas/touch and platform font rasterization remain unverified for this UI change.
+
+## Visual inspection and acceptance
+
+Windows GPU captures live under `dist/asset-downloads/ember-arena/ui-parity/`. Actual title,
+hero-selection, HUD and backpack captures are distinct from the read-only fixture captures.
+Fixture images verify rendering/layout only, not achievement, item-action or ending completion.
+
+Developer-only inspection: open F12 checks, then press a digit:
+
+| Key | Read-only fixture |
+| --- | --- |
+| 1 | Title |
+| 2 | Hero selection |
+| 3 | Gameplay HUD |
+| 4 | Backpack |
+| 5 | Item details |
+| 6 | Pause |
+| 7 | Settings; Right arrow cycles the six tabs |
+| 8 | Sewer victory presentation |
+| 9 | Defeat presentation |
+| 0 | Hero info |
+
+F12 returns to the previous game state. Previewing a result never records a victory/loss or
+changes actor health. These controls are absent from the original-looking player menus.
+
+No matching upstream executable screenshot suite or automated image-difference acceptance has
+been run. Source rectangle/geometry tests, native screenshots and passing interaction tests
+must not be described as acceptance of complete one-to-one visual parity.
+
+A v4.0.2 reference JAR was downloaded from the upstream release for comparison. Its isolated
+startup was rejected by automatic approval policy (`blocked by policy`, no detailed reason
+returned). It was not executed and no reference-client screenshots were accepted as evidence.

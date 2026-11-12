@@ -1,0 +1,1484 @@
+{
+  "revision": "57a4e06a4caf162446d1c28caa7983f0493fecf0",
+  "records": [
+    {
+      "file": "sprites/spd-ui/title_land.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/banners.png",
+      "rect": [
+        0,
+        100,
+        240,
+        57
+      ],
+      "sha256": "45a5abda771a06bc3268e16d97da5694c53a163b95f2ab8a0f27f7289db79a9d"
+    },
+    {
+      "file": "sprites/spd-ui/title_port.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/banners.png",
+      "rect": [
+        0,
+        0,
+        139,
+        100
+      ],
+      "sha256": "c7d2ada64eb715c0596c181e79a11f0251684818eda8d248b79a031e5c7944c6"
+    },
+    {
+      "file": "sprites/spd-ui/boss_slain.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/banners.png",
+      "rect": [
+        0,
+        157,
+        127,
+        68
+      ],
+      "sha256": "fdfe9b4b91e2e7c7847a178365ebb62bc43ec391fa869f6c37fe0769fffe04af"
+    },
+    {
+      "file": "sprites/spd-ui/game_over.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/banners.png",
+      "rect": [
+        128,
+        157,
+        128,
+        35
+      ],
+      "sha256": "6cc6166ba959947da8c8032382b20c762cc34431ee096c6a41265ccbc6d1407a"
+    },
+    {
+      "file": "sprites/spd-ui/status.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/status_pane.png",
+      "rect": [
+        0,
+        0,
+        82,
+        38
+      ],
+      "sha256": "73baafac5cb47beca1da4c3d802befc9ba8a00b649dbaadb42a464c7b474d9be"
+    },
+    {
+      "file": "sprites/spd-ui/status_large.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/status_pane.png",
+      "rect": [
+        0,
+        64,
+        41,
+        39
+      ],
+      "sha256": "e7a9d428f90c69d5d54fdabcf99f8dafa3084bd0bdefefe8d315bb0cb695f87f"
+    },
+    {
+      "file": "sprites/spd-ui/status_left.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/status_pane.png",
+      "rect": [
+        0,
+        64,
+        33,
+        39
+      ],
+      "sha256": "9257e84902fb03aff95789e23a102887bb0083ae2a4d6eab2fc3e9562856e842"
+    },
+    {
+      "file": "sprites/spd-ui/status_middle.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/status_pane.png",
+      "rect": [
+        33,
+        64,
+        4,
+        39
+      ],
+      "sha256": "9637fecaed14f567645d1f55bdc747a97751f2c2dbb1b9e8e6c49b67659da780"
+    },
+    {
+      "file": "sprites/spd-ui/status_right.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/status_pane.png",
+      "rect": [
+        37,
+        64,
+        4,
+        39
+      ],
+      "sha256": "d94140426c5572740ec4fbb5d8e1ae97b6ad58d1060470d23eac0c8fa043c051"
+    },
+    {
+      "file": "sprites/spd-ui/hp.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/status_pane.png",
+      "rect": [
+        0,
+        40,
+        50,
+        4
+      ],
+      "sha256": "c34d0beeb9af2d772c0df023a527e70c93ddc7f488b7709ed8f152356b085032"
+    },
+    {
+      "file": "sprites/spd-ui/hp_large.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/status_pane.png",
+      "rect": [
+        0,
+        103,
+        128,
+        9
+      ],
+      "sha256": "077d75da21c1459a540f2189409859114b3be612ac938faae83ea25e34225d62"
+    },
+    {
+      "file": "sprites/spd-ui/xp.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/status_pane.png",
+      "rect": [
+        0,
+        48,
+        17,
+        4
+      ],
+      "sha256": "03bc0293d492b18ece0cb545bc2a55e83b6d1e9f9918d9ced955eae84672851a"
+    },
+    {
+      "file": "sprites/spd-ui/xp_large.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/status_pane.png",
+      "rect": [
+        0,
+        121,
+        128,
+        7
+      ],
+      "sha256": "ed953676f517e495cb63814512f815100436b1d732edf461fdbd1de0cb1a72f2"
+    },
+    {
+      "file": "sprites/spd-ui/bag_tool.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/toolbar.png",
+      "rect": [
+        0,
+        0,
+        24,
+        26
+      ],
+      "sha256": "7e560b4faec21da68022ed4aadf9c054e4cdc2a030bbebdeac661b6e562c3c74"
+    },
+    {
+      "file": "sprites/spd-ui/wait_tool.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/toolbar.png",
+      "rect": [
+        24,
+        0,
+        20,
+        26
+      ],
+      "sha256": "f211c786abacc4f727515f0df9f558087c92390657f16257afc66d1bd3e12847"
+    },
+    {
+      "file": "sprites/spd-ui/search_tool.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/toolbar.png",
+      "rect": [
+        44,
+        0,
+        20,
+        26
+      ],
+      "sha256": "191406bb3f492cb4aa27056ba04de82a137dd78e8683bbef40be128485329010"
+    },
+    {
+      "file": "sprites/spd-ui/quick_tool.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/toolbar.png",
+      "rect": [
+        64,
+        0,
+        22,
+        24
+      ],
+      "sha256": "5ca656a2a88a9ccd288a46d06693a62a8534782a23f2cd12279eb0857f092071"
+    },
+    {
+      "file": "sprites/spd-ui/quick_left.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/toolbar.png",
+      "rect": [
+        86,
+        0,
+        20,
+        24
+      ],
+      "sha256": "ae3f29317e40c3f7561c8cee66fd55a02e96f59c961ba474d69a34abb6c34093"
+    },
+    {
+      "file": "sprites/spd-ui/quick_middle.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/toolbar.png",
+      "rect": [
+        88,
+        0,
+        18,
+        24
+      ],
+      "sha256": "19e869f69b953b0089d7febfb988e62278879bda1a57b1a0a515e3dbee36d9a7"
+    },
+    {
+      "file": "sprites/spd-ui/quick_right.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/toolbar.png",
+      "rect": [
+        106,
+        0,
+        19,
+        24
+      ],
+      "sha256": "7949849afa1b19358239c13d6f3341753eb4ccd2860061f4b83ea55531cb6e18"
+    },
+    {
+      "file": "sprites/spd-ui/bag_icon.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        0,
+        48,
+        16,
+        16
+      ],
+      "sha256": "84710d878a141715f04461e86d69f7c875bcfd9b61134ef34be733a92ec95f73"
+    },
+    {
+      "file": "sprites/spd-ui/enter.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "sha256": "0836e553d7f35abbed7498c902d5af4f65b8b97c6f58d1f7efaba77339138322"
+    },
+    {
+      "file": "sprites/spd-ui/support.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        17,
+        0,
+        17,
+        16
+      ],
+      "sha256": "a6c185de980c358b8e1a790d1605388fcd8a626c957631ae0a82c9f51f867dec"
+    },
+    {
+      "file": "sprites/spd-ui/rankings.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        34,
+        0,
+        17,
+        16
+      ],
+      "sha256": "5d3210a6421400801ba7ec5be36259331ea228d6cf1789a86792ddff5046dd8f"
+    },
+    {
+      "file": "sprites/spd-ui/news.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        68,
+        0,
+        16,
+        15
+      ],
+      "sha256": "90f10bb8ff0524b35624e56915db3796eeeaecda29d39ae07392a5ed30abade6"
+    },
+    {
+      "file": "sprites/spd-ui/changes.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        85,
+        0,
+        15,
+        15
+      ],
+      "sha256": "af663c666e0f713906be8f47bfb2266547a2fbcb6ebc48b60e182aa833159124"
+    },
+    {
+      "file": "sprites/spd-ui/settings.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        102,
+        0,
+        14,
+        14
+      ],
+      "sha256": "9fef38674705ee51387fe5059835c1f4debbf5d673c3b155829649c9fd0b2e15"
+    },
+    {
+      "file": "sprites/spd-ui/about.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        119,
+        0,
+        16,
+        16
+      ],
+      "sha256": "768630e5a1fbbd446e2b144ba98a007353a0f795959a66208cdf2ebc46b7e22f"
+    },
+    {
+      "file": "sprites/spd-ui/journal.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        136,
+        0,
+        17,
+        15
+      ],
+      "sha256": "514ac019fb991762ae87e866180c81762f5b8758ae5d4c2183363bf2076d501d"
+    },
+    {
+      "file": "sprites/spd-ui/exit.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        0,
+        16,
+        15,
+        11
+      ],
+      "sha256": "c6368fd4f4757d3d4ad60c58f05d3eb8bc2140a89cef59abd435fba739969751"
+    },
+    {
+      "file": "sprites/spd-ui/display.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        32,
+        16,
+        16,
+        12
+      ],
+      "sha256": "cc4fb097d1f15d604aa5740bbdaa573b3ac051e06049c004171cbe013fc42965"
+    },
+    {
+      "file": "sprites/spd-ui/data.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        48,
+        16,
+        14,
+        15
+      ],
+      "sha256": "36aba627016aabe3e0613b31e706e139b0f82b215d87898832551d839526f045"
+    },
+    {
+      "file": "sprites/spd-ui/audio.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        64,
+        16,
+        14,
+        14
+      ],
+      "sha256": "9d1ad2e8792a0aa79a41306ad50c0518d236f67cd8a6a1c66330c7eeaa04c41d"
+    },
+    {
+      "file": "sprites/spd-ui/langs.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        80,
+        16,
+        14,
+        11
+      ],
+      "sha256": "a838e89a809b86b8c6fc7f2fae4cff0b674af438f9c36a1071da20e8af495cae"
+    },
+    {
+      "file": "sprites/spd-ui/input.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        112,
+        16,
+        15,
+        12
+      ],
+      "sha256": "3def68832a8dd39f3bcd22a5551b1f52d9121e34d074dc34b18bef6531b064ab"
+    },
+    {
+      "file": "sprites/spd-ui/stats.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        128,
+        16,
+        16,
+        13
+      ],
+      "sha256": "1c1a4de5271c1fe1bbdbe444259e6d778fcaecb114a497c53af2994cc5ba2b6d"
+    },
+    {
+      "file": "sprites/spd-ui/info.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        16,
+        32,
+        14,
+        14
+      ],
+      "sha256": "4dbaa0cb51f38c76c52cb6ad4527535868635f47fc974c8883d51a0fb5793243"
+    },
+    {
+      "file": "sprites/spd-ui/unchecked.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        48,
+        32,
+        12,
+        12
+      ],
+      "sha256": "b8a828bc36e04bf8cb7aa0730f0885ae45ccb6db4ab0cc58060f4ef62c131627"
+    },
+    {
+      "file": "sprites/spd-ui/checked.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        64,
+        32,
+        12,
+        12
+      ],
+      "sha256": "ea53730ecc8a1a455257f7531a8208b0f736e7b9df4b7752b479820e660e2720"
+    },
+    {
+      "file": "sprites/spd-ui/close.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        80,
+        32,
+        11,
+        11
+      ],
+      "sha256": "416b44ca853ac20eb1e523d9bb466ba95b71abba2b7403dafd6d331e8c87d991"
+    },
+    {
+      "file": "sprites/spd-ui/stairs.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/icons.png",
+      "rect": [
+        0,
+        64,
+        15,
+        16
+      ],
+      "sha256": "6a1a5d6714664d5325e3583c8ce7094840dd3f09bdae8680306fe7bab2656e29"
+    },
+    {
+      "file": "sprites/spd-ui/menu.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/menu_button.png",
+      "rect": [
+        17,
+        2,
+        12,
+        11
+      ],
+      "sha256": "8ce0561a837038384af7ce5f7fa8e469bee8c2456c8faf78bb71abdd7be30510"
+    },
+    {
+      "file": "sprites/spd-ui/menu_pane.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/menu_pane.png",
+      "rect": [
+        1,
+        0,
+        31,
+        21
+      ],
+      "sha256": "0f93fbbd516e0e4c47921495a770ae9864343739f4dd99e16ce2e34777cd070c"
+    },
+    {
+      "file": "sprites/spd-ui/journal_button.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/menu_button.png",
+      "rect": [
+        2,
+        2,
+        13,
+        11
+      ],
+      "sha256": "8f7ff77493d8faa5c66261220ca9ee372541fdad1ae2ca11754fe10e41d80522"
+    },
+    {
+      "file": "sprites/spd-ui/journal_button_icon.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/menu_button.png",
+      "rect": [
+        31,
+        0,
+        11,
+        6
+      ],
+      "sha256": "c5cd39f84171e2ac2706e6fc1e37b9ab3417608a24d91e460ef377e5a609cba1"
+    },
+    {
+      "file": "sprites/spd-ui/bag_tool_icon.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/toolbar.png",
+      "rect": [
+        160,
+        0,
+        16,
+        16
+      ],
+      "sha256": "457d8ae7455b5335d8738c388782340c159ae783a9f83da4d6a9d17319a86668"
+    },
+    {
+      "file": "sprites/spd-ui/wait_tool_icon.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/toolbar.png",
+      "rect": [
+        176,
+        0,
+        16,
+        16
+      ],
+      "sha256": "e1c4eeb30a8439ef30e51ffa935d4f1442b381a89cde6b4a7f291a95bbeb90aa"
+    },
+    {
+      "file": "sprites/spd-ui/search_tool_icon.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/toolbar.png",
+      "rect": [
+        192,
+        0,
+        16,
+        16
+      ],
+      "sha256": "dceee9df0e6fbafa21f5760f5275ae18d28b16527971187afc3f20f63bf2654c"
+    },
+    {
+      "file": "sprites/spd-ui/hero_warrior.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/warrior.png",
+      "rect": [
+        0,
+        90,
+        12,
+        15
+      ],
+      "sha256": "f7840d2d87a5d4b9e1ed4afc0068086f2c1e8f2490ed142ca8c6ef97fa10ff07"
+    },
+    {
+      "file": "sprites/spd-ui/hero_mage.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/mage.png",
+      "rect": [
+        0,
+        90,
+        12,
+        15
+      ],
+      "sha256": "579d6f76662b92897200d499249eee9c9ae1ec5a7c545f7239c46b508518b48a"
+    },
+    {
+      "file": "sprites/spd-ui/hero_rogue.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/rogue.png",
+      "rect": [
+        0,
+        90,
+        12,
+        15
+      ],
+      "sha256": "7655571b1f0a6cd247a6e0592c5cbdc362538a32d45cc25fe6a4586f66d20214"
+    },
+    {
+      "file": "sprites/spd-ui/hero_huntress.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/huntress.png",
+      "rect": [
+        0,
+        90,
+        12,
+        15
+      ],
+      "sha256": "636996007689f6840c89d5d712658c2d82fee600f90278d4ce186cf6dde0a6bb"
+    },
+    {
+      "file": "sprites/spd-ui/hero_duelist.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/duelist.png",
+      "rect": [
+        0,
+        90,
+        12,
+        15
+      ],
+      "sha256": "3e41dfd81f17d93f55122754ed23672ea3c98740b96ab7715da17b4d7c5d4d4d"
+    },
+    {
+      "file": "sprites/spd-ui/hero_cleric.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/cleric.png",
+      "rect": [
+        0,
+        90,
+        12,
+        15
+      ],
+      "sha256": "f9182c5335884c01a7ff3fa5e0f9f440c9ad9437b6d7b6155fbb07b4acc7b882"
+    },
+    {
+      "file": "sprites/spd-ui/avatar_warrior.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/warrior.png",
+      "rect": [
+        1,
+        15,
+        11,
+        15
+      ],
+      "sha256": "0833dac1ded78dfd5514a074000c81ea8caf69585a3d87b3f880c2c40c04f5f9"
+    },
+    {
+      "file": "sprites/spd-ui/avatar_mage.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/mage.png",
+      "rect": [
+        1,
+        15,
+        11,
+        15
+      ],
+      "sha256": "66b0708c9c242268403f45379e9a47f884d1b39999fdee169621ed758d686278"
+    },
+    {
+      "file": "sprites/spd-ui/avatar_rogue.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/rogue.png",
+      "rect": [
+        1,
+        15,
+        11,
+        15
+      ],
+      "sha256": "0719b6a81d7859e5e1244a04e479db5e226ba13dd1767e10c6309f3bef506e5d"
+    },
+    {
+      "file": "sprites/spd-ui/avatar_huntress.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/huntress.png",
+      "rect": [
+        1,
+        15,
+        11,
+        15
+      ],
+      "sha256": "2c839ccaf57dc46122c55ad3d609d39194587e3a485015fc9773ef7cf9066a0e"
+    },
+    {
+      "file": "sprites/spd-ui/sword.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "rect": [
+        0,
+        96,
+        16,
+        16
+      ],
+      "sha256": "9d7652579e8c9180fabf05376e1bfa10256640149c9f775069e56585854a9704"
+    },
+    {
+      "file": "sprites/spd-ui/weapon_mage.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "rect": [
+        80,
+        96,
+        16,
+        16
+      ],
+      "sha256": "3bfa3d987b8c168f9fc153b69387ab5c522e81dcee121de8dced4cfdd049364a"
+    },
+    {
+      "file": "sprites/spd-ui/weapon_rogue.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "rect": [
+        64,
+        96,
+        16,
+        16
+      ],
+      "sha256": "052a69c84a40dc2b9d9caa6150364783e0e42d9950042ab637413f36603dcfa9"
+    },
+    {
+      "file": "sprites/spd-ui/weapon_huntress.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "rect": [
+        32,
+        96,
+        16,
+        16
+      ],
+      "sha256": "66d5c0f8df94a56650b25bf4ced39a7cb042b6f331a635522f682e80ef2ef0e2"
+    },
+    {
+      "file": "sprites/spd-ui/armor.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "rect": [
+        0,
+        176,
+        16,
+        16
+      ],
+      "sha256": "8340644c9b6fea17e8339fe67185f12140e8a5e46117d7a55bd4e2d0c738bfbd"
+    },
+    {
+      "file": "sprites/spd-ui/empty_weapon.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "rect": [
+        16,
+        0,
+        16,
+        16
+      ],
+      "sha256": "de221617a0b6604a28402bcf93d02bd12e136771a0bf5f39f2dd5f26777d57c7"
+    },
+    {
+      "file": "sprites/spd-ui/empty_armor.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "rect": [
+        32,
+        0,
+        16,
+        16
+      ],
+      "sha256": "3694b1530aeeafbd50237a286d3024d354cf8703cb013de845db308626d89b2c"
+    },
+    {
+      "file": "sprites/spd-ui/empty_artifact.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "rect": [
+        64,
+        0,
+        16,
+        16
+      ],
+      "sha256": "0d687b9f1ec31b7d9105b06f4cc2f229c489001e3c342fe4059e07fe42c39459"
+    },
+    {
+      "file": "sprites/spd-ui/empty_ring.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/sprites/items.png",
+      "rect": [
+        96,
+        0,
+        16,
+        16
+      ],
+      "sha256": "fd1698d096e62ad6b14373b86b229e9a18596b7401d83455af9fc47378a96b21"
+    },
+    {
+      "file": "sprites/spd-ui/window_0_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        0,
+        0,
+        6,
+        6
+      ],
+      "sha256": "5a63751550de0cf3210815e8ff434d98841a6244bacdb4500ac42a49bad66d1e"
+    },
+    {
+      "file": "sprites/spd-ui/window_0_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        6,
+        0,
+        8,
+        6
+      ],
+      "sha256": "28f0990979b6c45f038178635364b137e54300483367a7607f44ac516e20be3c"
+    },
+    {
+      "file": "sprites/spd-ui/window_0_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        14,
+        0,
+        6,
+        6
+      ],
+      "sha256": "8e151613ab211baa3bf4180f2aa9f19c425d5958549dff10893abe91112d41ae"
+    },
+    {
+      "file": "sprites/spd-ui/window_1_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        0,
+        6,
+        6,
+        8
+      ],
+      "sha256": "8a8b9cf8364c8978a9777563104961ccc5dfa21d791b4918a70621a21517aaea"
+    },
+    {
+      "file": "sprites/spd-ui/window_1_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        6,
+        6,
+        8,
+        8
+      ],
+      "sha256": "e3eed42be3500a521a4e45b6700f434f51526e0fa2ace4cc58b945acb302e647"
+    },
+    {
+      "file": "sprites/spd-ui/window_1_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        14,
+        6,
+        6,
+        8
+      ],
+      "sha256": "a4dc51ad7cb9512788e6304d8cb959f4bafdea025d54361da7914d5b0faef99a"
+    },
+    {
+      "file": "sprites/spd-ui/window_2_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        0,
+        14,
+        6,
+        6
+      ],
+      "sha256": "f36351016dab252c0afaec4afac97d96592b561929a7197161735a9bcbce74cb"
+    },
+    {
+      "file": "sprites/spd-ui/window_2_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        6,
+        14,
+        8,
+        6
+      ],
+      "sha256": "373fd3d39f3671fa1e455fa4f21a0e084b306534c8e05e528e035cefb45ec491"
+    },
+    {
+      "file": "sprites/spd-ui/window_2_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        14,
+        14,
+        6,
+        6
+      ],
+      "sha256": "49ed7f525925390386d06e89790e5284e6924f705d2bea9df60ab573986c84de"
+    },
+    {
+      "file": "sprites/spd-ui/silver_0_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        86,
+        0,
+        7,
+        7
+      ],
+      "sha256": "cedeca703e6ed40b84f5988ed341f06cadd51e1bad452cf535230b3629692a4b"
+    },
+    {
+      "file": "sprites/spd-ui/silver_0_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        93,
+        0,
+        8,
+        7
+      ],
+      "sha256": "fb1c2849649a55d13f70caf451fafbe6993fad1881ad45414c412e5113a57de4"
+    },
+    {
+      "file": "sprites/spd-ui/silver_0_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        101,
+        0,
+        7,
+        7
+      ],
+      "sha256": "353fc91105229f943da2adca4a381a21a3e17034c5cf2feab9794477c7197678"
+    },
+    {
+      "file": "sprites/spd-ui/silver_1_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        86,
+        7,
+        7,
+        8
+      ],
+      "sha256": "58f8e758c48a1e0e37958d37db1bf9125b85b47e3939a52f4d880d4e5f246a21"
+    },
+    {
+      "file": "sprites/spd-ui/silver_1_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        93,
+        7,
+        8,
+        8
+      ],
+      "sha256": "324694d2de05a2a15933f3c4aa2310f9f50616d25611c0a3647ce70494ce5a75"
+    },
+    {
+      "file": "sprites/spd-ui/silver_1_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        101,
+        7,
+        7,
+        8
+      ],
+      "sha256": "6b77977f7cad0f4805cd83d8fb696a2614aef41a9ab58600df3a336c14a779fb"
+    },
+    {
+      "file": "sprites/spd-ui/silver_2_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        86,
+        15,
+        7,
+        7
+      ],
+      "sha256": "c26cc0c98be1212f69ebbea49994f1a1dfe4ddade8fec3f3dba760dcd2b52105"
+    },
+    {
+      "file": "sprites/spd-ui/silver_2_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        93,
+        15,
+        8,
+        7
+      ],
+      "sha256": "09ad0a50f44f982d90ad67bca6ea2761fe5fb3e862a7c8013c01cc971fe955e5"
+    },
+    {
+      "file": "sprites/spd-ui/silver_2_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        101,
+        15,
+        7,
+        7
+      ],
+      "sha256": "c105a253ff03caaf70bcab1d671b30405283e21f390f698a3f5c8e4108a5d7a3"
+    },
+    {
+      "file": "sprites/spd-ui/toast_0_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        20,
+        9,
+        4,
+        4
+      ],
+      "sha256": "61111cc4b669f237108f0e95b26dbf0d2e20de77d2ec4ea446109e685594f609"
+    },
+    {
+      "file": "sprites/spd-ui/toast_0_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        24,
+        9,
+        1,
+        4
+      ],
+      "sha256": "4e93c326520b63538f9b0000b3069270f36d2b122bb92047ce8ae02413ef37b4"
+    },
+    {
+      "file": "sprites/spd-ui/toast_0_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        25,
+        9,
+        4,
+        4
+      ],
+      "sha256": "39b3812300cb286b24b6b2e6df7a442892fae949f36bf9b8b3fce0e41f6a0c1a"
+    },
+    {
+      "file": "sprites/spd-ui/toast_1_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        20,
+        13,
+        4,
+        1
+      ],
+      "sha256": "0a6d777a853d88afbb9e9754caa870d22126c69c3a0bb84e1f0ff091ca10d8f8"
+    },
+    {
+      "file": "sprites/spd-ui/toast_1_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        24,
+        13,
+        1,
+        1
+      ],
+      "sha256": "7ba30838fe574db0779a055a097cc93592328d652feea1b1d49dce700179139a"
+    },
+    {
+      "file": "sprites/spd-ui/toast_1_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        25,
+        13,
+        4,
+        1
+      ],
+      "sha256": "5fa6c0ad921632cd3afffc430ba43ed84e2ad1ad346397b4fe26b69125c303cc"
+    },
+    {
+      "file": "sprites/spd-ui/toast_2_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        20,
+        14,
+        4,
+        4
+      ],
+      "sha256": "e1574c9c0da60307f410d31f8887f5b0c9dc2ae156c0eaefc10502264d291410"
+    },
+    {
+      "file": "sprites/spd-ui/toast_2_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        24,
+        14,
+        1,
+        4
+      ],
+      "sha256": "d7fef7c6483d5b8c8666b84e20567d258bddf7bfe9a78f04a891e723bfcf826e"
+    },
+    {
+      "file": "sprites/spd-ui/toast_2_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        25,
+        14,
+        4,
+        4
+      ],
+      "sha256": "cb301b85dd65a9c4315bd3f06369682bdca171dce429f38a76b41b929e5dc00b"
+    },
+    {
+      "file": "sprites/spd-ui/red_0_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        38,
+        0,
+        2,
+        2
+      ],
+      "sha256": "ddb2f69cb9087888f2703f527efcb0e8bf29c6709e44dd4c34fb7244da51a437"
+    },
+    {
+      "file": "sprites/spd-ui/red_0_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        40,
+        0,
+        2,
+        2
+      ],
+      "sha256": "2edd80f84a84c3e2a251bed7b8b2a5098ecc81aa57891a14a6734cd6207e0053"
+    },
+    {
+      "file": "sprites/spd-ui/red_0_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        42,
+        0,
+        2,
+        2
+      ],
+      "sha256": "b1f73bda16c9e9ed56d467949c8075e95de15bc484be6cd09787032f29204814"
+    },
+    {
+      "file": "sprites/spd-ui/red_1_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        38,
+        2,
+        2,
+        2
+      ],
+      "sha256": "6c56a7dc8e5499a616bd48b6b0d3b495ff658dac916f5197c577cf18fec8b1a6"
+    },
+    {
+      "file": "sprites/spd-ui/red_1_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        40,
+        2,
+        2,
+        2
+      ],
+      "sha256": "a2f41b264ce269d7aad460ec7f85f7b343f6b06c7c029b1107ae34b1b89b159b"
+    },
+    {
+      "file": "sprites/spd-ui/red_1_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        42,
+        2,
+        2,
+        2
+      ],
+      "sha256": "c0fb4fa23ec00453877671c38fef4724ce463af85a41ba8bc5dca7246a90943f"
+    },
+    {
+      "file": "sprites/spd-ui/red_2_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        38,
+        4,
+        2,
+        2
+      ],
+      "sha256": "207d899cc60d9f4167c1fe158d3d2403d539755cd44b8cab2e396e26760d50c7"
+    },
+    {
+      "file": "sprites/spd-ui/red_2_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        40,
+        4,
+        2,
+        2
+      ],
+      "sha256": "da846c2692ecc5df083f10a15505c7ee00e4b18ff02c034241a01480ae0725cc"
+    },
+    {
+      "file": "sprites/spd-ui/red_2_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        42,
+        4,
+        2,
+        2
+      ],
+      "sha256": "7bacba0645e40c4e60e9ceda21adb20477e4ce3273822752f855ace64c025189"
+    },
+    {
+      "file": "sprites/spd-ui/grey_0_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        38,
+        6,
+        2,
+        2
+      ],
+      "sha256": "e697b269e125bdf61a33652bd01ca5123795f51e773f97c7cc407b3cd4f8edd1"
+    },
+    {
+      "file": "sprites/spd-ui/grey_0_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        40,
+        6,
+        2,
+        2
+      ],
+      "sha256": "38bf347f7ba442ea3d9754441fae588125a52d786e1a2acbdd7644f6676c093d"
+    },
+    {
+      "file": "sprites/spd-ui/grey_0_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        42,
+        6,
+        2,
+        2
+      ],
+      "sha256": "fe2aeba2ddb9dfd9cc148a7141fda4cabec2841f78f17999d6b118079e6f0532"
+    },
+    {
+      "file": "sprites/spd-ui/grey_1_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        38,
+        8,
+        2,
+        2
+      ],
+      "sha256": "6b015e918eeab5badcc0f17c9046c68bd0b776e4364841ea0476f66f4366e7d1"
+    },
+    {
+      "file": "sprites/spd-ui/grey_1_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        40,
+        8,
+        2,
+        2
+      ],
+      "sha256": "2fa55d170ec30b9bf00f46c8583d16b5bfcc18adf11299ee75ec8b34bbd79609"
+    },
+    {
+      "file": "sprites/spd-ui/grey_1_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        42,
+        8,
+        2,
+        2
+      ],
+      "sha256": "9d1e35713c68c9b6952ac14e80ec0cbda04be1ec0eccfe61019a324352b0596c"
+    },
+    {
+      "file": "sprites/spd-ui/grey_2_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        38,
+        10,
+        2,
+        2
+      ],
+      "sha256": "840126d303e8d7442ad0087f608daf7c08a0e3efd40e14ad16b6ecf519d46b57"
+    },
+    {
+      "file": "sprites/spd-ui/grey_2_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        40,
+        10,
+        2,
+        2
+      ],
+      "sha256": "ee13653d6bab31e7ce1a696a74c98942ec9d16cae825f90e8e4055e08bb97fee"
+    },
+    {
+      "file": "sprites/spd-ui/grey_2_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        42,
+        10,
+        2,
+        2
+      ],
+      "sha256": "d0a34f7f028c0e5e4b44563e1646346fac091da565d3b5139b8086da38b1ba5b"
+    },
+    {
+      "file": "sprites/spd-ui/tab_0_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        65,
+        22,
+        3,
+        3
+      ],
+      "sha256": "fc7f37fb472423a79168f72be96fb43fe6e9ace8161d5d0e12011b5ebbb30868"
+    },
+    {
+      "file": "sprites/spd-ui/tab_0_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        68,
+        22,
+        2,
+        3
+      ],
+      "sha256": "def40db38cf1176d5377ed1943250af8b13b6726d3b49d0ae9bf1e5a9a9c1dd6"
+    },
+    {
+      "file": "sprites/spd-ui/tab_0_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        70,
+        22,
+        3,
+        3
+      ],
+      "sha256": "0b5c03557937e2398aada82a1bdb674db3281a383013a81f1b5adce7fd984898"
+    },
+    {
+      "file": "sprites/spd-ui/tab_1_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        65,
+        25,
+        3,
+        7
+      ],
+      "sha256": "3865a1b4df626879b0b5d5ca1de12f7d881dae6edacca8061059542a16a6d3a0"
+    },
+    {
+      "file": "sprites/spd-ui/tab_1_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        68,
+        25,
+        2,
+        7
+      ],
+      "sha256": "b07a3d7addd5765597c1055d22cf31f75d195acb60863bf6fddaf7ea4704c12f"
+    },
+    {
+      "file": "sprites/spd-ui/tab_1_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        70,
+        25,
+        3,
+        7
+      ],
+      "sha256": "6075e0398ca7753da7296925f710385a3422685f3771ca460dd80b0fa89ce399"
+    },
+    {
+      "file": "sprites/spd-ui/tab_2_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        65,
+        32,
+        3,
+        3
+      ],
+      "sha256": "e4caf240e871a314262a2a42164db4e7d916f465bffa12bb0d988ff029a778ee"
+    },
+    {
+      "file": "sprites/spd-ui/tab_2_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        68,
+        32,
+        2,
+        3
+      ],
+      "sha256": "36c07782c8fc2abbbd222dfe15c0d232d431e54d5105223ff380760eb2a9eb9b"
+    },
+    {
+      "file": "sprites/spd-ui/tab_2_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        70,
+        32,
+        3,
+        3
+      ],
+      "sha256": "7f6c1a5e9bb3b39e1dffc697241c36f52a62c0b3d201c2e0a86404ca6cf94edb"
+    },
+    {
+      "file": "sprites/spd-ui/tabOff_0_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        75,
+        22,
+        3,
+        3
+      ],
+      "sha256": "212560806a974e43d49526f4fe844be3bf9dccf8fc95ec868b580c89320587a3"
+    },
+    {
+      "file": "sprites/spd-ui/tabOff_0_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        78,
+        22,
+        2,
+        3
+      ],
+      "sha256": "eb7d6e84da20d64a181564959a24f73ebe69d73fe88a55e95a27e7202d48ff87"
+    },
+    {
+      "file": "sprites/spd-ui/tabOff_0_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        80,
+        22,
+        3,
+        3
+      ],
+      "sha256": "212560806a974e43d49526f4fe844be3bf9dccf8fc95ec868b580c89320587a3"
+    },
+    {
+      "file": "sprites/spd-ui/tabOff_1_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        75,
+        25,
+        3,
+        7
+      ],
+      "sha256": "36cac32a967bfc45e054fc29e6905ceeaa55cbec73b91247a70f26e6b2d53f67"
+    },
+    {
+      "file": "sprites/spd-ui/tabOff_1_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        78,
+        25,
+        2,
+        7
+      ],
+      "sha256": "97d53f34b97cee2b6632f3c5099d556eafd91eddc4e0098716ca957b9dde298e"
+    },
+    {
+      "file": "sprites/spd-ui/tabOff_1_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        80,
+        25,
+        3,
+        7
+      ],
+      "sha256": "149568487f59a4ac9fffc17e26fd0cfd3d34551209a9fd1dbdd02cf90988042b"
+    },
+    {
+      "file": "sprites/spd-ui/tabOff_2_0.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        75,
+        32,
+        3,
+        3
+      ],
+      "sha256": "e5c1ef11ac848998a628a0ef06adb7ce3137f6877ea220666c953b70018bccee"
+    },
+    {
+      "file": "sprites/spd-ui/tabOff_2_1.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        78,
+        32,
+        2,
+        3
+      ],
+      "sha256": "e7e040aff71a747720563d04e17914b4bb06408bc887154570108a1c15cb91ee"
+    },
+    {
+      "file": "sprites/spd-ui/tabOff_2_2.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/interfaces/chrome.png",
+      "rect": [
+        80,
+        32,
+        3,
+        3
+      ],
+      "sha256": "35e51db5c6a0210d9f00197b5992da1ccf623719d737360d0a38ecb021e3e980"
+    },
+    {
+      "file": "sprites/spd-ui/title_arch.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/splashes/title/archs.png",
+      "rect": [
+        0,
+        0,
+        333,
+        100
+      ],
+      "sha256": "676ea54aeaa8e0980b569b9fd018c95c4218af98e7895b02dedeb418c545a58f"
+    },
+    {
+      "file": "sprites/spd-ui/title_cluster.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/splashes/title/back_clusters.png",
+      "rect": [
+        0,
+        0,
+        450,
+        250
+      ],
+      "sha256": "e41bcf475b3c60baac80640fa4dd25b847e9dc21e258e94baafb0e056cbdde92"
+    },
+    {
+      "file": "sprites/spd-ui/title_mid.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/splashes/title/mid_mixed.png",
+      "rect": [
+        0,
+        0,
+        273,
+        242
+      ],
+      "sha256": "282c7d556427023340de65f47ebf88680fd1b67b3d2fb835575241bb561fa356"
+    },
+    {
+      "file": "sprites/spd-ui/title_front.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/splashes/title/front_small.png",
+      "rect": [
+        0,
+        0,
+        112,
+        116
+      ],
+      "sha256": "dfd5444f6b22d415619cfd04d1e621b9574115865b8d3802768be8d9fcfd4c20"
+    }
+  ],
+  "font": {
+    "file": "fonts/spd-pixel.ttf",
+    "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/assets/fonts/pixel_font.ttf",
+    "sha256": "b0e3f69a08ed72c54e150060d2bfb99a39e75cfbbe2aeb12db9b2831bd816e17"
+  }
+}

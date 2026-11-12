@@ -26,6 +26,8 @@ export interface UiStyle {
   flexGrow?: number;
   flexShrink?: number;
   background?: UiColor;
+  imageMode?: "auto" | "stretch";
+  imageTint?: UiColor;
 }
 
 interface UiElementBase {
@@ -40,11 +42,12 @@ export interface UiTextElement extends UiElementBase {
   value: string;
   fontSize: number;
   color: UiColor;
+  font?: string;
 }
 export interface UiImageElement extends UiElementBase { kind: "image"; path: string; }
 export interface UiButtonElement extends UiElementBase { kind: "button"; onClick?: () => void; }
 export type UiElement = UiContainerElement | UiTextElement | UiImageElement | UiButtonElement;
-export interface UiTextOptions { style?: UiStyle; fontSize?: number; color?: UiColor; }
+export interface UiTextOptions { style?: UiStyle; fontSize?: number; color?: UiColor; font?: string; }
 export interface UiButtonOptions {
   style?: UiStyle;
   textStyle?: UiStyle;
@@ -67,7 +70,7 @@ export function column(id: string, style: UiStyle = {}, children: readonly UiEle
   return node(id, { ...style, flexDirection: "column" }, children);
 }
 export function text(id: string, value: string, options: UiTextOptions = {}): UiTextElement {
-  return { kind: "text", id, value, style: options.style, fontSize: options.fontSize ?? 16, color: options.color ?? defaultTextColor };
+  return { kind: "text", id, value, style: options.style, fontSize: options.fontSize ?? 16, color: options.color ?? defaultTextColor, font: options.font };
 }
 export function image(id: string, path: string, style: UiStyle = {}): UiImageElement {
   return { kind: "image", id, path, style };
@@ -90,6 +93,7 @@ function mountElement(element: UiElement, parentId: string): void {
   if (element.kind === "text") {
     const [red, green, blue, alpha] = element.color;
     requireUi(ui_set_text(element.id, element.value, element.fontSize, red, green, blue, alpha), "text", element.id);
+    if (element.font) requireUi(ui_set_font(element.id, element.font), "font", element.id);
   } else if (element.kind === "image") {
     requireUi(ui_set_image(element.id, element.path), "image", element.id);
   } else if (element.kind === "button" && element.onClick) {
@@ -102,17 +106,18 @@ export function mountUi(root: UiElement): void {
   buttonCallbacks.clear();
   mountElement(root, "");
 }
-export function updateUi(): void {
+export function updateUi(): boolean {
   // A held pointer can press a replacement button again after a remount.
   // Keep the action latched until release, across rebuilds of the UI tree.
   const pointerPressed = input_primary_pointer().pressed;
   if (!pointerPressed) pointerActionHandled = false;
-  if (pointerActionHandled) return;
+  if (pointerActionHandled) return false;
   // A callback may remount the UI and replace this map. Process one action
   // from the original tree, never newly mounted buttons in the same frame.
   for (const [id, callback] of [...buttonCallbacks]) {
-    if (ui_button_just_pressed(id)) { pointerActionHandled = pointerPressed; callback(); break; }
+    if (ui_button_just_pressed(id)) { pointerActionHandled = pointerPressed; callback(); return true; }
   }
+  return false;
 }
 export function unmountUi(): void { buttonCallbacks.clear(); ui_clear(); }
 export function removeUi(id: string): boolean { buttonCallbacks.delete(id); return ui_despawn(id); }

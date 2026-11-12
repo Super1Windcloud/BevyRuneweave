@@ -26,6 +26,8 @@ export interface UiStyle {
   flexGrow?: number;
   flexShrink?: number;
   background?: UiColor;
+  imageMode?: "auto" | "stretch";
+  imageTint?: UiColor;
 }
 
 interface UiElementBase {
@@ -43,6 +45,7 @@ export interface UiTextElement extends UiElementBase {
   value: string;
   fontSize: number;
   color: UiColor;
+  font?: string;
 }
 
 export interface UiImageElement extends UiElementBase {
@@ -61,6 +64,7 @@ export interface UiTextOptions {
   style?: UiStyle;
   fontSize?: number;
   color?: UiColor;
+  font?: string;
 }
 
 export interface UiButtonOptions {
@@ -106,6 +110,7 @@ export function text(id: string, value: string, options: UiTextOptions = {}): Ui
     style: options.style,
     fontSize: options.fontSize ?? 16,
     color: options.color ?? defaultTextColor,
+    font: options.font,
   };
 }
 
@@ -149,6 +154,7 @@ function mountElement(element: UiElement, parentId: string): void {
       "text",
       element.id,
     );
+    if (element.font) requireUi(ui_set_font(element.id, element.font), "font", element.id);
   } else if (element.kind === "image") {
     requireUi(ui_set_image(element.id, element.path), "image", element.id);
   } else if (element.kind === "button" && element.onClick) {

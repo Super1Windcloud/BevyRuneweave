@@ -256,6 +256,7 @@ mod tests {
             RuneweaveScriptApiPlugin,
         ))
         .init_asset::<Image>()
+        .init_asset::<Font>()
         .init_asset::<bevy::world_serialization::WorldAsset>()
         .init_asset::<AnimationClip>()
         .init_asset::<AnimationGraph>();
@@ -272,6 +273,11 @@ mod tests {
         ));
         app.world_mut()
             .spawn((Camera3d::default(), Camera::default()));
+        app.world_mut().spawn((
+            Camera2d,
+            Projection::Orthographic(OrthographicProjection::default_2d()),
+            Transform::default(),
+        ));
         app.world_mut().init_resource::<ButtonInput<KeyCode>>();
         app.finish();
         let world_id = app.world().id();
@@ -311,6 +317,8 @@ mod tests {
             call("on_script_loaded", &mut context)?;
             click("start")?;
             call("on_update", &mut context)?;
+            click("begin_run")?;
+            call("on_update", &mut context)?;
             guard.with_world_mut(|world| {
                 world
                     .resource_mut::<ButtonInput<KeyCode>>()
@@ -327,8 +335,13 @@ mod tests {
             })?;
             click("pause")?;
             call("on_update", &mut context)?;
-            click("checks")?;
+            guard.with_world_mut(|world| {
+                world
+                    .resource_mut::<ButtonInput<KeyCode>>()
+                    .press(KeyCode::F12)
+            })?;
             call("on_update", &mut context)?;
+            guard.with_world_mut(|world| world.resource_mut::<ButtonInput<KeyCode>>().clear())?;
             let mut lines = std::collections::HashSet::new();
             for _ in 0..2 {
                 guard.with_world_mut(|world| {
@@ -351,7 +364,7 @@ mod tests {
             }
             click("back")?;
             call("on_update", &mut context)?;
-            click("resume")?;
+            click("pause_window_outside")?;
             call("on_update", &mut context)?;
             guard.with_world_mut(|world| {
                 let mut query = world.query_filtered::<&mut Window, With<PrimaryWindow>>();
@@ -364,13 +377,18 @@ mod tests {
             call("on_update", &mut context)?;
             click("bag_btn")?;
             call("on_update", &mut context)?;
-            click("bag_page")?;
+            click("slot_food_ration")?;
             call("on_update", &mut context)?;
             guard.with_world_mut(|world| {
-                assert_eq!(world.resource::<ScriptGameState>().message, "INVENTORY");
+                assert_eq!(world.resource::<ScriptGameState>().message, "ITEM");
                 let label =
-                    super::super::find_owned_entity(world, &attachment, "bag_page__label").unwrap();
-                assert_eq!(world.get::<Text>(label).unwrap().0, "PAGE 2 / 2 / NEXT");
+                    super::super::find_owned_entity(world, &attachment, "item_detail_title")
+                        .unwrap();
+                assert_eq!(world.get::<Text>(label).unwrap().0, "Food Ration");
+                assert_eq!(
+                    world.get::<TextFont>(label).unwrap().font_smoothing,
+                    bevy::text::FontSmoothing::None
+                );
                 assert!(
                     super::super::find_owned_entity(world, &attachment, "use_food_ration")
                         .is_some()

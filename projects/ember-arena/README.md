@@ -6,6 +6,12 @@ The current milestone is a playable five-depth sewer expedition. It is **not yet
 one-to-one port**. [PARITY.md](PARITY.md) records the implemented subset, upstream references,
 known differences and the next content to migrate.
 
+The UI is being aligned independently against the pinned upstream revision. See
+[UI_PARITY.md](UI_PARITY.md) for original source anchors, current screen coverage and the
+remaining visual/content differences. Original chrome, icons, font, title/hero scenes,
+five-column inventory and item-action windows replace the previous generic panels.
+This is not yet a claim that every original screen is pixel-identical.
+
 ## Run and verify
 
 From the repository root:
@@ -25,6 +31,8 @@ repository `target/`; root tooling supplies the TypeScript dependencies.
 - Native top-down 2D sprites use the original hero, monster, item and sewer tile atlases.
   Frame sizes follow upstream `HeroSprite`, mob sprites and `DungeonTileSheet`; the previous
   2.5D standee models remain available as assets but are not used in this mode.
+- The world retains fixed 16-unit tiles. A real orthographic camera follows the hero and uses
+  integer UI zoom; resizing does not move or rescale actors in the authoritative Bevy world.
 - A seeded 25×25 floor contains nine rooms, connecting corridors, doors, water and stairs.
   This generator guarantees connectivity; it does not reproduce upstream's room generator.
 - Movement and combat are turn based. Standing idle does not move monsters, consume food,
@@ -55,6 +63,9 @@ repository `target/`; root tooling supplies the TypeScript dependencies.
 | 1–7 | Healing, flame, invisibility, strength, upgrade, mapping, food |
 | Escape | Pause/resume or close the current menu |
 
+The title opens a separate six-icon hero selection screen; the four implemented classes are
+playable, while Duelist/Cleric show their upstream unlock-message presentation. Selecting a
+backpack slot opens an item-detail window before Drink/Read/Eat is confirmed.
 Inventory browsing and pausing cost no turns. Successfully using an item returns to play and
 allows monster responses. Empty item slots and blocked moves cost no turns. Keyboard holds
 repeat at a bounded rate; clicks never path through unexplored terrain.
@@ -124,3 +135,23 @@ execution remain unverified for this change. The historical macOS arena verifica
   the child process's `PATH` to bypass a mise `npm.cmd` shim resolution failure. No persistent
   machine configuration was changed. GPU startup logged a missing Epic overlay-layer manifest;
   rendering still initialized and the screenshots above were captured successfully.
+
+### UI alignment verification on 2026-11-12 (Windows Debug)
+
+- `npm --prefix projects/ember-arena test`: **36 passed**. The inventory regression now verifies
+  a five-column grid and item confirmation, replacing the earlier compact-page layout.
+- `cargo test --locked --offline -p bevy-runeweave --lib`: **38 passed, 1 performance test ignored**.
+  Lua/QuickJS parity covers font selection/preservation, image mode/tint and real camera control.
+- `cargo build --locked --offline -p ember-arena-ts`, root tooling checks, the shared TypeScript
+  SDK check, Rust formatting and whitespace checks passed.
+- Original UI atlases/font are pinned to revision `57a4e06a4caf162446d1c28caa7983f0493fecf0`.
+  Source coordinates, generated crop dimensions/checksums and core screen geometry are tested.
+- Native title, six-class selection, HUD and backpack renders were inspected. Read-only F12
+  fixtures cover the existing item, pause, settings, result and hero-info presentations.
+  Evidence is under `dist/asset-downloads/ember-arena/ui-parity/`; fixture captures are rendering
+  evidence, not proof of item actions or a completed run. Foreground OS mouse control was
+  unavailable in this run; window-directed keyboard events drove the native captures.
+- A matching upstream executable pixel-diff run was not completed. Full original settings,
+  secondary scenes/data, animation and other differences remain explicitly tracked in
+  [UI_PARITY.md](UI_PARITY.md). The original source-to-source layout work must not be reported
+  as full one-to-one UI acceptance. Other platform execution remains unverified.

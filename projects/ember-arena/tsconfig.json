@@ -5,6 +5,7 @@
     "rootDir": "modules/ember-arena",
     "outDir": "modules/ember-arena/game/assets",
     "strict": true,
+    "resolveJsonModule": true,
     "noEmit": true,
     "noEmitOnError": true,
     "removeComments": true,

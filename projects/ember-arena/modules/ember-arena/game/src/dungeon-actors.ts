@@ -1,7 +1,7 @@
 import { field, kind } from "./actors.js";
 import { type EnemyKind, type HeroClass, type Point } from "./rules.js";
 
-export let cellSize = 22;
+export const cellSize = 16;
 export const mobSprites: Record<EnemyKind, string> = { chaser: "rat", ranger: "gnoll", charger: "crab", boss: "goo" };
 const frameSizes: Record<string, readonly [number, number]> = {
   warrior: [12, 15], mage: [12, 15], rogue: [12, 15], huntress: [12, 15],
@@ -37,19 +37,6 @@ export function actorSprite(id: string, hero: HeroClass, visible = true): void {
   sprite(id, name, cellPosition(id), 2);
   const scale = scene_transform(id)!.get("scale") as BmsReflectReference;
   for (const axis of ["x", "y"]) scale.set(axis, visible ? 1 : 0);
-}
-
-export function resizeGrid(size: number): void {
-  if (size === cellSize) return;
-  // Rescale the real transforms without caching another set of actor positions.
-  const ratio = size / cellSize;
-  for (const id of scene_actor_ids()) {
-    if (kind(id) === "effect") { scene_despawn(id); continue; }
-    const translation = scene_transform(id)!.get("translation") as BmsReflectReference;
-    translation.set("x", (translation.get("x") as number) * ratio);
-    translation.set("y", ((translation.get("y") as number) + 40) * ratio - 40);
-  }
-  cellSize = size;
 }
 
 export function monsterIds(): string[] {

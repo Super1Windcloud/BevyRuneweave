@@ -3,11 +3,12 @@ import { actor, change, field, kind, position } from "./actors.js";
 import { clamp, dungeonMonsters, enemySpecs, getHungerStatus, heroClasses, heroClassList, itemCatalog, mobCombat, seededRandom,
   type EnemyKind, type HeroClass, type ItemKind, type Point } from "./rules.js";
 import { canStep, cellDistance, cellKey, findPath, generateFloor, lineOfSight, reveal, sameCell, terrainAt, type DungeonFloor, type Terrain } from "./dungeon.js";
-import { actorSprite, cellPosition, cellSize, mobSprites, monsterIds, placeCell, resizeGrid, sprite } from "./dungeon-actors.js";
+import { actorSprite, cellPosition, cellSize, mobSprites, monsterIds, placeCell, sprite } from "./dungeon-actors.js";
 import { defaultProfile, parseProfile, type Profile } from "./profile.js";
-import { button, column, image, mountUi, node, row, text, updateUi, type UiElement, type UiStyle } from "../../api/ui.js";
+import { mountUi, updateUi } from "../../api/ui.js";
+import { renderSpdUi, uiMetrics, type UiPhase } from "./spd-ui.js";
 
-type Phase = "menu" | "playing" | "paused" | "won" | "lost" | "checks" | "settings" | "inventory";
+type Phase = UiPhase;
 
 const ink = [0.055, 0.05, 0.04, 0.97] as const;
 const amber = [1, 0.60, 0.20, 1] as const;
@@ -45,7 +46,11 @@ let settingsReturn: Phase = "menu";
 let runRecorded = false;
 let random = seededRandom(profile.seed);
 let checkPage = 0;
-let bagPage = 0;
+let selectedItem: ItemKind = "potion_healing";
+let settingsTab = 0;
+let overlayReturn: Phase = "playing";
+let uiNotice = "";
+let previewPhase: Phase | null = null;
 
 // Shattered Pixel Dungeon core state
 let gold = 0;
@@ -98,7 +103,7 @@ function persistProfile(): void {
 }
 
 function openSettings(): void {
-  settingsReturn = phase;
+  settingsReturn = phase === "paused" ? "playing" : phase;
   resetPending = false;
   setPhase("settings");
 }
@@ -116,269 +121,77 @@ function resetProfile(): void {
   drawUi();
 }
 
-function action(id: string, label: string, callback: () => void, primary = false): UiElement {
-  return button(id, label, {
-    onClick: callback,
-    fontSize: compactUi() ? 12 : 16,
-    color: primary ? [0.06, 0.08, 0.08, 1] : [0.9, 0.95, 0.95, 1],
-    style: {
-      width: "100%",
-      height: compactUi() ? 36 : 48,
-      borderRadius: 2,
-      background: primary ? amber : [0.16, 0.14, 0.11, 1],
-    },
-  });
-}
-
-function itemAction(kindKey: ItemKind): UiElement {
-  const def = itemCatalog[kindKey];
-  const count = inventory[kindKey];
-  const disabled = count <= 0;
-  return row(`item_row_${kindKey}`, { width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8 }, [
-    image(`item_ico_${kindKey}`, `sprites/dungeon/${kindKey}.png`, { width: compactUi() ? 20 : 24, height: compactUi() ? 20 : 24 }),
-    column(`item_info_${kindKey}`, { flexGrow: 1 }, [
-      text(`item_title_${kindKey}`, `${def.name}  x${count}`, { fontSize: compactUi() ? 12 : 14, color: disabled ? muted : teal }),
-      text(`item_desc_${kindKey}`, def.description, { fontSize: 11, color: muted, style: { display: compactUi() ? "none" : "flex" } }),
-    ]),
-    button(`use_${kindKey}`, disabled ? "EMPTY" : `USE`, {
-      onClick: () => { useInventoryItem(kindKey); drawUi(); },
-      fontSize: 12,
-      style: {
-        width: 80,
-        height: compactUi() ? 30 : 36,
-        borderRadius: 2,
-        background: disabled ? [0.08, 0.12, 0.14, 0.6] : amber,
-      },
-      color: disabled ? muted : [0.06, 0.08, 0.08, 1],
-    }),
-  ]);
-}
-
-function safeStyle(): UiStyle {
-  const safe = window_safe_area();
-  const pointer = input_primary_pointer();
-  return {
-    position: "absolute",
-    left: `${(safe.leftInset / pointer.viewportWidth) * 100}%`,
-    top: `${(safe.topInset / pointer.viewportHeight) * 100}%`,
-    width: `${(safe.width / pointer.viewportWidth) * 100}%`,
-    height: `${(safe.height / pointer.viewportHeight) * 100}%`,
-  };
-}
-
-function panel(title: string, subtitle: string, content: UiElement[]): UiElement {
-  return column("panel", {
-    width: "90%",
-    maxWidth: 470,
-    padding: compactUi() ? 12 : 24,
-    gap: compactUi() ? 6 : 12,
-    background: ink,
-    borderRadius: 2,
-  }, [
-    text("panel_kicker", "SHATTERED PIXEL DUNGEON", { fontSize: 12, color: amber }),
-    text("panel_title", title, { fontSize: compactUi() ? 22 : 32 }),
-    text("panel_subtitle", subtitle, {
-      fontSize: compactUi() ? 11 : 14,
-      color: muted,
-      style: { display: compactUi() ? "none" : "flex" },
-    }),
-    ...content,
-  ]);
-}
-
 function drawUi(): void {
-  const pointer = input_primary_pointer();
-  const safe = window_safe_area();
-  const metrics = window_metrics();
+  const pointer = input_primary_pointer(), safe = window_safe_area(), metrics = window_metrics();
+  if (metrics.width <= 0 || metrics.height <= 0) return;
   viewport = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
-  const children: UiElement[] = [];
-
-  if (phase === "playing") {
-    const hunger = getHungerStatus(hungerTimer);
-    const hungerColor = hunger === "satiated" ? teal : hunger === "hungry" ? amber : crimson;
-    children.push(column("hud", { width: "100%", padding: 16, gap: 6 }, [
-      row("hud_top", { width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8 }, [
-        row("hud_hero_box", { gap: 8, alignItems: "center" }, [
-          image("hud_hero_icon", heroClasses[selectedClass].splash, { width: 28, height: 28 }),
-          column("hud_stats", { gap: 2, flexGrow: 1 }, [
-            text("hud_health", `VITALITY  ${Math.ceil(health())}`, { fontSize: 16, color: teal }),
-            text("hud_score", `LV ${level} / ${score} PTS / ${gold} G`, { fontSize: 12, color: muted }),
-          ]),
-        ]),
-        column("hud_center", { alignItems: "center", gap: 2 }, [
-          row("hud_depth_row", { gap: 4, alignItems: "center" }, [
-            image("hud_badge_icon", "sprites/spd/badges.png", { width: 16, height: 16 }),
-            text("hud_wave", `SEWERS: DEPTH ${depth}`, { fontSize: 15, color: amber }),
-          ]),
-          text("hud_hunger", hunger.toUpperCase(), { fontSize: 11, color: hungerColor }),
-        ]),
-        row("hud_controls", { gap: 4 }, [
-          button("bag_btn", "BAG [I]", {
-            onClick: () => setPhase("inventory"),
-            fontSize: 12,
-            style: { width: 56, height: 40, background: [0.12, 0.22, 0.24, 1], borderRadius: 2 },
-          }),
-          button("pause", "II", {
-            onClick: () => setPhase("paused"),
-            fontSize: 18,
-            style: { width: 44, height: 40, background: ink, borderRadius: 2 },
-          }),
-        ]),
-      ]),
-      node("health_track", { width: "100%", height: 4, background: [0.1, 0.2, 0.2, 0.7] }, [
-        node("health_fill", { width: `${clamp((health() / maxHealth) * 100, 0, 100)}%`, height: 4, background: teal }),
-      ]),
-      text("hud_info", statusLine(), { fontSize: 12, color: muted }),
-      column("boss_panel", { width: "100%", gap: 4, display: scene_actor("warden") ? "flex" : "none" }, [
-        row("boss_title_row", { gap: 8, alignItems: "center" }, [
-          image("boss_icon", "sprites/spd/goo.png", { width: 20, height: 20 }),
-          image("boss_hp_frame", "sprites/spd/boss_hp.png", { width: 16, height: 16 }),
-          text("boss_label", `GOO ${scene_actor("warden") ? Math.ceil(field("warden", "health")) : 0} / 100`, { fontSize: 14, color: amber }),
-        ]),
-        node("boss_track", { width: "100%", height: 5, background: ink }, [
-          node("boss_fill", { width: `${scene_actor("warden") ? clamp(field("warden", "health"), 0, 100) : 0}%`, height: 5, background: crimson }),
-        ]),
-      ]),
-      text("combat_notice", "", { fontSize: 15, color: amber }),
-      column("hud_logs", { width: "100%", gap: 2, padding: 4 }, [
-        ...dungeonLogs.map((entry, idx) =>
-          text(`log_line_${idx}`, entry, { fontSize: 11, color: idx === 0 ? teal : muted })
-        ),
-      ]),
-    ]));
-    children.push(row("turn_controls", { position: "absolute", bottom: 36, left: 16, right: 16, gap: 8 }, [
-      button("wait", "WAIT [SPACE]", { onClick: () => { queuedPath = []; spendTurns(); }, style: { width: "48%", height: 36, background: ink }, fontSize: 12 }),
-      button("descend", "DESCEND [E]", { onClick: descend, style: { width: "48%", height: 36, background: ink }, fontSize: 12 }),
-    ]));
-    children.push(text("hint", "WASD/ARROWS: STEP OR ATTACK | CLICK: WALK | SPACE: WAIT | E: DESCEND | I: BAG", {
-      fontSize: 11,
-      color: muted,
-      style: { position: "absolute", bottom: 12, left: 16, right: 16, display: profile.showHints ? "flex" : "none" },
-    }));
-  } else if (phase === "inventory") {
-    children.push(panel("Hero's Backpack", `SEWERS / GOLD ${gold} / HUNGER: ${getHungerStatus(hungerTimer).toUpperCase()}`, [
-      row("bag_header", { gap: 10, alignItems: "center" }, [
-        image("bag_icon", "sprites/spd/items.png", { width: 32, height: 32 }),
-        text("bag_title", "SEWER SATCHEL & ALCHEMY", { fontSize: 14, color: amber }),
-      ]),
-      ...(Object.keys(itemCatalog) as ItemKind[]).filter((_, index) => !compactUi() || Math.floor(index / 4) === bagPage).map(itemAction),
-      ...(compactUi() ? [action("bag_page", `PAGE ${bagPage + 1} / 2 / NEXT`, () => { bagPage = (bagPage + 1) % 2; drawUi(); })] : []),
-      action("close_bag", "CLOSE BACKPACK [ESC / I]", () => setPhase("playing"), true),
-    ]));
-  } else if (phase === "menu") {
-    const heroSpec = heroClasses[selectedClass];
-    children.push(panel("Descent into the Sewers", "Turn-based sewer expedition.\nExplore five depths and defeat Goo to complete this milestone.", [
-      image("spd_banner", "sprites/spd/banners.png", { width: compactUi() ? 180 : 220, height: compactUi() ? 34 : 42 }),
-      row("menu_art", { gap: 12, alignItems: "center" }, [
-        image("menu_icon", "sprites/spd/amulet.png", { width: 32, height: 32 }),
-        text("menu_controls", "Explore rooms, open doors and find the stairs.\nThe world waits until you take a turn.", { fontSize: 13, color: muted }),
-      ]),
-      row("hero_select_row", { width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8 }, [
-        image("hero_splash", heroSpec.splash, { width: compactUi() ? 46 : 56, height: compactUi() ? 46 : 56, borderRadius: 2 }),
-        column("hero_desc_col", { flexGrow: 1, gap: 2 }, [
-          text("hero_class_label", `CLASS: ${heroSpec.name}`, { fontSize: 16, color: amber }),
-          text("hero_title_label", heroSpec.title, { fontSize: 12, color: teal }),
-          text("hero_perks_label", heroSpec.perks, { fontSize: 11, color: muted }),
-        ]),
-        button("hero_class", "CYCLE HERO", {
-          onClick: () => {
-            const nextIdx = (heroClassList.indexOf(selectedClass) + 1) % heroClassList.length;
-            selectedClass = heroClassList[nextIdx]!;
-            room();
-            drawUi();
-          },
-          fontSize: 12,
-          style: { width: 110, height: 42, background: [0.15, 0.25, 0.28, 1], borderRadius: 2 },
-        }),
-      ]),
-      action("start", "DESCEND INTO THE SEWERS", startRun, true),
-      text("saved_stats", `BEST ${profile.bestScore}  /  WINS ${profile.wins} / ${profile.runs}  /  SEED ${profile.seed}`, { fontSize: 12, color: teal }),
-      action("settings", "SETTINGS & PROGRESS", openSettings),
-      action("checks", "RUNTIME CHECKS", openChecks),
-      action("exit", "RETURN TO LAUNCHER", () => { app_request_exit(); }),
-      text("credits", "In progress: Shattered Pixel Dungeon port (00-Evan / Watabou). See asset licenses.", { fontSize: 11, color: muted }),
-    ]));
-  } else if (phase === "paused") {
-    children.push(panel("Sewer Rest Camp", "The subterranean conduits grow quiet. Prepare your next move.", [
-      action("resume", "KEEP EXPLORING", () => setPhase("playing"), true),
-      action("settings", "SETTINGS & PROGRESS", openSettings),
-      action("checks", "RUNTIME CHECKS", openChecks),
-      action("restart", "RESTART DESCENT", startRun),
-      action("home", "MAIN MENU", loadMenu),
-      action("exit", "RETURN TO LAUNCHER", () => { app_request_exit(); }),
-    ]));
-  } else if (phase === "settings") {
-    const changeSetting = (changeFn: () => void): void => { changeFn(); persistProfile(); drawUi(); };
-    const pair = (id: string, first: UiElement, second: UiElement): UiElement => row(id, { width: "100%", justifyContent: "space-between" }, [
-      column(`${id}_left`, { width: "49%" }, [first]), column(`${id}_right`, { width: "49%" }, [second]),
-    ]);
-    children.push(panel("Dungeon settings", `BEST ${profile.bestScore} / ${profile.wins} WINS / ${profile.runs} FINISHED RUNS`, [
-      pair("settings_input", action("sensitivity", `DRAG  /  ${profile.sensitivity.toFixed(2)}x`, () => changeSetting(() => {
-        const values = [0.75, 1, 1.25, 1.5]; profile.sensitivity = values[(values.indexOf(profile.sensitivity) + 1) % values.length]!;
-      })), action("hints", `HINTS  /  ${profile.showHints ? "ON" : "OFF"}`, () => changeSetting(() => { profile.showHints = !profile.showHints; }))),
-      pair("settings_effects", action("motion", `REDUCED FX  /  ${profile.reducedMotion ? "ON" : "OFF"}`, () => changeSetting(() => { profile.reducedMotion = !profile.reducedMotion; })),
-        action("seed", `SEED  /  ${profile.seed}`, () => changeSetting(() => { profile.seed = (profile.seed + 1) >>> 0; }))),
-      text("save_notice", saveNotice || "Your settings and finished-run records are saved locally.", { fontSize: 12, color: muted }),
-      ...(resetPending ? [
-        text("reset_warning", "Clear this game's saved records and settings?", { fontSize: 13, color: amber }),
-        pair("reset_actions", action("confirm_reset", "CONFIRM RESET", resetProfile),
-          action("cancel_reset", "KEEP MY DATA", () => { resetPending = false; drawUi(); })),
-      ] : [
-        pair("save_actions", action("retry_save", "RETRY SAVE", () => { persistProfile(); drawUi(); }),
-          action("reset_save", "RESET SAVED PROGRESS", () => { resetPending = true; drawUi(); })),
-      ]),
-      action("settings_back", "BACK", () => setPhase(settingsReturn), true),
-    ]));
-  } else if (phase === "won" || phase === "lost") {
-    children.push(panel(
-      phase === "won" ? "The Sewers Are Cleared!" : "You Perished in the Sewers.",
-      `${score} POINTS / LEVEL ${level} / ${turns} TURNS / DEPTH ${depth}`, [
-        ...(phase === "won" ? [
-          row("won_art", { gap: 12, alignItems: "center", justifyContent: "center" }, [
-            image("victory_banner", "sprites/spd/banners.png", { width: 180, height: 36 }),
-            image("victory_key", "sprites/dungeon/skeleton_key.png", { width: 44, height: 44 }),
-            text("victory_key_label", "SKELETON KEY FOUND / SEWER MILESTONE", { fontSize: 13, color: amber }),
-          ]),
-        ] : [
-          row("lost_art", { gap: 8, alignItems: "center", justifyContent: "center" }, [
-            image("defeat_badge", "sprites/spd/badges.png", { width: 36, height: 36 }),
-            text("defeat_label", "PERISHED IN THE SEWERS", { fontSize: 13, color: crimson }),
-          ]),
-        ]),
-        text("result_note", phase === "won"
-          ? "Goo has dissolved into primordial sludge. You have conquered the Sewers and recovered the Amulet!"
-          : "The treacherous sewers claim another daring adventurer. Try another class and venture forth again!",
-          { fontSize: 14, color: muted }),
-        text("result_record", `BEST ${profile.bestScore}  /  WINS ${profile.wins} / ${profile.runs}`, { fontSize: 14, color: teal }),
-        text("result_save", saveNotice, { fontSize: 12, color: muted }),
-        action("restart", "DESCENT AGAIN", startRun, true),
-        action("home", "MAIN MENU", loadMenu),
-        action("exit", "RETURN TO LAUNCHER", () => { app_request_exit(); }),
-      ]));
-  } else {
-    const pageSize = compactUi() ? 3 : 6;
-    const pages = Math.max(1, Math.ceil(checks.length / pageSize));
-    checkPage = Math.min(checkPage, pages - 1);
-    children.push(panel("Runtime checks", "Contract checks run in the live script context.", [
-      ...checks.slice(checkPage * pageSize, (checkPage + 1) * pageSize).map((line, index) =>
-        text(`check_${index}`, line, { fontSize: compactUi() ? 11 : 12, color: line.startsWith("FAIL") ? [1, 0.3, 0.3, 1] : muted })
-      ),
-      action("check_page", `NEXT PAGE  /  ${checkPage + 1} OF ${pages}`, () => { checkPage = (checkPage + 1) % pages; drawUi(); }),
-      text("network_status", networkStatus, { fontSize: 12, color: muted }),
-      action("network", "CHECK HTTP (PUBLIC ECHO SERVICE)", checkNetwork),
-      action("back", "BACK", () => setPhase(returnPhase), true),
-    ]));
-  }
-
-  mountUi(column("safe_root", {
-    ...safeStyle(),
-    alignItems: "center",
-    justifyContent: phase === "playing" ? "start" : "center",
-  }, children));
+  mountUi(renderSpdUi({
+    phase: previewPhase ?? phase, selectedClass, item: selectedItem, health: previewPhase === "lost" ? 0 : health(), maxHealth, level, strength, experience,
+    targetExperience: targetExperience(), depth, gold, score, turns, hunger: getHungerStatus(hungerTimer),
+    invisible: invisTimer, ooze: causticOozeTimer, bossHealth: scene_actor("warden") ? field("warden", "health") : null,
+    inventory, logs: dungeonLogs, profile, settingsTab, gameBehind: phase === "settings" ? !["menu", "heroes"].includes(settingsReturn) : phase === "journal" ? overlayReturn !== "menu" : ["hero", "message"].includes(phase) ? overlayReturn !== "heroes" : true,
+    saveNotice, resetPending, checks, checkPage, networkStatus, notice: uiNotice,
+  }, uiAction));
 }
 
-function statusLine(): string {
-  return `TURN ${turns} / STR ${strength} / XP ${experience}/${targetExperience()}${invisTimer > 0 ? ` / INVISIBLE ${invisTimer}` : ""}${causticOozeTimer > 0 ? ` / OOZE ${causticOozeTimer}` : ""}`;
+function closeModal(): void {
+  if (phase === "settings" && resetPending) { resetPending = false; drawUi(); return; }
+  if (phase === "item") setPhase("inventory");
+  else if (phase === "settings") setPhase(settingsReturn);
+  else if (phase === "hero" || phase === "message" || phase === "journal") setPhase(overlayReturn);
+  else if (phase === "checks") setPhase(returnPhase);
+  else if (["inventory", "paused"].includes(phase)) setPhase("playing");
+  else loadMenu();
+}
+
+function uiAction(id: string, value?: string | number): void {
+  if (previewPhase) { previewPhase = null; drawUi(); return; }
+  if (id.startsWith("select:")) {
+    const hero = id.slice(7) as HeroClass;
+    if (!heroClassList.includes(hero)) {
+      uiNotice = hero === ("duelist" as HeroClass)
+        ? "To unlock the Duelist equip a tier 2 or higher weapon with no strength penalty."
+        : "To unlock the Cleric fully cleanse the curse on any piece of cursed equipment.";
+      overlayReturn = "heroes"; setPhase("message"); return;
+    }
+    selectedClass = hero; room(); setPhase("heroes"); return;
+  }
+  if (id.startsWith("tab:")) { settingsTab = Number(id.slice(4)); drawUi(); return; }
+  if (id.startsWith("use_")) { phase = "inventory"; useInventoryItem(id.slice(4) as ItemKind); return; }
+  if (id === "journal" || id === "game_journal") { overlayReturn = phase === "menu" ? "menu" : "playing"; setPhase("journal"); return; }
+  if (["rankings", "journal", "news", "changes", "about", "support"].includes(id)) { setPhase(id as Phase); return; }
+  switch (id) {
+    case "start": setPhase("heroes"); return;
+    case "begin_run": startRun(); return;
+    case "restart": setPhase("heroes"); return;
+    case "home": loadMenu(); return;
+    case "pause": setPhase("paused"); return;
+    case "bag_btn": setPhase("inventory"); return;
+    case "item": selectedItem = value as ItemKind; setPhase("item"); return;
+    case "quick": useInventoryItem(value as ItemKind); return;
+    case "hero_info": overlayReturn = phase; setPhase("hero"); return;
+    case "settings": openSettings(); return;
+    case "checks": openChecks(); return;
+    case "check_page": checkPage = (checkPage + 1) % Math.ceil(checks.length / 6); drawUi(); return;
+    case "network": checkNetwork(); return;
+    case "wait": queuedPath = []; spendTurns(); return;
+    case "descend": descend(); return;
+    case "modal_close": case "close_bag": case "settings_back": closeModal(); return;
+    case "back": if (phase === "heroes") loadMenu(); else closeModal(); return;
+    case "exit": app_request_exit(); return;
+    case "window_landscape": window_set_size(1280, 800); return;
+    case "window_portrait": window_set_size(450, 800); return;
+    case "hints": profile.showHints = !profile.showHints; break;
+    case "motion": profile.reducedMotion = !profile.reducedMotion; break;
+    case "sensitivity": { const values = [0.75, 1, 1.25, 1.5]; profile.sensitivity = values[(values.indexOf(profile.sensitivity) + 1) % values.length]!; break; }
+    case "seed": profile.seed = (profile.seed + 1) >>> 0; break;
+    case "retry_save": persistProfile(); drawUi(); return;
+    case "reset_save": resetPending = true; drawUi(); return;
+    case "cancel_reset": resetPending = false; drawUi(); return;
+    case "confirm_reset": resetProfile(); return;
+    default: return;
+  }
+  persistProfile(); drawUi();
 }
 
 function publish(): void {
@@ -386,6 +199,7 @@ function publish(): void {
 }
 
 function setPhase(next: Phase): void {
+  previewPhase = null;
   if ((next === "won" || next === "lost") && !runRecorded) {
     runRecorded = true;
     profile.runs++;
@@ -403,11 +217,12 @@ function setPhase(next: Phase): void {
 }
 
 function room(): void {
+  floor = null;
   scene_clear();
   ui_clear();
   scene_set_3d_enabled(false);
+  scene_set_camera_2d(0, 0, 800);
   paintBackdrop();
-  floor = null;
   renderedTiles.clear(); renderedFog.clear();
   sprite("player", selectedClass, { x: 12, z: 12 }, 2);
   scene_actor_set("player", "player", heroClasses[selectedClass].baseHealth, 1, 0.35);
@@ -416,7 +231,12 @@ function room(): void {
 function paintBackdrop(): void {
   const pointer = input_primary_pointer();
   if (!scene_transform("dungeon_backdrop")) scene_spawn("dungeon_backdrop", 0, 0, -10);
-  scene_set_sprite("dungeon_backdrop", "sprites/dungeon/void.png", pointer.viewportWidth, pointer.viewportHeight);
+  if (floor) {
+    const translation = scene_transform("player")!.get("translation") as BmsReflectReference;
+    scene_set_transform("dungeon_backdrop", translation.get("x") as number, (translation.get("y") as number) + 10, -10);
+    const metrics = window_metrics(), scale = uiMetrics().scale;
+    scene_set_sprite("dungeon_backdrop", "sprites/dungeon/void.png", metrics.width / scale, metrics.height / scale);
+  } else scene_set_sprite("dungeon_backdrop", "sprites/dungeon/void.png", pointer.viewportWidth, pointer.viewportHeight);
 }
 
 function loadMenu(): void {
@@ -431,7 +251,6 @@ function startRun(): void {
   damage = heroClasses[selectedClass].baseDamage;
   maxHealth = heroClasses[selectedClass].baseHealth;
   runRecorded = false;
-  bagPage = 0;
   actionCooldown = 0;
   queuedPath = [];
   random = seededRandom(profile.seed);
@@ -488,21 +307,19 @@ function spawnLoot(point: Point, item?: ItemKind): void {
 }
 
 function refreshDungeon(): void {
-  paintBackdrop();
   if (!floor) return;
   reveal(floor, cellPosition("player"));
-  const safe = window_safe_area();
-  const size = Math.max(6, Math.min(22, safe.width / 27, (safe.height - 210) / 25));
-  const resized = size !== cellSize;
-  resizeGrid(size);
+  const hero = scene_transform("player")!.get("translation") as BmsReflectReference;
+  scene_set_camera_2d(hero.get("x") as number, (hero.get("y") as number) + 10, window_metrics().height / uiMetrics().scale);
+  paintBackdrop();
   for (const key of floor.explored) {
     const point = { x: key % floor.width, z: Math.floor(key / floor.width) };
     const tile = terrainAt(floor, point);
-    if (resized || renderedTiles.get(key) !== tile) {
+    if (renderedTiles.get(key) !== tile) {
       sprite(`terrain_${key}`, tile, point); renderedTiles.set(key, tile);
     }
     if (!floor.visible.has(key)) {
-      if (resized || !renderedFog.has(key)) sprite(`fog_${key}`, "fog", point, 3);
+      if (!renderedFog.has(key)) sprite(`fog_${key}`, "fog", point, 3);
       renderedFog.add(key);
     } else if (renderedFog.delete(key)) scene_despawn(`fog_${key}`);
   }
@@ -651,7 +468,7 @@ function monstersTurn(): void {
 function spendTurns(count = 1): void {
   queuedPath = count > 1 ? [] : queuedPath;
   for (let turn = 0; turn < count && phase === "playing"; turn++) {
-    turns++;
+    turns++; change("player", "lifetime", turns);
     hungerTimer++;
     if (invisTimer > 0) invisTimer--;
     if (terrainAt(floor!, cellPosition("player")) === "water") causticOozeTimer = 0;
@@ -684,7 +501,7 @@ function descend(): void {
   queuedPath = [];
   if (!floor || !sameCell(cellPosition("player"), floor.exit)) { pushLog("Stand on the downward stairs to descend."); drawUi(); return; }
   if (depth === 5) { pushLog("Goo guards the way forward. Defeat it first."); drawUi(); return; }
-  depth++; turns++; hungerTimer++;
+  depth++; turns++; change("player", "lifetime", turns); hungerTimer++;
   pushLog(`You descend to depth ${depth}${depth === 5 ? ": Goo's lair" : ": sewers"}.`);
   enterFloor(); publish(); drawUi();
 }
@@ -705,7 +522,11 @@ function playerInput(dt: number, pointer: RuneweavePointerState): void {
   if (pointer.justPressed) {
     queuedPath = [];
     if (pointer.y > window_safe_area().top - 150 || pointer.y < window_safe_area().bottom + 80) return;
-    const target = { x: Math.round(pointer.x / cellSize + 12), z: Math.round(12 - (pointer.y + 40) / cellSize) };
+    const translation = scene_transform("player")!.get("translation") as BmsReflectReference;
+    const pointerScale = pointer.viewportHeight / window_metrics().height * uiMetrics().scale;
+    const worldX = (translation.get("x") as number) + pointer.x / pointerScale;
+    const worldY = (translation.get("y") as number) + 10 + pointer.y / pointerScale;
+    const target = { x: Math.round(worldX / cellSize + 12), z: Math.round(12 - (worldY + 40) / cellSize) };
     if (!floor!.explored.has(cellKey(floor!, target))) return;
     if (sameCell(target, cellPosition("player"))) { if (sameCell(target, floor!.exit)) descend(); return; }
     const blocked = new Set(monsterIds().filter((id) => !sameCell(cellPosition(id), target)).map((id) => cellKey(floor!, cellPosition(id))));
@@ -833,6 +654,7 @@ callbacks.on_update = (delta: number): void => {
   const pointer = input_primary_pointer();
   const safe = window_safe_area();
   const metrics = window_metrics();
+  if (metrics.width <= 0 || metrics.height <= 0) return;
   const signature = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
   if (viewport !== signature) {
     viewport = signature;
@@ -841,26 +663,41 @@ callbacks.on_update = (delta: number): void => {
   }
   const previousPhase = phase;
   const previousTurns = turns;
-  updateUi();
+  const uiActivated = updateUi();
   pollNetwork(dt);
-  if (phase !== previousPhase || turns !== previousTurns) return;
+  if (uiActivated || phase !== previousPhase || turns !== previousTurns) return;
+  if (input_key_just_pressed("F12")) {
+    if (phase === "checks") setPhase(returnPhase); else openChecks();
+    return;
+  }
+  // Read-only layout fixtures are confined to the developer checks screen.
+  // They never create a win/loss or mutate a run's persistent records.
+  if (phase === "checks") {
+    const previews: Phase[] = ["hero", "menu", "heroes", "playing", "inventory", "item", "paused", "settings", "won", "lost"];
+    for (let index = 0; index < previews.length; index++) {
+      if (input_key_just_pressed(`Digit${index}`)) { previewPhase = previews[index]!; drawUi(); return; }
+    }
+    if (previewPhase === "settings" && input_key_just_pressed("ArrowRight")) { settingsTab = (settingsTab + 1) % 6; drawUi(); return; }
+  }
 
   // Shortcut keys
   if (input_key_just_pressed("Escape")) {
     if (phase === "playing") setPhase("paused");
-    else if (phase === "inventory") setPhase("playing");
+    else if (phase === "inventory" || phase === "item" || phase === "hero" || phase === "message") closeModal();
     else if (phase === "paused") setPhase("playing");
     else if (phase === "checks") setPhase(returnPhase);
     else if (phase === "settings") setPhase(settingsReturn);
+    else if (phase !== "menu") loadMenu();
     return;
   }
   if (phase === "menu" && input_key_just_pressed("Space")) {
-    startRun();
+    setPhase("heroes");
     return;
   }
   if (phase === "inventory" && (input_key_just_pressed("KeyI") || input_key_just_pressed("KeyB"))) {
     setPhase("playing"); return;
   }
+  if (phase === "heroes" && input_key_just_pressed("Space")) { startRun(); return; }
   if (phase === "playing") {
     if (input_key_just_pressed("KeyI") || input_key_just_pressed("KeyB")) {
       setPhase("inventory");

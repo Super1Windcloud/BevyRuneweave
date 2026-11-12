@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
+import { prepareUiAssets } from "./prepare-ui-assets.js";
 
 const root = resolve(import.meta.dirname, "../../..");
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
@@ -494,6 +495,7 @@ for (const [name, index] of Object.entries({ gold: 18, food_ration: 437, skeleto
 }
 writeFileSync(join(dungeonSpritesDir, "fog.png"), encodePngRgba(1, 1, Buffer.from([0, 0, 0, 175])));
 writeFileSync(join(dungeonSpritesDir, "void.png"), encodePngRgba(1, 1, Buffer.from([7, 7, 6, 255])));
+await prepareUiAssets(assets, cache, decodePngRgba, encodePngRgba);
 
 // ---------------------------------------------------------------------------
 // 1. Generate Textured Room & Obstacle Geometry
