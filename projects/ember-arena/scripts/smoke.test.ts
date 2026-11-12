@@ -20,6 +20,7 @@ import { message, messages, renderMessage, translate, type MessageKey } from "..
 import { fontForText, measureText, wrapText } from "../modules/ember-arena/game/src/text-layout.js";
 import { fontAdvances } from "./font-metrics.js";
 import { buffId, type BuffKind } from "../modules/ember-arena/game/src/effects.js";
+import { staffChargeId } from "../modules/ember-arena/game/src/staff.js";
 
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
 type RecordValue = { [key: string]: unknown };
@@ -992,6 +993,135 @@ test("player buffs survive descending while environmental fire stays on the old 
   assert.ok(Number(game.entities.get("player")!.body!.health) >= 15);
   removeMonsters(game); const before = JSON.stringify([...game.entities]); game.tick(100);
   assert.equal(JSON.stringify([...game.entities]), before);
+});
+
+function mage(game = harness()): Game {
+  game.click("start"); game.click("hero_mage"); game.click("begin_run"); removeMonsters(game); return game;
+}
+
+test("the mage staff owns real charge state and exposes Zap without losing its melee action", () => {
+  const game = mage(), charger = game.entities.get(staffChargeId(1))!.body!;
+  assert.equal(charger.kind, "staff_charger"); assert.equal(charger.health, 4); assert.equal(charger.power, 0);
+  assert.equal(game.ui.get("quick_count_0")!.text, "4/4");
+  game.key("KeyI"); assert.equal(game.ui.get("gear_charge_1")!.text, "4/4"); game.click("gear_slot_1");
+  assert.equal(game.ui.get("zap_staff__label")!.text, "Zap"); assert.ok(game.ui.has("toggle_equipment"));
+  assert.match(game.ui.get("gear_detail_stats")!.text!.replace(/\n/g, " "), /Magic missile: 2–8/);
+  game.click("zap_staff"); assert.match(game.ui.get("target_prompt")!.text!, /Magic continues/);
+  game.click("cancel_target"); assert.equal(turnCount(game), 0);
+});
+
+test("staff targeting rejects self and unseen cells and idle or cancelled aim does not charge", () => {
+  const game = mage(), before = JSON.stringify([...game.entities]);
+  game.key("Digit3"); const afterPotion = JSON.stringify([...game.entities]);
+  game.key("KeyZ"); game.tapCell({ x: 12, z: 12 });
+  assert.equal(turnCount(game), 1); assert.equal(JSON.stringify([...game.entities]), afterPotion);
+  assert.match([...game.ui.values()].flatMap((element) => element.text ?? []).join(" "), /cannot zap yourself/);
+  game.tapCell({ x: 4, z: 12 }); game.tick(100); game.key("Escape");
+  assert.equal(JSON.stringify([...game.entities]), afterPotion); assert.ok(before !== afterPotion);
+  assert.ok(game.entities.has(buffId("invisibility", "player")));
+});
+
+test("magic missiles fly past an empty aim cell and always damage the first character without armor reduction", () => {
+  const game = mage(), charge = game.entities.get(staffChargeId(1))!.body!;
+  putActor(game, "front", "charger", { x: 12, z: 10 }); putActor(game, "behind", "chaser", { x: 12, z: 9 });
+  for (const id of ["front", "behind"]) game.entities.get(id)!.body!.cooldown = 1000;
+  for (let shot = 0; shot < 4; shot++) {
+    const before = Number(game.entities.get("front")!.body!.health);
+    game.click("quick_staff_1"); game.tapCell({ x: 12, z: 11 });
+    const damage = before - Number(game.entities.get("front")!.body!.health);
+    assert.ok(damage >= 2 && damage <= 8); assert.equal(charge.health, 3 - shot);
+    assert.equal(game.entities.get("behind")!.body!.health, 1000); assert.equal(turnCount(game), shot + 1);
+    assert.deepEqual(cell(game), { x: 12, z: 12 });
+  }
+  const before = JSON.stringify([...game.entities]); game.key("KeyZ");
+  assert.equal(turnCount(game), 4); assert.ok(!game.ui.has("target_prompt"));
+  assert.equal(JSON.stringify([...game.entities]), before);
+  assert.match([...game.ui.values()].flatMap((element) => element.text ?? []).join(" "), /no charges/);
+});
+
+test("empty staff casts still spend a charge and a tick and dispel invisibility", () => {
+  const game = mage(); game.key("Digit3"); game.key("KeyZ"); game.tapCell({ x: 12, z: 11 });
+  assert.equal(turnCount(game), 2); assert.equal(game.entities.get(staffChargeId(1))!.body!.health, 3);
+  assert.ok(!game.entities.has(buffId("invisibility", "player"))); assert.equal(game.state().lives, 20);
+});
+
+test("a carried unequipped staff recharges on eligible action ticks rather than idle frames", () => {
+  const game = mage(), charge = game.entities.get(staffChargeId(1))!.body!;
+  game.key("KeyZ"); game.tapCell({ x: 12, z: 11 });
+  assert.equal(charge.health, 3);
+  game.key("KeyI"); game.click("gear_slot_1"); game.click("toggle_equipment");
+  const before = JSON.stringify([...game.entities]); game.tick(100);
+  assert.equal(JSON.stringify([...game.entities]), before);
+  for (let tick = 2; tick < 40; tick++) game.click("wait");
+  assert.equal(charge.health, 3, "forty float increments of 0.025 remain just below one");
+  game.click("wait"); assert.equal(charge.health, 4); assert.equal(charge.power, 0);
+  game.key("KeyI"); assert.ok(game.ui.has("equipment_0")); game.click("gear_slot_1"); game.click("zap_staff");
+  assert.equal(turnCount(game), 41); assert.ok(game.ui.has("target_prompt"));
+});
+
+test("staff upgrades improve magic capacity and damage, restoring one charge without resetting its clock", () => {
+  const game = mage(), charge = game.entities.get(staffChargeId(1))!.body!;
+  game.key("KeyZ"); game.tapCell({ x: 12, z: 11 });
+  game.key("Digit5"); game.click("upgrade_2"); assert.equal(charge.health, 3, "armor upgrades do not grant staff charges");
+  const partial = Number(charge.power);
+  game.key("Digit5"); game.click("upgrade_1");
+  assert.equal(charge.health, 4); assert.ok(Number(charge.power) > partial); assert.equal(charge.cooldown, 3);
+  assert.equal(game.ui.get("quick_count_0")!.text, "4/5");
+  game.key("KeyI"); game.click("gear_slot_1");
+  assert.match(game.ui.get("gear_detail_stats")!.text!.replace(/\n/g, " "), /Magic missile: 3–10/);
+  game.click("zap_staff"); putActor(game, "target", "charger", { x: 13, z: 12 }); game.entities.get("target")!.body!.cooldown = 1000;
+  game.tapCell({ x: 13, z: 12 }); const damage = 1000 - Number(game.entities.get("target")!.body!.health);
+  assert.ok(damage >= 3 && damage <= 10); assert.equal(charge.health, 3);
+});
+
+test("starvation does not stop staff charging but a depleted boss passive window does", () => {
+  const game = mage(), charge = game.entities.get(staffChargeId(1))!.body!;
+  charge.health = 3; game.entities.get(buffId("hunger", "player"))!.body!.health = 450;
+  game.click("wait"); assert.equal(charge.power, Math.fround(0.025));
+  exhaustBossWindow(game);
+  const before = { health: charge.health, power: charge.power };
+  for (let tick = 0; tick < 5; tick++) game.click("wait");
+  assert.deepEqual({ health: charge.health, power: charge.power }, before);
+  // A real zap restores LockedFloor time and charging resumes that same action.
+  charge.health = 1; charge.power = 0.5;
+  putActor(game, "warden", "boss", { x: 13, z: 12 }, 100); game.entities.get("warden")!.body!.cooldown = 1000;
+  game.key("KeyZ"); game.tapCell({ x: 13, z: 12 });
+  assert.ok(Number(charge.power) > 0.5); assert.ok(Number(game.entities.get(buffId("locked_floor", "player"))!.body!.health) >= 2);
+});
+
+test("staff chargers preserve fractional phases and actual component identity across descent", () => {
+  const game = mage(), id = staffChargeId(1), charge = game.entities.get(id)!.body!;
+  charge.health = 3; charge.cooldown = 0.5; game.click("wait");
+  assert.equal(charge.cooldown, 1.5);
+  const map = generateFloor(1337, 1); walk(game, map, map.exit);
+  charge.health = 3; charge.power = 0.5;
+  const deadline = Number(charge.cooldown); game.click("descend");
+  assert.equal(game.entities.get(id)!.body, charge); assert.equal(charge.cooldown, deadline + 1);
+  assert.equal(charge.power, Math.fround(0.525)); assert.ok(game.ui.has("quick_staff_1"));
+});
+
+test("staff charging is removed on death and cannot leak into another hero's run", () => {
+  const game = mage(); game.entities.get("player")!.body!.health = 1;
+  const burn = putBuff(game, "burning", "player", 8); game.entities.get(burn)!.body!.power = 3;
+  game.click("wait"); assert.equal(game.state().message, "LOST"); assert.ok(!game.entities.has(staffChargeId(1)));
+  game.click("restart"); game.click("hero_warrior"); game.click("begin_run");
+  assert.ok(!game.entities.has(staffChargeId(1))); assert.ok(!game.ui.has("quick_staff_1"));
+});
+
+test("Chinese staff details and held Zap controls fit portrait and short landscape", () => {
+  for (const [width, height, mobile] of [[450, 800, true], [800, 320, false]] as const) {
+    const game = mage(harness(width, height, mobile, new Map(), false, "zh-CN"));
+    game.key("KeyI"); game.click("gear_slot_1");
+    assert.equal(game.ui.get("zap_staff__label")!.text, "施法");
+    const bounds = game.ui.get("equipment_window")!.style!;
+    assert.ok(Number(bounds.top) >= 0); assert.ok(Number(bounds.top) + Number(bounds.height) <= Number(game.ui.get("safe_root")!.style!.height));
+    const stats = game.ui.get("gear_detail_stats")!;
+    assert.match(stats.text!, /魔弹伤害/);
+    for (const line of stats.text!.split("\n")) assert.ok(measureText("zh-CN", line, stats.fontSize!) <= Number(stats.style!.width) + 0.01);
+    const before = JSON.stringify([...game.entities]); game.holdButton("zap_staff"); game.tick(30); game.releaseButton();
+    assert.equal(turnCount(game), 0); assert.equal(JSON.stringify([...game.entities]), before);
+    assert.match(game.ui.get("target_prompt")!.text!, /魔弹/); game.click("cancel_target");
+  }
 });
 
 function huntress(game = harness()): Game {

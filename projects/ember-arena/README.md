@@ -62,8 +62,21 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
 - Heroes start with 20 HP and 10 strength. Kills grant experience; leveling adds 5 maximum HP.
   The four starting melee weapons and cloth armor are real equipment with the original base
   ranges: worn shortsword 1–10, staff 1–6, dagger 1–8, gloves 1–5. Gloves attack in 0.5 ticks;
-  dagger surprise rolls use the upper quarter of their damage range. Staff casting,
-  cloak, seal, talents and original starting-supply parity remain pending.
+  dagger surprise rolls use the upper quarter of their damage range. Cloak, seal, talents
+  and original starting-supply parity remain pending.
+- The Mage's staff contains an identified magic-missile wand with four starting charges.
+  Choose Zap from its gear window, click its first quick slot or press Z. A confirmed cast
+  spends one charge and one tick; magic damage is 2–8 at +0 and bypasses ordinary armor and
+  attack accuracy. Unlike a thrown potion or arrow, the bolt continues beyond an empty aim
+  cell until it hits a character or obstacle. Self-targeting and cancellation are free;
+  an empty successful cast still consumes a charge and breaks invisibility. The staff stays
+  usable in melee and may be zapped while unequipped but carried.
+- Staff charges/partial charge/deadlines live in an actual reflected charger entity. Its
+  missing-charge recharge curve uses `10 + 40 * 0.75^missing` and f32 accumulation; wall-clock
+  idle time and menus do not charge it. Starvation alone does not disable charging, while an
+  exhausted LockedFloor window does. Staff upgrades improve magic damage/capacity and restore
+  one charge; the maximum is ten. Other wands/imbuing, advanced modifiers, flight and audio
+  remain pending.
 - The Huntress carries a spirit bow in her backpack and first quick slot. Open its item window
   and choose Shoot, click the quick slot, or press 8 to aim at a visible tile. Cancelling is free;
   arrows stop at the first character or obstacle and the bow is never consumed. At hero level
@@ -127,11 +140,12 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
 | I / B / BAG | Open or close the inventory |
 | 1–7 | Healing, flame, invisibility, strength, upgrade, mapping, food |
 | 8 | Aim the carried spirit bow |
+| Z | Aim a carried magic-missile staff |
 | Escape | Pause/resume or close the current menu |
 
 The title opens a separate six-icon hero selection screen; the four implemented classes are
 playable, while Duelist/Cleric show their upstream unlock-message presentation. Selecting a
-backpack slot opens an item-detail window before Drink/Throw/Shoot/Read/Eat is confirmed.
+backpack slot opens an item-detail window before Drink/Throw/Shoot/Zap/Read/Eat is confirmed.
 Inventory browsing and pausing cost no turns. Successfully using an item returns to play and
 allows monster responses. Empty item slots and blocked moves cost no turns. Keyboard holds
 repeat at a bounded rate; clicks never path through unexplored terrain.
@@ -211,6 +225,27 @@ hashes are checked before reusing that revision's cached bytes. The game runs of
 preparation. The old misnamed `skeleton_key.png` crop is replaced by `worn_key.png`.
 
 ## Verification boundaries
+
+### Magic-missile staff and charging on 2026-11-12
+
+- Upstream master still resolves to `57a4e06a4caf162446d1c28caa7983f0493fecf0`. Base
+  MagesStaff/Wand/WandOfMagicMissile and Ballistica.MAGIC_BOLT rules drive this batch.
+- **130 tests pass**: twenty-five source-rule tests and 105 gameplay/UI/asset tests. New
+  coverage checks initial charges, magic damage/capacity, f32 charging, full/depleted states,
+  fractional phase, extended rays and map edges, free self/cancel/unseen targets, empty casts,
+  armor-independent hits, invisibility, carried/unequipped use, upgrade restoration, starvation,
+  lock depletion/reactivation, cross-floor component identity, death cleanup and Chinese UI.
+- Biome, independent TypeScript checks, bundle/font generation, Rust formatting and whitespace
+  checks pass. `npm run check` continues to use Biome. No runtime API or public ABI changed.
+- `cargo test --locked --offline -p bevy-runeweave --no-default-features --features typescript
+  --lib quickjs_arena_runs_with_real_actor_components_and_ui -- --nocapture`: **1 passed**
+  on macOS Debug. The actual bundle selects the Mage and performs a zap through injected Bevy
+  pointer input. It checks actual target damage, charge consumption, partial recharge and
+  independent charger/hero deadlines, in addition to earlier native regression paths.
+- Rust changes are confined to test assertions. Other wand effects, imbuing, curses, talents,
+  subclasses and recharge modifiers are pending. New staff controls/charge labels have
+  **NOT_RUN** native GPU, OS-input, touch/lifecycle and reference-client pixel acceptance
+  on Windows, macOS, Linux, Android and iOS. The headless test covers the narrow path above.
 
 ### Spirit-bow targeting and combat on 2026-11-12
 

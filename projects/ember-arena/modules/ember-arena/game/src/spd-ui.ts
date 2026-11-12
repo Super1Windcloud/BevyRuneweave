@@ -7,6 +7,7 @@ import { translate, type MessageKey, type MessageParameters } from "./i18n.js";
 import { fontForText, measureText, wrapText } from "./text-layout.js";
 import { spiritBowDelay, spiritBowLevel, spiritBowRange, spiritBowStrength } from "./spirit-bow.js";
 import type { TargetKind } from "./projectiles.js";
+import { staffCapacity, staffCharges, staffDamageRange } from "./staff.js";
 
 export type UiPhase = "menu" | "heroes" | "playing" | "paused" | "won" | "lost" | "inventory" | "item" | "equipment" | "upgrade" | "hero" | "settings" | "checks" | "rankings" | "journal" | "news" | "changes" | "about" | "support" | "message";
 export interface SpdUiState {
@@ -207,6 +208,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       if (gear) {
         childrenSlot.push(image(`gear_icon_${gear.id}`, `sprites/dungeon/${gear.kind}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
         if (gear.level) childrenSlot.push(label(`gear_level_${gear.id}`, `+${gear.level}`, 1, 1, slotWidth - 2, 6, titleColor));
+        if (gear.kind === "mages_staff") childrenSlot.push(label(`gear_charge_${gear.id}`, `${staffCharges(gear.id)}/${staffCapacity(gear.level)}`, 1, slotHeight - 8, slotWidth - 2, 5));
       } else if (equipped) {
         childrenSlot.push(art(`equipment_${index}`, ["empty_weapon", "empty_armor", "empty_artifact", "empty_ring", "empty_ring"][index]!, (slotWidth - 16) / 2, (slotHeight - 16) / 2));
       } else if (key) {
@@ -269,7 +271,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     elements.push({ kind: "button", id: "wait", onClick: () => on("wait"), style: rect(waitX, toolbarY, 20, 26), children: [art("wait_tool", "wait_tool", 0, 0), art("wait_tool_icon", "wait_tool_icon", 2, 5)] });
     elements.push({ kind: "button", id: "search", onClick: () => on("search"), style: rect(searchX, toolbarY, 20, 26), children: [art("search_tool", "search_tool", 0, 0), art("search_tool_icon", "search_tool_icon", 2, 5)] });
     if (state.targeting) {
-      const promptWidth = Math.max(90, w - 30), lines = wrappedText(t(state.targeting === "bow" ? "target.bow" : "target.flame"), promptWidth, 6);
+      const promptWidth = Math.max(90, w - 30), lines = wrappedText(t(state.targeting === "staff" ? "target.staff" : state.targeting === "bow" ? "target.bow" : "target.flame"), promptWidth, 6);
       elements.push(label("target_prompt", lines.join("\n"), 2, 44, promptWidth, 6, titleColor, lines.length * 8));
       elements.push(control("cancel_target", t("common.close"), w - 28, 44, 26, 14, "toast", undefined, "cancel_target", true, 6));
     } else if (state.examining) {
@@ -280,18 +282,26 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       const lines = wrappedText(t("log.guide"), w - 4, 6);
       elements.push(label("hud_hint", lines.join("\n"), 2, 44, w - 4, 6, grey, lines.length * 8));
     }
-    const quick: (ItemKind | null)[] = state.inventory.spirit_bow > 0
+    const staff = state.equipment.find((gear) => gear.kind === "mages_staff");
+    const quick: (ItemKind | GearItem | null)[] = staff
+      ? [staff, "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null]
+      : state.inventory.spirit_bow > 0
       ? ["spirit_bow", "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null]
       : ["potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null, null];
     const count = 4 + Number(w > 152) + Number(w > 170);
     let quickRight = m.large ? searchX : toolbarX;
     for (let offset = 0; offset < count; offset++) {
-      const index = m.large ? count - 1 - offset : offset, item = quick[index];
+      const index = m.large ? count - 1 - offset : offset, entry = quick[index];
+      const gear = entry && typeof entry === "object" ? entry : undefined, item = typeof entry === "string" ? entry : undefined;
+      const name = gear?.kind ?? item;
+      const quantity = gear ? `${staffCharges(gear.id)}/${staffCapacity(gear.level)}` : item === "spirit_bow"
+        ? (spiritBowLevel(state.level) ? `+${spiritBowLevel(state.level)}` : "") : item ? `${state.inventory[item]}` : "";
       const side = m.large ? (index === 0 ? "left" : index === count - 1 ? "right" : "middle") : (index === 0 ? "right" : index === count - 1 ? "left" : "middle");
       const width = side === "left" ? 20 : side === "right" ? 19 : 18;
       quickRight -= width;
-      elements.push({ kind: "button", id: item ? `quick_${item}` : `quick_empty_${index}`, onClick: item ? () => on("quick", item) : undefined, style: rect(quickRight, h - 24, width, 24), children: [
-        art(`quick_frame_${index}`, `quick_${side}`, 0, 0), ...(item ? [image(`quick_icon_${index}`, `sprites/dungeon/${item}.png`, rect((width - 16) / 2, 3, 16, 16)), label(`quick_count_${index}`, item === "spirit_bow" ? (spiritBowLevel(state.level) ? `+${spiritBowLevel(state.level)}` : "") : `${state.inventory[item]}`, 2, 2, 14, 5)] : []),
+      elements.push({ kind: "button", id: gear ? `quick_staff_${gear.id}` : item ? `quick_${item}` : `quick_empty_${index}`,
+        onClick: gear ? () => on(`zap:${gear.id}`) : item ? () => on("quick", item) : undefined, style: rect(quickRight, h - 24, width, 24), children: [
+        art(`quick_frame_${index}`, `quick_${side}`, 0, 0), ...(name ? [image(`quick_icon_${index}`, `sprites/dungeon/${name}.png`, rect((width - 16) / 2, 3, 16, 16)), label(`quick_count_${index}`, quantity, 2, 2, 14, 5)] : []),
       ] });
     }
     const logWidth = Math.max(90, w - 90);
@@ -344,14 +354,16 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
         const description = t(spec.slot === "weapon" ? "gear.weaponStats" : "gear.armorStats", {
           min: range[0], max: range[1], strength: strengthRequired(gear), delay: attackDelay(gear, state.strength).toFixed(2),
         }) + (state.strength < strengthRequired(gear) ? `\n${t("gear.tooHeavy")}` : "")
-          + (gear.kind === "mages_staff" ? `\n${t("gear.staffPending")}` : "");
+          + (gear.kind === "mages_staff" ? `\n${t("gear.staffMagic", { min: staffDamageRange(gear.level)[0], max: staffDamageRange(gear.level)[1],
+            charges: staffCharges(gear.id), capacity: staffCapacity(gear.level) })}` : "");
         const lines = wrappedText(description, 132, 6), buttonY = 26 + Math.ceil(lines.length * 7.2);
         const cost = !gear.equipped && equippedGear(state.equipment, spec.slot) ? 2 : 1;
         window("equipment_window", 132, buttonY + 30, [
           image("gear_detail_icon", `sprites/dungeon/${gear.kind}.png`, rect(0, 0, 16, 16)),
           label("gear_detail_title", `${t(`item.${gear.kind}.name`)}${gear.level ? ` +${gear.level}` : ""}`, 20, 1, 112, 8, titleColor, 24),
           label("gear_detail_stats", lines.join("\n"), 0, 24, 132, 6, white, buttonY - 24),
-          control("toggle_equipment", t(gear.equipped ? "gear.remove" : "gear.equip"), 0, buttonY, 132, 16),
+          control("toggle_equipment", t(gear.equipped ? "gear.remove" : "gear.equip"), 0, buttonY, gear.kind === "mages_staff" ? 64 : 132, 16),
+          ...(gear.kind === "mages_staff" ? [control("zap_staff", t("item.zap"), 68, buttonY, 64, 16, "red", undefined, `zap:${gear.id}`, staffCharges(gear.id) > 0)] : []),
           label("gear_action_cost", t("gear.cost", { cost }), 0, buttonY + 19, 132, 6, grey, 10),
         ]);
       }

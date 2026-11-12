@@ -18,7 +18,8 @@ immutable revision; source and crop checksums are recorded in the asset manifest
 | Stairs | Explicit descent through five floors; supplies/HP and passive accumulators retained; Goo sealing creates a timed LockedFloor buff; key pickup and one-turn exit unlock | No return upstairs, floor persistence or prison transition; stronger-boss challenge variants pending |
 | Rendering | Correctly cropped native 2D hero, mob, item and sewer sprites | Static frames; no original sprite animations, stitched raised walls, particle effects or exact UI layout |
 | Native UI | Original atlas chrome/font, title and hero-selection scenes, joined toolbars, five-column backpack, item windows and tabbed settings | See [UI_PARITY.md](UI_PARITY.md); all original scenes/content and pixel-difference acceptance remain incomplete |
-| Heroes | Four starting melee weapons and cloth armor are real carried items; original base damage ranges, half-tick gloves and dagger surprise range; Huntress carries a usable spirit bow; 20 starting HP, 10 strength | Staff spells/charges, cloak/seal, full starting supplies, other classes/subclasses/talents pending |
+| Heroes | Four starting melee weapons and cloth armor are real carried items; original base damage ranges, half-tick gloves and dagger surprise range; Huntress carries a spirit bow; Mage has a charged magic-missile staff; 20 starting HP, 10 strength | Cloak/seal, full starting supplies, other classes/subclasses/talents pending |
+| Mage staff | Item/quick-slot/Z targeting, four initial charges, one-tick casts, magic damage 2–8 at +0, extended magic-bolt collision; real independent charger with staff recharge curve, upgrade damage/capacity/+1 charge, unequipped and cross-floor charging; empty casts dispel invisibility | Only base identified magic-missile wand; current-FOV aim, no other wands/imbuing, MagicCharge sharing, cursed zaps, talents/subclasses, rings, recharging buffs, missile animation or sound |
 | Spirit bow | Huntress starts with the original bow crop and first quick slot; free aim/cancel, first-impact projectiles, unlimited arrows, level-based damage/strength, adjacent/ranged accuracy and one-tick base shooting; target attacks dispel invisibility; gloves retain melee behavior | Current-FOV targeting only; no flying-arrow animation/sound, sniper specials, enchantments, rings, talents, augmentation or generic quickslot reassignment |
 | Rats/Gnolls/Crabs | Upstream base stats; melee gnolls; crab movement costs 0.5 ticks while attacks cost 1, with independent reflected action deadlines | Simplified sleeping/hunting/door behavior and custom loot distributions |
 | Goo | 100 HP, water healing, half-health enhancement, two-stage charge, range-2 burst, twenty-tick ooze with source sewer damage/water rules; real Worn Key and 2–4 blob drops; optional burst camera shake | Custom floor; simplified charge cancellation and hit processing, no boss badge/score rules |
@@ -49,7 +50,8 @@ All paths below are relative to the upstream repository's
 - `items/{Item,potions/PotionOfLiquidFlame}.java`, `mechanics/Ballistica.java`, `actors/blobs/Fire.java`: one-turn throws, first impact, fire seeding, decay and spread. `effects/particles/FlameParticle.java` supplies the static marker's color/size only; its emitter animation is not ported.
 - `items/{KindOfWeapon,EquipableItem}.java`, `items/weapon/{Weapon,melee/MeleeWeapon}.java`: equip/unequip time, accuracy and delay encumbrance, strength thresholds and damage scaling.
 - `items/weapon/SpiritBow.java`, `items/weapon/missiles/MissileWeapon.java`, `items/Item.java`, `actors/hero/{Hero,HeroClass}.java`: carried starting bow, unlimited arrows, level growth, range accuracy, cast delay and target-only invisibility dispel. `sprites/ItemSpriteSheet.java` supplies the 16×16 bow frame at index 144.
-- `items/weapon/melee/{WornShortsword,MagesStaff,Dagger,Gloves,Shortsword}.java`, `items/armor/{Armor,ClothArmor,LeatherArmor}.java`: supported item formulas. Staff melee is implemented; its wand capability is not.
+- `items/weapon/melee/{WornShortsword,MagesStaff,Dagger,Gloves,Shortsword}.java`, `items/armor/{Armor,ClothArmor,LeatherArmor}.java`: supported item formulas.
+- `items/wands/{Wand,WandOfMagicMissile}.java`, `MagesStaff.updateWand/applyWandChargeBuff`, `mechanics/Ballistica.java`: staff capacity/upgrade restoration, 0.75 recharge scaling, one-tick casts, magic damage, self-target rejection, invisibility dispel and MAGIC_BOLT continuation past empty aim cells.
 - `actors/hero/Hero.java`, `items/rings/RingOfForce.java`: armor penalties, base attack/evasion growth, excess-strength rolls and ring-free unarmed damage.
 - `actors/hero/Hero.java#search`: two action ticks, six hunger units, visible secret discovery and starting class search radii.
 - `actors/mobs/Goo.java#die`, `items/keys/WornKey.java`, `items/quest/GooBlob.java`: source drop identities and 60/30/10 percent blob-count weights.
@@ -59,17 +61,19 @@ All paths below are relative to the upstream repository's
 
 New behavior should cite an upstream source and add a focused behavior test. Tests using
 platform doubles and a custom generator must not be described as proof of one-to-one parity.
-The spirit-bow batch passes 115 tests, Biome and independent TypeScript checks.
+The magic-staff batch passes 130 tests, Biome and independent TypeScript checks.
 The platform doubles round reflected numbers to f32. The existing headless macOS Debug
 QuickJS/Bevy test also passes, checking real hunger/regeneration entities, hunger advancement,
 three-tick eating and the existing healing diagnostic. It also starts the Huntress and injects
 four pointer shots against a real actor, checking health, full-tick deadlines and retained bow/gloves.
+The Mage path checks an actual pointer zap, target health, consumed charge, reflected partial
+charge and the independent charger/hero clocks.
 This does not establish GPU rendering, real input/lifecycle or reference-client pixel parity;
 those checks are NOT_RUN for this batch on all five platforms. No runtime API or public ABI changed.
 
 ## Next migration order
 
-1. Add staff targeting/charges, advanced bow/status/item interactions, cloak/seal behavior,
+1. Add other wands/imbuing, advanced bow/status/item interactions, cloak/seal behavior,
    rings/curses and upstream starting inventories.
 2. Port sewer builders/painters, entrance/boss room rules, returnable persistent floors,
    stitched tile visuals, upstream camera smoothing/zoom controls and sprite animation.

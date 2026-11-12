@@ -14,6 +14,7 @@ import { applyBurning, applyHealing, applyInvisibility, applyLockedFloor, applyO
   fireRoot, fireVolume, hasBuff, healingStep, oozeDamage, playerBuff, remainingBuff, removeBuffs, seedFireCell, seedLiquidFlame, startVitals } from "./effects.js";
 import { projectileImpact, type TargetKind } from "./projectiles.js";
 import { spiritBowAccuracy, spiritBowDamage, spiritBowDelay, spiritBowStrength } from "./spirit-bow.js";
+import { createStaffCharger, rechargeStaff, staffCapacity, staffChargeId, staffChargerKind, staffCharges, staffDamageRange, staffGearId, upgradeStaffCharge } from "./staff.js";
 import { affectHunger, extendLockedFloor, hungerStep, lockedFloorStep, regenerationStep, starvingAt, type HungerStep } from "./survival.js";
 
 type Phase = UiPhase;
@@ -180,6 +181,7 @@ function uiAction(id: string, value?: string | number): void {
     selectedGear = idNumber; setPhase("equipment"); return;
   }
   if (id.startsWith("upgrade:")) { upgradeEquipment(Number(id.slice(8))); return; }
+  if (id.startsWith("zap:")) { beginStaffZap(Number(id.slice(4))); return; }
   if (id.startsWith("use_")) { phase = "inventory"; useInventoryItem(id.slice(4) as ItemKind); return; }
   if (id === "journal" || id === "game_journal") { overlayReturn = phase === "menu" ? "menu" : "playing"; setPhase("journal"); return; }
   if (["rankings", "journal", "news", "changes", "about", "support"].includes(id)) { setPhase(id as Phase); return; }
@@ -305,13 +307,14 @@ function startRun(): void {
   dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) })];
   room();
   startVitals("player", 0);
+  for (const gear of equipment) createStaffCharger(gear, 0);
   enterFloor();
   setPhase("playing");
 }
 
 function enterFloor(): void {
   examining = false; targeting = null; unsealFloor();
-  for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id)) scene_despawn(id);
+  for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id) && kind(id) !== staffChargerKind) scene_despawn(id);
   for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
   for (const key of renderedFog) scene_despawn(`fog_${key}`);
   renderedTiles.clear(); renderedFog.clear(); queuedPath = [];
@@ -398,7 +401,10 @@ function collectLoot(): void {
     if (item) {
       if (item === "worn_key") wornKeys++;
       else if (item === "goo_blob") gooBlobs++;
-      else if (isGearKind(item)) equipment.push({ id: Math.max(0, ...equipment.map((gear) => gear.id)) + 1, kind: item, level: 0, equipped: false });
+      else if (isGearKind(item)) {
+        const gear = { id: Math.max(0, ...equipment.map((gear) => gear.id)) + 1, kind: item, level: 0, equipped: false };
+        equipment.push(gear); createStaffCharger(gear, field("player", "cooldown"));
+      }
       else if (item === "spirit_bow") inventory.spirit_bow = 1;
       else inventory[item]++;
       pushLog(message("log.item", { item: message(`item.${item}.name`) }));
@@ -454,6 +460,7 @@ function upgradeEquipment(id: number): void {
   const item = equipment.find((gear) => gear.id === id);
   if (!item) return;
   item.level++; inventory.scroll_upgrade--;
+  upgradeStaffCharge(item);
   pushLog(message("log.gearUpgraded", { item: message(`item.${item.kind}.name`), level: item.level }));
   phase = "playing"; spendTurns();
 }
@@ -527,7 +534,11 @@ function attackMonster(id: string, ranged = false): void {
 function hurtPlayer(power: number): void {
   change("player", "health", Math.max(0, health() - power));
   queuedPath = [];
-  if (health() <= 0) { removeBuffs("player"); setPhase("lost"); }
+  if (health() <= 0) {
+    removeBuffs("player");
+    for (const id of scene_actor_ids()) if (kind(id) === staffChargerKind) scene_despawn(id);
+    setPhase("lost");
+  }
 }
 
 function damageActor(target: string, amount: number, now: number): void {
@@ -576,6 +587,13 @@ function fireAction(now: number): void {
 
 function effectAction(id: string, now: number): number {
   if (kind(id) === "blob_fire") { fireAction(now); return 1; }
+  if (kind(id) === staffChargerKind) {
+    const gear = equipment.find((gear) => gear.id === staffGearId(id) && gear.kind === "mages_staff");
+    if (!gear || health() <= 0) { scene_despawn(id); return 1; }
+    const regenOn = !hasBuff("locked_floor", "player") || remainingBuff("locked_floor", "player") >= 1;
+    const next = rechargeStaff(field(id, "health"), field(id, "power"), staffCapacity(gear.level), regenOn);
+    change(id, "health", next.charges); change(id, "power", next.partial); return 1;
+  }
   const type = buffKind(kind(id)), target = buffTarget(id);
   if (!type || !scene_actor(target) || field(target, "health") <= 0) { scene_despawn(id); return 1; }
   if (type === "invisibility") { scene_despawn(id); return 1; }
@@ -619,9 +637,33 @@ function effectAction(id: string, now: number): number {
   return 1;
 }
 
+function beginStaffZap(gearId: number): void {
+  if (!["playing", "equipment", "inventory"].includes(phase)) return;
+  const gear = equipment.find((item) => item.id === gearId && item.kind === "mages_staff");
+  if (!gear) return;
+  if (staffCharges(gear.id) < 1) { pushLog(message("staff.empty")); drawUi(); return; }
+  selectedGear = gear.id; queuedPath = []; examining = false; phase = "playing"; targeting = "staff";
+  publish(); drawUi();
+}
+
 function fireAtTarget(target: Point): void {
   if (!floor || !targeting || phase !== "playing") return;
   if (!floor.visible.has(cellKey(floor, target))) { pushLog(message("target.notVisible")); drawUi(); return; }
+  if (targeting === "staff") {
+    const gear = equipment.find((gear) => gear.id === selectedGear && gear.kind === "mages_staff");
+    if (!gear) { targeting = null; drawUi(); return; }
+    const hero = cellPosition("player"), impact = projectileImpact(floor, hero, target,
+      (point) => monsterIds().some((id) => sameCell(cellPosition(id), point)), false);
+    if (sameCell(hero, target) || sameCell(hero, impact)) { pushLog(message("staff.selfTarget")); drawUi(); return; }
+    if (staffCharges(gear.id) < 1) { targeting = null; pushLog(message("staff.empty")); drawUi(); return; }
+    change(staffChargeId(gear.id), "health", staffCharges(gear.id) - 1);
+    const enemy = monsterIds().find((id) => sameCell(cellPosition(id), impact));
+    if (enemy) {
+      const [min, max] = staffDamageRange(gear.level), damage = roll(min, max);
+      change(enemy, "lifetime", 1); pushLog(message("staff.hit", { damage })); damageMonster(enemy, damage);
+    } else pushLog(message("staff.miss"));
+    scene_despawn(buffId("invisibility", "player")); spendTurns(); return;
+  }
   const item = targeting === "bow" ? "spirit_bow" : "potion_liquid_flame";
   if (inventory[item] <= 0) { targeting = null; drawUi(); return; }
   const impact = projectileImpact(floor, cellPosition("player"), target,
@@ -714,7 +756,7 @@ function spendTurns(duration = 1): void {
   while (phase === "playing") {
     let next: string | null = null, earliest = ready, priority = 0;
     for (const id of scene_actor_ids()) {
-      const tag = kind(id), candidatePriority = tag in mobSprites ? -20 : effectPriority(tag);
+      const tag = kind(id), candidatePriority = tag in mobSprites ? -20 : tag === staffChargerKind ? -30 : effectPriority(tag);
       if (candidatePriority === undefined) continue;
       const time = Math.max(start, field(id, "cooldown"));
       if (time < earliest || (time === earliest && candidatePriority > priority)) {
@@ -800,6 +842,7 @@ function playerInput(dt: number, pointer: RuneweavePointerState): void {
   if (input_key_just_pressed("KeyF")) { toggleExamine(); return; }
   if (input_key_just_pressed("KeyE") || input_key_just_pressed("Period")) { descend(); return; }
   if (input_key_just_pressed("Space")) { queuedPath = []; spendTurns(); return; }
+  if (input_key_just_pressed("KeyZ")) { const staff = equipment.find((gear) => gear.kind === "mages_staff"); if (staff) beginStaffZap(staff.id); return; }
   const shortcuts: ItemKind[] = ["potion_healing", "potion_liquid_flame", "potion_invisibility", "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration", "spirit_bow"];
   for (const [index, item] of shortcuts.entries()) if (input_key_just_pressed(`Digit${index + 1}`)) { queuedPath = []; useInventoryItem(item); return; }
   const dx = Number(input_key_pressed("KeyD") || input_key_pressed("ArrowRight")) - Number(input_key_pressed("KeyA") || input_key_pressed("ArrowLeft"));

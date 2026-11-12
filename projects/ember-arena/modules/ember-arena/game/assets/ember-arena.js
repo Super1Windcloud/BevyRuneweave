@@ -441,6 +441,12 @@
     "item.drink": ["Drink", "\u996E\u7528"],
     "item.throw": ["Throw", "\u6295\u63B7"],
     "item.shoot": ["Shoot", "\u5C04\u51FB"],
+    "item.zap": ["Zap", "\u65BD\u6CD5"],
+    "target.staff": ["Choose a visible tile to aim. Magic continues past empty tiles. Esc cancels.", "\u9009\u62E9\u53EF\u89C1\u683C\u5B50\u7784\u51C6\uFF0C\u9B54\u5F39\u4F1A\u98DE\u8FC7\u7A7A\u683C\u3002\u6309Esc\u53EF\u53D6\u6D88\u3002"],
+    "staff.empty": ["The staff has no charges. Wait for it to recharge.", "\u9B54\u6756\u80FD\u91CF\u8017\u5C3D\uFF0C\u8BF7\u7B49\u5F85\u5145\u80FD\u3002"],
+    "staff.selfTarget": ["You cannot zap yourself.", "\u4E0D\u80FD\u5BF9\u81EA\u5DF1\u65BD\u6CD5\u3002"],
+    "staff.hit": ["The magic missile deals {damage} damage.", "\u9B54\u5F39\u9020\u6210\u4E86{damage}\u70B9\u4F24\u5BB3\u3002"],
+    "staff.miss": ["The magic missile dissipates.", "\u9B54\u5F39\u6D88\u6563\u4E86\u3002"],
     "target.bow": ["Choose a visible tile to shoot. Nearby targets are harder to hit. Esc cancels.", "\u9009\u62E9\u53EF\u89C1\u683C\u5B50\u5C04\u51FB\uFF0C\u8FD1\u8EAB\u76EE\u6807\u8F83\u96BE\u547D\u4E2D\u3002\u6309Esc\u53EF\u53D6\u6D88\u3002"],
     "target.flame": ["Choose a visible tile to throw. Fire can burn you too. Esc cancels.", "\u9009\u62E9\u53EF\u89C1\u683C\u5B50\u6295\u63B7\uFF0C\u706B\u7130\u4E5F\u4F1A\u707C\u4F24\u81EA\u5DF1\u3002\u6309Esc\u53EF\u53D6\u6D88\u3002"],
     "target.notVisible": ["Choose a tile in your current field of view.", "\u8BF7\u9009\u62E9\u5F53\u524D\u89C6\u91CE\u5185\u7684\u683C\u5B50\u3002"],
@@ -454,7 +460,7 @@
     "gear.weaponStats": ["Damage: {min}\u2013{max}\nStrength required: {strength}\nAttack time: {delay}\nUpgrades improve this weapon's damage and strength requirement.", "\u4F24\u5BB3\uFF1A{min}\u2013{max}\n\u529B\u91CF\u9700\u6C42\uFF1A{strength}\n\u653B\u51FB\u8017\u65F6\uFF1A{delay}\n\u5347\u7EA7\u4F1A\u6539\u5584\u8FD9\u4EF6\u6B66\u5668\u7684\u4F24\u5BB3\u548C\u529B\u91CF\u9700\u6C42\u3002"],
     "gear.armorStats": ["Damage reduction: {min}\u2013{max}\nStrength required: {strength}\nUpgrades improve this armor's protection and strength requirement.", "\u4F24\u5BB3\u51CF\u514D\uFF1A{min}\u2013{max}\n\u529B\u91CF\u9700\u6C42\uFF1A{strength}\n\u5347\u7EA7\u4F1A\u6539\u5584\u8FD9\u4EF6\u62A4\u7532\u7684\u9632\u62A4\u548C\u529B\u91CF\u9700\u6C42\u3002"],
     "gear.tooHeavy": ["Too heavy: weapon accuracy/attack speed or armor evasion/movement is penalized.", "\u529B\u91CF\u4E0D\u8DB3\uFF1A\u6B66\u5668\u547D\u4E2D\u4E0E\u653B\u901F\u6216\u62A4\u7532\u95EA\u907F\u4E0E\u79FB\u52A8\u901F\u5EA6\u4F1A\u53D7\u5230\u60E9\u7F5A\u3002"],
-    "gear.staffPending": ["Melee combat is available. Wand spells and charges are not implemented yet.", "\u53EF\u7528\u4E8E\u8FD1\u6218\u3002\u6CD5\u672F\u4E0E\u5145\u80FD\u5C1A\u672A\u5B9E\u73B0\u3002"],
+    "gear.staffMagic": ["Magic missile: {min}\u2013{max}\nCharges: {charges}/{capacity}   Zap: 1 turn", "\u9B54\u5F39\u4F24\u5BB3\uFF1A{min}\u2013{max}\n\u80FD\u91CF\uFF1A{charges}/{capacity} \u65BD\u6CD5\uFF1A1\u56DE\u5408"],
     "gear.equip": ["Equip", "\u88C5\u5907"],
     "gear.remove": ["Unequip", "\u5378\u4E0B"],
     "gear.cost": ["Action time: {cost}", "\u52A8\u4F5C\u8017\u65F6\uFF1A{cost}"],
@@ -851,7 +857,7 @@
   var spd_pixel_metrics_default = { "0": 0.537109375, "1": 0.341796875, "2": 0.537109375, "3": 0.537109375, "4": 0.537109375, "5": 0.537109375, "6": 0.537109375, "7": 0.537109375, "8": 0.537109375, "9": 0.537109375, " ": 0.244140625, "!": 0.1953125, '"': 0.390625, "#": 0.537109375, $: 0.5859375, "%": 0.68359375, "&": 0.634765625, "'": 0.1953125, "(": 0.390625, ")": 0.390625, "*": 0.634765625, "+": 0.48828125, ",": 0.1953125, "-": 0.390625, ".": 0.1953125, "/": 0.48828125, ":": 0.1953125, ";": 0.1953125, "<": 0.439453125, "=": 0.390625, ">": 0.439453125, "?": 0.48828125, "@": 0.537109375, A: 0.537109375, B: 0.537109375, C: 0.537109375, D: 0.537109375, E: 0.537109375, F: 0.537109375, G: 0.537109375, H: 0.537109375, I: 0.29296875, J: 0.48828125, K: 0.537109375, L: 0.48828125, M: 0.634765625, N: 0.537109375, O: 0.537109375, P: 0.537109375, Q: 0.537109375, R: 0.537109375, S: 0.537109375, T: 0.48828125, U: 0.537109375, V: 0.537109375, W: 0.634765625, X: 0.537109375, Y: 0.48828125, Z: 0.537109375, "[": 0.29296875, "\\": 0.634765625, "]": 0.29296875, "^": 0.537109375, _: 0.48828125, "`": 0.29296875, a: 0.48828125, b: 0.48828125, c: 0.48828125, d: 0.48828125, e: 0.48828125, f: 0.390625, g: 0.48828125, h: 0.48828125, i: 0.1953125, j: 0.29296875, k: 0.48828125, l: 0.29296875, m: 0.5859375, n: 0.48828125, o: 0.48828125, p: 0.48828125, q: 0.48828125, r: 0.390625, s: 0.48828125, t: 0.390625, u: 0.48828125, v: 0.48828125, w: 0.5859375, x: 0.48828125, y: 0.48828125, z: 0.537109375, "{": 0.390625, "|": 0.1953125, "}": 0.390625, "~": 0.68359375 };
 
   // modules/ember-arena/game/assets/fonts/noto-sans-sc-metrics.json
-  var noto_sans_sc_metrics_default = { "0": 0.555, "1": 0.555, "2": 0.555, "3": 0.555, "4": 0.555, "5": 0.555, "6": 0.555, "7": 0.555, "8": 0.555, "9": 0.555, " ": 0.224, "!": 0.323, '"': 0.474, "#": 0.555, $: 0.555, "%": 0.921, "&": 0.68, "'": 0.278, "(": 0.338, ")": 0.338, "*": 0.467, "+": 0.555, ",": 0.278, "-": 0.347, ".": 0.278, "/": 0.392, ":": 0.278, ";": 0.278, "<": 0.555, "=": 0.555, ">": 0.555, "?": 0.474, "@": 0.946, A: 0.608, B: 0.657, C: 0.638, D: 0.688, E: 0.589, F: 0.552, G: 0.689, H: 0.728, I: 0.293, J: 0.535, K: 0.646, L: 0.543, M: 0.812, N: 0.723, O: 0.742, P: 0.633, Q: 0.742, R: 0.635, S: 0.596, T: 0.599, U: 0.721, V: 0.575, W: 0.878, X: 0.573, Y: 0.531, Z: 0.603, "[": 0.338, "\\": 0.392, "]": 0.338, "^": 0.555, _: 0.559, "`": 0.606, a: 0.563, b: 0.618, c: 0.51, d: 0.62, e: 0.554, f: 0.325, g: 0.564, h: 0.607, i: 0.275, j: 0.275, k: 0.552, l: 0.284, m: 0.926, n: 0.61, o: 0.606, p: 0.62, q: 0.62, r: 0.388, s: 0.468, t: 0.377, u: 0.607, v: 0.521, w: 0.802, x: 0.498, y: 0.521, z: 0.475, "{": 0.338, "|": 0.27, "}": 0.338, "~": 0.555, \u7834: 1, \u788E: 1, \u7684: 1, \u50CF: 1, \u7D20: 1, \u5730: 1, \u7262: 1, \u7B80: 1, \u4F53: 1, \u4E2D: 1, \u6587: 1, \u8FDB: 1, \u5165: 1, \u652F: 1, \u6301: 1, \u6E38: 1, \u620F: 1, \u6392: 1, \u884C: 1, \u699C: 1, \u65E5: 1, \u5FD7: 1, \u65B0: 1, \u95FB: 1, \u8BBE: 1, \u7F6E: 1, \u66F4: 1, \u8BB0: 1, \u5F55: 1, \u5173: 1, \u4E8E: 1, \u4E3B: 1, \u83DC: 1, \u5355: 1, \u5F00: 1, \u59CB: 1, \u95ED: 1, \u8FD4: 1, \u56DE: 1, \u4E0B: 1, \u4E00: 1, \u9875: 1, \u662F: 1, \u5426: 1, \u9009: 1, \u62E9: 1, \u4F60: 1, \u82F1: 1, \u96C4: 1, \u6218: 1, \u58EB: 1, \u6CD5: 1, \u5E08: 1, \u76D7: 1, \u8D3C: 1, \u5973: 1, \u730E: 1, \u624B: 1, \u575A: 1, \u97E7: 1, \u8FD1: 1, "\u3002": 1, \u521D: 1, \u6B66: 1, \u5668: 1, \u5F3A: 1, "\uFF0C": 1, \u5E76: 1, \u989D: 1, \u5916: 1, \u643A: 1, \u5E26: 1, \u74F6: 1, \u6CBB: 1, \u7597: 1, \u836F: 1, \u6C34: 1, \u6709: 1, \u53E4: 1, \u8001: 1, \u6756: 1, \u5B66: 1, \u8005: 1, \u5347: 1, \u7EA7: 1, \u5377: 1, \u8F74: 1, \u548C: 1, \u63A2: 1, \u64C5: 1, \u957F: 1, \u6F5C: 1, \u6597: 1, \u9690: 1, \u5F62: 1, \u7528: 1, \u53D1: 1, \u52A8: 1, \u4F0F: 1, \u51FB: 1, \u8352: 1, \u91CE: 1, \u7D22: 1, \u968F: 1, \u7B49: 1, \u6210: 1, \u7075: 1, \u80FD: 1, \u77ED: 1, \u5F13: 1, \u98DF: 1, \u7269: 1, \u6DB2: 1, \u706B: 1, \u5242: 1, \u88C5: 1, \u5907: 1, \u4EF6: 1, \u4E8C: 1, \u9636: 1, \u6216: 1, \u9AD8: 1, \u4E14: 1, \u4E0D: 1, \u53D7: 1, \u5230: 1, \u529B: 1, \u91CF: 1, \u8DB3: 1, \u60E9: 1, \u7F5A: 1, \u5373: 1, \u53EF: 1, \u89E3: 1, \u9501: 1, \u51B3: 1, \u5BB6: 1, \u5F7B: 1, \u5E95: 1, \u51C0: 1, \u5316: 1, \u4EFB: 1, \u610F: 1, \u8BC5: 1, \u5492: 1, \u4E0A: 1, \u7267: 1, \u751F: 1, \u547D: 1, "\uFF1A": 1, \u7ECF: 1, \u9A8C: 1, \u91D1: 1, \u5E01: 1, \u5C5E: 1, \u6027: 1, \u5929: 1, \u8D4B: 1, \u80CC: 1, \u5305: 1, \u9605: 1, \u8BFB: 1, \u996E: 1, \u6295: 1, \u63B7: 1, \u5C04: 1, \u89C1: 1, \u683C: 1, \u5B50: 1, \u8EAB: 1, \u76EE: 1, \u6807: 1, \u8F83: 1, \u96BE: 1, \u6309: 1, \u53D6: 1, \u6D88: 1, \u7130: 1, \u4E5F: 1, \u4F1A: 1, \u707C: 1, \u4F24: 1, \u81EA: 1, \u5DF1: 1, \u8BF7: 1, \u5F53: 1, \u524D: 1, \u89C6: 1, \u5185: 1, \u65E7: 1, \u5251: 1, \u9B54: 1, \u5315: 1, \u9996: 1, \u9576: 1, \u9489: 1, \u5957: 1, \u5E03: 1, \u7532: 1, \u76AE: 1, "\u2013": 0.536, \u5BB3: 1, \u9700: 1, \u6C42: 1, \u653B: 1, \u8017: 1, \u65F6: 1, \u6539: 1, \u5584: 1, \u8FD9: 1, \u51CF: 1, \u514D: 1, \u62A4: 1, \u9632: 1, \u4E0E: 1, \u901F: 1, \u95EA: 1, \u907F: 1, \u79FB: 1, \u5EA6: 1, \u672F: 1, \u5145: 1, \u5C1A: 1, \u672A: 1, \u5B9E: 1, \u73B0: 1, \u5378: 1, \u4F5C: 1, \u8981: 1, \u94A5: 1, \u5319: 1, \u542F: 1, \u7B2C: 1, \u5C42: 1, \u9053: 1, \u51FA: 1, \u53E3: 1, \u5728: 1, \u697C: 1, \u68AF: 1, \u5904: 1, \u4F7F: 1, \u9ECF: 1, \u56E2: 1, \u7C98: 1, \u5495: 1, \u7559: 1, \u70BC: 1, \u6750: 1, \u6599: 1, \u672C: 1, \u690D: 1, \u7248: 1, \u6682: 1, \u653E: 1, \u4EA4: 1, \u6613: 1, \u5899: 1, \u58C1: 1, \u677F: 1, \u9762: 1, \u95E8: 1, \u6253: 1, \u5411: 1, \u70B9: 1, \u5DF2: 1, \u67E5: 1, \u770B: 1, \u8BE6: 1, \u60C5: 1, "\uFF1B": 1, \u518D: 1, \u6B21: 1, \u641C: 1, \u5468: 1, \u56F4: 1, "\uFF08": 1, \u5408: 1, "\uFF09": 1, \u9010: 1, \u6B65: 1, \u6062: 1, \u590D: 1, \u8150: 1, \u8680: 1, \u6E05: 1, \u9664: 1, \u6E29: 1, \u6696: 1, \u800C: 1, \u8212: 1, \u7F13: 1, \u6D41: 1, \u904D: 1, \u5168: 1, "\xD7": 1, \u540E: 1, \u71C3: 1, \u533A: 1, \u57DF: 1, \u88C2: 1, \u4E3A: 1, \u718A: 1, \u70C8: 1, "\uFF01": 1, \u4ECE: 1, \u654C: 1, \u4EBA: 1, \u5931: 1, \u4E86: 1, \u51C6: 1, \u6C38: 1, \u4E45: 1, \u589E: 1, \u52A0: 1, \u6D8C: 1, \u808C: 1, \u8089: 1, \u786E: 1, \u8BA4: 1, \u7B26: 1, \u878D: 1, \u63ED: 1, \u793A: 1, \u4F46: 1, \u5176: 1, \u5C40: 1, \u8111: 1, \u6D77: 1, \u6670: 1, \u8D77: 1, \u6765: 1, \u7CAE: 1, \u9965: 1, \u997F: 1, \u5403: 1, \u611F: 1, \u6E10: 1, \u9000: 1, \u65E0: 1, \u9650: 1, \u7BAD: 1, \u77E2: 1, \u66FF: 1, \u6362: 1, \u6563: 1, \u9F20: 1, \u8C7A: 1, \u72FC: 1, \u4FA6: 1, \u5BDF: 1, \u5175: 1, \u8783: 1, \u87F9: 1, \u6781: 1, \u70E7: 1, \u505C: 1, \u663E: 1, \u754C: 1, \u8F93: 1, \u6570: 1, \u636E: 1, \u97F3: 1, \u9891: 1, \u8BED: 1, \u8A00: 1, \u6BD4: 1, \u4F8B: 1, \u6A2A: 1, \u5C4F: 1, \u7AD6: 1, \u64CD: 1, \u63D0: 1, \u5C11: 1, \u6001: 1, \u6548: 1, \u679C: 1, \u6307: 1, \u9488: 1, \u654F: 1, \u500D: 1, \u65B9: 1, \u952E: 1, \u7A7A: 1, \u5F85: 1, \u53E5: 1, \u53F7: 1, \u7EDD: 1, \u5BF9: 1, \u5750: 1, \u8C03: 1, \u8282: 1, \u6700: 1, \u5206: 1, \u80DC: 1, \u5229: 1, \u5192: 1, \u9669: 1, \u673A: 1, \u79CD: 1, \u4FDD: 1, \u5B58: 1, \u5417: 1, "\uFF1F": 1, \u4E50: 1, \u7ACB: 1, \u6863: 1, \u4ECD: 1, \u8BDD: 1, \u6B63: 1, \u5E38: 1, \u73A9: 1, \u517C: 1, \u5BB9: 1, \u8986: 1, \u76D6: 1, \u8BE5: 1, \u8D25: 1, \u4EE5: 1, \u91CD: 1, \u8BD5: 1, \u539F: 1, \u5F71: 1, \u54CD: 1, \u91CC: 1, \u7A0B: 1, \u7891: 1, \u5B8C: 1, \u76D1: 1, \u72F1: 1, \u53CA: 1, \u7EED: 1, \u6B7B: 1, "\u2026": 1, \u9886: 1, \u88AB: 1, \u7ED3: 1, \u675F: 1, \u6DF1: 1, \u5357: 1, \u6536: 1, \u96C6: 1, \u54C1: 1, \u5236: 1, \u906D: 1, \u9047: 1, \u57FA: 1, \u521B: 1, \u8FD0: 1, \u7531: 1, \u6B22: 1, \u8FCE: 1, \u6BCF: 1, \u627E: 1, \u6361: 1, \u5C06: 1, \u679A: 1, \u6389: 1, \u843D: 1, \u62FE: 1, \u5148: 1, \u6BB5: 1, \u6247: 1, \u85CF: 1, \u5FEB: 1, \u4E9B: 1, \u5427: 1, \u9020: 1, \u8EB2: 1, \u7EE7: 1, \u81A8: 1, \u80C0: 1, \u79BB: 1, \u5B83: 1, \u8303: 1, \u84C4: 1, \u64A4: 1, \u7206: 1, \u7AD9: 1, \u6321: 1, \u4F4F: 1, \u53BB: 1, \u8DEF: 1, \u5DE2: 1, \u7A74: 1, \u68C0: 1, \u6240: 1, "\u3001": 1, \u53CD: 1, \u7EC4: 1, \u8BE2: 1, \u62D2: 1, \u503C: 1, \u7EF4: 1, \u7CBE: 1, \u5B57: 1, \u53D8: 1, \u76F8: 1, \u5207: 1, \u9500: 1, \u6BC1: 1, \u6821: 1, \u7406: 1, \u76D8: 1, \u89E6: 1, \u6478: 1, \u5B89: 1, \u77E5: 1, \u72B6: 1, \u5199: 1, \u5220: 1, \u50A8: 1, \u79C1: 1, \u6574: 1, \u753B: 1, \u89C9: 1, \u9F50: 1, \u63A5: 1, \u7F3A: 1, \u4ED6: 1, \u5E73: 1, \u53F0: 1, \u70ED: 1, \u8F7D: 1, \u7F51: 1, \u7EDC: 1, \u94AE: 1 };
+  var noto_sans_sc_metrics_default = { "0": 0.555, "1": 0.555, "2": 0.555, "3": 0.555, "4": 0.555, "5": 0.555, "6": 0.555, "7": 0.555, "8": 0.555, "9": 0.555, " ": 0.224, "!": 0.323, '"': 0.474, "#": 0.555, $: 0.555, "%": 0.921, "&": 0.68, "'": 0.278, "(": 0.338, ")": 0.338, "*": 0.467, "+": 0.555, ",": 0.278, "-": 0.347, ".": 0.278, "/": 0.392, ":": 0.278, ";": 0.278, "<": 0.555, "=": 0.555, ">": 0.555, "?": 0.474, "@": 0.946, A: 0.608, B: 0.657, C: 0.638, D: 0.688, E: 0.589, F: 0.552, G: 0.689, H: 0.728, I: 0.293, J: 0.535, K: 0.646, L: 0.543, M: 0.812, N: 0.723, O: 0.742, P: 0.633, Q: 0.742, R: 0.635, S: 0.596, T: 0.599, U: 0.721, V: 0.575, W: 0.878, X: 0.573, Y: 0.531, Z: 0.603, "[": 0.338, "\\": 0.392, "]": 0.338, "^": 0.555, _: 0.559, "`": 0.606, a: 0.563, b: 0.618, c: 0.51, d: 0.62, e: 0.554, f: 0.325, g: 0.564, h: 0.607, i: 0.275, j: 0.275, k: 0.552, l: 0.284, m: 0.926, n: 0.61, o: 0.606, p: 0.62, q: 0.62, r: 0.388, s: 0.468, t: 0.377, u: 0.607, v: 0.521, w: 0.802, x: 0.498, y: 0.521, z: 0.475, "{": 0.338, "|": 0.27, "}": 0.338, "~": 0.555, \u7834: 1, \u788E: 1, \u7684: 1, \u50CF: 1, \u7D20: 1, \u5730: 1, \u7262: 1, \u7B80: 1, \u4F53: 1, \u4E2D: 1, \u6587: 1, \u8FDB: 1, \u5165: 1, \u652F: 1, \u6301: 1, \u6E38: 1, \u620F: 1, \u6392: 1, \u884C: 1, \u699C: 1, \u65E5: 1, \u5FD7: 1, \u65B0: 1, \u95FB: 1, \u8BBE: 1, \u7F6E: 1, \u66F4: 1, \u8BB0: 1, \u5F55: 1, \u5173: 1, \u4E8E: 1, \u4E3B: 1, \u83DC: 1, \u5355: 1, \u5F00: 1, \u59CB: 1, \u95ED: 1, \u8FD4: 1, \u56DE: 1, \u4E0B: 1, \u4E00: 1, \u9875: 1, \u662F: 1, \u5426: 1, \u9009: 1, \u62E9: 1, \u4F60: 1, \u82F1: 1, \u96C4: 1, \u6218: 1, \u58EB: 1, \u6CD5: 1, \u5E08: 1, \u76D7: 1, \u8D3C: 1, \u5973: 1, \u730E: 1, \u624B: 1, \u575A: 1, \u97E7: 1, \u8FD1: 1, "\u3002": 1, \u521D: 1, \u6B66: 1, \u5668: 1, \u5F3A: 1, "\uFF0C": 1, \u5E76: 1, \u989D: 1, \u5916: 1, \u643A: 1, \u5E26: 1, \u74F6: 1, \u6CBB: 1, \u7597: 1, \u836F: 1, \u6C34: 1, \u6709: 1, \u53E4: 1, \u8001: 1, \u6756: 1, \u5B66: 1, \u8005: 1, \u5347: 1, \u7EA7: 1, \u5377: 1, \u8F74: 1, \u548C: 1, \u63A2: 1, \u64C5: 1, \u957F: 1, \u6F5C: 1, \u6597: 1, \u9690: 1, \u5F62: 1, \u7528: 1, \u53D1: 1, \u52A8: 1, \u4F0F: 1, \u51FB: 1, \u8352: 1, \u91CE: 1, \u7D22: 1, \u968F: 1, \u7B49: 1, \u6210: 1, \u7075: 1, \u80FD: 1, \u77ED: 1, \u5F13: 1, \u98DF: 1, \u7269: 1, \u6DB2: 1, \u706B: 1, \u5242: 1, \u88C5: 1, \u5907: 1, \u4EF6: 1, \u4E8C: 1, \u9636: 1, \u6216: 1, \u9AD8: 1, \u4E14: 1, \u4E0D: 1, \u53D7: 1, \u5230: 1, \u529B: 1, \u91CF: 1, \u8DB3: 1, \u60E9: 1, \u7F5A: 1, \u5373: 1, \u53EF: 1, \u89E3: 1, \u9501: 1, \u51B3: 1, \u5BB6: 1, \u5F7B: 1, \u5E95: 1, \u51C0: 1, \u5316: 1, \u4EFB: 1, \u610F: 1, \u8BC5: 1, \u5492: 1, \u4E0A: 1, \u7267: 1, \u751F: 1, \u547D: 1, "\uFF1A": 1, \u7ECF: 1, \u9A8C: 1, \u91D1: 1, \u5E01: 1, \u5C5E: 1, \u6027: 1, \u5929: 1, \u8D4B: 1, \u80CC: 1, \u5305: 1, \u9605: 1, \u8BFB: 1, \u996E: 1, \u6295: 1, \u63B7: 1, \u5C04: 1, \u65BD: 1, \u89C1: 1, \u683C: 1, \u5B50: 1, \u7784: 1, \u51C6: 1, \u9B54: 1, \u5F39: 1, \u4F1A: 1, \u98DE: 1, \u8FC7: 1, \u7A7A: 1, \u6309: 1, \u53D6: 1, \u6D88: 1, \u8017: 1, \u5C3D: 1, \u8BF7: 1, \u5F85: 1, \u5145: 1, \u5BF9: 1, \u81EA: 1, \u5DF1: 1, \u9020: 1, \u4E86: 1, \u70B9: 1, \u4F24: 1, \u5BB3: 1, \u6563: 1, \u8EAB: 1, \u76EE: 1, \u6807: 1, \u8F83: 1, \u96BE: 1, \u7130: 1, \u4E5F: 1, \u707C: 1, \u5F53: 1, \u524D: 1, \u89C6: 1, \u5185: 1, \u65E7: 1, \u5251: 1, \u5315: 1, \u9996: 1, \u9576: 1, \u9489: 1, \u5957: 1, \u5E03: 1, \u7532: 1, \u76AE: 1, "\u2013": 0.536, \u9700: 1, \u6C42: 1, \u653B: 1, \u65F6: 1, \u6539: 1, \u5584: 1, \u8FD9: 1, \u51CF: 1, \u514D: 1, \u62A4: 1, \u9632: 1, \u4E0E: 1, \u901F: 1, \u95EA: 1, \u907F: 1, \u79FB: 1, \u5EA6: 1, \u5408: 1, \u5378: 1, \u4F5C: 1, \u8981: 1, \u94A5: 1, \u5319: 1, \u542F: 1, \u7B2C: 1, \u5C42: 1, \u9053: 1, \u51FA: 1, \u53E3: 1, \u5728: 1, \u697C: 1, \u68AF: 1, \u5904: 1, \u4F7F: 1, \u9ECF: 1, \u56E2: 1, \u7C98: 1, \u5495: 1, \u7559: 1, \u70BC: 1, \u6750: 1, \u6599: 1, \u672C: 1, \u690D: 1, \u7248: 1, \u6682: 1, \u672A: 1, \u653E: 1, \u4EA4: 1, \u6613: 1, \u5899: 1, \u58C1: 1, \u677F: 1, \u9762: 1, \u95E8: 1, \u6253: 1, \u5411: 1, \u5DF2: 1, \u67E5: 1, \u770B: 1, \u8BE6: 1, \u60C5: 1, "\uFF1B": 1, \u518D: 1, \u6B21: 1, \u641C: 1, \u5468: 1, \u56F4: 1, "\uFF08": 1, "\uFF09": 1, \u9010: 1, \u6B65: 1, \u6062: 1, \u590D: 1, \u8150: 1, \u8680: 1, \u6E05: 1, \u9664: 1, \u6E29: 1, \u6696: 1, \u800C: 1, \u8212: 1, \u7F13: 1, \u6D41: 1, \u904D: 1, \u5168: 1, "\xD7": 1, \u540E: 1, \u71C3: 1, \u533A: 1, \u57DF: 1, \u88C2: 1, \u4E3A: 1, \u718A: 1, \u70C8: 1, "\uFF01": 1, \u4ECE: 1, \u654C: 1, \u4EBA: 1, \u5931: 1, \u6C38: 1, \u4E45: 1, \u589E: 1, \u52A0: 1, \u6D8C: 1, \u808C: 1, \u8089: 1, \u786E: 1, \u8BA4: 1, \u7B26: 1, \u878D: 1, \u63ED: 1, \u793A: 1, \u4F46: 1, \u5176: 1, \u5C40: 1, \u8111: 1, \u6D77: 1, \u6670: 1, \u8D77: 1, \u6765: 1, \u7CAE: 1, \u9965: 1, \u997F: 1, \u5403: 1, \u611F: 1, \u6E10: 1, \u9000: 1, \u65E0: 1, \u9650: 1, \u7BAD: 1, \u77E2: 1, \u66FF: 1, \u6362: 1, \u9F20: 1, \u8C7A: 1, \u72FC: 1, \u4FA6: 1, \u5BDF: 1, \u5175: 1, \u8783: 1, \u87F9: 1, \u6781: 1, \u70E7: 1, \u505C: 1, \u663E: 1, \u754C: 1, \u8F93: 1, \u6570: 1, \u636E: 1, \u97F3: 1, \u9891: 1, \u8BED: 1, \u8A00: 1, \u6BD4: 1, \u4F8B: 1, \u6A2A: 1, \u5C4F: 1, \u7AD6: 1, \u64CD: 1, \u63D0: 1, \u5C11: 1, \u6001: 1, \u6548: 1, \u679C: 1, \u6307: 1, \u9488: 1, \u654F: 1, \u500D: 1, \u65B9: 1, \u952E: 1, \u53E5: 1, \u53F7: 1, \u7EDD: 1, \u5750: 1, \u8C03: 1, \u8282: 1, \u6700: 1, \u5206: 1, \u80DC: 1, \u5229: 1, \u5192: 1, \u9669: 1, \u673A: 1, \u79CD: 1, \u4FDD: 1, \u5B58: 1, \u5417: 1, "\uFF1F": 1, \u4E50: 1, \u7ACB: 1, \u6863: 1, \u4ECD: 1, \u8BDD: 1, \u6B63: 1, \u5E38: 1, \u73A9: 1, \u73B0: 1, \u517C: 1, \u5BB9: 1, \u8986: 1, \u76D6: 1, \u8BE5: 1, \u8D25: 1, \u4EE5: 1, \u91CD: 1, \u8BD5: 1, \u539F: 1, \u5F71: 1, \u54CD: 1, \u91CC: 1, \u7A0B: 1, \u7891: 1, \u5B8C: 1, \u76D1: 1, \u72F1: 1, \u53CA: 1, \u7EED: 1, \u5C1A: 1, \u6B7B: 1, "\u2026": 1, \u9886: 1, \u88AB: 1, \u7ED3: 1, \u675F: 1, \u6DF1: 1, \u5357: 1, \u6536: 1, \u96C6: 1, \u54C1: 1, \u672F: 1, \u5236: 1, \u906D: 1, \u9047: 1, \u57FA: 1, \u521B: 1, \u8FD0: 1, \u7531: 1, \u6B22: 1, \u8FCE: 1, \u6BCF: 1, \u627E: 1, \u6361: 1, \u5C06: 1, \u679A: 1, \u6389: 1, \u843D: 1, \u62FE: 1, \u5148: 1, \u6BB5: 1, \u6247: 1, \u85CF: 1, \u5FEB: 1, \u4E9B: 1, \u5427: 1, \u8EB2: 1, \u7EE7: 1, \u81A8: 1, \u80C0: 1, \u79BB: 1, \u5B83: 1, \u8303: 1, \u84C4: 1, \u64A4: 1, \u7206: 1, \u7AD9: 1, \u6321: 1, \u4F4F: 1, \u53BB: 1, \u8DEF: 1, \u5DE2: 1, \u7A74: 1, \u68C0: 1, \u6240: 1, \u5B9E: 1, "\u3001": 1, \u53CD: 1, \u7EC4: 1, \u8BE2: 1, \u62D2: 1, \u503C: 1, \u7EF4: 1, \u7CBE: 1, \u5B57: 1, \u53D8: 1, \u76F8: 1, \u5207: 1, \u9500: 1, \u6BC1: 1, \u6821: 1, \u7406: 1, \u76D8: 1, \u89E6: 1, \u6478: 1, \u5B89: 1, \u77E5: 1, \u72B6: 1, \u5199: 1, \u5220: 1, \u50A8: 1, \u79C1: 1, \u6574: 1, \u753B: 1, \u89C9: 1, \u9F50: 1, \u63A5: 1, \u7F3A: 1, \u4ED6: 1, \u5E73: 1, \u53F0: 1, \u70ED: 1, \u8F7D: 1, \u7F51: 1, \u7EDC: 1, \u94AE: 1 };
 
   // modules/ember-arena/game/src/text-layout.ts
   var hasCjk = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/u;
@@ -920,6 +926,36 @@
   function spiritBowDamage(heroLevel, strength2, roll2) {
     const [min, max] = spiritBowRange(heroLevel), excess = strength2 - spiritBowStrength(heroLevel);
     return roll2(min, max) + (excess > 0 ? roll2(0, excess) : 0);
+  }
+
+  // modules/ember-arena/game/src/staff.ts
+  var staffChargerKind = "staff_charger";
+  var staffChargeId = (gearId) => `staff_charge:${gearId}`;
+  var staffGearId = (id) => Number(id.slice(id.indexOf(":") + 1));
+  var staffCapacity = (level2) => Math.min(4 + level2, 10);
+  var staffDamageRange = (level2) => [2 + level2, 8 + 2 * level2];
+  function staffCharges(gearId) {
+    return scene_actor(staffChargeId(gearId)) ? field(staffChargeId(gearId), "health") : 0;
+  }
+  function createStaffCharger(gear, now) {
+    if (gear.kind !== "mages_staff" || scene_actor(staffChargeId(gear.id))) return;
+    const id = staffChargeId(gear.id);
+    if (!scene_spawn(id, 0, 0, -20) || !scene_actor_set(id, staffChargerKind, staffCapacity(gear.level), 0, 1)) throw new Error("Cannot create staff charger");
+    change(id, "cooldown", Math.fround(now));
+  }
+  function rechargeStaff(charges, partial, capacity, regenOn) {
+    if (charges < capacity && regenOn) {
+      const delay = Math.fround(10 + 40 * Math.pow(0.75, Math.max(0, capacity - charges)));
+      partial = Math.fround(partial + Math.fround(1 / delay));
+    }
+    while (partial >= 1 && charges < capacity) {
+      charges++;
+      partial = Math.fround(partial - 1);
+    }
+    return { charges, partial: charges === capacity ? 0 : partial };
+  }
+  function upgradeStaffCharge(gear) {
+    if (gear.kind === "mages_staff") change(staffChargeId(gear.id), "health", Math.min(staffCharges(gear.id) + 1, staffCapacity(gear.level)));
   }
 
   // modules/ember-arena/game/src/spd-ui.ts
@@ -1085,6 +1121,7 @@
         if (gear) {
           childrenSlot.push(image(`gear_icon_${gear.id}`, `sprites/dungeon/${gear.kind}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
           if (gear.level) childrenSlot.push(label(`gear_level_${gear.id}`, `+${gear.level}`, 1, 1, slotWidth - 2, 6, titleColor));
+          if (gear.kind === "mages_staff") childrenSlot.push(label(`gear_charge_${gear.id}`, `${staffCharges(gear.id)}/${staffCapacity(gear.level)}`, 1, slotHeight - 8, slotWidth - 2, 5));
         } else if (equipped) {
           childrenSlot.push(art(`equipment_${index}`, ["empty_weapon", "empty_armor", "empty_artifact", "empty_ring", "empty_ring"][index], (slotWidth - 16) / 2, (slotHeight - 16) / 2));
         } else if (key) {
@@ -1160,7 +1197,7 @@
       elements.push({ kind: "button", id: "wait", onClick: () => on("wait"), style: rect(waitX, toolbarY, 20, 26), children: [art("wait_tool", "wait_tool", 0, 0), art("wait_tool_icon", "wait_tool_icon", 2, 5)] });
       elements.push({ kind: "button", id: "search", onClick: () => on("search"), style: rect(searchX, toolbarY, 20, 26), children: [art("search_tool", "search_tool", 0, 0), art("search_tool_icon", "search_tool_icon", 2, 5)] });
       if (state.targeting) {
-        const promptWidth = Math.max(90, w - 30), lines = wrappedText(t(state.targeting === "bow" ? "target.bow" : "target.flame"), promptWidth, 6);
+        const promptWidth = Math.max(90, w - 30), lines = wrappedText(t(state.targeting === "staff" ? "target.staff" : state.targeting === "bow" ? "target.bow" : "target.flame"), promptWidth, 6);
         elements.push(label("target_prompt", lines.join("\n"), 2, 44, promptWidth, 6, titleColor, lines.length * 8));
         elements.push(control("cancel_target", t("common.close"), w - 28, 44, 26, 14, "toast", void 0, "cancel_target", true, 6));
       } else if (state.examining) {
@@ -1171,18 +1208,28 @@
         const lines = wrappedText(t("log.guide"), w - 4, 6);
         elements.push(label("hud_hint", lines.join("\n"), 2, 44, w - 4, 6, grey, lines.length * 8));
       }
-      const quick = state.inventory.spirit_bow > 0 ? ["spirit_bow", "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null] : ["potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null, null];
+      const staff = state.equipment.find((gear) => gear.kind === "mages_staff");
+      const quick = staff ? [staff, "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null] : state.inventory.spirit_bow > 0 ? ["spirit_bow", "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null] : ["potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null, null];
       const count = 4 + Number(w > 152) + Number(w > 170);
       let quickRight = m.large ? searchX : toolbarX;
       for (let offset = 0; offset < count; offset++) {
-        const index = m.large ? count - 1 - offset : offset, item = quick[index];
+        const index = m.large ? count - 1 - offset : offset, entry = quick[index];
+        const gear = entry && typeof entry === "object" ? entry : void 0, item = typeof entry === "string" ? entry : void 0;
+        const name = gear?.kind ?? item;
+        const quantity = gear ? `${staffCharges(gear.id)}/${staffCapacity(gear.level)}` : item === "spirit_bow" ? spiritBowLevel(state.level) ? `+${spiritBowLevel(state.level)}` : "" : item ? `${state.inventory[item]}` : "";
         const side = m.large ? index === 0 ? "left" : index === count - 1 ? "right" : "middle" : index === 0 ? "right" : index === count - 1 ? "left" : "middle";
         const width = side === "left" ? 20 : side === "right" ? 19 : 18;
         quickRight -= width;
-        elements.push({ kind: "button", id: item ? `quick_${item}` : `quick_empty_${index}`, onClick: item ? () => on("quick", item) : void 0, style: rect(quickRight, h - 24, width, 24), children: [
-          art(`quick_frame_${index}`, `quick_${side}`, 0, 0),
-          ...item ? [image(`quick_icon_${index}`, `sprites/dungeon/${item}.png`, rect((width - 16) / 2, 3, 16, 16)), label(`quick_count_${index}`, item === "spirit_bow" ? spiritBowLevel(state.level) ? `+${spiritBowLevel(state.level)}` : "" : `${state.inventory[item]}`, 2, 2, 14, 5)] : []
-        ] });
+        elements.push({
+          kind: "button",
+          id: gear ? `quick_staff_${gear.id}` : item ? `quick_${item}` : `quick_empty_${index}`,
+          onClick: gear ? () => on(`zap:${gear.id}`) : item ? () => on("quick", item) : void 0,
+          style: rect(quickRight, h - 24, width, 24),
+          children: [
+            art(`quick_frame_${index}`, `quick_${side}`, 0, 0),
+            ...name ? [image(`quick_icon_${index}`, `sprites/dungeon/${name}.png`, rect((width - 16) / 2, 3, 16, 16)), label(`quick_count_${index}`, quantity, 2, 2, 14, 5)] : []
+          ]
+        });
       }
       const logWidth = Math.max(90, w - 90);
       const logLines = state.logs.slice(0, 3).reverse().map((entry) => wrappedText(entry, logWidth, 6));
@@ -1243,14 +1290,20 @@ ${t("bow.stats", {
             delay: attackDelay(gear, state.strength).toFixed(2)
           }) + (state.strength < strengthRequired(gear) ? `
 ${t("gear.tooHeavy")}` : "") + (gear.kind === "mages_staff" ? `
-${t("gear.staffPending")}` : "");
+${t("gear.staffMagic", {
+            min: staffDamageRange(gear.level)[0],
+            max: staffDamageRange(gear.level)[1],
+            charges: staffCharges(gear.id),
+            capacity: staffCapacity(gear.level)
+          })}` : "");
           const lines = wrappedText(description, 132, 6), buttonY = 26 + Math.ceil(lines.length * 7.2);
           const cost = !gear.equipped && equippedGear(state.equipment, spec.slot) ? 2 : 1;
           window("equipment_window", 132, buttonY + 30, [
             image("gear_detail_icon", `sprites/dungeon/${gear.kind}.png`, rect(0, 0, 16, 16)),
             label("gear_detail_title", `${t(`item.${gear.kind}.name`)}${gear.level ? ` +${gear.level}` : ""}`, 20, 1, 112, 8, titleColor, 24),
             label("gear_detail_stats", lines.join("\n"), 0, 24, 132, 6, white, buttonY - 24),
-            control("toggle_equipment", t(gear.equipped ? "gear.remove" : "gear.equip"), 0, buttonY, 132, 16),
+            control("toggle_equipment", t(gear.equipped ? "gear.remove" : "gear.equip"), 0, buttonY, gear.kind === "mages_staff" ? 64 : 132, 16),
+            ...gear.kind === "mages_staff" ? [control("zap_staff", t("item.zap"), 68, buttonY, 64, 16, "red", void 0, `zap:${gear.id}`, staffCharges(gear.id) > 0)] : [],
             label("gear_action_cost", t("gear.cost", { cost }), 0, buttonY + 19, 132, 6, grey, 10)
           ]);
         }
@@ -1482,17 +1535,18 @@ ${t("gear.staffPending")}` : "");
   }
 
   // modules/ember-arena/game/src/projectiles.ts
-  function projectileImpact(floor2, from, to, occupied) {
+  function projectileImpact(floor2, from, to, occupied, stopAtTarget = true) {
     if (sameCell(from, to)) return { ...from };
     const dx = Math.abs(to.x - from.x), dz = Math.abs(to.z - from.z);
     const sx = to.x > from.x ? 1 : -1, sz = to.z > from.z ? 1 : -1;
     const majorX = dx > dz, major = Math.max(dx, dz), minor = Math.min(dx, dz);
     let error = Math.floor(major / 2), point = { ...from }, previous = { ...from };
-    for (let step = 0; step <= major; step++) {
+    for (let step = 0; step <= (stopAtTarget ? major : floor2.width + floor2.height); step++) {
+      if (point.x < 0 || point.z < 0 || point.x >= floor2.width || point.z >= floor2.height) return previous;
       if (!sameCell(point, from)) {
         const character = occupied(point), tile = terrainAt(floor2, point);
         if (!passable(floor2, point) && !character) return previous;
-        if (tile === "wall" || tile === "secret_door" || tile === "door" || character || sameCell(point, to)) return point;
+        if (tile === "wall" || tile === "secret_door" || tile === "door" || character || stopAtTarget && sameCell(point, to)) return point;
       }
       previous = { ...point };
       if (majorX) point.x += sx;
@@ -1707,6 +1761,10 @@ ${t("gear.staffPending")}` : "");
     }
     if (id.startsWith("upgrade:")) {
       upgradeEquipment(Number(id.slice(8)));
+      return;
+    }
+    if (id.startsWith("zap:")) {
+      beginStaffZap(Number(id.slice(4)));
       return;
     }
     if (id.startsWith("use_")) {
@@ -1938,6 +1996,7 @@ ${t("gear.staffPending")}` : "");
     dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) })];
     room();
     startVitals("player", 0);
+    for (const gear of equipment) createStaffCharger(gear, 0);
     enterFloor();
     setPhase("playing");
   }
@@ -1945,7 +2004,7 @@ ${t("gear.staffPending")}` : "");
     examining = false;
     targeting = null;
     unsealFloor();
-    for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id)) scene_despawn(id);
+    for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id) && kind(id) !== staffChargerKind) scene_despawn(id);
     for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
     for (const key of renderedFog) scene_despawn(`fog_${key}`);
     renderedTiles.clear();
@@ -2031,8 +2090,11 @@ ${t("gear.staffPending")}` : "");
       if (item) {
         if (item === "worn_key") wornKeys++;
         else if (item === "goo_blob") gooBlobs++;
-        else if (isGearKind(item)) equipment.push({ id: Math.max(0, ...equipment.map((gear) => gear.id)) + 1, kind: item, level: 0, equipped: false });
-        else if (item === "spirit_bow") inventory.spirit_bow = 1;
+        else if (isGearKind(item)) {
+          const gear = { id: Math.max(0, ...equipment.map((gear2) => gear2.id)) + 1, kind: item, level: 0, equipped: false };
+          equipment.push(gear);
+          createStaffCharger(gear, field("player", "cooldown"));
+        } else if (item === "spirit_bow") inventory.spirit_bow = 1;
         else inventory[item]++;
         pushLog(message("log.item", { item: message(`item.${item}.name`) }));
       } else {
@@ -2096,6 +2158,7 @@ ${t("gear.staffPending")}` : "");
     if (!item) return;
     item.level++;
     inventory.scroll_upgrade--;
+    upgradeStaffCharge(item);
     pushLog(message("log.gearUpgraded", { item: message(`item.${item.kind}.name`), level: item.level }));
     phase = "playing";
     spendTurns();
@@ -2171,6 +2234,7 @@ ${t("gear.staffPending")}` : "");
     queuedPath = [];
     if (health() <= 0) {
       removeBuffs("player");
+      for (const id of scene_actor_ids()) if (kind(id) === staffChargerKind) scene_despawn(id);
       setPhase("lost");
     }
   }
@@ -2217,6 +2281,18 @@ ${t("gear.staffPending")}` : "");
   function effectAction(id, now) {
     if (kind(id) === "blob_fire") {
       fireAction(now);
+      return 1;
+    }
+    if (kind(id) === staffChargerKind) {
+      const gear = equipment.find((gear2) => gear2.id === staffGearId(id) && gear2.kind === "mages_staff");
+      if (!gear || health() <= 0) {
+        scene_despawn(id);
+        return 1;
+      }
+      const regenOn = !hasBuff("locked_floor", "player") || remainingBuff("locked_floor", "player") >= 1;
+      const next = rechargeStaff(field(id, "health"), field(id, "power"), staffCapacity(gear.level), regenOn);
+      change(id, "health", next.charges);
+      change(id, "power", next.partial);
       return 1;
     }
     const type = buffKind(kind(id)), target = buffTarget(id);
@@ -2273,11 +2349,65 @@ ${t("gear.staffPending")}` : "");
     else change(id, "health", left - 1);
     return 1;
   }
+  function beginStaffZap(gearId) {
+    if (!["playing", "equipment", "inventory"].includes(phase)) return;
+    const gear = equipment.find((item) => item.id === gearId && item.kind === "mages_staff");
+    if (!gear) return;
+    if (staffCharges(gear.id) < 1) {
+      pushLog(message("staff.empty"));
+      drawUi();
+      return;
+    }
+    selectedGear = gear.id;
+    queuedPath = [];
+    examining = false;
+    phase = "playing";
+    targeting = "staff";
+    publish();
+    drawUi();
+  }
   function fireAtTarget(target) {
     if (!floor || !targeting || phase !== "playing") return;
     if (!floor.visible.has(cellKey(floor, target))) {
       pushLog(message("target.notVisible"));
       drawUi();
+      return;
+    }
+    if (targeting === "staff") {
+      const gear = equipment.find((gear2) => gear2.id === selectedGear && gear2.kind === "mages_staff");
+      if (!gear) {
+        targeting = null;
+        drawUi();
+        return;
+      }
+      const hero = cellPosition("player"), impact2 = projectileImpact(
+        floor,
+        hero,
+        target,
+        (point) => monsterIds().some((id) => sameCell(cellPosition(id), point)),
+        false
+      );
+      if (sameCell(hero, target) || sameCell(hero, impact2)) {
+        pushLog(message("staff.selfTarget"));
+        drawUi();
+        return;
+      }
+      if (staffCharges(gear.id) < 1) {
+        targeting = null;
+        pushLog(message("staff.empty"));
+        drawUi();
+        return;
+      }
+      change(staffChargeId(gear.id), "health", staffCharges(gear.id) - 1);
+      const enemy = monsterIds().find((id) => sameCell(cellPosition(id), impact2));
+      if (enemy) {
+        const [min, max] = staffDamageRange(gear.level), damage = roll(min, max);
+        change(enemy, "lifetime", 1);
+        pushLog(message("staff.hit", { damage }));
+        damageMonster(enemy, damage);
+      } else pushLog(message("staff.miss"));
+      scene_despawn(buffId("invisibility", "player"));
+      spendTurns();
       return;
     }
     const item = targeting === "bow" ? "spirit_bow" : "potion_liquid_flame";
@@ -2389,7 +2519,7 @@ ${t("gear.staffPending")}` : "");
     while (phase === "playing") {
       let next = null, earliest = ready, priority = 0;
       for (const id of scene_actor_ids()) {
-        const tag = kind(id), candidatePriority = tag in mobSprites ? -20 : effectPriority(tag);
+        const tag = kind(id), candidatePriority = tag in mobSprites ? -20 : tag === staffChargerKind ? -30 : effectPriority(tag);
         if (candidatePriority === void 0) continue;
         const time = Math.max(start, field(id, "cooldown"));
         if (time < earliest || time === earliest && candidatePriority > priority) {
@@ -2509,6 +2639,11 @@ ${t("gear.staffPending")}` : "");
     if (input_key_just_pressed("Space")) {
       queuedPath = [];
       spendTurns();
+      return;
+    }
+    if (input_key_just_pressed("KeyZ")) {
+      const staff = equipment.find((gear) => gear.kind === "mages_staff");
+      if (staff) beginStaffZap(staff.id);
       return;
     }
     const shortcuts = ["potion_healing", "potion_liquid_flame", "potion_invisibility", "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration", "spirit_bow"];

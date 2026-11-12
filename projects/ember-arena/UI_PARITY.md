@@ -15,7 +15,7 @@ This ledger separates source-based implementation from pixel-parity acceptance.
 | Menu pane | `ui/MenuPane.java` | Source pane, menu/journal artwork, version and depth positions. Journal data/layout is still a subset. |
 | Toolbar | `ui/Toolbar.java` | Original 20/18/19-pixel joined slot frames, 4/5/6 visible-slot thresholds and desktop/mobile grouping. The carried spirit bow occupies the first quick slot and opens cancellable targeting. Search enters tile examination, a second click performs a two-turn search, and F exposes the same flow. Descent uses the HUD stairs, E/period or the hero's exit tile. Full quickslot assignment/auto-aim, swap and native long-press remain absent. |
 | Backpack | `windows/WndBag.java`, `ui/InventorySlot.java` | Five columns and 25 slots, adaptive layout, quantities and bag tab. Weapon/armor slots now reference actual item instances; removed gear remains in the backpack. Seven gear definitions, upgrade labels, key/blob descriptions and equip/unequip actions are present. Rings, artifacts, curses and full bag taxonomy remain pending. |
-| Item window | `windows/WndInfoItem.java`, `windows/WndUseItem.java` | Original chrome, icon/title and measured wrapping. Consumables expose their actions; gear exposes actual damage/armor/strength/time values and equip/remove. Spirit bow exposes Shoot and current level/damage/strength/time; it has no equip action or ammunition count. Upgrade scrolls use a paginated owned-item chooser, exclude the bow and are consumed only on confirmation. Liquid flame exposes Throw and a cancellable visible-tile targeting prompt. Generic throw/drop/quickslot dialogs remain absent; staff casting is explicitly identified as unavailable. |
+| Item window | `windows/WndInfoItem.java`, `windows/WndUseItem.java` | Original chrome, icon/title and measured wrapping. Consumables expose their actions; gear exposes actual damage/armor/strength/time values and equip/remove. Spirit bow exposes Shoot and current level/damage/strength/time; it has no equip action or ammunition count. Staff gear exposes Zap, current magic damage/charges and a first quick slot even while carried unequipped. Upgrade scrolls use a paginated owned-item chooser, exclude the bow and are consumed only on confirmation. Liquid flame exposes Throw and a cancellable visible-tile targeting prompt. Generic throw/drop/quickslot and wand-imbuing dialogs remain absent. |
 | Pause | `windows/WndGame.java` | Original 120-pixel content width, 20-pixel buttons, two-pixel gaps, Settings and Main Menu actions. Challenges are not present in the port. |
 | Settings | `windows/WndSettings.java` | Original content widths, six icon tabs, chrome and persisted English/Simplified Chinese selection. Hints affect the HUD; reduced effects disables burst camera shake. Sensitivity is explicitly disabled for absolute tile selection while preserving old settings. Full display, UI, keybinding, audio and broader locale support remain pending; audio controls are noninteractive. |
 | Hero info | `windows/WndHero.java` | Stats use actual hero/equipment values, including an accuracy/evasion/attack-time summary. Talent trees and complete original stat tabs remain absent. |
@@ -57,6 +57,13 @@ gaps. UI and scene images use nearest sampling. Source icons preserve their own 
   areas/touch and platform font rasterization remain unverified for this UI change.
 
 ## Visual inspection and acceptance
+
+The magic-staff batch passes 130 script tests, Biome and independent TypeScript checks.
+Portrait/short-landscape doubles verify Chinese staff stats, charge counts, Zap and held-click
+cancellation. The headless macOS QuickJS/Bevy test performs a pointer zap and validates actual
+damage/charge state. New staff controls and labels have NOT_RUN native screenshot, OS-input,
+real touch or reference-client pixel acceptance on all five platforms. Missile flight,
+staff particles, sound, imbuing and other wand dialogs remain pending.
 
 The spirit-bow batch passes 115 script tests, Biome and independent TypeScript checks.
 Chinese bow details, Shoot/cancel latching, stats and prompts fit portrait and short landscape

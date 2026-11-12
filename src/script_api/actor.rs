@@ -519,6 +519,53 @@ mod tests {
                     super::super::find_owned_entity(world, &attachment, "gear_icon_1").is_some()
                 );
             })?;
+            call("on_script_reloaded", &mut context)?;
+            click("start")?;
+            call("on_update", &mut context)?;
+            click("hero_mage")?;
+            call("on_update", &mut context)?;
+            click("begin_run")?;
+            call("on_update", &mut context)?;
+            let (target, charger) = guard.with_world_mut(|world| {
+                let target = world
+                    .query::<(Entity, &ScriptActor)>()
+                    .iter(world)
+                    .find(|(_, actor)| actor.kind == "chaser")
+                    .unwrap()
+                    .0;
+                world.get_mut::<Transform>(target).unwrap().translation =
+                    Vec3::new(16.0, -40.0, 2.0);
+                let mut actor = world.get_mut::<ScriptActor>(target).unwrap();
+                actor.health = 1000.0;
+                actor.cooldown = 1000.0;
+                let charger =
+                    super::super::find_owned_entity(world, &attachment, "staff_charge:1").unwrap();
+                assert_eq!(world.get::<ScriptActor>(charger).unwrap().health, 4.0);
+                (target, charger)
+            })?;
+            click("quick_staff_1")?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                let mut query = world.query_filtered::<&mut Window, With<PrimaryWindow>>();
+                query
+                    .single_mut(world)
+                    .unwrap()
+                    .set_cursor_position(Some(Vec2::new(432.0, 220.0)));
+                world
+                    .resource_mut::<ButtonInput<MouseButton>>()
+                    .press(MouseButton::Left);
+            })?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                let health = world.get::<ScriptActor>(target).unwrap().health;
+                assert!((992.0..=998.0).contains(&health));
+                let charger = world.get::<ScriptActor>(charger).unwrap();
+                assert_eq!(charger.health, 3.0);
+                assert_eq!(charger.power, 0.025);
+                assert_eq!(charger.cooldown, 1.0);
+                let player = super::super::find_owned_entity(world, &attachment, "player").unwrap();
+                assert_eq!(world.get::<ScriptActor>(player).unwrap().cooldown, 1.0);
+            })?;
             Ok(())
         })
     }
