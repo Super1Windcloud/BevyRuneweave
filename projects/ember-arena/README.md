@@ -26,6 +26,12 @@ npm --prefix projects/ember-arena run watch
 The Rust launcher builds the TypeScript bundle before starting. Cargo builds reuse the
 repository `target/`; root tooling supplies the TypeScript dependencies.
 
+The desktop window starts at **800×600 logical pixels**, centered on the primary monitor.
+`assets/engineConfig.json` declares that size before native window creation; script load/reload
+does not resize an already visible window. Manual resizing and the Display tab's landscape/
+portrait controls remain available. Android and iOS keep their native fullscreen geometry.
+This startup behavior requires a runtime rebuilt with support for `engineConfig.window`.
+
 ## Current gameplay
 
 - Native top-down 2D sprites use the original hero, monster, item and sewer tile atlases.
@@ -131,6 +137,20 @@ downloads are cached from upstream `master`, not an immutable release; checksums
 local generated artifacts. The game runs offline after preparation.
 
 ## Verification boundaries
+
+### Window startup verification on 2026-11-12 (macOS Debug)
+
+- Script tests: **49 passed**. Runtime library tests: **40 passed, 1 performance test ignored**.
+  Coverage includes initial project dimensions, legacy defaults, invalid settings, no resize during
+  script load/reload, manual orientation actions and the actual QuickJS game bundle.
+- With the current **800×600** configuration, native window geometry was sampled **178 times**
+  from its first visible appearance over five seconds. Every sample retained the same 800×632
+  outer frame at (320, 134) on the 1440×932 primary display. The runtime requests primary-monitor
+  centering before creation; the OS accounts for window decorations and available screen space.
+  Evidence is under `target/ember-arena-window-native/window-samples-800x600.json`.
+- The macOS unified Debug runtime package was rebuilt under
+  `dist/runtimes/macos/aarch64-apple-darwin/`; the iOS runtime library passed a cross-target Cargo
+  check. Windows, Linux and Android builds/runs, iOS native execution and Release were **NOT_RUN**.
 
 ### Localization verification on 2026-11-12 (macOS Debug)
 

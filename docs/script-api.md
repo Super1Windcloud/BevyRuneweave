@@ -124,6 +124,20 @@ macOS, and Linux. It returns `true` when the primary window accepts a finite siz
 game in immersive full-screen mode, and return `false` for every script resize request. This keeps
 one portable script contract without allowing gameplay code to break mobile full-screen behavior.
 
+For the **initial** desktop size, set an optional `window` object in `assets/engineConfig.json`:
+
+```json
+"window": { "width": 1280, "height": 800 }
+```
+
+The runtime reads these logical-pixel dimensions before creating the native window, and centers
+that final size on the primary monitor. Both fields must be integers from 1 through 16384;
+invalid desktop window settings return a startup error. Packages without `window` keep the
+600×800 default. Android and iOS ignore this desktop preference and retain native fullscreen.
+Use `window_set_size` for explicit user actions after launch, rather than in `on_script_loaded`:
+resizing an already visible window can produce a size transition and leave it off-center.
+The C ABI is unchanged; previously distributed runtime libraries need rebuilding to read this field.
+
 `window_safe_area()` returns `left`, `right`, `bottom`, `top`, `width`, `height`, and the four
 `*Inset` values in virtual world units. Desktop insets are zero. Android derives them from winit's
 native content rectangle; iOS derives them from the UIKit safe-area inner rectangle. Script

@@ -64,6 +64,48 @@ struct RuntimeConfig {
     app_name: Option<String>,
     #[allow(dead_code)]
     icon: Option<String>,
+    window: Option<serde_json::Value>,
+}
+
+/// Apply desktop dimensions before winit creates and centers the native window.
+/// Mobile hosts retain their platform-managed fullscreen window.
+fn initial_window(
+    title: String,
+    configuration: Option<serde_json::Value>,
+) -> Result<Window, String> {
+    let resolution = WindowResolution::new(WINDOW_WIDTH, WINDOW_HEIGHT);
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    let resolution = if let Some(configuration) = configuration {
+        #[derive(Deserialize)]
+        struct Dimensions {
+            width: u32,
+            height: u32,
+        }
+        let dimensions: Dimensions = serde_json::from_value(configuration)
+            .map_err(|error| format!("Invalid desktop window configuration: {error}"))?;
+        if !(1..=16_384).contains(&dimensions.width) || !(1..=16_384).contains(&dimensions.height) {
+            return Err(
+                "Desktop window dimensions must be integers between 1 and 16384".to_owned(),
+            );
+        }
+        WindowResolution::new(dimensions.width, dimensions.height)
+    } else {
+        resolution
+    };
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    let _ = configuration;
+
+    Ok(Window {
+        title,
+        resolution,
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        mode: WindowMode::BorderlessFullscreen(MonitorSelection::Primary),
+        #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+        position: WindowPosition::Centered(MonitorSelection::Primary),
+        present_mode: PresentMode::AutoVsync,
+        resizable: true,
+        ..default()
+    })
 }
 
 callback_labels!(OnUpdate => "on_update");
@@ -489,6 +531,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         .app_name
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| format!("Script Squadron - {backend}"));
+    let window = initial_window(title, runtime_config.window)?;
 
     let mut app = App::new();
     let scripting_plugins = runtime_scripting_plugins();
@@ -512,17 +555,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
                 ..default()
             })
             .set(WindowPlugin {
-                primary_window: Some(Window {
-                    title,
-                    resolution: WindowResolution::new(WINDOW_WIDTH, WINDOW_HEIGHT),
-                    #[cfg(any(target_os = "android", target_os = "ios"))]
-                    mode: WindowMode::BorderlessFullscreen(MonitorSelection::Primary),
-                    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
-                    position: WindowPosition::Centered(MonitorSelection::Primary),
-                    present_mode: PresentMode::AutoVsync,
-                    resizable: true,
-                    ..default()
-                }),
+                primary_window: Some(window),
                 ..default()
             }),
     )
@@ -734,6 +767,53 @@ mod tests {
 
     extern "C" fn record_exit_callback() {
         EXIT_CALLBACK_CALLED.store(true, Ordering::Release);
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn desktop_window_uses_project_dimensions_before_native_creation() {
+        let config: RuntimeConfig =
+            serde_json::from_str(r#"{"appName":"Game","window":{"width":1280,"height":800}}"#)
+                .unwrap();
+        let window = initial_window(config.app_name.unwrap(), config.window).unwrap();
+        assert_eq!((window.width(), window.height()), (1280.0, 800.0));
+        assert!(matches!(
+            window.position,
+            WindowPosition::Centered(MonitorSelection::Primary)
+        ));
+        assert!(window.resizable, "manual resizing must remain available");
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn desktop_window_keeps_legacy_defaults_and_rejects_invalid_dimensions() {
+        let config: RuntimeConfig = serde_json::from_str(r#"{"appName":"Legacy"}"#).unwrap();
+        let window = initial_window(config.app_name.unwrap(), config.window).unwrap();
+        assert_eq!((window.width(), window.height()), (600.0, 800.0));
+        for configuration in [
+            serde_json::json!({ "width": 0, "height": 800 }),
+            serde_json::json!({ "width": 1280, "height": 16_385 }),
+            serde_json::json!({ "width": -1, "height": 800 }),
+            serde_json::json!({ "width": 1280.5, "height": 800 }),
+            serde_json::json!({ "width": "1280", "height": 800 }),
+            serde_json::json!({ "width": 1280 }),
+        ] {
+            assert!(initial_window("Invalid".to_owned(), Some(configuration)).is_err());
+        }
+    }
+
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    #[test]
+    fn mobile_window_keeps_fullscreen_and_ignores_desktop_configuration() {
+        let window = initial_window(
+            "Mobile".to_owned(),
+            Some(serde_json::json!({ "width": 1280, "height": 800 })),
+        )
+        .unwrap();
+        assert!(matches!(
+            window.mode,
+            WindowMode::BorderlessFullscreen(MonitorSelection::Primary)
+        ));
     }
 
     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]

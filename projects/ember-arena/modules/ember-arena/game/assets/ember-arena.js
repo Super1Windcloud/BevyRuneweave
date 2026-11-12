@@ -1847,7 +1847,6 @@
     if (changed && phase === "checks") drawUi();
   }
   callbacks.on_script_loaded = () => {
-    window_set_size(1280, 800);
     networkRequests = [];
     loadProfile();
     loadMenu();

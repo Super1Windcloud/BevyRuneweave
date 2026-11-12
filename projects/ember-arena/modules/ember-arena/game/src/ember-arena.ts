@@ -647,7 +647,6 @@ function pollNetwork(dt: number): void {
 }
 
 callbacks.on_script_loaded = (): void => {
-  window_set_size(1280, 800);
   networkRequests = [];
   loadProfile();
   loadMenu();

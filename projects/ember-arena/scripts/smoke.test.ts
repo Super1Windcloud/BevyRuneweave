@@ -46,6 +46,7 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
   let state = { score: 0, lives: 0, message: "" };
   let exitRequested = false;
   let storageFailure = "";
+  const windowSizeRequests: [number, number][] = [];
   let pointer = { pressed: false, justPressed: false, x: 0, y: 0, viewportWidth: width / height * 800, viewportHeight: 800 };
   let camera = { x: 0, y: 0, height: 800 };
   const despawnUi = (id: string): boolean => {
@@ -135,7 +136,10 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
     window_safe_area: () => ({ left: -pointer.viewportWidth / 2, right: pointer.viewportWidth / 2, bottom: -400, top: 400,
       width: pointer.viewportWidth - (mobile ? 20 : 0), height: 800 - (mobile ? 40 : 0),
       leftInset: mobile ? 10 : 0, rightInset: mobile ? 10 : 0, topInset: mobile ? 20 : 0, bottomInset: mobile ? 20 : 0 }),
-    window_set_size: (w: number, h: number) => !mobile && Number.isFinite(w) && Number.isFinite(h),
+    window_set_size: (w: number, h: number) => {
+      windowSizeRequests.push([w, h]);
+      return !mobile && Number.isFinite(w) && Number.isFinite(h);
+    },
     app_request_exit: () => { exitRequested = true; return true; },
     http_get: () => 1,
     http_post: () => 2,
@@ -146,7 +150,7 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
   const tick = (count = 1): void => {
     for (let frame = 0; frame < count; frame++) { buttonPolls = 0; context.on_update(0.05); pressed.clear(); clicks.clear(); pointer.justPressed = false; }
   };
-  return { entities, ui, keys, pressed, tick, context, saves,
+  return { entities, ui, keys, pressed, tick, context, saves, windowSizeRequests,
     start: () => { clicks.add("start"); tick(); clicks.add("begin_run"); tick(); },
     item: (item: string) => { clicks.add(`slot_${item}`); tick(); clicks.add(`use_${item}`); tick(); },
     setting: (id: string) => {
@@ -947,4 +951,19 @@ test("numeric translations work when BMS reflection occupies the String global",
   assert.equal(game.ui.get("hud_level")!.text, "1级");
   game.click("hero_info");
   assert.match(game.ui.get("hero_stats")!.text!, /生命：20\/20/);
+});
+
+test("startup and reload retain the host window size while display controls still resize", () => {
+  const config = JSON.parse(readFileSync(resolve(assets, "engineConfig.json"), "utf8"));
+  assert.ok(Number.isInteger(config.window.width) && config.window.width > 0);
+  assert.ok(Number.isInteger(config.window.height) && config.window.height > 0);
+  for (const [width, height] of [[1280, 800], [450, 800], [800, 400]]) {
+    const game = harness(width, height);
+    assert.deepEqual(game.windowSizeRequests, [], "loading must not resize a visible window");
+    game.context.on_script_reloaded(); game.tick();
+    assert.deepEqual(game.windowSizeRequests, [], "reloading must retain the user's current size");
+    game.click("settings"); game.click("settings_tab_0");
+    game.click("window_landscape"); game.click("window_portrait");
+    assert.deepEqual(game.windowSizeRequests, [[1280, 800], [450, 800]]);
+  }
 });
