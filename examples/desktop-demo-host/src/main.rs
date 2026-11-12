@@ -2,7 +2,7 @@
 
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
-use eframe::egui;
+mod launcher;
 use flate2::read::GzDecoder;
 use libloading::{Library, Symbol};
 use lzma_rust2::XzReader;
@@ -28,12 +28,6 @@ const FALLBACK_RELEASE_ASSETS: [&str; 3] = [
     "script-squadron-js.zip",
     "script-squadron-lua.zip",
 ];
-#[cfg(target_os = "macos")]
-const LAUNCHER_ICON: &[u8] =
-    include_bytes!("../../../assets/branding/bevy_launcher_icon_macos.png");
-#[cfg(not(target_os = "macos"))]
-const LAUNCHER_ICON: &[u8] = include_bytes!("../../../assets/branding/bevy_icon.png");
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ProcessMode {
     Launcher,
@@ -169,7 +163,10 @@ impl LauncherApp {
         }
     }
 
-    fn start_download(&mut self, context: &egui::Context) {
+    fn start_download(&mut self) {
+        if self.downloading {
+            return;
+        }
         let url = self.url.trim().to_owned();
         if url.is_empty() {
             self.error = Some("Enter an asset package URL".to_owned());
@@ -177,22 +174,24 @@ impl LauncherApp {
         }
 
         let (sender, receiver) = mpsc::channel();
-        let context = context.clone();
         self.downloading = true;
         self.error = None;
         self.result = Some(receiver);
         thread::spawn(move || {
             let _ = sender.send(download_and_install(&url));
-            context.request_repaint();
         });
     }
 
-    fn poll_download(&mut self) {
+    fn poll_download(&mut self) -> bool {
         let Some(receiver) = &self.result else {
-            return;
+            return false;
         };
-        let Ok(result) = receiver.try_recv() else {
-            return;
+        let result = match receiver.try_recv() {
+            Ok(result) => result,
+            Err(mpsc::TryRecvError::Empty) => return false,
+            Err(mpsc::TryRecvError::Disconnected) => {
+                Err("Download worker stopped unexpectedly".to_owned())
+            }
         };
 
         self.result = None;
@@ -207,6 +206,7 @@ impl LauncherApp {
             }
             Err(error) => self.error = Some(error),
         }
+        true
     }
 
     fn refresh_remote_assets(&mut self) {
@@ -214,12 +214,16 @@ impl LauncherApp {
         self.error = None;
     }
 
-    fn poll_remote_assets(&mut self, context: &egui::Context) {
+    fn poll_remote_assets(&mut self) -> bool {
         let Some(receiver) = &self.remote_assets_result else {
-            return;
+            return false;
         };
-        let Ok(result) = receiver.try_recv() else {
-            return;
+        let result = match receiver.try_recv() {
+            Ok(result) => result,
+            Err(mpsc::TryRecvError::Empty) => return false,
+            Err(mpsc::TryRecvError::Disconnected) => {
+                Err("Release worker stopped unexpectedly".to_owned())
+            }
         };
 
         self.remote_assets_result = None;
@@ -230,150 +234,7 @@ impl LauncherApp {
             }
             Err(error) => self.error = Some(format!("Could not load release assets: {error}")),
         }
-        context.request_repaint();
-    }
-}
-
-impl eframe::App for LauncherApp {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        let context = ui.ctx().clone();
-        self.poll_download();
-        self.poll_remote_assets(&context);
-        egui::Frame::central_panel(ui.style()).show(ui, |ui| {
-            ui.add_space(12.0);
-            ui.heading("Bevy RuneWeave");
-            ui.add_space(12.0);
-
-            ui.horizontal(|ui| {
-                let label = self
-                    .remote_release_tag
-                    .as_deref()
-                    .map(|tag| format!("GitHub release assets ({tag})"))
-                    .unwrap_or_else(|| "GitHub release assets".to_owned());
-                ui.label(label);
-                if self.remote_assets_result.is_some() {
-                    ui.spinner();
-                } else if ui.button("Refresh").clicked() {
-                    self.refresh_remote_assets();
-                }
-            });
-            if !self.remote_assets.is_empty() {
-                let assets = self.remote_assets.clone();
-                egui::ScrollArea::vertical()
-                    .id_salt("remote_release_assets")
-                    .max_height(150.0)
-                    .auto_shrink([false, true])
-                    .show(ui, |ui| {
-                        ui.horizontal_wrapped(|ui| {
-                            for asset in assets {
-                                let asset_id = asset.name.clone();
-                                ui.push_id(asset_id, |ui| {
-                                    if ui
-                                        .add_enabled(
-                                            !self.downloading,
-                                            egui::Button::new(release_asset_label(&asset)),
-                                        )
-                                        .clicked()
-                                    {
-                                        self.url = asset.browser_download_url;
-                                        self.start_download(&context);
-                                    }
-                                });
-                            }
-                        });
-                    });
-            }
-            ui.add_space(10.0);
-
-            let response = ui.add_enabled(
-                !self.downloading,
-                egui::TextEdit::singleline(&mut self.url)
-                    .hint_text("Asset package URL")
-                    .desired_width(f32::INFINITY),
-            );
-            let submit =
-                response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
-
-            ui.add_space(10.0);
-            ui.horizontal(|ui| {
-                if self.downloading {
-                    ui.spinner();
-                    ui.label("Downloading...");
-                } else if ui.button("Start Game").clicked() || submit {
-                    self.start_download(&context);
-                }
-            });
-
-            ui.add_space(14.0);
-            ui.heading("Installed games");
-            ui.add_space(4.0);
-            let mut project_to_start = None;
-            egui::ScrollArea::vertical()
-                .id_salt("installed_games")
-                .max_height(240.0)
-                .auto_shrink([false, true])
-                .show(ui, |ui| {
-                    if self.installed_games.is_empty() {
-                        ui.weak("No installed games");
-                    }
-                    for game in &self.installed_games {
-                        ui.push_id(&game.project, |ui| {
-                            ui.separator();
-                            ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.strong(&game.name);
-                                    ui.weak(format!(
-                                        "Version {} | {}",
-                                        game.version,
-                                        game.language.label()
-                                    ));
-                                });
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        if ui
-                                            .add_enabled(
-                                                !self.downloading,
-                                                egui::Button::new("Start"),
-                                            )
-                                            .clicked()
-                                        {
-                                            project_to_start = Some(game.project.clone());
-                                        }
-                                        if self.active_project.as_deref()
-                                            == Some(game.project.as_str())
-                                        {
-                                            ui.weak("Active");
-                                        }
-                                    },
-                                );
-                            });
-                        });
-                    }
-                });
-            if let Some(project) = project_to_start {
-                self.start_installed_game(&project);
-            }
-
-            ui.add_space(10.0);
-            ui.horizontal(|ui| {
-                if ui.button("Refresh Installed Games").clicked()
-                    && let Err(error) = self.refresh_installed_games()
-                {
-                    self.error = Some(error);
-                }
-                if ui.button("Open Resource Directory").clicked()
-                    && let Err(error) = open_resource_directory()
-                {
-                    self.error = Some(error);
-                }
-            });
-
-            if let Some(error) = &self.error {
-                ui.add_space(8.0);
-                ui.colored_label(ui.visuals().error_fg_color, error);
-            }
-        });
+        true
     }
 }
 
@@ -1284,7 +1145,7 @@ fn launch_runtime_process() -> Result<(), String> {
     Ok(())
 }
 
-fn main() -> eframe::Result {
+fn main() {
     let mode = ProcessMode::from_args();
     #[cfg(not(debug_assertions))]
     if let Err(error) = initialize_release_logging(mode) {
@@ -1296,25 +1157,10 @@ fn main() -> eframe::Result {
             eprintln!("Bevy RuneWeave: {error}");
             std::process::exit(1);
         }
-        return Ok(());
+        return;
     }
 
-    let icon = eframe::icon_data::from_png_bytes(LAUNCHER_ICON).unwrap_or_default();
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1000.0, 693.0])
-            .with_min_inner_size([420.0, 210.0])
-            .with_icon(icon)
-            .with_resizable(true),
-        centered: true,
-        ..Default::default()
-    };
-    eframe::run_native(
-        "Bevy RuneWeave",
-        options,
-        Box::new(move |_creation_context| Ok(Box::new(LauncherApp::new()))),
-    )?;
-    Ok(())
+    launcher::run();
 }
 
 #[cfg(test)]

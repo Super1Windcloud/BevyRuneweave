@@ -258,9 +258,10 @@ Android 需要 SDK、NDK、`cargo-ndk` 以及相应 Rust target。
 桌面安装包包含 launcher、当前 OS 对应的统一 runtime，以及默认 TypeScript demo 资源。
 后续下载的资源会写入用户应用数据目录，不会写入 Program Files 或 macOS `.app` 内部。
 
-launcher 会在进入 Bevy 前将自身替换成仅运行 runtime 的进程模式。eframe launcher 事件循环
-与 Bevy 事件循环因此不会在同一进程重复注册 winit 平台全局类型，尤其是 macOS application
-delegate。
+桌面 launcher 使用 GPUI Kit，提供游戏库、资源发现、逐游戏启动和 URL 安装功能。
+浅色与暗色主题自动跟随系统，支持运行期间切换，并保留输入和下载状态。
+要求 macOS 15+、Windows 10+，或具备 Vulkan 驱动的 Linux 图形会话。
+游戏通过独立 runtime 进程启动，使 GPUI 原生应用生命周期与 Bevy 的 winit 事件循环分离。
 
 ```bash
 just package-windows-installer --release  # NSIS 安装程序 exe

@@ -280,9 +280,11 @@ Desktop release installers include the launcher, the OS-specific unified runtime
 TypeScript demo assets. Downloaded packages are stored in the user's application-data directory,
 not in Program Files or inside the macOS application bundle.
 
-The launcher replaces itself with a runtime-only process before entering Bevy. Keeping the eframe
-launcher event loop and the Bevy event loop in separate process modes avoids duplicate winit
-platform-global registration, particularly the macOS application delegate.
+The native GPUI Kit launcher has library and discovery pages, per-game launch controls, and URL
+installation. Its light and dark palettes follow system appearance, including changes while running.
+It requires macOS 15+, Windows 10+, or a graphical Linux session with a Vulkan driver.
+Games start in a separate runtime process, keeping GPUI's native lifecycle separate from Bevy's
+winit event loop.
 
 ```bash
 just package-windows-installer --release  # NSIS setup executable

@@ -1,6 +1,14 @@
 # Desktop Demo Host
 
 This standalone Cargo project builds the Bevy RuneWeave launcher for Windows, macOS, and Linux.
+The native UI uses GPUI Kit, with a warm light canvas, a compact dark sidebar, and separate library
+and discovery pages. Light and dark palettes follow the window's system appearance at startup
+and update immediately when it changes, preserving the current page, URL input, and download state.
+The library highlights the active project and provides per-game launch
+buttons. Discovery lists release packages and accepts a custom package URL, including Enter to
+install. Narrow windows collapse navigation to icons; the main content scrolls independently of
+the download status bar. Downloads disable install and launch actions until installation finishes.
+
 It downloads an asset package into staging, validates `engineConfig.json`, and installs it under a
 stable project-specific directory in the user data directory (`<engineConfig.name>/assets`). The
 `active-project` marker records which installed package the launcher starts through the public C
@@ -48,8 +56,17 @@ runtime. Mobile hosts accept ZIP packages; the desktop launcher additionally sup
 formats listed above.
 
 The launcher UI and Bevy runtime execute in separate process modes. This is required on macOS
-because eframe and the dynamically loaded Bevy runtime each link winit; starting both event loops in
-one process would register the same Objective-C application delegate twice.
+to keep GPUI's native application lifecycle separate from the dynamically loaded Bevy runtime's
+winit event loop. Starting a game spawns the same executable with `--run-game` before initializing
+the launcher UI.
+
+The launcher requires macOS 15+, Windows 10+, or a graphical Linux session with a Vulkan driver.
+The macOS installer declares this minimum version to match GPUI Kit's supported platform range.
+GPUI Kit uses Metal on macOS and DirectX on Windows.
+Linux builds also require the X11/Wayland development libraries described in the
+[GPUI Kit 0.9.0 installation guide](https://gpui-kit.com/versions/v0.9.0/docs/installation/). The Rust runtime and mobile
+hosts do not depend on GPUI Kit. UI interaction tests use Kit's headless test windows; they do not
+replace native rendering checks on each desktop platform.
 
 Release builds redirect stdout and stderr to process-specific files under the application-data
 directory. Every process start truncates its own file, so `logs/launcher.log` contains only the
