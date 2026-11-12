@@ -18,7 +18,8 @@ immutable revision; source and crop checksums are recorded in the asset manifest
 | Stairs | Explicit descent through five floors; supplies/HP and passive accumulators retained; Goo sealing creates a timed LockedFloor buff; key pickup and one-turn exit unlock | No return upstairs, floor persistence or prison transition; stronger-boss challenge variants pending |
 | Rendering | Correctly cropped native 2D hero, mob, item and sewer sprites | Static frames; no original sprite animations, stitched raised walls, particle effects or exact UI layout |
 | Native UI | Original atlas chrome/font, title and hero-selection scenes, joined toolbars, five-column backpack, item windows and tabbed settings | See [UI_PARITY.md](UI_PARITY.md); all original scenes/content and pixel-difference acceptance remain incomplete |
-| Heroes | Four starting melee weapons and cloth armor are real carried items; original base damage ranges, half-tick gloves and dagger surprise range; Huntress carries a spirit bow; Mage has a charged magic-missile staff; 20 starting HP, 10 strength | Cloak/seal, full starting supplies, other classes/subclasses/talents pending |
+| Heroes | Four starting melee weapons and cloth armor are real carried items; original base damage ranges, half-tick gloves and dagger surprise range; Huntress carries a spirit bow; Mage has a charged magic-missile staff; Rogue wears a usable cloak; 20 starting HP, 10 strength | Warrior seal, full starting supplies, other classes/subclasses/talents pending |
+| Cloak of Shadows | Rogue starts equipped with three charges and the original 9×15 item crop; item/quick-slot/C activation costs one tick, manual stop is free; four stealth ticks per charge, independent potion stacking, attack/zap dispel, use-XP levels and recharge; unequipping cancels stealth and stops its passive clock | Base identified uncursed cloak only; no Light Cloak/Protective Shadows talents, Assassin preparation, curses, magic immunity, energy rings, external artifact charge effects, original particles or sound |
 | Mage staff | Item/quick-slot/Z targeting, four initial charges, one-tick casts, magic damage 2–8 at +0, extended magic-bolt collision; real independent charger with staff recharge curve, upgrade damage/capacity/+1 charge, unequipped and cross-floor charging; empty casts dispel invisibility | Only base identified magic-missile wand; current-FOV aim, no other wands/imbuing, MagicCharge sharing, cursed zaps, talents/subclasses, rings, recharging buffs, missile animation or sound |
 | Spirit bow | Huntress starts with the original bow crop and first quick slot; free aim/cancel, first-impact projectiles, unlimited arrows, level-based damage/strength, adjacent/ranged accuracy and one-tick base shooting; target attacks dispel invisibility; gloves retain melee behavior | Current-FOV targeting only; no flying-arrow animation/sound, sniper specials, enchantments, rings, talents, augmentation or generic quickslot reassignment |
 | Rats/Gnolls/Crabs | Upstream base stats; melee gnolls; crab movement costs 0.5 ticks while attacks cost 1, with independent reflected action deadlines | Simplified sleeping/hunting/door behavior and custom loot distributions |
@@ -27,11 +28,11 @@ immutable revision; source and crop checksums are recorded in the asset manifest
 | Hunger | Hungry at 300, starving at 450 with one immediate damage; further damage accumulates HT/1000 per tick using f32 and a strict >1 threshold; food/search preserve actor phase and damage remainder; sealed floors pause hunger | WellFed, Shadows, Salt Cube, food talents, cursed Horn and challenge modifiers pending |
 | Regeneration/LockedFloor | Independent regeneration accumulates 0.1 HP on eligible wounded ticks before mobs/DOT; full health/starvation pause the accumulator; normal Goo lock grants 50 ticks, damage restores 1.5× dealt damage capped at 50; boss death immediately removes the lock | Chalice, rings, trinkets, stronger-boss variants and other passive charging effects pending |
 | Healing | One-turn potion applies a diminishing `(int)(0.8f*HT+14)` budget at 25% per tick; maximum-budget reapplication, priority before damage; does not cure ooze or burning | Other cured debuffs, challenges, trinkets and complete status interactions pending |
-| Invisibility | Independent twenty-tick expiry, blocks detection, attacks break it; surprise hits | Potion-only implementation, no complete cloak/artifact mechanics |
+| Invisibility | Potion's independent twenty-tick expiry and cloak stealth coexist; removing/expiring either preserves the other; target attacks and wand casts dispel both; surprise hits | Other invisibility sources, preparation/talent interactions and original character rendering pending |
 | Strength/upgrade | Strength +1; scroll selects any owned weapon/armor; original damage/armor scaling and strength thresholds at +1/+3/+6/+10; cancel is free | No enchantment/curse handling or advanced upgrade interactions |
 | Mapping | Reveals terrain and discovers secret doors without exposing occupants | No traps or challenge modifiers yet |
 | Liquid flame | Free targeting/cancel; one-turn throw with first-character/door/solid collision; 3×3 fire, eight-tick Burning, water extinguishing and orthogonal door spread/destruction | Target selection limited to current FOV; static source-color marker instead of particles; no inventory/heap burning, plants, freezing, gases, immunities or advanced modifiers |
-| Items/loot | Seven consumables, a carried spirit bow, gold, key/blobs and seven equipment definitions; real loot entities; equipment can be collected, inspected, worn and removed; bow cannot be upgraded by scroll | Leather armor/shortsword drops on floors 2–4 are custom fixtures; randomized identification, generic throwing, other keys/chests, shops and alchemy pending |
+| Items/loot | Seven consumables, a carried spirit bow, an equippable cloak, gold, key/blobs and seven equipment definitions; real loot entities; equipment can be collected, inspected, worn and removed; bow/cloak excluded from scroll upgrades | Leather armor/shortsword drops on floors 2–4 are custom fixtures; randomized identification, generic throwing, other artifacts/keys/chests, shops and alchemy pending |
 | Settings | Hints affect the HUD; reduced effects suppresses burst camera shake; inactive sensitivity explicitly disabled while preserving old values | No relative-pointer sensitivity, audio controls or complete upstream settings |
 | End condition | Goo death keeps playing; physically collect its Worn Key, unlock the exit, then explicitly leave to record one sewer milestone | **No Amulet award**; prison and later content remain pending and are identified as unavailable in the result |
 | Persistence | Settings and completed milestone records, save-error recovery | No in-progress run serialization or save/resume |
@@ -43,6 +44,7 @@ All paths below are relative to the upstream repository's
 
 - `actors/hero/Hero.java`: starting 20 HP / 10 STR, level health growth, XP requirement and action handling.
 - `actors/hero/HeroClass.java`: class-specific equipment; used to identify the gaps above.
+- `items/artifacts/{CloakOfShadows,Artifact}.java`, `items/{KindofMisc,EquipableItem}.java`, `actors/buffs/Invisibility.java`: cloak equip/activation costs, paid stealth ticks, use-XP/capacity, inactive recharge and independent invisibility sources. Talent, curse, ring and magic-immunity modifiers are excluded.
 - `actors/mobs/{Rat,Gnoll,Crab,Goo}.java`: basic stats, crab speed, Goo charge, water healing and enrage.
 - `actors/buffs/{Hunger,Regeneration,LockedFloor}.java`: 300/450 thresholds, fractional starvation/regeneration accumulators, actor priorities and the fifty-tick passive window. `items/food/Food.java`, `actors/hero/Hero.java#search`, `actors/mobs/Goo.java#damage` and `levels/Level.java#seal` supply food/search costs, window extension and seal/unseal behavior.
 - `actors/Actor.java`: f32 action times, rounding near whole ticks and hero/mob/buff priorities.
@@ -61,19 +63,21 @@ All paths below are relative to the upstream repository's
 
 New behavior should cite an upstream source and add a focused behavior test. Tests using
 platform doubles and a custom generator must not be described as proof of one-to-one parity.
-The magic-staff batch passes 130 tests, Biome and independent TypeScript checks.
+The cloak batch passes 146 tests, Biome and independent TypeScript checks.
 The platform doubles round reflected numbers to f32. The existing headless macOS Debug
 QuickJS/Bevy test also passes, checking real hunger/regeneration entities, hunger advancement,
 three-tick eating and the existing healing diagnostic. It also starts the Huntress and injects
 four pointer shots against a real actor, checking health, full-tick deadlines and retained bow/gloves.
 The Mage path checks an actual pointer zap, target health, consumed charge, reflected partial
 charge and the independent charger/hero clocks.
+The Rogue path checks real cloak charge/XP/equip fields, its active buff/deadline and a free
+manual stop through the actual bundle and BMS UI actions.
 This does not establish GPU rendering, real input/lifecycle or reference-client pixel parity;
 those checks are NOT_RUN for this batch on all five platforms. No runtime API or public ABI changed.
 
 ## Next migration order
 
-1. Add other wands/imbuing, advanced bow/status/item interactions, cloak/seal behavior,
+1. Add the Warrior seal, other wands/imbuing, advanced cloak/bow/status/item interactions,
    rings/curses and upstream starting inventories.
 2. Port sewer builders/painters, entrance/boss room rules, returnable persistent floors,
    stitched tile visuals, upstream camera smoothing/zoom controls and sprite animation.

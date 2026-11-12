@@ -62,7 +62,7 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
 - Heroes start with 20 HP and 10 strength. Kills grant experience; leveling adds 5 maximum HP.
   The four starting melee weapons and cloth armor are real equipment with the original base
   ranges: worn shortsword 1–10, staff 1–6, dagger 1–8, gloves 1–5. Gloves attack in 0.5 ticks;
-  dagger surprise rolls use the upper quarter of their damage range. Cloak, seal, talents
+  dagger surprise rolls use the upper quarter of their damage range. Seal, talents
   and original starting-supply parity remain pending.
 - The Mage's staff contains an identified magic-missile wand with four starting charges.
   Choose Zap from its gear window, click its first quick slot or press Z. A confirmed cast
@@ -77,6 +77,18 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
   exhausted LockedFloor window does. Staff upgrades improve magic damage/capacity and restore
   one charge; the maximum is ten. Other wands/imbuing, advanced modifiers, flight and audio
   remain pending.
+- The Rogue starts with a Cloak of Shadows in the artifact slot and first quick slot. Click
+  it or press C to enter stealth for one tick; stopping stealth is free. Each paid charge
+  provides four action ticks, including the final charge after its displayed energy reaches
+  zero. It starts with three charges, grows through use and caps at ten charges. Its item
+  window shows level, energy and experience, with equip/remove and stealth/stop controls.
+- An equipped, inactive cloak recharges through its own reflected actor. Active stealth and
+  depleted LockedFloor windows pause charging; starvation alone does not. Unequipping spends
+  one tick, removes cloak stealth and stops the passive clock; re-equipping resumes charging
+  on a new attachment phase. Potion and cloak invisibility coexist, and removing one source
+  preserves the other. Attacks and successful wand casts dispel both. Idle frames and menus
+  advance neither charge use nor recharge. Talents, curses, energy rings and original cloak
+  particles/sound remain pending.
 - The Huntress carries a spirit bow in her backpack and first quick slot. Open its item window
   and choose Shoot, click the quick slot, or press 8 to aim at a visible tile. Cancelling is free;
   arrows stop at the first character or obstacle and the bow is never consumed. At hero level
@@ -141,6 +153,7 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
 | 1–7 | Healing, flame, invisibility, strength, upgrade, mapping, food |
 | 8 | Aim the carried spirit bow |
 | Z | Aim a carried magic-missile staff |
+| C | Activate/stop the equipped cloak |
 | Escape | Pause/resume or close the current menu |
 
 The title opens a separate six-icon hero selection screen; the four implemented classes are
@@ -225,6 +238,27 @@ hashes are checked before reusing that revision's cached bytes. The game runs of
 preparation. The old misnamed `skeleton_key.png` crop is replaced by `worn_key.png`.
 
 ## Verification boundaries
+
+### Cloak of Shadows and invisibility sources on 2026-11-12
+
+- Upstream master remains `57a4e06a4caf162446d1c28caa7983f0493fecf0`. This batch uses
+  base CloakOfShadows/Artifact, equip timing, Rogue starting equipment and Invisibility.dispel.
+- **146 tests pass**: thirty source-rule tests and 116 gameplay/UI/asset tests. New coverage
+  checks real equipped ownership, paid stealth duration/exhaustion, free stop/empty actions,
+  idle freeze, potion stacking/expiry, attack dispel, recharge float thresholds, use-XP growth,
+  upgrade exclusion, unequip/re-equip clocks, starvation/LockedFloor, descent identity, death
+  cleanup and Chinese portrait/short-landscape held controls. The original 9×15 cloak crop
+  and font metrics were regenerated through the owning preparation commands.
+- Biome, independent TypeScript checks, bundle generation, Rust formatting and whitespace
+  checks pass. No shared runtime API or public ABI changed; cloak state lives in real BMS
+  entities, with no separate actor store.
+- `cargo test --locked --offline -p bevy-runeweave --no-default-features --features typescript
+  --lib quickjs_arena_runs_with_real_actor_components_and_ui -- --nocapture`: **1 passed**
+  on macOS Debug. The actual Rogue bundle activates/stops the cloak through BMS UI actions,
+  asserting charge/XP/equip fields, active-buff state/deadlines and free deactivation.
+- Rust changes are test-only. Full cloak talents, curses, other artifacts and native particles
+  remain pending. New cloak surfaces have **NOT_RUN** native GPU, OS-input, real mobile touch/
+  lifecycle and reference-client pixel acceptance on Windows, macOS, Linux, Android and iOS.
 
 ### Magic-missile staff and charging on 2026-11-12
 
