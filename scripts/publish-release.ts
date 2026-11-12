@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { deflateRawSync } from "node:zlib";
 import { build, transform } from "esbuild";
+import { listReleaseAssets, releaseAssetLabel, syncReleaseAssets, type ReleaseCandidate } from "./release-assets.js";
 
 const require = createRequire(import.meta.url);
 const luamin = require("luamin") as { minify(source: string): string };
@@ -271,17 +272,19 @@ function bundleLua(project: ReleaseProject): string {
   return bundledModules.join("\n");
 }
 
-async function prepareAssets(project: ReleaseProject, destination: string) {
+async function prepareScript(project: ReleaseProject): Promise<string> {
+  return project.language === "lua" ? compressLua(bundleLua(project)) : bundleJavaScript(project);
+}
+
+function prepareAssets(project: ReleaseProject, destination: string, bundled: string) {
   cpSync(project.assets, destination, { recursive: true });
   const script = join(destination, project.scriptEntry);
   mkdirSync(dirname(script), { recursive: true });
   if (project.language === "lua") {
-    const bundled = bundleLua(project);
     removePackagedScripts(destination, [".lua"]);
-    writeFileSync(script, encryptScript(compressLua(bundled)));
+    writeFileSync(script, encryptScript(bundled));
     return;
   }
-  const bundled = await bundleJavaScript(project);
   removePackagedScripts(destination, [".js", ".mjs", ".cjs"]);
   writeFileSync(script, encryptScript(bundled));
 }
@@ -292,41 +295,56 @@ function compressLua(source: string) {
 
 async function main() {
   mkdirSync(output, { recursive: true });
-  const archives: string[] = [];
   const projects = discoverProjects();
   const selectedProjects = projects.filter((project) =>
     language === "all" || project.language === language ||
     (language === "typescript" && project.language === "ts"),
   );
   if (selectedProjects.length === 0) throw new Error(`No projects match language: ${language}`);
+  const candidates: ReleaseCandidate[] = [];
   for (const project of selectedProjects) {
-    const archive = join(output, `${project.packageName}.zip`);
-    const staging = join(output, `.staging-${project.directory}-${process.pid}`);
-    rmSync(staging, { recursive: true, force: true });
-    await prepareAssets(project, staging);
-    const replacing = existsSync(archive);
-    rmSync(archive, { force: true });
-    createZip(staging, archive);
-    rmSync(staging, { recursive: true, force: true });
-    archives.push(archive);
-    console.log(`${replacing ? "Replaced" : "Created"} ${archive}`);
+    const bundled = await prepareScript(project);
+    candidates.push({
+      name: `${project.packageName}.zip`,
+      label: releaseAssetLabel(project.assets, project.language, project.scriptEntry, bundled, scriptEncryptionKey()),
+      async prepare() {
+        const archive = join(output, `${project.packageName}.zip`);
+        const staging = join(output, `.staging-${project.directory}-${process.pid}`);
+        rmSync(staging, { recursive: true, force: true });
+        try {
+          prepareAssets(project, staging, bundled);
+          const replacing = existsSync(archive);
+          createZip(staging, archive);
+          console.log(`${replacing ? "Replaced" : "Created"} ${archive}`);
+          return archive;
+        } finally {
+          rmSync(staging, { recursive: true, force: true });
+        }
+      },
+    });
   }
-  if (!upload) return;
-  const releaseResponse = await api(`/releases/tags/${tag}`);
+  if (!upload) {
+    for (const candidate of candidates) await candidate.prepare();
+    return;
+  }
+  const releaseResponse = await api(`/releases/tags/${encodeURIComponent(tag)}`);
   if (!releaseResponse.ok) throw new Error(`Release lookup failed: ${releaseResponse.status} ${await releaseResponse.text()}`);
-  const release = await releaseResponse.json() as { upload_url: string; assets: { id: number; name: string }[] };
-  for (const archive of archives) {
-    const name = archive.split(/[\\/]/).pop()!;
-    for (const asset of release.assets.filter((item) => item.name === name)) {
+  const release = await releaseResponse.json() as { id: number; upload_url: string };
+  const assets = await listReleaseAssets(release.id, api);
+  await syncReleaseAssets(candidates, assets, {
+    async remove(asset) {
       const deleted = await api(`/releases/assets/${asset.id}`, { method: "DELETE" });
-      if (!deleted.ok) throw new Error(`Could not replace ${name}: ${deleted.status}`);
-    }
-    const uploadUrl = release.upload_url.replace(/\{.*$/, "") + `?name=${encodeURIComponent(name)}`;
-    const body = readFileSync(archive);
-    const uploaded = await fetch(uploadUrl, { method: "POST", headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/zip" }, body });
-    if (!uploaded.ok) throw new Error(`Upload failed for ${name}: ${uploaded.status} ${await uploaded.text()}`);
-    console.log(`Uploaded ${name}`);
-  }
+      if (!deleted.ok) throw new Error(`Could not replace ${asset.name}: ${deleted.status}`);
+    },
+    async upload(candidate, archive) {
+      const query = new URLSearchParams({ name: candidate.name, label: candidate.label });
+      const uploadUrl = release.upload_url.replace(/\{.*$/, "") + `?${query}`;
+      const body = readFileSync(archive);
+      const uploaded = await fetch(uploadUrl, { method: "POST", headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/zip" }, body });
+      if (!uploaded.ok) throw new Error(`Upload failed for ${candidate.name}: ${uploaded.status} ${await uploaded.text()}`);
+    },
+    log: console.log,
+  });
 }
 
 main().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });

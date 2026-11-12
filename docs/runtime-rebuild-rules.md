@@ -86,14 +86,23 @@ just package-assets-typescript 0.0.1
 just package-assets-js 0.0.1
 just package-assets-lua 0.0.1
 just update-assets 0.0.1
+just upload-asset 0.0.1
 ```
 
 `package-assets all` 会通过 Cargo workspace 和各项目的 `modules/*/module.json` 自动扫描
 所有 `projects/*`，并以 Cargo package name 作为 ZIP 名称。语言专用命令会筛选所有对应
 语言的项目，而不是只处理一个固定示例。打包会先把每个项目的 JavaScript/TypeScript
 依赖或 Lua 模块合并到 `scriptEntry` 指定的单一入口，再压缩混淆；ZIP 中不会保留其他脚本
-源码。`update-assets` 执行相同打包流程并替换 GitHub Release 中的同名资源。这些处理均不会
-改变 runtime library。
+源码。这些处理均不会改变 runtime library。
+
+`update-assets`、`upload-assets` 和 `upload-asset` 默认按项目增量上传：比较加密前的脚本
+及其他实际打包资源的内容指纹，只有变更或远端缺失的项目才生成 ZIP 并上传替换同名资源。
+未变更的项目、其他语言筛选之外的项目和 runtime 等其他 Release 资产保持原样。
+指纹保存在 GitHub Release 资产的 `label` 中，不依赖本地上传记录或 Git 工作区是否干净；
+在另一台机器执行相同命令也能跳过未变更项目。旧资产没有指纹、上传未完成或加密密钥改变
+时会重新上传；脚本加密的随机 nonce 不会导致重复上传。首次迁移旧 Release 时会替换
+所有缺少指纹的选中项目，之后再次执行无变化时上传数量为零。上传失败后重试只处理尚未
+成功的项目。`package-assets` 仍是显式的本地打包命令，不读取或修改远端 Release。
 
 ### Host 与安装包
 

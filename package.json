@@ -24,7 +24,8 @@
     "release:assets": "tsx --env-file=.env scripts/publish-release.ts",
     "update:bevy": "tsx scripts/update-bevy-runtime.ts",
     "typecheck:scripts": "tsc --project scripts/tsconfig.json",
-    "test": "npm run typecheck:scripts"
+    "test:release-assets": "tsx --test scripts/release-assets.test.ts",
+    "test": "npm run typecheck:scripts && npm run test:release-assets"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

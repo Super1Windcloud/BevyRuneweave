@@ -191,12 +191,16 @@ package-assets-typescript tag="0.0.1":
 package-assets-lua tag="0.0.1":
     just package-assets lua "{{tag}}"
 
-# Package all script projects and replace the same-named assets in a GitHub release.
+# Upload only changed or missing project assets to a GitHub release.
 update-assets tag="0.0.1":
     npm exec -- tsx --env-file=.env scripts/publish-release.ts --tag="{{tag}}"
 
 # Backward-compatible alias for update-assets.
 upload-assets tag="0.0.1":
+    just update-assets "{{tag}}"
+
+# Singular alias for incremental project asset uploads.
+upload-asset tag="0.0.1":
     just update-assets "{{tag}}"
 
 # Package the macOS Lua/QuickJS runtime library.
