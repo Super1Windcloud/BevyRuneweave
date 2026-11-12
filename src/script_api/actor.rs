@@ -349,6 +349,33 @@ mod tests {
                     "{lines:?}"
                 );
             }
+            click("back")?;
+            call("on_update", &mut context)?;
+            click("resume")?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                let mut query = world.query_filtered::<&mut Window, With<PrimaryWindow>>();
+                query
+                    .single_mut(world)
+                    .unwrap()
+                    .resolution
+                    .set(800.0, 400.0);
+            })?;
+            call("on_update", &mut context)?;
+            click("bag_btn")?;
+            call("on_update", &mut context)?;
+            click("bag_page")?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                assert_eq!(world.resource::<ScriptGameState>().message, "INVENTORY");
+                let label =
+                    super::super::find_owned_entity(world, &attachment, "bag_page__label").unwrap();
+                assert_eq!(world.get::<Text>(label).unwrap().0, "PAGE 2 / 2 / NEXT");
+                assert!(
+                    super::super::find_owned_entity(world, &attachment, "use_food_ration")
+                        .is_some()
+                );
+            })?;
             call("on_script_reloaded", &mut context)?;
             guard.with_world_mut(|world| {
                 assert_eq!(world.query::<&ScriptActor>().iter(world).count(), 1);

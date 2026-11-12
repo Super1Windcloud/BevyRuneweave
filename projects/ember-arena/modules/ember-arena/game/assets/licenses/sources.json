@@ -1,31 +1,153 @@
 {
-  "author": "Kay Lousberg",
-  "license": "CC0-1.0",
-  "commit": "672074b73ba276876a19e8816ecdc5241817ab47",
+  "author": "Evan Debenham (00-Evan) & Watabou",
+  "license": "GPL-3.0 & CC-BY-NC-SA-4.0",
+  "source": "https://github.com/00-Evan/shattered-pixel-dungeon",
   "records": [
     {
-      "file": "models/Mage.glb",
-      "source": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/672074b73ba276876a19e8816ecdc5241817ab47/addons/kaykit_character_pack_adventures/Characters/gltf/Mage.glb",
-      "sha256": "cf898585da33fab50c724d31605fb931eb2912e6d2280092141e98ca81ad507d",
+      "file": "models/Knight.glb",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/warrior.png",
+      "sha256": "a1ad21ae855f67018c1c7ce564cd91b318b295f9d70455248f72f861f9c7ff1e",
       "animation": "Walking_A"
     },
     {
-      "file": "models/Knight.glb",
-      "source": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/672074b73ba276876a19e8816ecdc5241817ab47/addons/kaykit_character_pack_adventures/Characters/gltf/Knight.glb",
-      "sha256": "60428e3abc09ba83e595d256e3af8c5c976b46cdae599f0802fc82b4a3445168",
+      "file": "models/Mage.glb",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/mage.png",
+      "sha256": "8b7ce3c1a788b6c5abf3c49b005052d02c9a715afb8a836d7d5788a761f0890d",
       "animation": "Walking_A"
     },
     {
       "file": "models/Rogue_Hooded.glb",
-      "source": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/672074b73ba276876a19e8816ecdc5241817ab47/addons/kaykit_character_pack_adventures/Characters/gltf/Rogue_Hooded.glb",
-      "sha256": "93e6e25213009952276d9cf34f5d96a243767334c66f280db0433ddfabb91545",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/rogue.png",
+      "sha256": "5fb026c26cfadd3476ba83c22aaad4a389d50220c26e5fb4e125b987d216d0e9",
       "animation": "Walking_A"
     },
     {
       "file": "models/Barbarian.glb",
-      "source": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/672074b73ba276876a19e8816ecdc5241817ab47/addons/kaykit_character_pack_adventures/Characters/gltf/Barbarian.glb",
-      "sha256": "cefc311a0e10c7858b6141f5ada7e33268727564fb8ac1347aab97d000669cc6",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/huntress.png",
+      "sha256": "8aa5063ad314d3af0598f9486d890d078d35721c563e28f2fba2d68de145d44d",
       "animation": "Walking_A"
+    }
+  ],
+  "spriteRecords": [
+    {
+      "file": "sprites/dungeon/warrior.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/warrior.png",
+      "sha256": "6ef2d8d96238c778d0d3b428e85c4eae575966de4390fea33d87facd55c04cf3"
+    },
+    {
+      "file": "sprites/dungeon/mage.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/mage.png",
+      "sha256": "bf7d0bd0181cf7460f940d9883d9088c04316cb61aff60616d634180182c578f"
+    },
+    {
+      "file": "sprites/dungeon/rogue.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/rogue.png",
+      "sha256": "46007e70ba0f7bfdab480c998ef2e04576578c5d660074f303c072f895d88cf3"
+    },
+    {
+      "file": "sprites/dungeon/huntress.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/huntress.png",
+      "sha256": "7b54e0e5bb6322c039d93cf895f5811f4941a3f3aee95d7a4a366840993d375c"
+    },
+    {
+      "file": "sprites/dungeon/rat.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/rat.png",
+      "sha256": "2f2b37fbed63abe29ddf2bbcdf5c3f83269231de712043279f5e1f7d98f7339e"
+    },
+    {
+      "file": "sprites/dungeon/gnoll.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/gnoll.png",
+      "sha256": "e53d641584101e345fe62e5b5e0c63f8f1054c39b8551fa1fe3f027e9d37b656"
+    },
+    {
+      "file": "sprites/dungeon/crab.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/crab.png",
+      "sha256": "cadb33aaeb090ff8c7ccbb9cf3e12d4c0000d63fd75b4b52a01c1c98c1489ecb"
+    },
+    {
+      "file": "sprites/dungeon/goo.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/goo.png",
+      "sha256": "4f1795045eb91a5f2f9c301189104c922db6fd66873b0d2a6bd7c3119d82da1d"
+    },
+    {
+      "file": "sprites/dungeon/floor.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/environment/tiles_sewers.png",
+      "sha256": "16598672f11b2b13e74e2e73907183772eec1823fb04e61293237bba701631b6"
+    },
+    {
+      "file": "sprites/dungeon/entrance.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/environment/tiles_sewers.png",
+      "sha256": "ae30398d8b06816e928ddb1520bdc4d4477194189339001bfcd649d185675b7b"
+    },
+    {
+      "file": "sprites/dungeon/exit.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/environment/tiles_sewers.png",
+      "sha256": "6cf0877cf1248224da26c6882531aee790038faf459f3f85920e386530542a06"
+    },
+    {
+      "file": "sprites/dungeon/water.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/environment/tiles_sewers.png",
+      "sha256": "37285bcdba0638897e2b269e34cb9c15fd9f06c3bbbba4fd2f2d9c32230d71dc"
+    },
+    {
+      "file": "sprites/dungeon/wall.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/environment/tiles_sewers.png",
+      "sha256": "d6e6466b115f34a3343a18c16d962961083e430b44629257354169473b43adf0"
+    },
+    {
+      "file": "sprites/dungeon/door.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/environment/tiles_sewers.png",
+      "sha256": "b4c1e13f6f9a3a35a0b50df298cdf89f8529d488e080a38713f7e8ad401b4ea1"
+    },
+    {
+      "file": "sprites/dungeon/open_door.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/environment/tiles_sewers.png",
+      "sha256": "b86f3d2f021ebf616ac8a1c72dc686f050f86f09465fcb363702f11b3d5805e2"
+    },
+    {
+      "file": "sprites/dungeon/gold.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/items.png",
+      "sha256": "8357f7aae21144cd183aeed00a0720cff7b9b689a1dc81e1eb803cf3a9ccc555"
+    },
+    {
+      "file": "sprites/dungeon/food_ration.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/items.png",
+      "sha256": "571d5035095a17da9d0a2da0477a12c97c443a41810b6b81fd9837643fe42c45"
+    },
+    {
+      "file": "sprites/dungeon/skeleton_key.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/items.png",
+      "sha256": "2bd1902526b83d57353c928b4d9fc4d9827982facb444eb194955a914c77c429"
+    },
+    {
+      "file": "sprites/dungeon/potion_healing.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/items.png",
+      "sha256": "d196b7608bfdce75a161dba48276898b4243fca5b01e82aec99c689f5bccf86d"
+    },
+    {
+      "file": "sprites/dungeon/potion_liquid_flame.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/items.png",
+      "sha256": "501fb09004e5b753de76b36c8c94d0385098069d738c11ae7476eff2c773b101"
+    },
+    {
+      "file": "sprites/dungeon/potion_invisibility.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/items.png",
+      "sha256": "07b6f2890f37195775048a44664d1c686b357e3a985f5a095d974b90e46e1488"
+    },
+    {
+      "file": "sprites/dungeon/potion_strength.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/items.png",
+      "sha256": "795263c3ae391d784b64a8be36ab8c97b2e1bdc850a94b2f06493fd2fe20b023"
+    },
+    {
+      "file": "sprites/dungeon/scroll_upgrade.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/items.png",
+      "sha256": "3d51c221f2234770d9dff443b783e138a8b64bf7627510bcc076fa3789f2b21c"
+    },
+    {
+      "file": "sprites/dungeon/scroll_magic_mapping.png",
+      "source": "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets/sprites/items.png",
+      "sha256": "daa29eaa8b3f1809404137bc3e5bd278224960321b80018bcdd5790c4ab7321c"
     }
   ]
 }

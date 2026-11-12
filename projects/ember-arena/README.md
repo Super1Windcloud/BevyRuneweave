@@ -1,13 +1,12 @@
-# Ember Arena (Shattered Pixel Dungeon Edition)
+# Ember Arena — Shattered Pixel Dungeon port
 
-A TypeScript dungeon survival adaptation replicating the core mechanics and atmosphere of the open-source classic
-[Shattered Pixel Dungeon](https://github.com/00-Evan/shattered-pixel-dungeon) by 00-Evan (Evan Debenham) & Watabou (Oleg Dolya).
-Five sewer depths, four playable hero classes (Warrior, Mage, Rogue, Huntress), classic sewer mobs (Marsupial Rat,
-Gnoll Scout, Sewer Crab), the final warden boss Goo, surprise attack mechanics, backpack inventory with potions & scrolls,
-hunger management, persistent records/settings, and in-game runtime check verification.
-Characters use low-poly 3D models with official Shattered Pixel Dungeon sprite assets and an orthographic camera; menus use retained Bevy UI.
+An in-progress TypeScript/Bevy port of
+[Shattered Pixel Dungeon](https://github.com/00-Evan/shattered-pixel-dungeon).
+The current milestone is a playable five-depth sewer expedition. It is **not yet a complete
+one-to-one port**. [PARITY.md](PARITY.md) records the implemented subset, upstream references,
+known differences and the next content to migrate.
 
-## Run
+## Run and verify
 
 From the repository root:
 
@@ -15,100 +14,113 @@ From the repository root:
 just run-ember-arena
 just run-ember-arena --release
 just test-ember-arena
-```
-
-The Rust launcher builds this project's TypeScript entry before starting. All Cargo builds share
-the repository `target/`; no separate dependency installation is needed when root tooling is installed.
-To watch TypeScript edits while the game is open, run:
-
-```bash
 npm --prefix projects/ember-arena run watch
 ```
 
-Desktop: WASD/arrow keys to move, Space to wait/rest or start, `I` or `B` to open the backpack inventory,
-`1`-`7` for quick-use potions and scrolls, Escape to pause/resume.
-Desktop and mobile: drag or click to move. Attacks aim automatically at the nearest enemy.
-Collect green dew crystals for upgrades. Pillars and obstacles block line of sight, allowing Surprise Attacks.
-After 40, 85, and 130 seconds, the dungeon depths advance. Defeat Goo (The Warden) to claim the Amulet of Yendor!
+The Rust launcher builds the TypeScript bundle before starting. Cargo builds reuse the
+repository `target/`; root tooling supplies the TypeScript dependencies.
 
-## Gameplay & Shattered Pixel Dungeon Mechanics
+## Current gameplay
 
-- **Hero Classes**: Selectable on the main menu:
-  - **Warrior** (`Knight.glb`): High starting vitality (100 HP), tempered sword (+1 Potion of Healing, higher base strike).
-  - **Mage** (`Mage.glb`): Rapid magic missile staff bolts (+1 Scroll of Upgrade, 16% faster cast delay).
-  - **Rogue** (`Rogue_Hooded.glb`): Swift movement speed, starting Invisibility Potion, bonus stealth strikes.
-  - **Huntress** (`Barbarian.glb`): Master of ranged combat and area devastation (+1 Liquid Flame, Food Ration).
-- **Surprise Attacks**: Attacking an enemy from behind pillar cover or while cloaked in invisibility guarantees a Surprise Attack (+50% critical damage).
-- **Backpack Inventory & Alchemy**:
-  - `Potion of Healing`: Restores 45 Vitality and cures caustic ooze.
-  - `Liquid Flame`: Deals 35 explosive damage to surrounding foes.
-  - `Potion of Invisibility`: Cloaks hero for 6s with guaranteed surprise attacks.
-  - `Potion of Strength`: Permanently grants +4 base damage.
-  - `Scroll of Upgrade`: Upgrades equipped gear (+8 damage, +20 Max HP).
-  - `Scroll of Magic Mapping`: Magnetizes all crystals on the floor directly to the hero.
-  - `Food Ration`: Fully satisfies hunger and restores 15 Vitality.
-- **Hunger System**: Hunger status progresses from `SATIATED` (<60s) to `HUNGRY` (60-120s) to `STARVING` (>120s). Starvation slowly drains vitality unless food is consumed.
-- **The Warden: Goo**: At Depth 5, Goo emerges with 500 HP, caustic ooze debuffs, and charged pump-up shockwaves. Pillars provide cover from its explosive blasts.
+- Native top-down 2D sprites use the original hero, monster, item and sewer tile atlases.
+  Frame sizes follow upstream `HeroSprite`, mob sprites and `DungeonTileSheet`; the previous
+  2.5D standee models remain available as assets but are not used in this mode.
+- A seeded 25×25 floor contains nine rooms, connecting corridors, doors, water and stairs.
+  This generator guarantees connectivity; it does not reproduce upstream's room generator.
+- Movement and combat are turn based. Standing idle does not move monsters, consume food,
+  or advance dungeon depth. Walls and occupied cells stop movement. Bumping a monster attacks it;
+  opening a closed door takes a turn before entering its tile.
+- Walls and closed doors block sight. Explored terrain remains dimly visible; monsters and
+  dropped items outside the current field of view remain hidden. Mapping reveals terrain only.
+- Rats have 8 HP, gnolls 12, crabs 15 and normal Goo 100. Gnolls fight in melee; crabs move
+  twice as fast. Goo heals in water, becomes more dangerous below half health, charges a
+  short-range attack, and can inflict ooze that washes off in water.
+- Heroes start with 20 HP and 10 strength. Kills grant experience; leveling adds 5 maximum HP.
+  The four selectable classes currently differ in basic weapon damage and initial supplies;
+  their complete equipment, ranged attacks, talents and artifacts remain pending.
+- Hunger begins at 300 turns and starvation at 450. A ration satisfies 300 hunger and takes
+  three turns. Waiting does not instantly heal; basic regeneration is gradual and stops
+  during starvation. Several potion/scroll effects remain simplified; see the parity table.
+- Depth changes require standing on downward stairs and explicitly descending. Health and
+  supplies carry forward. Defeating Goo completes the **sewer milestone** and records the
+  Skeleton Key; it does not award the Amulet of Yendor or claim the full game is complete.
 
-## Assets & Licensing
+| Input | Action |
+| --- | --- |
+| WASD / arrows | One tile step; bump a monster to attack |
+| Click / tap an explored tile | Walk a known route; stop if hurt or a new monster appears |
+| Space / WAIT | Wait one turn |
+| E / period / DESCEND | Use downward stairs |
+| I / B / BAG | Open or close the inventory |
+| 1–7 | Healing, flame, invisibility, strength, upgrade, mapping, food |
+| Escape | Pause/resume or close the current menu |
 
-- 3D Character Models: [KayKit Adventurers](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0) by Kay Lousberg (CC0-1.0).
-- Sprites and UI Art: [Shattered Pixel Dungeon](https://github.com/00-Evan/shattered-pixel-dungeon) by Evan Debenham & Oleg Dolya (GPL-3.0). Official assets include `amulet.png`, `goo.png`, `rat.png`, `gnoll.png`, `crab.png`, `items.png`, `banners.png`, `badges.png`, `hero_icons.png`, and `sewers.jpg`.
-- Room geometry, pillars, projectiles, and crystal drops are generated by repository-owned TypeScript.
-- Complete license terms and checksums are stored under `game/assets/licenses/`.
+Inventory browsing and pausing cost no turns. Successfully using an item returns to play and
+allows monster responses. Empty item slots and blocked moves cost no turns. Keyboard holds
+repeat at a bounded rate; clicks never path through unexplored terrain.
 
-To reproduce the assets:
+## Architecture
+
+Gameplay, floor generation, input and UI flow live in TypeScript. Reflected `ScriptActor`
+components and real Bevy `Transform` components remain authoritative for actor health,
+positions, awareness and combat state. References are reacquired within script callbacks.
+TypeScript retains only terrain, exploration, inventory, progression and presentation metadata;
+there is no second actor/ECS store and no new language-specific business global.
+
+The retained native UI uses the existing BMS registry. The runtime explicitly selects the active
+2D/3D camera as its default UI camera, because Bevy's automatic selection can choose an inactive
+higher-order camera and hide menus. This uses portable Bevy components without a C ABI change.
+
+Settings and completed-run records use structured BMS storage results. Existing incompatible
+saves are preserved until a confirmed reset. In-progress runs/floor backtracking are not saved.
+The optional diagnostic sends fixed GET/POST echo requests to httpbin.org, without player data.
+Audio and native physics remain API gaps; full Lua gameplay is not implemented.
+
+## Assets and attribution
+
+Original Pixel Dungeon / Shattered Pixel Dungeon art is credited to Oleg Dolya (Watabou) and
+Evan Debenham (00-Evan). Existing notices live under `game/assets/licenses/`.
+Legacy KayKit assets retain their own attribution. Do not remove those notices.
 
 ```bash
 npm --prefix projects/ember-arena run prepare:assets
 ```
 
-Original downloads are cached under `dist/asset-downloads/ember-arena/`; only selected runtime
-assets and their license records live in this project. The game needs no network connection to play.
-The optional HTTP diagnostic calls the public `https://httpbin.org/get` and `/post` echo endpoints
-with a fixed test payload. It sends no player data or credentials and is not a leaderboard.
+The preparation script reuses `dist/asset-downloads/ember-arena/` and emits PNG crops and GLBs.
+Generated crops include source URLs and SHA-256 checksums in `licenses/sources.json`. Original
+downloads are cached from upstream `master`, not an immutable release; checksums describe the
+local generated artifacts. The game runs offline after preparation.
 
-## Architecture and acceptance
+## Verification boundaries
 
-`actors.ts` reads positions from BMS references to real Bevy `Transform` components. Health,
-speed, radius, attack power, velocity and per-actor timers live in reflected `ScriptActor`
-components. Actor queries read the real World and enforce script attachment ownership.
-TypeScript contains combat rules, encounter progression and UI flow, without another ECS store.
-Circle and swept-segment collision is gameplay code, not an integrated native physics engine.
+`npm --prefix projects/ember-arena test` typechecks, rebuilds the bundle, and runs deterministic
+tests with platform doubles. Tests cover floor connectivity across 200 seed/depth combinations,
+doors and visibility, idle/turn behavior, five-depth transitions, combat, mapping, hunger,
+portrait input, resizing, asset provenance, settings, reset and error recovery.
 
-| Area | Evidence / boundary |
-| --- | --- |
-| Gameplay loop | TypeScript simulation tests cover movement, pause, upgrades, three waves, win/loss, restart and portrait drag. |
-| Real ECS and language conversion | Rust registry tests exercise actor references in Lua and QuickJS, ownership isolation and deletion. |
-| Game through real QuickJS | A headless integration test loads the actual bundle and validates movement, retained UI, runtime checks and reset. |
-| API check screen | Checks owned entities, reflected fields, 2D sprites/text, transform/camera contracts, UI validation, input reads and unknown HTTP handles. |
-| GLB and animation | Offline tests validate GLB headers, embedded textures and selected clip; request acceptance alone does not prove rendered animation. |
-| HTTP | Optional live GET/POST check; simulation doubles are not real-backend evidence. |
-| Host and reload | Native exit remains user-triggered. Callback reset is tested; full host re-entry and native reload require platform runs. |
-| Persistent progress/settings | Structured BMS storage results; tests cover reopening, namespace isolation, invalid/oversized values, corruption, I/O failures, retries and confirmed reset. |
-| Audio, native physics | Not implemented as script services; explicitly marked as API gaps. |
-| Dynamic components / script systems | Optional BMS capabilities are not enabled or exercised by this game. |
-| Lua gameplay | Actor API parity is tested; the full game is TypeScript only. |
-| Platforms | Shared APIs use portable Bevy/BMS types; Windows, Linux, Android and iOS execution must be verified separately. |
+`cargo test --locked --offline -p bevy-runeweave --lib` includes execution of the actual game
+bundle through QuickJS and real Bevy components, Lua/QuickJS actor and storage parity,
+camera selection, and portable path validation. Simulation results do not prove GPU rendering,
+mobile input/lifecycle, performance or full upstream behavior.
 
-`scripts/smoke.test.ts` uses platform doubles to test game rules deterministically. These results
-must not be reported as GPU, native input, mobile lifecycle, performance or accessibility acceptance.
-The game is a foundation for acceptance coverage, not proof of every possible game-development need.
+Windows Debug native screenshots/logs for this milestone are stored under
+`dist/asset-downloads/ember-arena/native-turn-based-*`. macOS, Linux, Android, iOS and Release
+execution remain unverified for this change. The historical macOS arena verification from
+2026-10-30 predates the turn-based port and does not validate this milestone.
 
-### Verified on 2026-10-30
+### Verified on 2026-11-11 (Windows Debug)
 
-- `just test-ember-arena`: 13 tests passed, including a complete simulated boss victory, persistent settings, corrupt-save preservation, save retry, deterministic encounters and effect cleanup.
-- `cargo test --locked --offline -p bevy-runeweave --lib`: 36 passed, 1 performance test ignored.
-  Includes real Lua/QuickJS actor mutation, foreign-owner rejection, and actual game-bundle
-  execution through QuickJS with movement, paginated UI checks and callback reset. Six storage
-  tests cover real filesystem round trips, project isolation, late callbacks during a game switch,
-  traversal/size limits, bad data, failed replacement, and equivalent Lua/QuickJS results.
-- `npm run typecheck:scripts`, the original TypeScript project's check, Rust formatting and
-  `git diff --check` passed.
-- `just run-ember-arena`: the updated macOS Debug executable built and started on Metal;
-  the native combat scene rendered with the mage, enemies, crystals and HUD. The screenshot and
-  startup log are `dist/asset-downloads/ember-arena/gameplay-v2.png` and `native-v2.log`.
-- Native combat input was not automated because macOS event-posting access is unavailable.
-  Windows, Linux, Android, iOS, Release mode, full native reload, audio, native save durability,
-  native physics, live external HTTP, performance and accessibility remain unverified or unimplemented
-  as specified above. No other-platform build success is implied.
+- `npm --prefix projects/ember-arena test`: **27 passed**, including UI remount/held-pointer
+  regressions. Asset preparation succeeded using the existing local download cache.
+- `cargo test --locked --offline -p bevy-runeweave --lib`: **37 passed, 1 performance test ignored**.
+  The actual QuickJS game test also opens the compact backpack and verifies page 2 in real Bevy UI.
+- `cargo build --locked --offline -p ember-arena-ts`: succeeded using the repository `target/`.
+- `npm run typecheck:scripts`, `cargo fmt --check` and `git diff --check`: passed.
+- The native executable rendered through Vulkan on an NVIDIA RTX 3060 Laptop GPU. Window-directed
+  keyboard input verified starting, stepping, opening a door and opening the backpack. A real
+  OS mouse click verified compact backpack pagination after resizing to an 800×400 client area.
+  Screenshots include `native-turn-based-door.png` and `native-turn-based-compact-backpack-page2.png`.
+- For the background native launch, the resolved Node installation directory was prepended to
+  the child process's `PATH` to bypass a mise `npm.cmd` shim resolution failure. No persistent
+  machine configuration was changed. GPU startup logged a missing Epic overlay-layer manifest;
+  rendering still initialized and the screenshots above were captured successfully.

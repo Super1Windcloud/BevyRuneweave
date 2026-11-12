@@ -1,27 +1,25 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import { createContext, runInContext } from "node:vm";
 import {
-  constrain,
-  distance,
-  dungeonMonsters,
   getHungerStatus,
   heroClasses,
   heroClassList,
-  isSurpriseStrike,
   itemCatalog,
-  pillars,
+  enemySpecs,
+  mobCombat,
   seededRandom,
-  segmentHits,
-  waveAt,
+  type Point,
 } from "../modules/ember-arena/game/src/rules.js";
+import { canStep, cellKey, findPath, generateFloor, lineOfSight, reveal, sameCell, terrainAt, type DungeonFloor, type Terrain } from "../modules/ember-arena/game/src/dungeon.js";
 import { defaultProfile, parseProfile } from "../modules/ember-arena/game/src/profile.js";
 
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
 type RecordValue = { [key: string]: unknown };
-interface Entity { transform: RecordValue; body?: RecordValue; model?: string }
+interface Entity { transform: RecordValue; body?: RecordValue; model?: string; sprite?: { path: string; width: number; height: number } }
 interface Ui { parent: string; text?: string; style?: RecordValue }
 
 // Platform doubles for deterministic gameplay tests, not runtime acceptance.
@@ -34,12 +32,14 @@ class Reference {
   }
   set(key: string, value: unknown): void { this.value[key] = value; }
 }
-function harness(width = 1280, height = 800, mobile = false, saves = new Map<string, string>()) {
+function harness(width = 1280, height = 800, mobile = false, saves = new Map<string, string>(), stickyUi = false) {
   const entities = new Map<string, Entity>();
   const ui = new Map<string, Ui>();
   const pressed = new Set<string>();
   const keys = new Set<string>();
   const clicks = new Set<string>();
+  let buttonPolls = 0;
+  let heldButton: string | null = null;
   let state = { score: 0, lives: 0, message: "" };
   let exitRequested = false;
   let storageFailure = "";
@@ -78,7 +78,10 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
     },
     scene_play_animation: (id: string, path: string) => entities.has(id) && existsSync(resolve(assets, path)),
     scene_set_3d_enabled: () => true,
-    scene_set_sprite: (id: string, path: string) => entities.has(id) && existsSync(resolve(assets, path)),
+    scene_set_sprite: (id: string, path: string, width: number, height: number) => {
+      if (!entities.has(id) || !existsSync(resolve(assets, path))) return false;
+      entities.get(id)!.sprite = { path, width, height }; return true;
+    },
     scene_set_text: (id: string) => entities.has(id),
     scene_set_transform: (id: string, x: number, y: number, z: number) => {
       if (!entities.has(id)) return false;
@@ -107,7 +110,10 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
     },
     ui_set_image: (id: string, path: string) => ui.has(id) && existsSync(resolve(assets, path)),
     ui_despawn: despawnUi,
-    ui_button_just_pressed: (id: string) => { const active = clicks.has(id); clicks.delete(id); return active; },
+    ui_button_just_pressed: (id: string) => {
+      if (stickyUi && ++buttonPolls > 100) throw new Error("UI callbacks revisited a remounted tree");
+      const active = clicks.has(id) || heldButton === id; if (!stickyUi) clicks.delete(id); return active;
+    },
     input_key_pressed: (key: string) => keys.has(key),
     input_key_just_pressed: (key: string) => pressed.has(key),
     input_key_just_released: () => false,
@@ -126,7 +132,7 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
   runInContext(readFileSync(resolve(assets, "ember-arena.js"), "utf8"), context);
   context.on_script_loaded();
   const tick = (count = 1): void => {
-    for (let frame = 0; frame < count; frame++) { context.on_update(0.05); pressed.clear(); clicks.clear(); }
+    for (let frame = 0; frame < count; frame++) { buttonPolls = 0; context.on_update(0.05); pressed.clear(); clicks.clear(); pointer.justPressed = false; }
   };
   return { entities, ui, keys, pressed, tick, context, saves,
     failStorage: (error = "") => { storageFailure = error; },
@@ -134,15 +140,18 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
     click: (id: string) => { assert.ok(ui.has(id), `Missing button ${id}`); clicks.add(id); tick(); },
     pointer: (value: Partial<typeof pointer>) => { pointer = { ...pointer, ...value }; },
     exitRequested: () => exitRequested,
+    resize: (w: number, h: number) => { width = w; height = h; pointer.viewportWidth = w / h * 800; },
+    key: (key: string) => { pressed.add(key); tick(); },
+    holdButton: (id: string) => { heldButton = id; pointer.pressed = true; tick(); },
+    releaseButton: () => { heldButton = null; pointer.pressed = false; tick(); },
+    step: (dx: number, dz: number) => {
+      if (dx) keys.add(dx > 0 ? "KeyD" : "KeyA");
+      if (dz) keys.add(dz > 0 ? "KeyS" : "KeyW");
+      tick(); keys.clear(); tick(4);
+    },
   };
 }
 
-test("room collision, swept projectile hits and wave transitions", () => {
-  for (const pillar of pillars) assert.ok(distance(constrain(pillar, 0.35, 8), pillar) >= 1.1499);
-  assert.ok(segmentHits({ x: -2, z: 0 }, { x: 2, z: 0 }, { x: 0, z: 0 }, 0.2));
-  assert.ok(!segmentHits({ x: -2, z: 0 }, { x: 2, z: 0 }, { x: 0, z: 1 }, 0.2));
-  assert.deepEqual([waveAt(0), waveAt(40), waveAt(85), waveAt(130)], [0, 1, 2, 3]);
-});
 test("menu, movement, pause, restart, diagnostics and host exit", () => {
   const game = harness();
   assert.equal(game.state().message, "MENU");
@@ -164,8 +173,8 @@ test("menu, movement, pause, restart, diagnostics and host exit", () => {
   assert.match(game.ui.get("network_status")!.text!, /PASS GET 200/);
   assert.match(game.ui.get("network_status")!.text!, /PASS POST 200/);
   game.click("back"); game.click("restart");
-  assert.equal(game.state().lives, 100);
-  assert.equal([...game.entities.values()].filter((value) => value.body).length, 1);
+  assert.equal(game.state().lives, 20);
+  assert.equal([...game.entities.values()].filter((value) => value.body?.kind === "chaser").length, 8);
   game.click("pause"); game.click("exit");
   assert.ok(game.exitRequested());
 });
@@ -173,56 +182,23 @@ test("portrait touch, native safe area and reload reset", () => {
   const game = harness(450, 800, true);
   game.click("start");
   assert.notEqual(game.ui.get("safe_root")!.style!.top, "0%");
-  game.pointer({ pressed: true, x: 0 }); game.tick();
-  game.pointer({ pressed: true, x: 30 }); game.tick();
+  game.pointer({ pressed: true, justPressed: true, x: game.entities.get("player")!.sprite!.width, y: -40 }); game.tick();
   assert.ok((game.entities.get("player")!.transform.translation as { x: number }).x > 0);
   game.context.on_script_reloaded();
   assert.equal(game.state().message, "MENU");
   assert.equal([...game.entities.values()].filter((value) => value.body).length, 1);
 });
-test("crystals open an upgrade and vigor heals the real actor state", () => {
-  const game = harness(); game.click("start");
-  game.entities.get("player")!.body!.health = 40;
-  for (let index = 0; index < 7; index++) game.entities.set(`pickup_${index}`, {
-    transform: { translation: { x: 0, y: 0.3, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } },
-    body: { kind: "crystal", health: 1, speed: 0, radius: 0.2, lifetime: 0 },
-  });
-  game.tick(); assert.equal(game.state().message, "UPGRADE");
-  game.click("upgrade_vigor");
-  assert.equal(game.entities.get("player")!.body!.health, 70);
-  assert.ok((game.entities.get("player")!.body!.speed as number) > 3.7);
-  assert.equal(game.state().message, "PLAYING");
-});
-test("three waves, boss victory, bounded actors and repeatable restart", () => {
-  const game = harness(); game.click("start");
-  game.entities.get("player")!.body!.health = 100_000;
-  let maximum = 0;
-  let sawBossBar = false;
-  for (let frame = 0; frame < 6500 && game.state().message !== "WON"; frame++) {
-    if (game.state().message === "UPGRADE") game.click("upgrade_power");
-    game.tick(); maximum = Math.max(maximum, game.entities.size);
-    if (game.ui.get("boss_panel")?.style?.display === "flex") sawBossBar = true;
-  }
-  assert.equal(game.state().message, "WON");
-  assert.ok(game.state().score >= 500);
-  assert.equal(parseProfile(game.saves.get("profile")!).wins, 1);
-  assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
-  assert.ok(maximum < 230, `Unexpected entity growth: ${maximum}`);
-  assert.ok(sawBossBar, "boss vitality must be visible during the final encounter");
-  game.click("restart");
-  assert.equal(game.state().score, 0);
-  assert.equal(game.state().lives, 100);
-});
 test("contact damage ends a run and restart removes hostile actors", () => {
   const game = harness(); game.click("start");
   game.entities.get("player")!.body!.health = 1;
   game.entities.set("lethal", {
-    transform: { translation: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } },
-    body: { kind: "chaser", health: 1000, speed: 0, radius: 0.4, cooldown: 10, lifetime: 0 },
+    transform: { translation: { x: 22, y: -40, z: 2 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } },
+    body: { kind: "chaser", health: 1000, speed: 1, radius: 0.4, cooldown: 0, lifetime: 1, power: 0 },
   });
-  game.tick(); assert.equal(game.state().message, "LOST");
+  for (let turn = 0; turn < 20 && game.state().message === "PLAYING"; turn++) game.click("wait");
+  assert.equal(game.state().message, "LOST");
   game.click("restart"); assert.ok(!game.entities.has("lethal"));
-  assert.equal(game.state().lives, 100);
+  assert.equal(game.state().lives, 20);
 });
 test("downloaded GLBs contain an embedded texture and walking clip", () => {
   for (const name of ["Mage", "Knight", "Rogue_Hooded", "Barbarian"]) {
@@ -266,10 +242,11 @@ test("failed saves can be retried and a finished run is counted once", () => {
   game.click("settings_back"); game.click("start");
   game.entities.get("player")!.body!.health = 1;
   game.entities.set("lethal", {
-    transform: { translation: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } },
-    body: { kind: "chaser", health: 1000, speed: 0, radius: 0.4, cooldown: 10, lifetime: 0 },
+    transform: { translation: { x: 22, y: -40, z: 2 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } },
+    body: { kind: "chaser", health: 1000, speed: 1, radius: 0.4, cooldown: 0, lifetime: 1, power: 0 },
   });
-  game.tick(20); assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
+  for (let turn = 0; turn < 20 && game.state().message === "PLAYING"; turn++) game.click("wait");
+  assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
   game.context.on_script_reloaded(); game.tick();
   assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
 });
@@ -289,60 +266,6 @@ test("save schema validation rejects bad statistics and nonfinite settings", () 
     { ...defaultProfile(), sensitivity: 100 }, { ...defaultProfile(), seed: 0x100000000 }, { ...defaultProfile(), showHints: "false" }]) {
     assert.throws(() => parseProfile(JSON.stringify(data)));
   }
-});
-
-test("hit effects expire, and reduced effects disables them", () => {
-  for (const reduced of [false, true]) {
-    const game = harness();
-    if (reduced) { game.click("settings"); game.click("motion"); game.click("settings_back"); }
-    game.click("start");
-    game.entities.set("target", {
-      transform: { translation: { x: 0, y: 0, z: -1 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } },
-      body: { kind: "chaser", health: 1000, speed: 0, radius: 0.4, cooldown: 10, lifetime: 0 },
-    });
-    let sawEffect = false;
-    for (let frame = 0; frame < 12; frame++) {
-      game.tick(); if ([...game.entities.values()].some((entity) => entity.body?.kind === "effect")) sawEffect = true;
-    }
-    assert.equal(sawEffect, !reduced);
-    game.entities.delete("target");
-    game.tick(5);
-    assert.ok(![...game.entities.values()].some((entity) => entity.body?.kind === "effect"));
-  }
-});
-
-test("shattered pixel dungeon classes, items, surprise attacks and hunger mechanics", () => {
-  assert.equal(heroClassList.length, 4);
-  for (const classKey of heroClassList) {
-    const spec = heroClasses[classKey];
-    assert.ok(spec.name.length > 0);
-    assert.ok(spec.baseHealth >= 90);
-    assert.ok(spec.baseDamage >= 15);
-  }
-
-  assert.equal(dungeonMonsters.boss.name, "Goo (The Warden)");
-  assert.equal(dungeonMonsters.chaser.name, "Marsupial Rat");
-  assert.equal(dungeonMonsters.ranger.name, "Gnoll Scout");
-  assert.equal(dungeonMonsters.charger.name, "Sewer Crab");
-
-  assert.ok("potion_healing" in itemCatalog);
-  assert.ok("scroll_upgrade" in itemCatalog);
-  assert.ok("potion_liquid_flame" in itemCatalog);
-  assert.ok("food_ration" in itemCatalog);
-
-  // Surprise attack: true when invisible
-  assert.ok(isSurpriseStrike({ x: 0, z: 0 }, { x: 3, z: 3 }, true));
-  // Surprise attack: true when near pillar cover
-  const nearPillar = { x: pillars[0]!.x + 0.5, z: pillars[0]!.z };
-  const farEnemy = { x: pillars[0]!.x + 4, z: pillars[0]!.z + 4 };
-  assert.ok(isSurpriseStrike(nearPillar, farEnemy, false));
-  // False in wide open field
-  assert.ok(!isSurpriseStrike({ x: 6, z: 4 }, { x: 6, z: 2 }, false));
-
-  // Hunger status
-  assert.equal(getHungerStatus(10), "satiated");
-  assert.equal(getHungerStatus(80), "hungry");
-  assert.equal(getHungerStatus(150), "starving");
 });
 
 test("in-game backpack inventory, item usage and hero class switching", () => {
@@ -366,14 +289,13 @@ test("in-game backpack inventory, item usage and hero class switching", () => {
   assert.match(game.ui.get("item_title_potion_healing")!.text!, /Potion of Healing/);
 
   // Drink healing potion
-  game.entities.get("player")!.body!.health = 40;
+  game.entities.get("player")!.body!.health = 4;
   game.click("use_potion_healing");
-  assert.equal(game.entities.get("player")!.body!.health, 85);
+  assert.equal(game.entities.get("player")!.body!.health, 20);
 
   // Read upgrade scroll
-  game.click("use_scroll_upgrade");
-  // Close bag
-  game.click("close_bag");
+  game.click("bag_btn"); game.click("use_scroll_upgrade");
+  assert.equal(game.entities.get("player")!.body!.health, 20, "weapon upgrades do not grant HP");
   assert.equal(game.state().message, "PLAYING");
 });
 
@@ -428,4 +350,279 @@ test("official shattered pixel dungeon sprite assets exist and are valid", () =>
     const stat = readFileSync(fullPath);
     assert.ok(stat.length > 0, `Empty asset: ${file}`);
   }
+});
+
+type Game = ReturnType<typeof harness>;
+function cell(game: Game, id = "player"): Point {
+  const size = game.entities.get("terrain_312")!.sprite!.width;
+  const translation = game.entities.get(id)!.transform.translation as { x: number; y: number };
+  return { x: Math.round(translation.x / size + 12), z: Math.round(12 - (translation.y + 40) / size) };
+}
+function putActor(game: Game, id: string, type: string, point: Point, health = 1000, speed = 1): void {
+  const size = game.entities.get("terrain_312")!.sprite!.width;
+  game.entities.set(id, {
+    transform: { translation: { x: (point.x - 12) * size, y: (12 - point.z) * size - 40, z: 2 },
+      rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } },
+    body: { kind: type, health, speed, radius: 0.4, cooldown: 0, lifetime: 0, power: 0, velocity_x: 0, velocity_z: 0 },
+  });
+}
+function removeMonsters(game: Game): void {
+  for (const [id, entity] of game.entities) if (entity.body?.kind && String(entity.body.kind) in enemySpecs) game.entities.delete(id);
+}
+function walk(game: Game, map: DungeonFloor, target: Point): void {
+  const path = findPath(map, cell(game), target);
+  assert.ok(path.length || sameCell(cell(game), target), "destination must be reachable");
+  for (const next of path) {
+    // Opening a closed door takes a turn before stepping into its cell.
+    for (let attempt = 0; attempt < 2 && !sameCell(cell(game), next); attempt++) {
+      const current = cell(game); game.step(next.x - current.x, next.z - current.z);
+    }
+    assert.deepEqual(cell(game), next);
+    if (terrainAt(map, next) === "door") map.tiles[cellKey(map, next)] = "open_door";
+  }
+}
+
+test("seeded sewer floors connect every room and keep stairs inside the boundary", () => {
+  for (let seed = 0; seed < 40; seed++) for (let depth = 1; depth <= 5; depth++) {
+    const map = generateFloor(seed, depth);
+    assert.equal(terrainAt(map, map.entrance), "entrance");
+    assert.equal(terrainAt(map, map.exit), "exit");
+    assert.ok(!sameCell(map.entrance, map.exit));
+    for (const room of map.rooms) assert.ok(sameCell(room, map.entrance) || findPath(map, map.entrance, room).length);
+    for (let index = 0; index < map.width; index++) {
+      assert.equal(terrainAt(map, { x: index, z: 0 }), "wall");
+      assert.equal(terrainAt(map, { x: 0, z: index }), "wall");
+      assert.equal(terrainAt(map, { x: index, z: map.height - 1 }), "wall");
+      assert.equal(terrainAt(map, { x: map.width - 1, z: index }), "wall");
+    }
+  }
+  assert.deepEqual(generateFloor(1337, 2).tiles, generateFloor(1337, 2).tiles);
+  assert.notDeepEqual(generateFloor(1337, 1).tiles, generateFloor(1337, 2).tiles);
+});
+
+test("closed doors block vision, opening reveals the room, and memory retains terrain", () => {
+  const map: DungeonFloor = { width: 7, height: 5, depth: 1, entrance: { x: 1, z: 2 }, exit: { x: 5, z: 2 }, rooms: [],
+    tiles: Array<Terrain>(35).fill("wall"), explored: new Set(), visible: new Set() };
+  for (let z = 1; z < 4; z++) for (const x of [1, 2, 4, 5]) map.tiles[cellKey(map, { x, z })] = "floor";
+  map.tiles[cellKey(map, { x: 3, z: 2 })] = "door";
+  reveal(map, map.entrance);
+  assert.ok(map.visible.has(cellKey(map, { x: 3, z: 2 })), "the closed door itself is visible");
+  assert.ok(!map.visible.has(cellKey(map, map.exit)), "the room behind the door stays hidden");
+  assert.ok(!lineOfSight(map, map.entrance, map.exit));
+  map.tiles[cellKey(map, { x: 3, z: 2 })] = "open_door";
+  reveal(map, map.entrance); assert.ok(map.visible.has(cellKey(map, map.exit)));
+  reveal(map, map.entrance, 1);
+  assert.ok(!map.visible.has(cellKey(map, map.exit)) && map.explored.has(cellKey(map, map.exit)));
+  assert.ok(!canStep(map, { x: 2, z: 1 }, { x: 3, z: 2 }), "a diagonal cannot squeeze through a solid corner");
+  assert.deepEqual(findPath(map, map.entrance, map.exit, new Set([cellKey(map, { x: 3, z: 2 })])), []);
+});
+
+test("waiting without input freezes actors, hunger and depth; blocked movement costs no turn", () => {
+  const game = harness(); game.click("start");
+  const before = JSON.stringify([...game.entities]);
+  game.tick(4000);
+  assert.equal(JSON.stringify([...game.entities]), before);
+  assert.match(game.ui.get("hud_info")!.text!, /^TURN 0 /);
+  assert.match(game.ui.get("hud_wave")!.text!, /DEPTH 1/);
+  removeMonsters(game);
+  const map = generateFloor(1337, 1);
+  const target = { x: 10, z: 10 };
+  walk(game, map, target);
+  const turn = game.ui.get("hud_info")!.text;
+  game.step(-1, -1); // The wall outside the north-west corner of the starting room.
+  assert.deepEqual(cell(game), target);
+  assert.equal(game.ui.get("hud_info")!.text, turn);
+  game.key("Digit4");
+  assert.equal(game.ui.get("hud_info")!.text, turn, "an empty item slot consumes no turn");
+});
+
+test("door opening costs one turn and keyboard movement lands exactly on a tile", () => {
+  const game = harness(); game.click("start"); removeMonsters(game);
+  const map = generateFloor(1337, 1);
+  const path = findPath(map, map.entrance, map.exit);
+  const doorIndex = path.findIndex((point) => terrainAt(map, point) === "door");
+  assert.ok(doorIndex > 0);
+  walk(game, map, path[doorIndex - 1]!);
+  const current = cell(game), next = path[doorIndex]!;
+  game.step(next.x - current.x, next.z - current.z);
+  assert.deepEqual(cell(game), current);
+  assert.equal(game.entities.get(`terrain_${cellKey(map, next)}`)!.sprite!.path, "sprites/dungeon/open_door.png");
+  game.step(next.x - current.x, next.z - current.z);
+  assert.deepEqual(cell(game), next);
+});
+
+test("stairs require the exit tile and preserve hero health and inventory across all five depths", () => {
+  const game = harness(); game.click("start");
+  game.click("descend"); assert.match(game.ui.get("hud_wave")!.text!, /DEPTH 1/);
+  game.entities.get("player")!.body!.health = 20;
+  for (let depth = 1; depth < 5; depth++) {
+    removeMonsters(game);
+    const map = generateFloor(1337, depth);
+    walk(game, map, map.exit);
+    game.click("descend");
+    assert.deepEqual(cell(game), map.entrance);
+    assert.match(game.ui.get("hud_wave")!.text!, new RegExp(`DEPTH ${depth + 1}`));
+    assert.equal(game.entities.get("player")!.body!.health, 20);
+    assert.ok(game.entities.size < 200, "previous terrain and actors must be removed");
+  }
+  assert.equal(game.entities.get("warden")!.body!.health, 100);
+  assert.equal(game.ui.get("boss_panel")!.style!.display, "flex");
+  removeMonsters(game);
+  putActor(game, "warden", "boss", { x: 13, z: 12 }, 1, 1);
+  for (let attempt = 0; attempt < 5 && game.state().message === "PLAYING"; attempt++) game.step(1, 0);
+  assert.equal(game.state().message, "WON");
+  assert.match(game.ui.get("victory_key_label")!.text!, /SKELETON KEY/);
+  assert.equal(parseProfile(game.saves.get("profile")!).wins, 1);
+  game.tick(50); assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
+  game.click("restart");
+  assert.equal(game.state().lives, 20); assert.match(game.ui.get("hud_info")!.text!, /^TURN 0 /);
+});
+
+test("bump attacks consume turns, break invisibility and never move into an occupied cell", () => {
+  const game = harness(); game.click("start"); removeMonsters(game);
+  putActor(game, "target", "chaser", { x: 13, z: 12 });
+  const health = game.state().lives;
+  game.key("Digit3");
+  assert.equal(game.state().lives, health, "invisible heroes cannot be attacked");
+  assert.match(game.ui.get("hud_info")!.text!, /INVISIBLE 20/);
+  game.step(1, 0);
+  assert.deepEqual(cell(game), { x: 12, z: 12 });
+  assert.ok((game.entities.get("target")!.body!.health as number) < 1000);
+  assert.doesNotMatch(game.ui.get("hud_info")!.text!, /INVISIBLE/);
+  assert.ok([...game.ui.values()].some((node) => node.text?.includes("Surprise attack!")));
+  const snapshot = JSON.stringify([...game.entities]); game.tick(100);
+  assert.equal(JSON.stringify([...game.entities]), snapshot, "enemies only retaliate after an action");
+});
+
+test("magic mapping reveals terrain while hidden monsters and items stay hidden", () => {
+  const game = harness(); game.click("hero_class"); game.click("start"); game.key("Digit6");
+  const map = generateFloor(1337, 1);
+  reveal(map, map.entrance);
+  assert.equal([...game.entities.keys()].filter((id) => id.startsWith("terrain_")).length, 625);
+  for (const [id, entity] of game.entities) {
+    if (entity.body?.kind !== "chaser" && entity.body?.kind !== "loot") continue;
+    const visible = map.visible.has(cellKey(map, cell(game, id)));
+    assert.equal((entity.transform.scale as { x: number }).x, visible ? 1 : 0);
+  }
+});
+
+test("viewport changes preserve every real actor tile and update sprite dimensions", () => {
+  const game = harness(); game.click("start"); game.step(1, 0);
+  const before = new Map([...game.entities].filter(([, entity]) => entity.body).map(([id]) => [id, cell(game, id)]));
+  game.resize(450, 800); game.tick();
+  assert.ok(game.entities.get("terrain_312")!.sprite!.width < 22);
+  for (const [id, point] of before) assert.deepEqual(cell(game, id), point);
+  game.resize(1280, 800); game.tick();
+  assert.equal(game.entities.get("terrain_312")!.sprite!.width, 22);
+  for (const [id, point] of before) assert.deepEqual(cell(game, id), point);
+});
+
+test("upstream basic sewer statistics, hero vitality and hunger boundaries", () => {
+  assert.deepEqual([enemySpecs.chaser.health, enemySpecs.ranger.health, enemySpecs.charger.health, enemySpecs.boss.health], [8, 12, 15, 100]);
+  assert.deepEqual([mobCombat.chaser.attack, mobCombat.ranger.attack, mobCombat.charger.attack], [8, 10, 12]);
+  assert.equal(enemySpecs.charger.speed, 2);
+  for (const hero of heroClassList) assert.equal(heroClasses[hero].baseHealth, 20);
+  assert.deepEqual([299, 300, 449, 450].map(getHungerStatus), ["satiated", "hungry", "hungry", "starving"]);
+});
+
+test("hunger advances with turns, food takes three turns, and waiting grants no instant heal", () => {
+  const game = harness(); game.click("start"); removeMonsters(game);
+  game.entities.get("player")!.body!.health = 4;
+  game.click("wait");
+  assert.equal(game.state().lives, 4);
+  for (let turn = 1; turn < 301; turn++) game.click("wait");
+  assert.equal(game.ui.get("hud_hunger")!.text, "HUNGRY");
+  game.entities.get("player")!.body!.health = 4;
+  game.key("Digit7");
+  assert.equal(game.state().lives, 4, "food must not directly heal the hero");
+  assert.match(game.ui.get("hud_info")!.text!, /^TURN 304 /);
+  assert.equal(game.ui.get("hud_hunger")!.text, "SATIATED");
+  for (let turn = 0; turn < 449; turn++) game.click("wait");
+  assert.equal(game.ui.get("hud_hunger")!.text, "STARVING");
+  game.entities.get("player")!.body!.health = 20;
+  for (let turn = 0; turn < 10; turn++) game.click("wait");
+  assert.equal(game.state().lives, 19);
+});
+
+test("generated native sprites retain upstream frame sizes and manifest checksums", () => {
+  const manifest = JSON.parse(readFileSync(resolve(assets, "licenses/sources.json"), "utf8")) as {
+    spriteRecords: { file: string; sha256: string }[];
+  };
+  assert.ok(manifest.spriteRecords.length >= 20);
+  for (const entry of manifest.spriteRecords) {
+    assert.equal(createHash("sha256").update(readFileSync(resolve(assets, entry.file))).digest("hex"), entry.sha256);
+  }
+  for (const [name, width, height] of [["warrior", 12, 15], ["gnoll", 12, 15], ["goo", 20, 14], ["exit", 16, 16]] as const) {
+    const png = readFileSync(resolve(assets, `sprites/dungeon/${name}.png`));
+    assert.equal(png.readUInt32BE(16), width); assert.equal(png.readUInt32BE(20), height);
+    assert.equal(png[25], 6, "indexed upstream assets must become real RGBA sprites");
+  }
+});
+
+test("Goo charges before its burst and heals in water even while sleeping", () => {
+  const game = harness(); game.click("start"); removeMonsters(game);
+  game.entities.get("player")!.body!.health = 100;
+  putActor(game, "warden", "boss", { x: 13, z: 12 }, 40);
+  game.entities.get("warden")!.body!.power = 1;
+  game.click("wait");
+  assert.equal(game.entities.get("warden")!.body!.power, 2);
+  assert.equal(game.state().lives, 100, "the second pump-up stage spends a turn without attacking");
+  game.click("wait");
+  assert.equal(game.entities.get("warden")!.body!.power, 0);
+  assert.ok(game.state().lives < 100, "the charged burst resolves on the following action");
+  const map = generateFloor(1337, 1);
+  const key = map.tiles.findIndex((tile, index) => tile === "water" && Math.abs(index % 25 - 12) > 7);
+  assert.ok(key >= 0);
+  putActor(game, "warden", "boss", { x: key % 25, z: Math.floor(key / 25) }, 40);
+  game.click("wait");
+  assert.equal(game.entities.get("warden")!.body!.health, 41);
+});
+
+test("click walking stops at a door when a previously hidden enemy appears", () => {
+  const game = harness(); game.click("start"); removeMonsters(game);
+  const map = generateFloor(1337, 1);
+  const path = findPath(map, map.entrance, map.exit);
+  const index = path.findIndex((point) => terrainAt(map, point) === "door");
+  walk(game, map, path[index - 1]!);
+  putActor(game, "hidden_rat", "chaser", path[index + 1]!);
+  const size = game.entities.get("terrain_312")!.sprite!.width;
+  const door = path[index]!, before = cell(game);
+  game.pointer({ justPressed: true, x: (door.x - 12) * size, y: (12 - door.z) * size - 40 });
+  game.tick(20);
+  assert.deepEqual(cell(game), before);
+  assert.equal(game.entities.get(`terrain_${cellKey(map, door)}`)!.sprite!.path, "sprites/dungeon/open_door.png");
+  assert.equal((game.entities.get("hidden_rat")!.transform.scale as { x: number }).x, 1);
+});
+
+test("compact landscape backpacks paginate every item without advancing turns", () => {
+  const game = harness(800, 400, true); game.click("start"); game.click("bag_btn");
+  const before = JSON.stringify([...game.entities]);
+  assert.ok(game.ui.has("use_potion_healing") && !game.ui.has("use_food_ration"));
+  assert.equal(game.ui.get("item_desc_potion_healing")!.style!.display, "none");
+  game.click("bag_page");
+  assert.ok(game.ui.has("use_food_ration") && game.ui.has("use_scroll_upgrade"));
+  assert.ok(!game.ui.has("use_potion_healing"));
+  assert.equal(JSON.stringify([...game.entities]), before);
+  game.click("bag_page"); assert.ok(game.ui.has("use_potion_healing"));
+  game.key("KeyI"); assert.equal(game.state().message, "PLAYING");
+});
+
+test("button callbacks can remount the same button without replaying a frame's press", () => {
+  const game = harness(800, 400, false, new Map(), true);
+  game.click("start"); game.click("bag_btn"); game.click("bag_page");
+  assert.equal(game.ui.get("bag_page__label")!.text, "PAGE 2 / 2 / NEXT");
+  assert.ok(game.ui.has("use_food_ration"));
+  game.tick(3);
+  assert.equal(game.ui.get("bag_page__label")!.text, "PAGE 2 / 2 / NEXT");
+  game.click("bag_page");
+  assert.equal(game.ui.get("bag_page__label")!.text, "PAGE 1 / 2 / NEXT");
+});
+
+test("holding a pointer across a UI remount triggers one action until release", () => {
+  const game = harness(800, 400); game.click("start"); game.click("bag_btn");
+  game.holdButton("bag_page"); game.tick(10);
+  assert.equal(game.ui.get("bag_page__label")!.text, "PAGE 2 / 2 / NEXT");
+  game.releaseButton(); game.holdButton("bag_page"); game.tick(10);
+  assert.equal(game.ui.get("bag_page__label")!.text, "PAGE 1 / 2 / NEXT");
+  game.releaseButton();
 });

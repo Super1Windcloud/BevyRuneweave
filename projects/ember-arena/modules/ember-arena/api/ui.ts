@@ -54,6 +54,7 @@ export interface UiButtonOptions {
 }
 
 const buttonCallbacks = new Map<string, () => void>();
+let pointerActionHandled = false;
 const defaultTextColor: UiColor = [1, 1, 1, 1];
 
 export function node(id: string, style: UiStyle = {}, children: readonly UiElement[] = []): UiContainerElement {
@@ -102,7 +103,16 @@ export function mountUi(root: UiElement): void {
   mountElement(root, "");
 }
 export function updateUi(): void {
-  for (const [id, callback] of buttonCallbacks) if (ui_button_just_pressed(id)) callback();
+  // A held pointer can press a replacement button again after a remount.
+  // Keep the action latched until release, across rebuilds of the UI tree.
+  const pointerPressed = input_primary_pointer().pressed;
+  if (!pointerPressed) pointerActionHandled = false;
+  if (pointerActionHandled) return;
+  // A callback may remount the UI and replace this map. Process one action
+  // from the original tree, never newly mounted buttons in the same frame.
+  for (const [id, callback] of [...buttonCallbacks]) {
+    if (ui_button_just_pressed(id)) { pointerActionHandled = pointerPressed; callback(); break; }
+  }
 }
 export function unmountUi(): void { buttonCallbacks.clear(); ui_clear(); }
 export function removeUi(id: string): boolean { buttonCallbacks.delete(id); return ui_despawn(id); }

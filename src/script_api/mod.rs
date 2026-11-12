@@ -274,11 +274,26 @@ fn scene_play_animation(
 
 fn scene_set_3d_enabled(context: FunctionCallContext, enabled: bool) -> Result<bool, InteropError> {
     context.world()?.with_world_mut(|world| {
-        let mut query = world.query_filtered::<&mut Camera, With<Camera3d>>();
-        let Some(mut camera) = query.iter_mut(world).next() else {
+        let mut query = world.query_filtered::<(Entity, &mut Camera), With<Camera3d>>();
+        let Some((camera_3d, mut camera)) = query.iter_mut(world).next() else {
             return false;
         };
         camera.is_active = enabled;
+        // Bevy's automatic UI camera selection considers order even when a
+        // camera is inactive. Keep retained UI on the active runtime camera.
+        let camera_2d = world
+            .query_filtered::<Entity, With<Camera2d>>()
+            .iter(world)
+            .next();
+        world.entity_mut(camera_3d).remove::<IsDefaultUiCamera>();
+        if let Some(camera_2d) = camera_2d {
+            world.entity_mut(camera_2d).remove::<IsDefaultUiCamera>();
+            world
+                .entity_mut(if enabled { camera_3d } else { camera_2d })
+                .insert(IsDefaultUiCamera);
+        } else if enabled {
+            world.entity_mut(camera_3d).insert(IsDefaultUiCamera);
+        }
         true
     })
 }
@@ -860,6 +875,46 @@ mod tests {
             .single(&world)
             .map_err(|error| InteropError::string(format!("expected one 3D camera: {error}")))?;
         assert!(!camera.is_active);
+        Ok(())
+    }
+
+    #[test]
+    fn scene_camera_toggle_keeps_ui_on_the_active_camera() -> Result<(), InteropError> {
+        let mut world = World::new();
+        world.init_resource::<AppScriptFunctionRegistry>();
+        world.init_resource::<AppTypeRegistry>();
+        let camera_2d = world.spawn((Camera2d, IsDefaultUiCamera)).id();
+        let camera_3d = world
+            .spawn((
+                Camera3d::default(),
+                Camera {
+                    order: 1,
+                    ..default()
+                },
+            ))
+            .id();
+        for enabled in [false, true, false, true, false] {
+            let cache = WorldGuard::setup_cache(&world, CurrentScriptAttachment::default());
+            WorldGuard::with_static_guard(&mut world, cache, |_guard| {
+                assert!(scene_set_3d_enabled(
+                    FunctionCallContext::new(Language::Unknown),
+                    enabled
+                )?);
+                Ok::<(), InteropError>(())
+            })?;
+            let selected = world
+                .run_system_cached(|camera: bevy::ui::DefaultUiCamera| camera.get())
+                .unwrap();
+            assert_eq!(selected, Some(if enabled { camera_3d } else { camera_2d }));
+            assert!(world.get::<Camera>(selected.unwrap()).unwrap().is_active);
+            assert_eq!(
+                world
+                    .query_filtered::<Entity, With<IsDefaultUiCamera>>()
+                    .iter(&world)
+                    .count(),
+                1
+            );
+        }
         Ok(())
     }
 

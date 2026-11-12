@@ -154,6 +154,7 @@ fn log_first_frame_presented(
 fn spawn_scene_camera(mut commands: Commands) {
     commands.spawn((
         Camera2d,
+        IsDefaultUiCamera,
         Camera {
             order: 0,
             ..default()
@@ -432,16 +433,21 @@ fn emit_update(time: Res<Time>, mut callbacks: MessageWriter<ScriptCallbackEvent
 }
 
 fn normalize_script_path(asset_root: &Path, path: &Path) -> Result<PathBuf, String> {
-    let relative = if path.is_absolute() {
+    let relative = if path.has_root() {
         path.strip_prefix(asset_root)
             .map_err(|_| format!("script must be inside {}", asset_root.display()))?
     } else {
         path.strip_prefix("assets").unwrap_or(path)
     };
     if relative.as_os_str().is_empty()
-        || relative
-            .components()
-            .any(|component| matches!(component, std::path::Component::ParentDir))
+        || relative.components().any(|component| {
+            matches!(
+                component,
+                std::path::Component::ParentDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
+        })
     {
         return Err("script path must point to a file inside the asset directory".to_owned());
     }
@@ -759,12 +765,21 @@ mod tests {
             normalize_script_path(Path::new("assets"), Path::new("shooter.js")).unwrap(),
             PathBuf::from("shooter.js")
         );
+        let asset_root = std::env::current_dir().unwrap().join("assets");
+        assert_eq!(
+            normalize_script_path(&asset_root, &asset_root.join("shooter.js")).unwrap(),
+            PathBuf::from("shooter.js")
+        );
     }
 
     #[test]
     fn rejects_scripts_outside_asset_root() {
         assert!(normalize_script_path(Path::new("assets"), Path::new("../shooter.js")).is_err());
         assert!(normalize_script_path(Path::new("assets"), Path::new("/tmp/shooter.js")).is_err());
+        #[cfg(target_os = "windows")]
+        for path in [r"\tmp\shooter.js", r"C:shooter.js", r"C:\tmp\shooter.js"] {
+            assert!(normalize_script_path(Path::new("assets"), Path::new(path)).is_err());
+        }
     }
 
     #[test]
@@ -825,6 +840,11 @@ mod tests {
             panic!("scene camera must keep a fixed virtual height");
         };
         assert_eq!(viewport_height, crate::GAME_VIEWPORT_HEIGHT);
+        let ui_camera = world
+            .run_system_cached(|camera: bevy::ui::DefaultUiCamera| camera.get())
+            .expect("default UI camera query must run")
+            .expect("UI must have an active default camera");
+        assert!(world.get::<Camera2d>(ui_camera).is_some());
 
         let (camera, projection) = world
             .query_filtered::<(&Camera, &Projection), With<Camera3d>>()

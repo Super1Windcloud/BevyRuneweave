@@ -1,53 +1,26 @@
 export interface Point { x: number; z: number }
 export type EnemyKind = "chaser" | "ranger" | "charger" | "boss";
-export const pillars: readonly Point[] = [{ x: -3, z: -1 }, { x: 3, z: 1 }, { x: 0, z: 3.5 }];
-export const waveEnds = [40, 85, 130] as const;
 
 export const enemySpecs: Record<EnemyKind, { model: string; health: number; speed: number; radius: number; scale: number }> = {
-  chaser: { model: "Knight", health: 24, speed: 1.4, radius: 0.4, scale: 0.62 },
-  ranger: { model: "Rogue_Hooded", health: 18, speed: 1.1, radius: 0.35, scale: 0.60 },
-  charger: { model: "Barbarian", health: 40, speed: 1.7, radius: 0.45, scale: 0.68 },
-  boss: { model: "Knight", health: 500, speed: 0.85, radius: 0.9, scale: 1.25 },
+  chaser: { model: "spd_rat", health: 8, speed: 1, radius: 0.4, scale: 0.9 },
+  ranger: { model: "spd_gnoll", health: 12, speed: 1, radius: 0.35, scale: 1.0 },
+  charger: { model: "spd_crab", health: 15, speed: 2, radius: 0.45, scale: 1.0 },
+  boss: { model: "spd_goo", health: 100, speed: 1, radius: 0.9, scale: 1.6 },
+};
+
+// Normal (no challenge modifiers) values from upstream Rat/Gnoll/Crab/Goo.java.
+export const mobCombat: Record<EnemyKind, { attack: number; defense: number; minDamage: number; maxDamage: number; armor: number; experience: number; maxLevel: number }> = {
+  chaser: { attack: 8, defense: 2, minDamage: 1, maxDamage: 4, armor: 1, experience: 1, maxLevel: 5 },
+  ranger: { attack: 10, defense: 4, minDamage: 1, maxDamage: 6, armor: 2, experience: 2, maxLevel: 8 },
+  charger: { attack: 12, defense: 5, minDamage: 1, maxDamage: 7, armor: 4, experience: 4, maxLevel: 9 },
+  boss: { attack: 10, defense: 8, minDamage: 1, maxDamage: 8, armor: 2, experience: 10, maxLevel: 30 },
 };
 
 export const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
-export const distance = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.z - b.z);
 
 export function seededRandom(seed: number): () => number {
   let value = seed >>> 0;
   return () => { value = (Math.imul(value, 1664525) + 1013904223) >>> 0; return value / 0x100000000; };
-}
-
-export function direction(a: Point, b: Point): Point {
-  const length = distance(a, b);
-  return length < 0.0001 ? { x: 0, z: 0 } : { x: (b.x - a.x) / length, z: (b.z - a.z) / length };
-}
-
-export function constrain(point: Point, radius: number, halfWidth: number): Point {
-  let x = clamp(point.x, -halfWidth + radius, halfWidth - radius);
-  let z = clamp(point.z, -5.5 + radius, 5.5 - radius);
-  for (const pillar of pillars) {
-    const delta = direction(pillar, { x, z });
-    const length = distance(pillar, { x, z });
-    const minimum = radius + 0.8;
-    if (length < minimum) {
-      x = pillar.x + (length < 0.0001 ? 1 : delta.x) * minimum;
-      z = pillar.z + delta.z * minimum;
-    }
-  }
-  return { x: clamp(x, -halfWidth + radius, halfWidth - radius), z: clamp(z, -5.5 + radius, 5.5 - radius) };
-}
-
-export function segmentHits(start: Point, end: Point, target: Point, radius: number): boolean {
-  const dx = end.x - start.x;
-  const dz = end.z - start.z;
-  const lengthSquared = dx * dx + dz * dz;
-  const t = lengthSquared < 0.00001 ? 0 : clamp(((target.x - start.x) * dx + (target.z - start.z) * dz) / lengthSquared, 0, 1);
-  return distance({ x: start.x + dx * t, z: start.z + dz * t }, target) <= radius;
-}
-
-export function waveAt(elapsed: number): number {
-  return waveEnds.filter((end) => elapsed >= end).length;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +41,6 @@ export interface HeroClassSpec {
   baseHealth: number;
   baseSpeed: number;
   baseDamage: number;
-  fireDelay: number;
   perks: string;
 }
 
@@ -78,60 +50,56 @@ export const heroClasses: Record<HeroClass, HeroClassSpec> = {
     name: "WARRIOR",
     title: "Vanguard of the Sewers",
     model: "Knight",
-    splash: "sprites/spd/warrior.jpg",
+    splash: "sprites/spd/avatar_warrior.png",
     sprite: "sprites/spd/warrior.png",
     icon: "sprites/spd/hero_icons.png",
-    description: "Equipped with iron mail and a tempered blade. Sturdy and resilient in direct melee.",
-    baseHealth: 100,
-    baseSpeed: 3.7,
-    baseDamage: 18,
-    fireDelay: 0.48,
-    perks: "+1 Potion of Healing, higher base strike power",
+    description: "A sturdy melee fighter. Starts with a stronger blade and an extra healing potion.",
+    baseHealth: 20,
+    baseSpeed: 1,
+    baseDamage: 6,
+    perks: "Worn shortsword / cloth armor / extra healing potion",
   },
   mage: {
     id: "mage",
     name: "MAGE",
     title: "Scholar of Arcana",
     model: "Mage",
-    splash: "sprites/spd/mage.jpg",
+    splash: "sprites/spd/avatar_mage.png",
     sprite: "sprites/spd/mage.png",
     icon: "sprites/spd/hero_icons.png",
-    description: "Channels magic missile bolts from an ancient staff. Rapid ranged firepower.",
-    baseHealth: 100,
-    baseSpeed: 3.7,
-    baseDamage: 16,
-    fireDelay: 0.40,
-    perks: "+1 Scroll of Upgrade, 16% faster wand casting",
+    description: "A scholar carrying an ancient staff. Starts with an extra upgrade and mapping scroll.",
+    baseHealth: 20,
+    baseSpeed: 1,
+    baseDamage: 5,
+    perks: "Mage's staff / cloth armor / magic mapping scroll",
   },
   rogue: {
     id: "rogue",
     name: "ROGUE",
     title: "Shadow Stalker",
     model: "Rogue_Hooded",
-    splash: "sprites/spd/rogue.jpg",
+    splash: "sprites/spd/avatar_rogue.png",
     sprite: "sprites/spd/rogue.png",
     icon: "sprites/spd/hero_icons.png",
-    description: "Shrouded in a cloak of shadows. Swift movement and deadly surprise attacks.",
-    baseHealth: 100,
-    baseSpeed: 4.1,
-    baseDamage: 15,
-    fireDelay: 0.46,
-    perks: "+1 Potion of Invisibility, +10% move speed",
+    description: "A stealthy fighter. Starts with an extra invisibility potion for surprise attacks.",
+    baseHealth: 20,
+    baseSpeed: 1,
+    baseDamage: 5,
+    perks: "Dagger / cloth armor / extra invisibility potion",
   },
   huntress: {
     id: "huntress",
     name: "HUNTRESS",
     title: "Seeker of the Slums",
     model: "Barbarian",
-    splash: "sprites/spd/huntress.jpg",
+    splash: "sprites/spd/avatar_huntress.png",
     sprite: "sprites/spd/huntress.png",
     icon: "sprites/spd/hero_icons.png",
-    description: "Armed with a spirit bow and fiery alchemy. Masters area damage.",
-    baseHealth: 100,
-    baseSpeed: 3.8,
-    baseDamage: 19,
-    fireDelay: 0.48,
-    perks: "+1 Potion of Liquid Flame & Food Ration",
+    description: "A wilderness explorer. Starts with extra food and liquid flame. Bow abilities are pending.",
+    baseHealth: 20,
+    baseSpeed: 1,
+    baseDamage: 5,
+    perks: "Gloves / cloth armor / extra food ration",
   },
 };
 
@@ -156,7 +124,7 @@ export const dungeonMonsters: Record<EnemyKind, DungeonMonsterInfo> = {
   ranger: {
     name: "Gnoll Scout",
     depth: 2,
-    lore: "Wild hyena scout slinging poisoned darts from afar.",
+    lore: "A sewer-dwelling gnoll scout that attacks in melee.",
     drops: "Gold, Healing Potions, Darts",
     sprite: "sprites/spd/gnoll.png",
   },
@@ -168,10 +136,10 @@ export const dungeonMonsters: Record<EnemyKind, DungeonMonsterInfo> = {
     sprite: "sprites/spd/crab.png",
   },
   boss: {
-    name: "Goo (The Warden)",
+    name: "Goo",
     depth: 5,
     lore: "The colossal caustic slime ruling the sewer depths. Pumps itself up before explosive blasts!",
-    drops: "Amulet of Yendor, 500 Gold",
+    drops: "Skeleton Key (sewer milestone; the Amulet lies much deeper)",
     sprite: "sprites/spd/goo.png",
   },
 };
@@ -199,23 +167,23 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     id: "potion_healing",
     name: "Potion of Healing",
     category: "potion",
-    description: "Restores 45 Vitality and cures caustic ooze.",
-    effectText: "A warm soothing energy flows through you (+45 HP).",
+    description: "Restores vitality and cures caustic ooze. Costs 1 turn.",
+    effectText: "A warm soothing energy flows through you.",
     sprite: "sprites/spd/items.png",
   },
   potion_liquid_flame: {
     id: "potion_liquid_flame",
     name: "Liquid Flame",
     category: "potion",
-    description: "Hurls volatile fire that deals 35 damage to surrounding foes.",
-    effectText: "The flask shatters into a roaring blaze (35 damage)! ",
+    description: "Deals 12 damage to nearby visible foes. Costs 1 turn.",
+    effectText: "The flask shatters into a roaring blaze!",
     sprite: "sprites/spd/items.png",
   },
   potion_invisibility: {
     id: "potion_invisibility",
     name: "Potion of Invisibility",
     category: "potion",
-    description: "Cloaks hero in shadows for 6s. Grants guaranteed surprise attacks.",
+    description: "Cloaks the hero for 20 turns. Attacking breaks invisibility.",
     effectText: "You vanish from enemy sight. Surprise attacks ready!",
     sprite: "sprites/spd/items.png",
   },
@@ -223,32 +191,32 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     id: "potion_strength",
     name: "Potion of Strength",
     category: "potion",
-    description: "Permanently enhances hero strike power by +4.",
-    effectText: "Your muscles surge with power (+4 Base Damage)!",
+    description: "Permanently increases strength by 1. Costs 1 turn.",
+    effectText: "Your muscles surge with power (+1 Strength)!",
     sprite: "sprites/spd/items.png",
   },
   scroll_upgrade: {
     id: "scroll_upgrade",
     name: "Scroll of Upgrade",
     category: "scroll",
-    description: "Upgrades equipped gear (+8 Damage, +20 Max Vitality).",
-    effectText: "Ancient runes infuse your weaponry (+8 DMG, +20 HP)!",
+    description: "Upgrades the equipped weapon by 1. Costs 1 turn.",
+    effectText: "Ancient runes infuse your weapon (+1 upgrade)!",
     sprite: "sprites/spd/items.png",
   },
   scroll_magic_mapping: {
     id: "scroll_magic_mapping",
     name: "Magic Mapping",
     category: "scroll",
-    description: "Reveals the sewer currents and draws all crystals to you.",
-    effectText: "The dungeon layout clears in your mind! Crystals magnetic!",
+    description: "Reveals this floor's terrain, without revealing its inhabitants.",
+    effectText: "The dungeon layout clears in your mind!",
     sprite: "sprites/spd/items.png",
   },
   food_ration: {
     id: "food_ration",
     name: "Food Ration",
     category: "food",
-    description: "Wholesome subterranean bread. Resets hunger and restores 15 HP.",
-    effectText: "You feast on the ration. Hunger fully satisfied (+15 HP)!",
+    description: "Satisfies 300 hunger. Eating takes 3 turns; it does not heal.",
+    effectText: "You eat the ration. Your hunger subsides.",
     sprite: "sprites/spd/items.png",
   },
 };
@@ -256,40 +224,7 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
 export type HungerState = "satiated" | "hungry" | "starving";
 
 export function getHungerStatus(hungerTime: number): HungerState {
-  if (hungerTime < 60) return "satiated";
-  if (hungerTime < 120) return "hungry";
+  if (hungerTime < 300) return "satiated";
+  if (hungerTime < 450) return "hungry";
   return "starving";
-}
-
-export function depthAtTime(elapsed: number): number {
-  if (elapsed < 30) return 1;
-  if (elapsed < 65) return 2;
-  if (elapsed < 100) return 3;
-  if (elapsed < 130) return 4;
-  return 5;
-}
-
-export function depthTitle(depth: number): string {
-  switch (depth) {
-    case 1: return "DEPTH 1: SEWERS";
-    case 2: return "DEPTH 2: DRAINAGE CANAL";
-    case 3: return "DEPTH 3: FLOODED BASIN";
-    case 4: return "DEPTH 4: SLIME VAULTS";
-    case 5: default: return "DEPTH 5: GOO'S LAIR";
-  }
-}
-
-export function isSurpriseStrike(
-  heroPos: Point,
-  targetPos: Point,
-  isInvisible: boolean,
-  obstaclePillars: readonly Point[] = pillars
-): boolean {
-  if (isInvisible) return true;
-  for (const pillar of obstaclePillars) {
-    if (distance(heroPos, pillar) < 1.4 && distance(targetPos, pillar) > 1.3) {
-      return true;
-    }
-  }
-  return false;
 }
