@@ -1,10 +1,11 @@
 const callbacks = globalThis as unknown as RuneweaveCallbacks;
 import { actor, change, field, kind, position } from "./actors.js";
-import { clamp, dungeonMonsters, enemySpecs, getHungerStatus, heroClasses, heroClassList, itemCatalog, mobCombat, seededRandom,
+import { clamp, enemySpecs, getHungerStatus, heroClasses, heroClassList, itemCatalog, mobCombat, seededRandom,
   type EnemyKind, type HeroClass, type ItemKind, type Point } from "./rules.js";
 import { canStep, cellDistance, cellKey, findPath, generateFloor, lineOfSight, reveal, sameCell, terrainAt, type DungeonFloor, type Terrain } from "./dungeon.js";
 import { actorSprite, cellPosition, cellSize, mobSprites, monsterIds, placeCell, sprite } from "./dungeon-actors.js";
 import { defaultProfile, parseProfile, type Profile } from "./profile.js";
+import { message, renderMessage, type Message, type MessageKey } from "./i18n.js";
 import { mountUi, updateUi } from "../../api/ui.js";
 import { renderSpdUi, uiMetrics, type UiPhase } from "./spd-ui.js";
 
@@ -36,10 +37,11 @@ const renderedFog = new Set<number>();
 let nextId = 0;
 let viewport = "";
 let networkRequests: { id: number; method: string; elapsed: number }[] = [];
-let networkStatus = "HTTP: NOT_RUN (use the network check button)";
-let checks: string[] = [];
+let networkStatus = message("network.idle");
+let networkLines: Message[] = [];
+let checks: Message[] = [];
 let profile: Profile = defaultProfile();
-let saveNotice = "";
+let saveNotice: Message | null = null;
 let saveBlocked = false;
 let resetPending = false;
 let settingsReturn: Phase = "menu";
@@ -49,7 +51,7 @@ let checkPage = 0;
 let selectedItem: ItemKind = "potion_healing";
 let settingsTab = 0;
 let overlayReturn: Phase = "playing";
-let uiNotice = "";
+let uiNotice: Message | null = null;
 let previewPhase: Phase | null = null;
 
 // Shattered Pixel Dungeon core state
@@ -57,7 +59,7 @@ let gold = 0;
 let hungerTimer = 0;
 let invisTimer = 0;
 let causticOozeTimer = 0;
-let dungeonLogs: string[] = [];
+let dungeonLogs: Message[] = [];
 let inventory: Record<ItemKind, number> = {
   potion_healing: 1,
   potion_liquid_flame: 1,
@@ -73,25 +75,25 @@ const uid = (prefix: string): string => `${prefix}_${nextId++}`;
 const health = (): number => Math.max(0, field("player", "health"));
 const targetExperience = (): number => 5 + level * 5;
 
-function pushLog(entry: string): void {
+function pushLog(entry: Message): void {
   dungeonLogs.unshift(entry);
   if (dungeonLogs.length > 3) dungeonLogs.pop();
 }
 
 function loadProfile(): void {
   saveBlocked = false;
-  saveNotice = "";
+  saveNotice = null;
   profile = defaultProfile();
   const result = storage_read("profile");
   if (result.state === "error") {
-    saveNotice = `Save unavailable (${result.error}). Playing in this session is safe.`;
+    saveNotice = message("save.unavailable", { error: result.error });
     saveBlocked = result.error === "invalid_data" || result.error === "too_large";
   } else if (result.state === "ok") {
     try {
       profile = parseProfile(result.value);
     } catch {
       saveBlocked = true;
-      saveNotice = "Existing save is incompatible. It will not be overwritten.";
+      saveNotice = message("save.incompatible");
     }
   }
 }
@@ -99,7 +101,7 @@ function loadProfile(): void {
 function persistProfile(): void {
   if (saveBlocked) return;
   const result = storage_write("profile", JSON.stringify(profile));
-  saveNotice = result.state === "ok" ? "Progress and settings saved." : `Save failed (${result.error}). You can retry in settings.`;
+  saveNotice = result.state === "ok" ? message("save.saved") : message("save.failed", { error: result.error });
 }
 
 function openSettings(): void {
@@ -111,11 +113,11 @@ function openSettings(): void {
 function resetProfile(): void {
   const result = storage_remove("profile");
   if (result.state === "error") {
-    saveNotice = `Reset failed (${result.error}). Existing save retained.`;
+    saveNotice = message("save.resetFailed", { error: result.error });
   } else {
     profile = defaultProfile();
     saveBlocked = false;
-    saveNotice = "Saved progress reset. Your current run is unchanged.";
+    saveNotice = message("save.reset");
   }
   resetPending = false;
   drawUi();
@@ -125,12 +127,15 @@ function drawUi(): void {
   const pointer = input_primary_pointer(), safe = window_safe_area(), metrics = window_metrics();
   if (metrics.width <= 0 || metrics.height <= 0) return;
   viewport = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
+  const localized = (value: Message): string => renderMessage(profile.language, value);
   mountUi(renderSpdUi({
     phase: previewPhase ?? phase, selectedClass, item: selectedItem, health: previewPhase === "lost" ? 0 : health(), maxHealth, level, strength, experience,
     targetExperience: targetExperience(), depth, gold, score, turns, hunger: getHungerStatus(hungerTimer),
     invisible: invisTimer, ooze: causticOozeTimer, bossHealth: scene_actor("warden") ? field("warden", "health") : null,
-    inventory, logs: dungeonLogs, profile, settingsTab, gameBehind: phase === "settings" ? !["menu", "heroes"].includes(settingsReturn) : phase === "journal" ? overlayReturn !== "menu" : ["hero", "message"].includes(phase) ? overlayReturn !== "heroes" : true,
-    saveNotice, resetPending, checks, checkPage, networkStatus, notice: uiNotice,
+    inventory, logs: dungeonLogs.map(localized), profile, settingsTab, gameBehind: phase === "settings" ? !["menu", "heroes"].includes(settingsReturn) : phase === "journal" ? overlayReturn !== "menu" : ["hero", "message"].includes(phase) ? overlayReturn !== "heroes" : true,
+    saveNotice: saveNotice ? localized(saveNotice) : "", resetPending, checks: checks.map(localized), checkPage,
+    networkStatus: networkLines.length ? networkLines.map(localized).join("\n") : localized(networkStatus),
+    notice: uiNotice ? localized(uiNotice) : "",
   }, uiAction));
 }
 
@@ -150,8 +155,7 @@ function uiAction(id: string, value?: string | number): void {
     const hero = id.slice(7) as HeroClass;
     if (!heroClassList.includes(hero)) {
       uiNotice = hero === ("duelist" as HeroClass)
-        ? "To unlock the Duelist equip a tier 2 or higher weapon with no strength penalty."
-        : "To unlock the Cleric fully cleanse the curse on any piece of cursed equipment.";
+        ? message("hero.unlockDuelist") : message("hero.unlockCleric");
       overlayReturn = "heroes"; setPhase("message"); return;
     }
     selectedClass = hero; room(); setPhase("heroes"); return;
@@ -181,6 +185,8 @@ function uiAction(id: string, value?: string | number): void {
     case "exit": app_request_exit(); return;
     case "window_landscape": window_set_size(1280, 800); return;
     case "window_portrait": window_set_size(450, 800); return;
+    case "language_english": profile.language = "en"; break;
+    case "language_chinese": profile.language = "zh-CN"; break;
     case "hints": profile.showHints = !profile.showHints; break;
     case "motion": profile.reducedMotion = !profile.reducedMotion; break;
     case "sensitivity": { const values = [0.75, 1, 1.25, 1.5]; profile.sensitivity = values[(values.indexOf(profile.sensitivity) + 1) % values.length]!; break; }
@@ -263,7 +269,7 @@ function startRun(): void {
     scroll_magic_mapping: selectedClass === "mage" ? 1 : 0,
     food_ration: selectedClass === "huntress" ? 2 : 1,
   };
-  dungeonLogs = [`Welcome to the sewers, ${heroClasses[selectedClass].name}.`, "Move one tile at a time. Find the stairs to descend."];
+  dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) }), message("log.guide")];
   room();
   enterFloor();
   setPhase("playing");
@@ -339,8 +345,8 @@ function collectLoot(): void {
   for (const id of scene_actor_ids()) {
     if (kind(id) !== "loot" || !sameCell(point, cellPosition(id))) continue;
     const item = (Object.keys(itemCatalog) as ItemKind[])[field(id, "power") - 1];
-    if (item) { inventory[item]++; pushLog(`You pick up ${itemCatalog[item].name}.`); }
-    else { const coins = 3 + Math.floor(random() * 8); gold += coins; pushLog(`You pick up ${coins} gold.`); }
+    if (item) { inventory[item]++; pushLog(message("log.item", { item: message(`item.${item}.name`) })); }
+    else { const coins = 3 + Math.floor(random() * 8); gold += coins; pushLog(message("log.gold", { gold: coins })); }
     scene_despawn(id);
   }
 }
@@ -348,7 +354,7 @@ function collectLoot(): void {
 function useInventoryItem(kindKey: ItemKind): boolean {
   if ((phase !== "playing" && phase !== "inventory") || inventory[kindKey] <= 0) return false;
   inventory[kindKey]--;
-  pushLog(itemCatalog[kindKey].effectText);
+  pushLog(message(`item.${kindKey}.effect`));
   if (kindKey === "potion_healing") {
     change("player", "health", maxHealth); causticOozeTimer = 0;
   } else if (kindKey === "potion_liquid_flame") {
@@ -377,16 +383,16 @@ function damageMonster(id: string, power: number): void {
   scene_despawn(id);
   score += type === "boss" ? 500 : 10;
   if (level <= spec.maxLevel) experience += spec.experience;
-  pushLog(`${dungeonMonsters[type].name} defeated.`);
+  pushLog(message("log.defeated", { monster: message(`monster.${type}`) }));
   if (type === "boss") {
-    pushLog("Goo drops the Skeleton Key. The sewers are cleared!");
+    pushLog(message("log.sewersCleared"));
     setPhase("won"); return;
   }
   if (random() < 0.5) spawnLoot(point);
   while (experience >= targetExperience()) {
     experience -= targetExperience(); level++; maxHealth += 5;
     change("player", "health", Math.min(maxHealth, health() + 5));
-    pushLog(`You reached level ${level} (+5 maximum HP).`);
+    pushLog(message("log.level", { level }));
   }
 }
 
@@ -403,9 +409,9 @@ function attackMonster(id: string): void {
   invisTimer = 0; change(id, "lifetime", 1);
   if (hit) {
     const power = Math.max(0, roll(1, damage + Math.max(0, strength - 10)) - roll(0, spec.armor));
-    pushLog(`${surprised ? "Surprise attack! " : ""}You hit ${dungeonMonsters[type].name} for ${power}.`);
+    pushLog(message(surprised ? "log.surprise" : "log.hit", { monster: message(`monster.${type}`), damage: power }));
     damageMonster(id, power);
-  } else pushLog(`${dungeonMonsters[type].name} dodges your attack.`);
+  } else pushLog(message("log.enemyDodged", { monster: message(`monster.${type}`) }));
 }
 
 function hurtPlayer(power: number): void {
@@ -430,10 +436,10 @@ function monstersTurn(): void {
       && (charged || canStep(floor!, current, hero));
     if (canAttack) {
       if (type === "boss") {
-        if (field(id, "power") === 1) { change(id, "power", 2); pushLog("Goo swells further! Get out of reach!"); continue; }
+        if (field(id, "power") === 1) { change(id, "power", 2); pushLog(message("log.gooSwells")); continue; }
         const enraged = field(id, "health") <= 50;
         if (!charged && random() < (enraged ? 0.5 : 0.2)) {
-          change(id, "power", 1); pushLog("Goo is pumping up! Retreat!"); continue;
+          change(id, "power", 1); pushLog(message("log.gooCharging")); continue;
         }
       }
       const enraged = type === "boss" && field(id, "health") <= 50;
@@ -441,10 +447,10 @@ function monstersTurn(): void {
       if (random() * attack >= random() * (4 + level)) {
         const max = enraged ? 12 : spec.maxDamage;
         const power = Math.max(0, roll(spec.minDamage * (charged ? 3 : 1), max * (charged ? 3 : 1)) - roll(0, 2));
-        pushLog(`${dungeonMonsters[type].name}${charged ? " bursts" : " hits you"} for ${power}.`);
+        pushLog(message(charged ? "log.enemyBurst" : "log.enemyHit", { monster: message(`monster.${type}`), damage: power }));
         hurtPlayer(power);
         if (type === "boss" && random() < 1 / 3) causticOozeTimer = 5;
-      } else pushLog(`You dodge ${dungeonMonsters[type].name}.`);
+      } else pushLog(message("log.dodged", { monster: message(`monster.${type}`) }));
       change(id, "power", 0);
       if (phase !== "playing") return;
       continue; // Crab moves twice, but its attack delay is still one turn.
@@ -491,7 +497,7 @@ function movePlayer(dx: number, dz: number): boolean {
   if (target) { attackMonster(target); queuedPath = []; }
   else if (terrainAt(floor, next) === "door") {
     floor.tiles[cellKey(floor, next)] = "open_door";
-    pushLog("You open the door.");
+    pushLog(message("log.door"));
   } else { placeCell("player", next); collectLoot(); }
   if (phase === "playing") spendTurns();
   return true;
@@ -499,10 +505,10 @@ function movePlayer(dx: number, dz: number): boolean {
 
 function descend(): void {
   queuedPath = [];
-  if (!floor || !sameCell(cellPosition("player"), floor.exit)) { pushLog("Stand on the downward stairs to descend."); drawUi(); return; }
-  if (depth === 5) { pushLog("Goo guards the way forward. Defeat it first."); drawUi(); return; }
+  if (!floor || !sameCell(cellPosition("player"), floor.exit)) { pushLog(message("log.stairs")); drawUi(); return; }
+  if (depth === 5) { pushLog(message("log.gooBlocks")); drawUi(); return; }
   depth++; turns++; change("player", "lifetime", turns); hungerTimer++;
-  pushLog(`You descend to depth ${depth}${depth === 5 ? ": Goo's lair" : ": sewers"}.`);
+  pushLog(message(depth === 5 ? "log.lair" : "log.descend", { depth }));
   enterFloor(); publish(); drawUi();
 }
 
@@ -550,14 +556,14 @@ function openChecks(): void {
   returnPhase = phase;
   checks = [];
   checkPage = 0;
-  const check = (name: string, run: () => boolean): void => {
+  const check = (name: MessageKey, run: () => boolean): void => {
     try {
-      checks.push(`${run() ? "PASS" : "FAIL"}  ${name}`);
+      checks.push(message("checks.line", { status: run() ? "PASS" : "FAIL", name: message(name) }));
     } catch {
-      checks.push(`FAIL  ${name}`);
+      checks.push(message("checks.line", { status: "FAIL", name: message(name) }));
     }
   };
-  check("Owned entity + reflected component + query", () => {
+  check("checks.entity", () => {
     scene_spawn("probe", 0, 0, 0);
     scene_actor_set("probe", "probe", 5, 1, 0.3);
     actor("probe").set("health", 3);
@@ -565,21 +571,21 @@ function openChecks(): void {
     reference.set("x", 2);
     return field("probe", "health") === 3 && position("probe").x === 2 && scene_actor_ids().includes("probe");
   });
-  check("Invalid values / missing entities rejected", () =>
+  check("checks.values", () =>
     !scene_actor_set("missing", "probe", 1, 1, 1) &&
     !scene_set_transform_3d("probe", 0, 0, 0, 0, 0, 0, -1) &&
     !scene_set_model("probe", "../forbidden.glb") &&
     !window_set_size(NaN, 100)
   );
-  check("2D sprite / text / transform / camera toggle", () => {
+  check("checks.scene", () => {
     const sprite = scene_set_sprite("probe", "sprites/settings-icon.png", 32, 32);
     const label = scene_set_text("probe", "2D probe", 16, 1, 1, 1, 1, "center");
     const transformed = scene_set_transform("probe", 4, 2, 1) && position("probe").x === 4;
     const camera = scene_set_3d_enabled(true) && scene_set_3d_enabled(false);
     return sprite && label && transformed && camera;
   });
-  check("Despawn invalidates lookup", () => scene_despawn("probe") && scene_actor("probe") == null && scene_transform("probe") == null);
-  check("UI validation + child cleanup", () => {
+  check("checks.despawn", () => scene_despawn("probe") && scene_actor("probe") == null && scene_transform("probe") == null);
+  check("checks.ui", () => {
     ui_spawn("probe_ui", "", "node");
     ui_spawn("probe_child", "probe_ui", "text");
     ui_spawn("probe_image", "probe_ui", "image");
@@ -587,18 +593,18 @@ function openChecks(): void {
     const rejected = !ui_set_style("probe_ui", JSON.stringify({ unsupported: 1 }));
     return img && rejected && ui_despawn("probe_ui") && !ui_set_text("probe_child", "gone", 12, 1, 1, 1, 1);
   });
-  check("Keyboard / touch / pointer / safe-area reads", () => {
+  check("checks.input", () => {
     input_key_pressed("KeyW");
     input_key_just_pressed("KeyW");
     input_key_just_released("KeyW");
     input_primary_touch();
     return window_safe_area().width > 0 && input_primary_pointer().viewportHeight > 0 && window_metrics().width > 0;
   });
-  check("Unknown HTTP request state", () => http_poll(2147483647).state === "unknown");
+  check("checks.unknownHttp", () => http_poll(2147483647).state === "unknown");
   const storage = storage_read("_acceptance_probe");
-  if (storage.state === "error" && storage.error === "unavailable") checks.push("NOT_RUN  Persistent storage (no private data directory)");
+  if (storage.state === "error" && storage.error === "unavailable") checks.push(message("checks.line", { status: "NOT_RUN", name: message("checks.noStorage") }));
   else {
-    check("Persistent write / read / remove", () => {
+    check("checks.storage", () => {
       if (storage.state !== "missing") return false;
       const written = storage_write("_acceptance_probe", "ember-arena-probe");
       const read = storage_read("_acceptance_probe");
@@ -606,15 +612,16 @@ function openChecks(): void {
       return written.state === "ok" && read.state === "ok" && read.value === "ember-arena-probe" && removed.state === "ok";
     });
   }
-  checks.push("NOT_RUN  Full upstream content / sprite animation / native visual parity");
-  checks.push("NOT_RUN  Audio / native physics: API gaps");
-  checks.push("NOT_RUN  Lua gameplay / other platforms / hot reload");
+  checks.push(message("checks.line", { status: "NOT_RUN", name: message("checks.content") }));
+  checks.push(message("checks.line", { status: "NOT_RUN", name: message("checks.apis") }));
+  checks.push(message("checks.line", { status: "NOT_RUN", name: message("checks.platforms") }));
   setPhase("checks");
 }
 
 function checkNetwork(): void {
   if (networkRequests.length) return;
-  networkStatus = "HTTP: PENDING (GET + POST to httpbin.org)";
+  networkStatus = message("network.pending");
+  networkLines = [];
   networkRequests = [
     { id: http_get("https://httpbin.org/get"), method: "GET", elapsed: 0 },
     { id: http_post("https://httpbin.org/post", JSON.stringify({ game: "ember-arena", probe: true }), "application/json"), method: "POST", elapsed: 0 },
@@ -623,17 +630,20 @@ function checkNetwork(): void {
 }
 
 function pollNetwork(dt: number): void {
+  let changed = false;
   for (const request of [...networkRequests]) {
     request.elapsed += dt;
     const result = http_poll(request.id);
     if (result.state === "pending") continue;
     networkRequests = networkRequests.filter((candidate) => candidate !== request);
-    const status = result.state === "complete"
-      ? `${result.status >= 200 && result.status < 300 ? "PASS" : "FAIL"} ${request.method} ${result.status}`
-      : `FAIL ${request.method} ${result.state === "error" ? result.error.slice(0, 90) : "unknown request"}`;
-    networkStatus = networkStatus.startsWith("HTTP: PENDING") ? status : `${networkStatus}\n${status}`;
-    if (phase === "checks") ui_set_text("network_status", networkStatus, 12, ...muted);
+    networkLines.push(message("network.result", {
+      status: result.state === "complete" && result.status >= 200 && result.status < 300 ? "PASS" : "FAIL",
+      method: request.method,
+      detail: result.state === "complete" ? result.status : result.state === "error" ? result.error.slice(0, 90) : message("network.unknown"),
+    }));
+    changed = true;
   }
+  if (changed && phase === "checks") drawUi();
 }
 
 callbacks.on_script_loaded = (): void => {

@@ -16,11 +16,14 @@ import {
 } from "../modules/ember-arena/game/src/rules.js";
 import { canStep, cellKey, findPath, generateFloor, lineOfSight, reveal, sameCell, terrainAt, type DungeonFloor, type Terrain } from "../modules/ember-arena/game/src/dungeon.js";
 import { defaultProfile, parseProfile } from "../modules/ember-arena/game/src/profile.js";
+import { message, messages, renderMessage, translate, type MessageKey } from "../modules/ember-arena/game/src/i18n.js";
+import { fontForText, measureText, wrapText } from "../modules/ember-arena/game/src/text-layout.js";
+import { fontAdvances } from "./font-metrics.js";
 
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
 type RecordValue = { [key: string]: unknown };
 interface Entity { transform: RecordValue; body?: RecordValue; model?: string; sprite?: { path: string; width: number; height: number } }
-interface Ui { parent: string; text?: string; style?: RecordValue; image?: string; font?: string }
+interface Ui { parent: string; text?: string; style?: RecordValue; image?: string; font?: string; fontSize?: number }
 
 // Platform doubles for deterministic gameplay tests, not runtime acceptance.
 // Real BMS references and Lua/QuickJS parity are tested in Rust separately.
@@ -106,9 +109,9 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
       if (!ui.has(id) || "unsupported" in style) return false;
       ui.get(id)!.style = { ...ui.get(id)!.style, ...style }; return true;
     },
-    ui_set_text: (id: string, value: string) => {
+    ui_set_text: (id: string, value: string, fontSize: number) => {
       if (!ui.has(id)) return false;
-      ui.get(id)!.text = value; return true;
+      ui.get(id)!.text = value; ui.get(id)!.fontSize = fontSize; return true;
     },
     ui_set_image: (id: string, path: string) => {
       if (!ui.has(id) || !existsSync(resolve(assets, path))) return false;
@@ -747,4 +750,201 @@ test("zero-sized minimized windows preserve the scene and restore the pixel UI s
   game.resize(1280, 800); game.tick();
   assert.equal(game.ui.get("health_fill")!.image, "sprites/spd-ui/hp_large.png");
   assert.equal(game.camera().height, 800 / 3);
+});
+
+function changeLanguage(game: Game, language: "en" | "zh-CN"): void {
+  game.click("settings"); game.click("settings_tab_5");
+  game.click(language === "en" ? "language_english" : "language_chinese");
+}
+
+test("English and Chinese catalogs are complete and share interpolation parameters", () => {
+  for (const [key, [english, chinese]] of Object.entries(messages)) {
+    assert.ok(english.trim(), `Missing English: ${key}`);
+    assert.ok(chinese.trim(), `Missing Chinese: ${key}`);
+    const parameters = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]).sort();
+    assert.deepEqual(parameters(chinese), parameters(english), key);
+    assert.equal(translate("en", key as MessageKey), english);
+    assert.equal(translate("zh-CN", key as MessageKey), chinese);
+  }
+  const hit = message("log.surprise", { monster: message("monster.chaser"), damage: 7 });
+  assert.equal(renderMessage("en", hit), "Surprise attack! You hit Marsupial Rat for 7.");
+  assert.equal(renderMessage("zh-CN", hit), "伏击！你击中了食腐老鼠，造成7点伤害。");
+});
+
+test("legacy and unsupported language values preserve statistics without blocking saves", () => {
+  const { language: _, ...legacy } = { ...defaultProfile(), bestScore: 123, runs: 8, wins: 2 };
+  for (const language of [undefined, "fr", "zh-TW", null, 42]) {
+    const parsed = parseProfile(JSON.stringify({ ...legacy, language }));
+    assert.equal(parsed.language, "en");
+    assert.equal(parsed.bestScore, 123); assert.equal(parsed.runs, 8); assert.equal(parsed.wins, 2);
+  }
+  assert.equal(parseProfile(JSON.stringify({ ...legacy, language: "zh" })).language, "zh-CN");
+  assert.equal(parseProfile(JSON.stringify({ ...legacy, language: "zh-CN" })).language, "zh-CN");
+});
+
+test("language choices apply immediately, persist, and restore English without losing progress", () => {
+  const profile = { ...defaultProfile(), bestScore: 900, runs: 3, wins: 1 };
+  const saves = new Map([["profile", JSON.stringify(profile)]]);
+  const game = harness(1280, 800, false, saves);
+  changeLanguage(game, "zh-CN");
+  assert.equal(game.ui.get("settings_title")!.text, "语言");
+  assert.match(game.ui.get("language_chinese__label")!.text!, /已选择/);
+  assert.equal(parseProfile(saves.get("profile")!).language, "zh-CN");
+  game.key("Escape");
+  assert.equal(game.ui.get("start__label")!.text, "进入地牢");
+  assert.equal(game.ui.get("spd_banner")!.text, "破碎的像素地牢");
+  const reopened = harness(1280, 800, false, saves);
+  assert.equal(reopened.ui.get("start__label")!.text, "进入地牢");
+  changeLanguage(reopened, "en"); reopened.key("Escape");
+  assert.equal(reopened.ui.get("start__label")!.text, "Enter the Dungeon");
+  assert.equal(reopened.ui.get("spd_banner")!.image, "sprites/spd-ui/title_land.png");
+  const restored = parseProfile(saves.get("profile")!);
+  assert.equal(restored.bestScore, 900); assert.equal(restored.runs, 3); assert.equal(restored.wins, 1);
+  assert.equal(restored.language, "en");
+});
+
+test("in-run switching retranslates existing logs and keeps actors, inventory, and turns", () => {
+  const game = harness(); game.start();
+  const actors = JSON.stringify([...game.entities]);
+  const turns = turnCount(game);
+  assert.ok([...game.ui.values()].some((node) => node.text?.includes("Welcome to the sewers")));
+  game.click("pause"); changeLanguage(game, "zh-CN"); game.key("Escape");
+  assert.equal(game.state().message, "PLAYING");
+  assert.equal(turnCount(game), turns);
+  assert.equal(JSON.stringify([...game.entities]), actors);
+  assert.ok([...game.ui.values()].some((node) => node.text?.includes("欢迎来到下水道，战士")));
+  game.click("bag_btn");
+  assert.equal(game.ui.get("bag_title")!.text, "背包");
+  game.click("slot_potion_healing");
+  assert.equal(game.ui.get("item_detail_title")!.text, "治疗药水");
+  assert.equal(game.ui.get("use_potion_healing__label")!.text, "饮用");
+  assert.match(game.ui.get("item_detail_desc")!.text!, /恢复生命/);
+  game.click("use_potion_healing");
+  assert.equal(turnCount(game), turns + 1);
+  assert.ok([...game.ui.values()].some((node) => node.text?.includes("温暖而舒缓的能量")));
+  game.click("pause"); changeLanguage(game, "en"); game.key("Escape");
+  assert.ok([...game.ui.values()].some((node) => node.text?.includes("A warm soothing energy")));
+});
+
+test("Chinese menus, hero messages, settings tabs and read-only results are localized", () => {
+  const game = harness(); changeLanguage(game, "zh-CN");
+  for (const [tab, title] of ["显示", "界面", "输入", "数据", "音频", "语言"].entries()) {
+    game.click(`settings_tab_${tab}`); assert.equal(game.ui.get("settings_title")!.text, title);
+  }
+  game.key("Escape"); game.click("rankings");
+  assert.match(game.ui.get("rankings_content")!.text!, /最高分/);
+  game.click("back"); game.click("start");
+  assert.equal(game.ui.get("hero_class_label")!.text, "战士");
+  game.click("hero_mage"); assert.equal(game.ui.get("hero_class_label")!.text, "法师");
+  assert.match(game.ui.get("hero_description")!.text!, /古老法杖/);
+  game.click("hero_duelist"); assert.match(game.ui.get("message_text")!.text!.replace(/\n/g, ""), /决斗家/);
+  game.key("Escape"); game.click("begin_run"); game.key("F12"); game.key("Digit8");
+  assert.equal(game.ui.get("result_title")!.text, "击败粘咕！");
+  assert.equal(game.ui.get("result_banner")!.text, "首领已被击败");
+  game.key("Digit9"); assert.equal(game.ui.get("result_title")!.text, "你死了……");
+  assert.equal(parseProfile(game.saves.get("profile")!).runs, 0, "previews cannot record a run");
+});
+
+test("Chinese save errors and incompatible profiles preserve data and remain recoverable", () => {
+  const game = harness(); changeLanguage(game, "zh-CN"); game.failStorage("io");
+  game.setting("hints"); game.click("settings_tab_3");
+  assert.match(game.ui.get("save_notice")!.text!, /保存失败（io）/);
+  game.failStorage(); game.setting("retry_save");
+  assert.equal(parseProfile(game.saves.get("profile")!).language, "zh-CN");
+  assert.equal(game.ui.get("save_notice")!.text, "进度和设置已保存。");
+  const incompatible = "{\"schemaVersion\":99,\"valuable\":true}";
+  const saves = new Map([["profile", incompatible]]);
+  const blocked = harness(1280, 800, false, saves);
+  changeLanguage(blocked, "zh-CN"); blocked.click("settings_tab_3");
+  assert.equal(blocked.ui.get("save_notice")!.text, "现有存档不兼容，不会覆盖该存档。");
+  assert.equal(saves.get("profile"), incompatible);
+});
+
+test("the bundled Chinese font covers both dictionaries and language-choice labels", () => {
+  const metadata = JSON.parse(readFileSync(resolve(assets, "licenses/font-sources.json"), "utf8"));
+  for (const record of [metadata.font, metadata.notice]) {
+    assert.equal(createHash("sha256").update(readFileSync(resolve(assets, record.file))).digest("hex"), record.sha256);
+    assert.ok(record.source.includes(metadata.revision));
+  }
+  assert.match(readFileSync(resolve(assets, metadata.notice.file), "utf8"), /SIL OPEN FONT LICENSE/);
+  const glyphs = Object.values(messages).flat().join("").replace(/[\n\r\t]/g, "");
+  const font = readFileSync(resolve(assets, metadata.font.file));
+  const measured = fontAdvances(font, glyphs);
+  const bundled = JSON.parse(readFileSync(resolve(assets, "fonts/noto-sans-sc-metrics.json"), "utf8"));
+  for (const glyph of new Set(glyphs)) {
+    assert.ok(measured[glyph] !== undefined, `Missing glyph ${glyph}`);
+    assert.equal(bundled[glyph], measured[glyph], `Stale glyph metrics ${glyph}`);
+  }
+  assert.equal(fontForText("en", "简体中文"), "fonts/noto-sans-sc.otf");
+  assert.equal(fontForText("en", "English"), "fonts/spd-pixel.ttf");
+});
+
+test("Chinese and long Latin words wrap by measured glyph width without losing characters", () => {
+  for (const language of ["en", "zh-CN"] as const) {
+    for (const value of ["恢复生命并清除腐蚀黏液。消耗1回合。", "A long English description wraps at word boundaries.", "shatteredpixel.com/blog/very-long-diagnostic-token"]) {
+      const lines = wrapText(language, value, 40, 6);
+      assert.ok(lines.length > 1);
+      assert.equal(lines.join("").replace(/\s/g, ""), value.replace(/\s/g, ""));
+      assert.ok(lines.every((line) => measureText(language, line, 6) <= 40.001));
+    }
+  }
+  const paragraph = translate("zh-CN", "hero.warrior.description");
+  const wrapped = wrapText("zh-CN", paragraph, 80, 6);
+  assert.ok(wrapped.every((line) => !/^[，。！？、：；）】》]/u.test(line)));
+  assert.equal(wrapped.join(""), paragraph);
+});
+
+test("Chinese portrait and compact landscape controls use real glyph sizes and retain their actions", () => {
+  for (const [width, height] of [[450, 800], [800, 400], [1280, 800]]) {
+    const game = harness(width, height); changeLanguage(game, "zh-CN");
+    for (const [id, element] of game.ui) {
+      if (!id.endsWith("__label")) continue;
+      const parent = game.ui.get(element.parent)!;
+      assert.ok(Number(element.style!.width) <= Number(parent.style!.width), `${width}: ${id}`);
+      assert.equal(element.font, "fonts/noto-sans-sc.otf");
+    }
+    game.key("Escape"); game.start(); game.click("bag_btn"); game.click("slot_potion_healing");
+    const description = game.ui.get("item_detail_desc")!;
+    assert.equal(description.font, "fonts/noto-sans-sc.otf");
+    assert.ok(description.text!.split("\n").every((line) => measureText("zh-CN", line, description.fontSize!) <= Number(description.style!.width) + 0.01));
+    assert.ok(Number(description.style!.top) + Number(description.style!.height) <= Number(game.ui.get("use_potion_healing")!.style!.top));
+  }
+});
+
+test("Chinese HUD states, diagnostics and network results keep machine status tokens", () => {
+  const game = harness(); changeLanguage(game, "zh-CN"); game.key("Escape"); game.start(); removeMonsters(game);
+  for (let turn = 0; turn < 300; turn++) game.click("wait");
+  assert.equal(game.ui.get("hud_hunger")!.text, "饥饿");
+  for (let turn = 300; turn < 450; turn++) game.click("wait");
+  assert.equal(game.ui.get("hud_hunger")!.text, "极度饥饿");
+  game.key("Digit3"); assert.equal(game.ui.get("hud_invisible")!.text, "隐形");
+  game.key("F12"); assert.equal(game.ui.get("checks_title")!.text, "运行时检查");
+  assert.match(game.ui.get("check_0")!.text!, /^PASS  所属实体/);
+  game.click("network");
+  assert.match(game.ui.get("network_status")!.text!, /PASS GET 200/);
+  assert.match(game.ui.get("network_status")!.text!, /PASS POST 200/);
+});
+
+test("portrait Chinese logs wrap without overlapping their neighbors or the toolbar", () => {
+  const game = harness(450, 800); changeLanguage(game, "zh-CN"); game.key("Escape"); game.start();
+  game.click("descend");
+  const logs = [...game.ui].filter(([id]) => id.startsWith("log_line_")).map(([, element]) => element);
+  let bottom = 0;
+  for (const log of logs) {
+    assert.ok(Number(log.style!.top) >= bottom);
+    assert.ok(log.text!.split("\n").every((line) => measureText("zh-CN", line, log.fontSize!) <= Number(log.style!.width) + 0.01));
+    bottom = Number(log.style!.top) + Number(log.style!.height);
+  }
+  assert.ok(bottom <= Number(game.ui.get("bag_btn")!.style!.top));
+});
+
+test("numeric translations work when BMS reflection occupies the String global", () => {
+  const game = harness();
+  game.context.String = { reflectedType: "String" };
+  game.start();
+  assert.equal(game.ui.get("hud_level")!.text, "lv. 1");
+  game.click("pause"); changeLanguage(game, "zh-CN"); game.key("Escape");
+  assert.equal(game.ui.get("hud_level")!.text, "1级");
+  game.click("hero_info");
+  assert.match(game.ui.get("hero_stats")!.text!, /生命：20\/20/);
 });

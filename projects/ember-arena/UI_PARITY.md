@@ -9,7 +9,7 @@ This ledger separates source-based implementation from pixel-parity acceptance.
 
 | Surface | Source used | Current implementation / limit |
 | --- | --- | --- |
-| Title | `scenes/TitleScene.java`, `ui/TitleBackground.java`, `effects/BannerSprites.java` | Original landscape/portrait banner, eight entry buttons, chrome, icons and integer UI zoom. Background uses original layers but a static arrangement; original scrolling, flames and glow remain absent. |
+| Title | `scenes/TitleScene.java`, `ui/TitleBackground.java`, `effects/BannerSprites.java` | Original landscape/portrait banner in English, localized text title in Chinese, eight entry buttons, chrome, icons and integer UI zoom. Background uses original layers but a static arrangement; original scrolling, flames and glow remain absent. |
 | Hero selection | `scenes/HeroSelectScene.java`, `sprites/HeroSprite.java`, `messages/actors/actors.properties` | Separate full-screen scene, six original hero icons, landscape grid / portrait strip, original splash, left fade and locked-class message windows. Duelist/Cleric remain locked because their gameplay kits are absent. The four playable classes retain truthful port descriptions, rather than claiming unimplemented powers. |
 | Status pane | `ui/StatusPane.java` | Original 82×38 and large 160×39 layouts, 128×9 / 50×4 health bars, source hero portrait, XP bar and level. Compass, complete buff icons, shields, DOT overlays and blink animations remain absent. |
 | Menu pane | `ui/MenuPane.java` | Source pane, menu/journal artwork, version and depth positions. Journal data/layout is still a subset. |
@@ -17,9 +17,9 @@ This ledger separates source-based implementation from pixel-parity acceptance.
 | Backpack | `windows/WndBag.java`, `ui/InventorySlot.java` | Five columns and 25 slots, 28-pixel slot base, one-pixel margins, adaptive narrow/short layout, equipped/normal colors, quantity labels and bag tab. Full equipment/bag contents and equipment actions are not implemented. |
 | Item window | `windows/WndInfoItem.java`, `windows/WndUseItem.java` | Original window chrome, item icon/title, measured text wrapping, content-dependent height and Drink/Read/Eat action. Descriptions accurately reflect the existing simplified effects; throw/drop/equip/quickslot dialogs remain absent. |
 | Pause | `windows/WndGame.java` | Original 120-pixel content width, 20-pixel buttons, two-pixel gaps, Settings and Main Menu actions. Challenges are not present in the port. |
-| Settings | `windows/WndSettings.java` | Original landscape/portrait content widths, six icon tabs, original chrome, pixel font and functioning existing settings/save/reset controls. This is still a reduced settings implementation: full display, UI, keybinding, audio and localization controls are not equivalent to upstream. Audio controls are noninteractive because audio is absent. |
+| Settings | `windows/WndSettings.java` | Original landscape/portrait content widths, six icon tabs, original chrome and functioning settings/save/reset controls, including persisted English/Simplified Chinese selection. This is still a reduced settings implementation: full display, UI, keybinding, audio and the broader upstream locale catalog are not equivalent to upstream. Audio controls are noninteractive because audio is absent. |
 | Hero info | `windows/WndHero.java` | Original-style stats window using actual current hero values. Talent trees and complete equipment/stat tabs remain absent. |
-| Results | `effects/BannerSprites.java`, `windows/WndGame.java` | Original Boss Slain / Game Over art and chrome. Completion remains a sewer milestone, not the upstream Amulet ending; result content and progression are different. |
+| Results | `effects/BannerSprites.java`, `windows/WndGame.java` | Original Boss Slain / Game Over art in English, localized text banners in Chinese, and original chrome. Completion remains a sewer milestone, not the upstream Amulet ending; result content and progression are different. |
 | Secondary title pages | `scenes/{Rankings,Journal,About}Scene.java`, title button sources | Original entry names/icons and common window art. Rankings currently shows local aggregates; journal/news/changes/about/support are reduced informational pages. Their full original scenes, services and data are not ported. |
 | Other original windows | Upstream `windows/` and game scenes | Shops, full alchemy, quest/NPC dialogs, badges, challenges, keybindings, subclasses/talents, resurrection, full save-slot management and region/interlevel scenes remain to be migrated. |
 
@@ -29,8 +29,11 @@ This ledger separates source-based implementation from pixel-parity acceptance.
 downloads immutable-revision assets into the existing local cache. Crops and font source hashes
 are stored in `assets/licenses/ui-sources.json`. No AI-redrawn UI art is used.
 
-The native UI uses the original `pixel_font.ttf` with smoothing disabled. ASCII advance widths
-are extracted from its OpenType `cmap`/`hmtx` tables to measure and wrap text. This is not proof
+English uses the original `pixel_font.ttf` with smoothing disabled. Chinese text uses bundled
+Noto Sans SC 2.004 with its OFL notice and pinned SHA-256 under `assets/licenses/`. Advance widths
+for both fonts come from their OpenType `cmap`/`hmtx` tables. Chinese wraps at character boundaries
+and overlong Latin tokens are split to fit; font selection also covers the Chinese option while
+the interface is in English. This is not proof
 that LibGDX and Bevy produce identical glyph baselines or every rendered pixel.
 
 Nine-patch edges explicitly request `imageMode: "stretch"`; automatic aspect fitting would leave

@@ -9,6 +9,7 @@
     "watch": "esbuild modules/ember-arena/game/src/ember-arena.ts --bundle --format=iife --target=es2023 --outfile=modules/ember-arena/game/assets/ember-arena.js --watch=forever",
     "check": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.scripts.json --noEmit",
     "prepare:assets": "tsx scripts/prepare-assets.ts",
+    "prepare:fonts": "tsx scripts/prepare-fonts.ts",
     "test": "npm run check && npm run build && tsx --test scripts/smoke.test.ts"
   },
   "devDependencies": {

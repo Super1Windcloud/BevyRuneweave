@@ -70,6 +70,34 @@ Inventory browsing and pausing cost no turns. Successfully using an item returns
 allows monster responses. Empty item slots and blocked moves cost no turns. Keyboard holds
 repeat at a bounded rate; clicks never path through unexplored terrain.
 
+## Languages
+
+Open **Settings → Language** and choose **English** or **简体中文**. The default is English.
+The choice applies immediately and is saved with the profile. Switching during an expedition
+preserves actors, inventory and turns, and also retranslates existing combat logs and notices.
+Menus, hero/item details, HUD states, results, settings, informational pages and diagnostic captions
+support both languages. Runtime phase IDs, HTTP methods, status tokens and raw error codes remain
+stable. Chinese title/result captions replace the English bitmap lettering; English retains the
+original artwork.
+
+Version-1 profiles without a language field continue in English. Unknown language values fall back
+to English while retaining statistics. Incompatible saves remain protected; language switching
+still works for the session. **Clear data** resets settings, including the language, to defaults.
+
+English uses the original pixel font. Chinese and the Chinese language-choice label use bundled
+Noto Sans SC 2.004 (SIL OFL 1.1), including measured Chinese/Latin advances and character wrapping.
+The original 8.3 MB font is bundled without modification, so rendering needs no system CJK font
+or network access. Its pinned source, SHA-256 and license are in `assets/licenses/font-sources.json`
+and `assets/licenses/NotoSansSC-OFL.txt`.
+
+```bash
+npm --prefix projects/ember-arena run prepare:fonts
+```
+
+This command reuses `dist/asset-downloads/ember-arena/`, validates the pinned font/license hashes,
+and regenerates the font metrics. Full asset preparation also runs this step. Adding translations
+requires regenerating metrics; tests verify that every catalog glyph exists in the bundled font.
+
 ## Architecture
 
 Gameplay, floor generation, input and UI flow live in TypeScript. Reflected `ScriptActor`
@@ -103,6 +131,27 @@ downloads are cached from upstream `master`, not an immutable release; checksums
 local generated artifacts. The game runs offline after preparation.
 
 ## Verification boundaries
+
+### Localization verification on 2026-11-12 (macOS Debug)
+
+- `npm --prefix projects/ember-arena test`: **48 passed**, including catalog/parameter coverage,
+  legacy profiles, persistent language selection, live log translation, unchanged gameplay state,
+  Chinese font glyph coverage/provenance, portrait wrapping and the reflected `String` global.
+- `cargo test --locked --offline -p bevy-runeweave --lib quickjs_arena_runs_with_real_actor_components_and_ui`:
+  **1 passed**, executing the actual bundle through QuickJS and real Bevy components.
+- `cargo run --locked --offline -p ember-arena-ts`: built and ran using the repository cache.
+  The native fixture uses `RUNEWEAVE_DATA_DIR` under `target/ember-arena-i18n-native`, preserving
+  regular player saves. Window-directed keyboard events verified hero selection, starting the
+  expedition and opening the backpack. Chinese title, hero, HUD, inventory, item-detail preview
+  and language-settings preview screenshots are under that directory's `screenshots/` folder.
+- `npm --prefix projects/ember-arena run prepare:fonts`, root tooling typecheck and
+  `git diff --check`: passed. Font preparation validates pinned bytes before generating metrics.
+- Native text renders Chinese successfully. The current Bevy/ICU stack still logs
+  `No segmentation model for language: ja`; this change uses measured script-side wrapping
+  and does not replace the runtime's segmentation provider.
+- Windows, Linux, Android, iOS and Release rendering were **NOT_RUN** for this localization change.
+
+### Existing gameplay and UI evidence
 
 `npm --prefix projects/ember-arena test` typechecks, rebuilds the bundle, and runs deterministic
 tests with platform doubles. Tests cover floor connectivity across 200 seed/depth combinations,

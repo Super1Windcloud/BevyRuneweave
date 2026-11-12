@@ -3,9 +3,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromeFrames, spdUiRevision, uiFrames, type UiRect } from "../modules/ember-arena/game/src/spd-ui-atlas.js";
 import { fontAdvances } from "./font-metrics.js";
+import { prepareFonts } from "./prepare-fonts.js";
 
 interface Png { w: number; h: number; pixels: Buffer }
 export async function prepareUiAssets(assets: string, cache: string, decode: (bytes: Buffer) => Png, encode: (w: number, h: number, pixels: Buffer) => Buffer): Promise<void> {
+  await prepareFonts(assets, cache);
   const target = join(assets, "sprites/spd-ui");
   mkdirSync(target, { recursive: true }); mkdirSync(join(assets, "fonts"), { recursive: true });
   const base = `https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/${spdUiRevision}/core/src/main/assets/`;

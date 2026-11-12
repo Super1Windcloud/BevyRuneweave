@@ -1,27 +1,9 @@
 import { image, node, text, type UiElement, type UiStyle, type UiColor } from "../../api/ui.js";
 import { chromeFrames, uiFrames } from "./spd-ui-atlas.js";
-import { heroClasses, heroClassList, itemCatalog, type HeroClass, type ItemKind } from "./rules.js";
+import { heroClassList, itemCatalog, type HeroClass, type ItemKind } from "./rules.js";
 import type { Profile } from "./profile.js";
-import advances from "../assets/fonts/spd-pixel-metrics.json";
-
-const glyphAdvances: Record<string, number> = advances;
-function textWidth(value: string, size: number): number {
-  let width = 0;
-  for (const glyph of value) width += (glyphAdvances[glyph] ?? glyphAdvances["?"]!) * size;
-  return width;
-}
-function wrappedText(value: string, width: number, size: number): string[] {
-  const lines: string[] = [];
-  for (const paragraph of value.split("\n")) {
-    let line = "";
-    for (const word of paragraph.split(" ")) {
-      const next = line ? `${line} ${word}` : word;
-      if (line && textWidth(next, size) > width) { lines.push(line); line = word; } else line = next;
-    }
-    lines.push(line);
-  }
-  return lines;
-}
+import { translate, type MessageKey, type MessageParameters } from "./i18n.js";
+import { fontForText, measureText, wrapText } from "./text-layout.js";
 
 export type UiPhase = "menu" | "heroes" | "playing" | "paused" | "won" | "lost" | "inventory" | "item" | "hero" | "settings" | "checks" | "rankings" | "journal" | "news" | "changes" | "about" | "support" | "message";
 export interface SpdUiState {
@@ -69,15 +51,18 @@ export function uiMetrics(): UiMetrics {
 const titleColor: UiColor = [1, 1, 68 / 255, 1];
 const white: UiColor = [1, 1, 1, 1];
 const grey: UiColor = [0.67, 0.67, 0.67, 1];
-const font = "fonts/spd-pixel.ttf";
 type Action = (id: string, value?: string | number) => void;
 
 export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
+  const language = state.profile.language;
+  const t = (key: MessageKey, parameters?: MessageParameters): string => translate(language, key, parameters);
+  const textWidth = (value: string, size: number): number => measureText(language, value, size);
+  const wrappedText = (value: string, width: number, size: number): string[] => wrapText(language, value, width, size);
   const m = uiMetrics(), s = m.scale, w = m.width, h = m.height;
   const elements: UiElement[] = [];
   const rect = (x: number, y: number, width: number, height: number): UiStyle => ({ position: "absolute", left: Math.round(x * s), top: Math.round(y * s), width: Math.round(width * s), height: Math.round(height * s) });
   function label(id: string, value: string, x: number, y: number, width: number, size = 8, color: UiColor = white, height = size * 1.5): UiElement {
-    return text(id, value, { font, fontSize: size * s, color, style: rect(x, y, width, height) });
+    return text(id, value, { font: fontForText(language, value), fontSize: size * s, color, style: rect(x, y, width, height) });
   }
   function art(id: string, name: string, x: number, y: number, width?: number, height?: number, tint?: UiColor): UiElement {
     const f = uiFrames[name];
@@ -91,10 +76,12 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
   }
   function control(id: string, value: string, x: number, y: number, width: number, height = 20, type: "red" | "grey" | "toast" | null = "red", icon?: string, action = id, enabled = true, size = 9): UiElement {
     const children: UiElement[] = type ? patch(`${id}_chrome`, type, 0, 0, width, height) : [];
-    const labelWidth = textWidth(value, size), iconWidth = icon ? uiFrames[icon]?.rect[2] ?? 14 : 0;
+    const iconWidth = icon ? uiFrames[icon]?.rect[2] ?? 14 : 0;
+    size = value ? Math.min(size, size * Math.max(1, width - iconWidth - (icon ? 6 : 4)) / textWidth(value, size)) : size;
+    const labelWidth = textWidth(value, size);
     const groupWidth = labelWidth + (icon ? iconWidth + (value ? 2 : 0) : 0), groupLeft = (width - groupWidth) / 2;
     if (icon) children.push(art(`${id}_icon`, icon, groupLeft, (height - (uiFrames[icon]?.rect[3] ?? 14)) / 2));
-    if (value) children.push(text(`${id}__label`, value, { font, fontSize: size * s,
+    if (value) children.push(text(`${id}__label`, value, { font: fontForText(language, value), fontSize: size * s,
       color: !enabled ? grey : id === "begin_run" || id.startsWith("use_") ? titleColor : white,
       style: rect(groupLeft + (icon ? iconWidth + 2 : 0), (height - size * 1.2) / 2, labelWidth + 1, size * 1.5) }));
     return { kind: "button", id, onClick: enabled ? () => on(action) : undefined,
@@ -124,22 +111,27 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     titleBackground();
     const land = m.landscape, bannerW = land ? 240 : 139, bannerH = land ? 57 : 100;
     const top = Math.max(bannerH - 6, h * 0.45);
-    elements.push(art("spd_banner", land ? "title_land" : "title_port", (w - bannerW) / 2, 2 + (top - bannerH) / 2));
+    if (language === "en") elements.push(art("spd_banner", land ? "title_land" : "title_port", (w - bannerW) / 2, 2 + (top - bannerH) / 2));
+    else {
+      const title = t(land ? "title.name" : "title.portrait");
+      const titleWidth = Math.max(...title.split("\n").map((line) => textWidth(line, 18)));
+      elements.push(label("spd_banner", title, (w - titleWidth) / 2, 2 + (top - (land ? 24 : 48)) / 2, titleWidth + 1, 18, titleColor, 54));
+    }
     const area = land ? 234 : 133, left = (w - area) / 2;
     const gap = Math.max(2, Math.floor((h - top - (land ? 3 : 4) * 20) / 3 / (land ? 3 : 5)));
     const y = top + gap;
     if (land) {
-      elements.push(control("start", "Enter the Dungeon", left, y, area / 2 - 1, 20, "toast", "enter"));
-      elements.push(control("support", "Support the Game", left + area / 2 + 1, y, area / 2 - 1, 20, "toast", "support"));
+      elements.push(control("start", t("menu.start"), left, y, area / 2 - 1, 20, "toast", "enter"));
+      elements.push(control("support", t("menu.support"), left + area / 2 + 1, y, area / 2 - 1, 20, "toast", "support"));
       for (const [index, id] of ["rankings", "journal", "news", "settings", "changes", "about"].entries()) {
         const cw = Math.floor(area / 3) - 1;
-        elements.push(control(id, id[0]!.toUpperCase() + id.slice(1), left + index % 3 * (cw + 2), y + (1 + Math.floor(index / 3)) * (20 + gap), cw, 20, "toast", id));
+        elements.push(control(id, t(`menu.${id}` as MessageKey), left + index % 3 * (cw + 2), y + (1 + Math.floor(index / 3)) * (20 + gap), cw, 20, "toast", id));
       }
     } else {
-      elements.push(control("start", "Enter the Dungeon", left, y, area, 20, "toast", "enter"));
-      elements.push(control("support", "Support the Game", left, y + 20 + gap, area, 20, "toast", "support"));
+      elements.push(control("start", t("menu.start"), left, y, area, 20, "toast", "enter"));
+      elements.push(control("support", t("menu.support"), left, y + 20 + gap, area, 20, "toast", "support"));
       for (const [index, id] of ["rankings", "journal", "news", "changes", "settings", "about"].entries()) {
-        elements.push(control(id, id[0]!.toUpperCase() + id.slice(1), left + index % 2 * (area / 2 + 1), y + (2 + Math.floor(index / 2)) * (20 + gap), area / 2 - 1, 20, "toast", id));
+        elements.push(control(id, t(`menu.${id}` as MessageKey), left + index % 2 * (area / 2 + 1), y + (2 + Math.floor(index / 2)) * (20 + gap), area / 2 - 1, 20, "toast", id));
       }
     }
     elements.push(label("version", "v0.1.0", w - 26, h - 8, 24, 5, grey));
@@ -147,7 +139,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
   }
   function heroScreen(): void {
     titleBackground();
-    const spec = heroClasses[state.selectedClass];
+    const heroName = t(`hero.${state.selectedClass}.name`);
     const leftArea = m.landscape ? Math.max(100, w / 3) : w;
     const backgroundWidth = h * 800 / 450;
     const backgroundLeft = (w - backgroundWidth) / 2 + (m.landscape ? leftArea / 6 : 0);
@@ -155,7 +147,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     if (m.landscape) elements.push(art("hero_text_shade", "hero_fade", 0, 0, leftArea + 8, h));
     const uiHeight = Math.min(h - 20, 300), uiTop = (h - uiHeight) / 2;
     const spacing = (uiHeight - 120) / 2 - (uiHeight >= 160 ? 5 : 0) - (uiHeight >= 180 ? 6 : 0);
-    if (m.landscape) elements.push(label("hero_select_title", "Choose Your Hero", (leftArea - 110) / 2, uiTop, 110, 12, titleColor));
+    if (m.landscape) elements.push(label("hero_select_title", t("hero.choose"), (leftArea - 110) / 2, uiTop, 110, 12, titleColor));
     const selectorY = m.landscape ? uiTop + 16 + spacing : h - 24;
     const heroButtons = ["warrior", "mage", "rogue", "huntress", "duelist", "cleric"] as const;
     const portraitWidth = Math.min(35, w / 6);
@@ -169,10 +161,10 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       elements.push(button);
     });
     const nameY = m.landscape ? selectorY + 66 : h - 95;
-    const nameWidth = textWidth(spec.name[0] + spec.name.slice(1).toLowerCase(), 9), nameLeft = (leftArea - nameWidth - 20) / 2;
-    if (m.landscape) elements.push(label("hero_class_label", spec.name[0] + spec.name.slice(1).toLowerCase(), nameLeft, nameY, nameWidth + 4, 9, titleColor));
-    if (m.landscape) elements.push(label("hero_description", spec.description, (leftArea - 80) / 2, nameY + 16, 80, 6, white, 56));
-    elements.push(control("begin_run", m.landscape ? "Start" : spec.name[0] + spec.name.slice(1).toLowerCase(), m.landscape ? (leftArea - 64) / 2 : (w - 64) / 2, m.landscape ? uiTop + uiHeight - 21 : h - 43, 64, 21, "toast", "enter"));
+    const nameWidth = textWidth(heroName, 9), nameLeft = (leftArea - nameWidth - 20) / 2;
+    if (m.landscape) elements.push(label("hero_class_label", heroName, nameLeft, nameY, nameWidth + 4, 9, titleColor));
+    if (m.landscape) elements.push(label("hero_description", wrappedText(t(`hero.${state.selectedClass}.description`), 80, 6).join("\n"), (leftArea - 80) / 2, nameY + 16, 80, 6, white, 56));
+    elements.push(control("begin_run", m.landscape ? t("common.start") : heroName, m.landscape ? (leftArea - 64) / 2 : (w - 64) / 2, m.landscape ? uiTop + uiHeight - 21 : h - 43, 64, 21, "toast", "enter"));
     elements.push(iconControl("hero_info", "info", m.landscape ? nameLeft + nameWidth : (w + 64) / 2, m.landscape ? nameY : h - 43));
     elements.push(iconControl("back", "exit", w - 20, 0));
   }
@@ -184,7 +176,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       while (slotWidth >= 26 && slotWidth * 5 + 4 + 12 > w) slotWidth--;
     }
     const width = slotWidth * 5 + 4, height = 14 + slotHeight * 5 + 4;
-    const children: UiElement[] = [label("bag_title", "Backpack", 0, 2, width - 25, 8, titleColor), image("bag_gold", "sprites/dungeon/gold.png", rect(width - 15, 0, 12, 12)), label("bag_gold_count", `${state.gold}`, width - 38, 3, 23, 6, titleColor)];
+    const children: UiElement[] = [label("bag_title", t("bag.title"), 0, 2, width - 25, 8, titleColor), image("bag_gold", "sprites/dungeon/gold.png", rect(width - 15, 0, 12, 12)), label("bag_gold_count", `${state.gold}`, width - 38, 3, 23, 6, titleColor)];
     const items = (Object.keys(itemCatalog) as ItemKind[]).filter((key) => state.inventory[key] > 0);
     for (let index = 0; index < 25; index++) {
       const x = index % 5 * (slotWidth + 1), y = 14 + Math.floor(index / 5) * (slotHeight + 1);
@@ -223,7 +215,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       elements.push(label("hud_experience", `${state.experience}/${state.targetExperience}`, 3, 30, 17, 3, [1, 1, 170 / 255, 0.6]));
     }
     elements.push(art("hud_hero_icon", `avatar_${state.selectedClass}`, 9.5, 8.5, 11, 15));
-    const levelText = large ? `lv. ${state.level}` : `${state.level}`;
+    const levelText = large ? t("hud.level", { level: state.level }) : `${state.level}`;
     elements.push(label("hud_level", levelText, large ? (30 - textWidth(levelText, 6)) / 2 : 25.5 - textWidth(levelText, 6) / 2, large ? 30 : 28, 30, 6, [1, 1, 170 / 255, 1]));
     elements.push({ kind: "button", id: "hero_info", onClick: () => on("hero_info"), style: rect(0, 0, 30, 36), children: [] });
     elements.push({ kind: "button", id: "hero_info_bar", onClick: () => on("hero_info"), style: large ? rect(30, 19, 130, 20) : rect(30, 0, 50, 9), children: [] });
@@ -233,8 +225,8 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     elements.push({ kind: "button", id: "game_journal", onClick: () => on("game_journal"), style: rect(w - 31, 0, 17, 21), children: [art("journal_button", "journal_button", 2, 8), art("journal_button_icon", "journal_button_icon", 3, 10.5)] });
     elements.push(art("hud_stairs", "stairs", w - 38, 8, 7, 8));
     elements.push(label("hud_wave", `${state.depth}`, w - 38, 16, 7, 4));
-    if (state.hunger !== "satiated") elements.push(label("hud_hunger", state.hunger === "starving" ? "Starving" : "Hungry", large ? 32 : 33, large ? 4 : 10, 80, 6, titleColor));
-    if (state.invisible) elements.push(label("hud_invisible", "Invisible", 33, large ? 10 : 18, 70, 6, titleColor));
+    if (state.hunger !== "satiated") elements.push(label("hud_hunger", state.hunger === "starving" ? t("hud.starving") : t("hud.hungry"), large ? 32 : 33, large ? 4 : 10, 80, 6, titleColor));
+    if (state.invisible) elements.push(label("hud_invisible", t("hud.invisible"), 33, large ? 10 : 18, 70, 6, titleColor));
     const toolbarX = !m.large && m.landscape ? w - 64 : w - 24, toolbarY = h - 26;
     const waitX = m.large ? w - 44 : m.landscape ? w - 20 : 0;
     const searchX = m.large ? w - 64 : m.landscape ? w - 40 : 20;
@@ -253,10 +245,17 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
         art(`quick_frame_${index}`, `quick_${side}`, 0, 0), ...(item ? [image(`quick_icon_${index}`, `sprites/dungeon/${item}.png`, rect((width - 16) / 2, 3, 16, 16)), label(`quick_count_${index}`, `${state.inventory[item]}`, 2, 2, 14, 5)] : []),
       ] });
     }
-    state.logs.slice(0, 3).reverse().forEach((entry, index) => elements.push(label(`log_line_${index}`, entry, 2, h - 62 + index * 10, Math.max(90, w - 90), 6, index === 2 ? white : grey, 10)));
+    const logWidth = Math.max(90, w - 90);
+    const logLines = state.logs.slice(0, 3).reverse().map((entry) => wrappedText(entry, logWidth, 6));
+    const logHeights = logLines.map((lines) => Math.max(10, Math.ceil(lines.length * 7.2) + 2));
+    let logY = h - 32 - logHeights.reduce((sum, height) => sum + height, 0);
+    logLines.forEach((lines, index) => {
+      elements.push(label(`log_line_${index}`, lines.join("\n"), 2, logY, logWidth, 6, index === logLines.length - 1 ? white : grey, logHeights[index]!));
+      logY += logHeights[index]!;
+    });
     if (state.bossHealth !== null) elements.push(node("boss_panel", rect((w - 100) / 2, 2, 100, 10), [
       node("boss_track", { ...rect(0, 5, 100, 3), background: [0.1, 0.03, 0.03, 1] }),
-      node("boss_fill", { ...rect(0, 5, Math.max(0, state.bossHealth), 3), background: [0.65, 0.05, 0.04, 1] }), label("boss_label", "Goo", 0, -2, 100, 6, titleColor),
+      node("boss_fill", { ...rect(0, 5, Math.max(0, state.bossHealth), 3), background: [0.65, 0.05, 0.04, 1] }), label("boss_label", t("monster.boss"), 0, -2, 100, 6, titleColor),
     ]));
   }
 
@@ -272,83 +271,84 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     window("message_window", 120, height, [label("message_text", lines.join("\n"), 0, 0, 120, 6, white, height)]);
   }
   else if (state.phase === "paused") window("pause_window", 120, 42, [
-    control("settings", "Settings", 0, 0, 120, 20, "red", "settings"),
-    control("home", "Main Menu", 0, 22, 120, 20, "red", "display"),
+    control("settings", t("menu.settings"), 0, 0, 120, 20, "red", "settings"),
+    control("home", t("menu.home"), 0, 22, 120, 20, "red", "display"),
   ]);
   else if (state.phase === "inventory" || state.phase === "item") {
     const bag = inventoryContent(); window("bag_window", bag.width, bag.height, bag.children);
     if (state.phase === "item") {
       const def = itemCatalog[state.item];
-      const lines = wrappedText(def.description, 120, 6), descriptionHeight = Math.ceil(lines.length * 7.2);
+      const lines = wrappedText(t(`item.${state.item}.description`), 120, 6), descriptionHeight = Math.ceil(lines.length * 7.2);
       const buttonY = 20 + descriptionHeight;
       window("item_window", 120, buttonY + 16, [
         image("item_detail_icon", `sprites/dungeon/${state.item}.png`, rect(0, 0, 16, 16)),
-        label("item_detail_title", def.name, 20, 1, 100, 9, titleColor, 26),
+        label("item_detail_title", t(`item.${state.item}.name`), 20, 1, 100, 9, titleColor, 26),
         label("item_detail_desc", lines.join("\n"), 0, 18, 120, 6, white, descriptionHeight),
-        control(`use_${state.item}`, def.category === "food" ? "Eat" : def.category === "scroll" ? "Read" : "Drink", 0, buttonY, 120, 16, "red", undefined, `use_${state.item}`, true, 8),
+        control(`use_${state.item}`, def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", undefined, `use_${state.item}`, true, 8),
       ]);
     }
   } else if (state.phase === "hero") {
     window("hero_window", 120, 126, [
       art("hero_detail_icon", `avatar_${state.selectedClass}`, 0, 0, 22, 30),
-      label("hero_detail_title", `Level ${state.level} ${state.selectedClass}`, 28, 4, 92, 9, titleColor, 22),
-      label("hero_stats", `Health: ${Math.ceil(state.health)}/${state.maxHealth}\nStrength: ${state.strength}\nExperience: ${state.experience}/${state.targetExperience}\nGold: ${state.gold}`, 0, 34, 120, 8, white, 60),
-      control("hero_stats_tab", "Stats", 0, 108, 58, 16, "grey"), control("hero_talents_tab", "Talents", 60, 108, 60, 16, "toast", undefined, "hero_talents_tab", false),
+      label("hero_detail_title", t("hero.level", { level: state.level, hero: t(`hero.${state.selectedClass}.name`) }), 28, 4, 92, 9, titleColor, 22),
+      label("hero_stats", t("hero.stats", { health: Math.ceil(state.health), maxHealth: state.maxHealth, strength: state.strength, experience: state.experience, target: state.targetExperience, gold: state.gold }), 0, 34, 120, 8, white, 60),
+      control("hero_stats_tab", t("hero.statsTab"), 0, 108, 58, 16, "grey"), control("hero_talents_tab", t("hero.talents"), 60, 108, 60, 16, "toast", undefined, "hero_talents_tab", false),
     ]);
   } else if (state.phase === "settings") {
     const width = m.landscape ? 223 : 122, height = Math.min(156, h - 36), content: UiElement[] = [];
-    const headings = ["Display", "UI", "Input", "Data", "Audio", "Language"];
-    content.push(label("settings_title", headings[state.settingsTab]!, 0, 0, width, 9, titleColor));
+    const headings = ["settings.display", "settings.ui", "settings.input", "settings.data", "settings.audio", "settings.language"] as const;
+    content.push(label("settings_title", t(headings[state.settingsTab]!), 0, 0, width, 9, titleColor));
     const names = ["display", "settings", "input", "data", "audio", "langs"];
     names.forEach((name, index) => content.push(control(`settings_tab_${index}`, "", index * (width / 6), height - 18, width / 6 - 1, 18, state.settingsTab === index ? "grey" : "toast", name, `tab:${index}`)));
     if (state.settingsTab === 0) {
-      content.push(label("display_scale_label", "Display scale", 0, 22, width, 8));
-      content.push(control("window_landscape", "Landscape", 0, 38, width, 18));
-      content.push(control("window_portrait", "Portrait", 0, 58, width, 18));
+      content.push(label("display_scale_label", t("settings.scale"), 0, 22, width, 8));
+      content.push(control("window_landscape", t("settings.landscape"), 0, 38, width, 18));
+      content.push(control("window_portrait", t("settings.portrait"), 0, 58, width, 18));
     } else if (state.settingsTab === 1) {
-      content.push(control("hints", `Hints: ${state.profile.showHints ? "On" : "Off"}`, 0, 24, width, 18, "grey"));
-      content.push(control("motion", `Reduced effects: ${state.profile.reducedMotion ? "On" : "Off"}`, 0, 45, width, 18, "grey"));
+      content.push(control("hints", t("settings.hints", { value: t(state.profile.showHints ? "common.on" : "common.off") }), 0, 24, width, 18, "grey"));
+      content.push(control("motion", t("settings.motion", { value: t(state.profile.reducedMotion ? "common.on" : "common.off") }), 0, 45, width, 18, "grey"));
     } else if (state.settingsTab === 2) {
-      content.push(control("sensitivity", `Pointer sensitivity: ${state.profile.sensitivity.toFixed(2)}x`, 0, 24, width, 18, "grey"));
-      content.push(label("input_bindings", "WASD / Arrows: Move\nSpace: Wait   I: Inventory\nEscape: Menu", 0, 49, width, 7, white, 50));
+      content.push(control("sensitivity", t("settings.sensitivity", { value: state.profile.sensitivity.toFixed(2) }), 0, 24, width, 18, "grey"));
+      content.push(label("input_bindings", t("settings.bindings"), 0, 49, width, 7, white, 50));
     } else if (state.settingsTab === 3) {
-      content.push(label("saved_stats", `Best: ${state.profile.bestScore}   Wins: ${state.profile.wins}\nRuns: ${state.profile.runs}`, 0, 18, width, 7, white, 24));
-      content.push(label("save_notice", state.saveNotice || "Your progress is saved on this device.", 0, 43, width, 6, grey, 25));
-      content.push(control("seed", `Seed: ${state.profile.seed}`, 0, 71, width, 16, "grey"));
-      content.push(control("retry_save", "Save", 0, 90, width / 2 - 1, 16));
-      content.push(control("reset_save", "Clear data", width / 2 + 1, 90, width / 2 - 1, 16));
+      content.push(label("saved_stats", t("settings.stats", { best: state.profile.bestScore, wins: state.profile.wins, runs: state.profile.runs }), 0, 18, width, 7, white, 24));
+      content.push(label("save_notice", state.saveNotice || t("save.device"), 0, 43, width, 6, grey, 25));
+      content.push(control("seed", t("settings.seed", { seed: state.profile.seed }), 0, 71, width, 16, "grey"));
+      content.push(control("retry_save", t("settings.save"), 0, 90, width / 2 - 1, 16));
+      content.push(control("reset_save", t("settings.clear"), width / 2 + 1, 90, width / 2 - 1, 16));
     } else if (state.settingsTab === 4) {
-      content.push(label("audio_music", "Music volume", 0, 26, width, 8, grey), label("audio_sfx", "SFX volume", 0, 62, width, 8, grey));
+      content.push(label("audio_music", t("settings.music"), 0, 26, width, 8, grey), label("audio_sfx", t("settings.sfx"), 0, 62, width, 8, grey));
       content.push(node("music_slider", { ...rect(0, 43, width, 3), background: [0.3, 0.3, 0.3, 1] }), node("sfx_slider", { ...rect(0, 79, width, 3), background: [0.3, 0.3, 0.3, 1] }));
-    } else content.push(control("language_english", "English", 0, 24, width, 20, "grey"));
+    } else {
+      content.push(control("language_english", language === "en" ? `${t("language.en")} (${t("settings.current")})` : t("language.en"), 0, 24, width, 20, language === "en" ? "grey" : "red"));
+      content.push(control("language_chinese", language === "zh-CN" ? `${t("language.zh-CN")}（${t("settings.current")}）` : t("language.zh-CN"), 0, 48, width, 20, language === "zh-CN" ? "grey" : "red"));
+      content.push(label("language_hint", wrappedText(t("settings.languageHint"), width, 6).join("\n"), 0, 76, width, 6, grey, 30));
+    }
     window("settings_window", width, height, content);
-    if (state.resetPending) window("reset_window", 120, 60, [label("reset_warning", "Erase saved progress?", 0, 0, 120, 8, titleColor, 22), control("confirm_reset", "Yes", 0, 40, 59, 18), control("cancel_reset", "No", 61, 40, 59, 18)]);
+    if (state.resetPending) window("reset_window", 120, 60, [label("reset_warning", t("settings.reset"), 0, 0, 120, 8, titleColor, 22), control("confirm_reset", t("common.yes"), 0, 40, 59, 18), control("cancel_reset", t("common.no"), 61, 40, 59, 18)]);
   } else if (state.phase === "won" || state.phase === "lost") {
-    elements.push(art("result_banner", state.phase === "won" ? "boss_slain" : "game_over", (w - 128) / 2, h * 0.12));
+    if (language === "en") elements.push(art("result_banner", state.phase === "won" ? "boss_slain" : "game_over", (w - 128) / 2, h * 0.12));
+    else {
+      const title = t(state.phase === "won" ? "result.bannerWin" : "result.bannerLose"), width = textWidth(title, 16);
+      elements.push(label("result_banner", title, (w - width) / 2, h * 0.12, width + 1, 16, titleColor, 24));
+    }
     window("result_window", 120, 88, [
-      label("result_title", state.phase === "won" ? "Goo defeated!" : "You died...", 0, 0, 120, 9, titleColor),
-      label("result_stats", `Score: ${state.score}\nDepth: ${state.depth}    Level: ${state.level}`, 0, 18, 120, 7, white, 26),
-      control("restart", "Start New Game", 0, 46, 120, 20, "red", "enter"),
-      control("home", "Main Menu", 0, 68, 120, 20, "red", "display"),
+      label("result_title", state.phase === "won" ? t("result.win") : t("result.lose"), 0, 0, 120, 9, titleColor),
+      label("result_stats", t("result.stats", { score: state.score, depth: state.depth, level: state.level }), 0, 18, 120, 7, white, 26),
+      control("restart", t("result.restart"), 0, 46, 120, 20, "red", "enter"),
+      control("home", t("menu.home"), 0, 68, 120, 20, "red", "display"),
     ], true, h * 0.66);
   } else if (state.phase === "checks") {
     const lines = state.checks.slice(state.checkPage * 6, state.checkPage * 6 + 6);
-    window("checks_window", 190, 146, [label("checks_title", "Runtime checks", 0, 0, 190, 9, titleColor),
+    window("checks_window", 190, 146, [label("checks_title", t("checks.title"), 0, 0, 190, 9, titleColor),
       ...lines.map((line, index) => label(`check_${index}`, line, 0, 16 + index * 13, 190, 6, white, 12)),
       label("network_status", state.networkStatus, 0, 96, 190, 6, grey, 18),
-      control("check_page", "Next", 0, 124, 60, 18), control("network", "HTTP", 64, 124, 60, 18), control("back", "Back", 128, 124, 60, 18),
+      control("check_page", t("common.next"), 0, 124, 60, 18), control("network", "HTTP", 64, 124, 60, 18), control("back", t("common.back"), 128, 124, 60, 18),
     ]);
   } else if (menuPhases.includes(state.phase) && state.phase !== "menu") {
     const page = state.phase;
-    const contents: Record<string, string> = {
-      rankings: `Best score: ${state.profile.bestScore}\nGames played: ${state.profile.runs}\nVictories: ${state.profile.wins}`,
-      journal: "Guide\n\nExplore the dungeon. Collect items and defeat enemies.\n\nPotions   Scrolls   Equipment\n\nAlchemy",
-      news: "Shattered Pixel Dungeon\n\nNews from ShatteredPixel.com\n\nshatteredpixel.com/blog/",
-      changes: "Changes\n\nTurn-based dungeon exploration\nSewer encounters and Goo\nOriginal interface assets",
-      about: "Shattered Pixel Dungeon\n\nEvan Debenham\n\nBased on Pixel Dungeon\nby Oleg Dolya (Watabou)\n\nEmber Arena runtime port",
-      support: "Support Shattered Pixel Dungeon\n\nCreated by Evan Debenham\n\nshatteredpixel.com\npatreon.com/ShatteredPixel",
-    };
-    window(`${page}_window`, 170, 132, [label(`${page}_title`, page[0]!.toUpperCase() + page.slice(1), 0, 0, 170, 9, titleColor), label(`${page}_content`, contents[page]!, 0, 18, 170, 7, white, 94), control("back", "Close", 0, 114, 170, 18)]);
+
+    window(`${page}_window`, 170, 132, [label(`${page}_title`, t(`menu.${page}` as MessageKey), 0, 0, 170, 9, titleColor), label(`${page}_content`, t(`page.${page}` as MessageKey, { best: state.profile.bestScore, runs: state.profile.runs, wins: state.profile.wins }), 0, 18, 170, 7, white, 94), control("back", t("common.close"), 0, 114, 170, 18)]);
   }
   return node("safe_root", { position: "absolute", left: m.left, top: m.top, width: Math.round(w * s), height: Math.round(h * s) }, elements);
 }
