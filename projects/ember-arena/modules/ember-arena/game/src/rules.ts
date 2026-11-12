@@ -93,10 +93,10 @@ export const heroClasses: Record<HeroClass, HeroClassSpec> = {
     splash: "sprites/spd/avatar_huntress.png",
     sprite: "sprites/spd/huntress.png",
     icon: "sprites/spd/hero_icons.png",
-    description: "A wilderness explorer. Starts with extra food and liquid flame. Bow abilities are pending.",
+    description: "A wilderness explorer carrying a spirit bow that grows with her level. Starts with extra food and liquid flame.",
     baseHealth: 20,
     baseSpeed: 1,
-    perks: "Gloves / cloth armor / extra food ration",
+    perks: "Spirit bow / gloves / cloth armor / extra food ration",
   },
 };
 
@@ -148,18 +148,19 @@ export type ItemKind =
   | "potion_strength"
   | "scroll_upgrade"
   | "scroll_magic_mapping"
-  | "food_ration";
+  | "food_ration"
+  | "spirit_bow";
 
 export type LootKind = ItemKind | "worn_key" | "goo_blob" | GearKind;
 // Stable indices stored in reflected ScriptActor.power, shared by spawning and pickup.
 export const lootKinds: readonly LootKind[] = ["potion_healing", "potion_liquid_flame", "potion_invisibility",
   "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration", "worn_key", "goo_blob",
-  "worn_shortsword", "mages_staff", "dagger", "gloves", "shortsword", "cloth_armor", "leather_armor"];
+  "worn_shortsword", "mages_staff", "dagger", "gloves", "shortsword", "cloth_armor", "leather_armor", "spirit_bow"];
 
 export interface ItemDef {
   id: ItemKind;
   name: string;
-  category: "potion" | "scroll" | "food";
+  category: "potion" | "scroll" | "food" | "weapon";
   description: string;
   effectText: string;
   sprite: string;
@@ -220,6 +221,14 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     category: "food",
     description: "Satisfies 300 hunger. Eating takes 3 turns; it does not heal.",
     effectText: "You eat the ration. Your hunger subsides.",
+    sprite: "sprites/spd/items.png",
+  },
+  spirit_bow: {
+    id: "spirit_bow",
+    name: "Spirit Bow",
+    category: "weapon",
+    description: "Fires unlimited spirit arrows and grows with hero level. Shooting does not replace your melee weapon. Cannot be upgraded with scrolls.",
+    effectText: "The spirit arrow fades away.",
     sprite: "sprites/spd/items.png",
   },
 };

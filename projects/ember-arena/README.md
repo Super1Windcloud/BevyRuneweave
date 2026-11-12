@@ -62,8 +62,17 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
 - Heroes start with 20 HP and 10 strength. Kills grant experience; leveling adds 5 maximum HP.
   The four starting melee weapons and cloth armor are real equipment with the original base
   ranges: worn shortsword 1–10, staff 1–6, dagger 1–8, gloves 1–5. Gloves attack in 0.5 ticks;
-  dagger surprise rolls use the upper quarter of their damage range. Staff casting, bow,
+  dagger surprise rolls use the upper quarter of their damage range. Staff casting,
   cloak, seal, talents and original starting-supply parity remain pending.
+- The Huntress carries a spirit bow in her backpack and first quick slot. Open its item window
+  and choose Shoot, click the quick slot, or press 8 to aim at a visible tile. Cancelling is free;
+  arrows stop at the first character or obstacle and the bow is never consumed. At hero level
+  one its base damage is 1–6 with strength requirement 10; at level five it is 2–8 and requires
+  strength 9. Growth follows hero level, so upgrade scrolls cannot select the bow. Adjacent
+  targets halve accuracy while distant targets receive a 1.5 multiplier. Base shooting takes
+  one tick without replacing the gloves' half-tick melee. A target attack breaks invisibility;
+  empty/self shots spend one tick without harming the hero or dispelling invisibility.
+  Arrow flight/sound and advanced bow modifiers remain pending.
 - Heroes, mobs and the supported effects use independent fractional timestamps in real reflected
   components, with f32 precision matching both Bevy and the original Java Actor. Hero wins
   timestamp ties; healing/regeneration precede fire, then mobs, then ordinary buffs. Hunger,
@@ -117,11 +126,12 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
 | F / Search icon | Examine a tile; press again to search nearby |
 | I / B / BAG | Open or close the inventory |
 | 1–7 | Healing, flame, invisibility, strength, upgrade, mapping, food |
+| 8 | Aim the carried spirit bow |
 | Escape | Pause/resume or close the current menu |
 
 The title opens a separate six-icon hero selection screen; the four implemented classes are
 playable, while Duelist/Cleric show their upstream unlock-message presentation. Selecting a
-backpack slot opens an item-detail window before Drink/Throw/Read/Eat is confirmed.
+backpack slot opens an item-detail window before Drink/Throw/Shoot/Read/Eat is confirmed.
 Inventory browsing and pausing cost no turns. Successfully using an item returns to play and
 allows monster responses. Empty item slots and blocked moves cost no turns. Keyboard holds
 repeat at a bounded rate; clicks never path through unexplored terrain.
@@ -201,6 +211,29 @@ hashes are checked before reusing that revision's cached bytes. The game runs of
 preparation. The old misnamed `skeleton_key.png` crop is replaced by `worn_key.png`.
 
 ## Verification boundaries
+
+### Spirit-bow targeting and combat on 2026-11-12
+
+- Upstream master still resolves to `57a4e06a4caf162446d1c28caa7983f0493fecf0`. Base
+  SpiritBow/SpiritArrow, MissileWeapon, Weapon and Hero/HeroClass rules drive this batch;
+  advanced modifiers and original starting-inventory parity remain separate work.
+- **115 tests pass**: twenty source-rule tests and 95 gameplay/UI/asset tests. New coverage
+  checks hero-level damage/strength/accuracy/delay, actual Huntress ownership and item action,
+  free cancel/unseen targets, switching between bow/flame, repeated first-character hits,
+  unlimited arrows, independent glove melee, empty/self shots, invisibility, scroll exclusion,
+  unequipped melee, real XP growth, descent/restart and Chinese portrait/short-landscape UI.
+- Biome, independent TypeScript checks, bundle/asset/font generation, Rust formatting and
+  whitespace checks pass. The original 16×16 bow crop and its hash are in the pinned manifest.
+- `cargo test --locked --offline -p bevy-runeweave --no-default-features --features typescript
+  --lib quickjs_arena_runs_with_real_actor_components_and_ui -- --nocapture`: **1 passed**
+  on macOS Debug. The actual bundle selects the Huntress, aims from the quick slot, and fires
+  four injected Bevy pointer clicks at a real target. Assertions check damage, one-tick shooting,
+  stationary hero position and the retained bow/gloves. The input fixture now releases held
+  movement/mouse state explicitly; clearing transition events alone leaves buttons held.
+- Rust changes are test-only. Runtime interfaces and the public ABI are unchanged. This
+  headless integration evidence does not establish native GPU rendering, OS input, audio,
+  mobile touch/lifecycle or reference-client pixel parity: these are **NOT_RUN for this batch**
+  on Windows, macOS, Linux, Android and iOS.
 
 ### Hunger, regeneration and LockedFloor on 2026-11-12
 

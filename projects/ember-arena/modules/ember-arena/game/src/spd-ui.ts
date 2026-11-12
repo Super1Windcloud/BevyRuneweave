@@ -5,6 +5,8 @@ import { armorRange, attackDelay, attackSkill, defenseSkill, equippedGear, gearD
 import type { Profile } from "./profile.js";
 import { translate, type MessageKey, type MessageParameters } from "./i18n.js";
 import { fontForText, measureText, wrapText } from "./text-layout.js";
+import { spiritBowDelay, spiritBowLevel, spiritBowRange, spiritBowStrength } from "./spirit-bow.js";
+import type { TargetKind } from "./projectiles.js";
 
 export type UiPhase = "menu" | "heroes" | "playing" | "paused" | "won" | "lost" | "inventory" | "item" | "equipment" | "upgrade" | "hero" | "settings" | "checks" | "rankings" | "journal" | "news" | "changes" | "about" | "support" | "message";
 export interface SpdUiState {
@@ -27,7 +29,7 @@ export interface SpdUiState {
   healing: number;
   burning: number;
   lockedFloor: number | null;
-  targeting: boolean;
+  targeting: TargetKind | null;
   bossHealth: number | null;
   inventory: Record<ItemKind, number>;
   equipment: readonly GearItem[];
@@ -209,7 +211,9 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
         childrenSlot.push(art(`equipment_${index}`, ["empty_weapon", "empty_armor", "empty_artifact", "empty_ring", "empty_ring"][index]!, (slotWidth - 16) / 2, (slotHeight - 16) / 2));
       } else if (key) {
         childrenSlot.push(image(`item_ico_${key}`, `sprites/dungeon/${key}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
-        childrenSlot.push(label(`item_count_${key}`, `${quantity(key)}`, 1, 1, slotWidth - 2, 6));
+        if (key === "spirit_bow") {
+          if (spiritBowLevel(state.level)) childrenSlot.push(label("item_level_spirit_bow", `+${spiritBowLevel(state.level)}`, 1, 1, slotWidth - 2, 6));
+        } else childrenSlot.push(label(`item_count_${key}`, `${quantity(key)}`, 1, 1, slotWidth - 2, 6));
       }
       children.push({ kind: "button", id: gear ? `gear_slot_${gear.id}` : key ? `slot_${key}` : `bag_slot_${index}`, onClick: gear ? () => on(`gear:${gear.id}`) : key ? () => on(key === "worn_key" || key === "goo_blob" ? key : "item", key) : undefined,
         style: { ...rect(x, y, slotWidth, slotHeight), background: equipped ? [145 / 255, 147 / 255, 140 / 255, 153 / 255] : [83 / 255, 86 / 255, 77 / 255, 153 / 255] }, children: childrenSlot });
@@ -265,7 +269,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     elements.push({ kind: "button", id: "wait", onClick: () => on("wait"), style: rect(waitX, toolbarY, 20, 26), children: [art("wait_tool", "wait_tool", 0, 0), art("wait_tool_icon", "wait_tool_icon", 2, 5)] });
     elements.push({ kind: "button", id: "search", onClick: () => on("search"), style: rect(searchX, toolbarY, 20, 26), children: [art("search_tool", "search_tool", 0, 0), art("search_tool_icon", "search_tool_icon", 2, 5)] });
     if (state.targeting) {
-      const promptWidth = Math.max(90, w - 30), lines = wrappedText(t("target.flame"), promptWidth, 6);
+      const promptWidth = Math.max(90, w - 30), lines = wrappedText(t(state.targeting === "bow" ? "target.bow" : "target.flame"), promptWidth, 6);
       elements.push(label("target_prompt", lines.join("\n"), 2, 44, promptWidth, 6, titleColor, lines.length * 8));
       elements.push(control("cancel_target", t("common.close"), w - 28, 44, 26, 14, "toast", undefined, "cancel_target", true, 6));
     } else if (state.examining) {
@@ -276,7 +280,9 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       const lines = wrappedText(t("log.guide"), w - 4, 6);
       elements.push(label("hud_hint", lines.join("\n"), 2, 44, w - 4, 6, grey, lines.length * 8));
     }
-    const quick: (ItemKind | null)[] = ["potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null, null];
+    const quick: (ItemKind | null)[] = state.inventory.spirit_bow > 0
+      ? ["spirit_bow", "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null]
+      : ["potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null, null];
     const count = 4 + Number(w > 152) + Number(w > 170);
     let quickRight = m.large ? searchX : toolbarX;
     for (let offset = 0; offset < count; offset++) {
@@ -285,7 +291,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       const width = side === "left" ? 20 : side === "right" ? 19 : 18;
       quickRight -= width;
       elements.push({ kind: "button", id: item ? `quick_${item}` : `quick_empty_${index}`, onClick: item ? () => on("quick", item) : undefined, style: rect(quickRight, h - 24, width, 24), children: [
-        art(`quick_frame_${index}`, `quick_${side}`, 0, 0), ...(item ? [image(`quick_icon_${index}`, `sprites/dungeon/${item}.png`, rect((width - 16) / 2, 3, 16, 16)), label(`quick_count_${index}`, `${state.inventory[item]}`, 2, 2, 14, 5)] : []),
+        art(`quick_frame_${index}`, `quick_${side}`, 0, 0), ...(item ? [image(`quick_icon_${index}`, `sprites/dungeon/${item}.png`, rect((width - 16) / 2, 3, 16, 16)), label(`quick_count_${index}`, item === "spirit_bow" ? (spiritBowLevel(state.level) ? `+${spiritBowLevel(state.level)}` : "") : `${state.inventory[item]}`, 2, 2, 14, 5)] : []),
       ] });
     }
     const logWidth = Math.max(90, w - 90);
@@ -321,13 +327,15 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     const bag = inventoryContent(); window("bag_window", bag.width, bag.height, bag.children);
     if (state.phase === "item") {
       const def = itemCatalog[state.item];
-      const lines = wrappedText(t(`item.${state.item}.description`), 120, 6), descriptionHeight = Math.ceil(lines.length * 7.2);
+      const bowStats = state.item === "spirit_bow" ? `\n${t("bow.stats", { min: spiritBowRange(state.level)[0], max: spiritBowRange(state.level)[1],
+        strength: spiritBowStrength(state.level), delay: spiritBowDelay(state.level, state.strength, true).toFixed(2), level: spiritBowLevel(state.level) })}` : "";
+      const lines = wrappedText(t(`item.${state.item}.description`) + bowStats, 120, 6), descriptionHeight = Math.ceil(lines.length * 7.2);
       const buttonY = 20 + descriptionHeight;
       window("item_window", 120, buttonY + 16, [
         image("item_detail_icon", `sprites/dungeon/${state.item}.png`, rect(0, 0, 16, 16)),
         label("item_detail_title", t(`item.${state.item}.name`), 20, 1, 100, 9, titleColor, 26),
         label("item_detail_desc", lines.join("\n"), 0, 18, 120, 6, white, descriptionHeight),
-        control(`use_${state.item}`, state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", undefined, `use_${state.item}`, true, 8),
+        control(`use_${state.item}`, state.item === "spirit_bow" ? t("item.shoot") : state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", undefined, `use_${state.item}`, true, 8),
       ]);
     } else if (state.phase === "equipment") {
       const gear = state.equipment.find((item) => item.id === state.selectedGear);

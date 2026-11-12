@@ -279,6 +279,7 @@ mod tests {
             Transform::default(),
         ));
         app.world_mut().init_resource::<ButtonInput<KeyCode>>();
+        app.world_mut().init_resource::<ButtonInput<MouseButton>>();
         app.finish();
         let world_id = app.world().id();
         let attachment = ScriptAttachment::StaticScript(Handle::<ScriptAsset>::default());
@@ -352,7 +353,7 @@ mod tests {
                     world.get::<ScriptActor>(entity).unwrap().cooldown
                 );
                 assert_eq!(hunger.cooldown, hunger.health);
-                world.resource_mut::<ButtonInput<KeyCode>>().clear();
+                world.resource_mut::<ButtonInput<KeyCode>>().reset_all();
             })?;
             click("pause")?;
             call("on_update", &mut context)?;
@@ -446,6 +447,76 @@ mod tests {
                         .iter(world)
                         .count(),
                     1
+                );
+            })?;
+            click("start")?;
+            call("on_update", &mut context)?;
+            click("hero_huntress")?;
+            call("on_update", &mut context)?;
+            click("begin_run")?;
+            call("on_update", &mut context)?;
+            let target = guard.with_world_mut(|world| {
+                let enemies: Vec<_> = world
+                    .query::<(Entity, &ScriptActor)>()
+                    .iter(world)
+                    .filter(|(_, actor)| actor.kind == "chaser")
+                    .map(|(entity, _)| entity)
+                    .collect();
+                let target = enemies[0];
+                for &enemy in &enemies[1..] {
+                    world.despawn(enemy);
+                }
+                world.get_mut::<Transform>(target).unwrap().translation =
+                    Vec3::new(16.0, -40.0, 2.0);
+                let mut actor = world.get_mut::<ScriptActor>(target).unwrap();
+                actor.health = 1000.0;
+                actor.cooldown = 1000.0;
+                target
+            })?;
+            for shot in 1..=4 {
+                click("quick_spirit_bow")?;
+                call("on_update", &mut context)?;
+                guard.with_world_mut(|world| {
+                    assert!(
+                        super::super::find_owned_entity(world, &attachment, "target_prompt")
+                            .is_some()
+                    );
+                    let mut query = world.query_filtered::<&mut Window, With<PrimaryWindow>>();
+                    // At 800x400 with UI zoom 2, tile (13,12) is (432,220).
+                    query
+                        .single_mut(world)
+                        .unwrap()
+                        .set_cursor_position(Some(Vec2::new(432.0, 220.0)));
+                    world
+                        .resource_mut::<ButtonInput<MouseButton>>()
+                        .press(MouseButton::Left);
+                })?;
+                call("on_update", &mut context)?;
+                guard.with_world_mut(|world| {
+                    let player =
+                        super::super::find_owned_entity(world, &attachment, "player").unwrap();
+                    assert_eq!(
+                        world.get::<ScriptActor>(player).unwrap().cooldown,
+                        shot as f32
+                    );
+                    assert_eq!(world.get::<Transform>(player).unwrap().translation.x, 0.0);
+                    world.resource_mut::<ButtonInput<MouseButton>>().reset_all();
+                })?;
+                call("on_update", &mut context)?;
+            }
+            guard.with_world_mut(|world| {
+                let health = world.get::<ScriptActor>(target).unwrap().health;
+                assert!(health < 1000.0 && health >= 976.0);
+            })?;
+            click("bag_btn")?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                assert!(
+                    super::super::find_owned_entity(world, &attachment, "slot_spirit_bow")
+                        .is_some()
+                );
+                assert!(
+                    super::super::find_owned_entity(world, &attachment, "gear_icon_1").is_some()
                 );
             })?;
             Ok(())

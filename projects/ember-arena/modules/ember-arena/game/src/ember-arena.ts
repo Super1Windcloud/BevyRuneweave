@@ -12,7 +12,8 @@ import { armorReduction, attackDelay, attackSkill, defenseSkill, equippedGear, g
   moveDelay, startingEquipment, strengthDeficit, timeAfter, weaponDamage } from "./equipment.js";
 import { applyBurning, applyHealing, applyInvisibility, applyLockedFloor, applyOoze, buffId, buffKind, buffTarget, effectPriority,
   fireRoot, fireVolume, hasBuff, healingStep, oozeDamage, playerBuff, remainingBuff, removeBuffs, seedFireCell, seedLiquidFlame, startVitals } from "./effects.js";
-import { projectileImpact } from "./projectiles.js";
+import { projectileImpact, type TargetKind } from "./projectiles.js";
+import { spiritBowAccuracy, spiritBowDamage, spiritBowDelay, spiritBowStrength } from "./spirit-bow.js";
 import { affectHunger, extendLockedFloor, hungerStep, lockedFloorStep, regenerationStep, starvingAt, type HungerStep } from "./survival.js";
 
 type Phase = UiPhase;
@@ -53,7 +54,7 @@ let overlayReturn: Phase = "playing";
 let uiNotice: Message | null = null;
 let previewPhase: Phase | null = null;
 let examining = false;
-let targeting = false;
+let targeting: TargetKind | null = null;
 let cameraShake = 0;
 let wornKeys = 0;
 let gooBlobs = 0;
@@ -75,6 +76,7 @@ let inventory: Record<ItemKind, number> = {
   scroll_upgrade: 1,
   scroll_magic_mapping: 0,
   food_ration: 1,
+  spirit_bow: 0,
 };
 
 const uid = (prefix: string): string => `${prefix}_${nextId++}`;
@@ -200,7 +202,7 @@ function uiAction(id: string, value?: string | number): void {
     case "wait": queuedPath = []; spendTurns(); return;
     case "search": toggleExamine(); return;
     case "cancel_examine": examining = false; drawUi(); return;
-    case "cancel_target": targeting = false; drawUi(); return;
+    case "cancel_target": targeting = null; drawUi(); return;
     case "worn_key": uiNotice = message("item.worn_key.description"); overlayReturn = "inventory"; setPhase("message"); return;
     case "goo_blob": uiNotice = message("item.goo_blob.description"); overlayReturn = "inventory"; setPhase("message"); return;
     case "descend": descend(); return;
@@ -230,7 +232,7 @@ function publish(): void {
 function setPhase(next: Phase): void {
   previewPhase = null;
   examining = false;
-  targeting = false;
+  targeting = null;
   cameraShake = 0;
   if ((next === "won" || next === "lost") && !runRecorded) {
     runRecorded = true;
@@ -251,7 +253,7 @@ function setPhase(next: Phase): void {
 
 function room(): void {
   floor = null;
-  examining = targeting = false; cameraShake = 0;
+  examining = false; targeting = null; cameraShake = 0;
   scene_clear();
   ui_clear();
   scene_set_3d_enabled(false);
@@ -298,6 +300,7 @@ function startRun(): void {
     scroll_upgrade: selectedClass === "mage" ? 2 : 1,
     scroll_magic_mapping: selectedClass === "mage" ? 1 : 0,
     food_ration: selectedClass === "huntress" ? 2 : 1,
+    spirit_bow: selectedClass === "huntress" ? 1 : 0,
   };
   dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) })];
   room();
@@ -307,7 +310,7 @@ function startRun(): void {
 }
 
 function enterFloor(): void {
-  examining = targeting = false; unsealFloor();
+  examining = false; targeting = null; unsealFloor();
   for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id)) scene_despawn(id);
   for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
   for (const key of renderedFog) scene_despawn(`fog_${key}`);
@@ -396,6 +399,7 @@ function collectLoot(): void {
       if (item === "worn_key") wornKeys++;
       else if (item === "goo_blob") gooBlobs++;
       else if (isGearKind(item)) equipment.push({ id: Math.max(0, ...equipment.map((gear) => gear.id)) + 1, kind: item, level: 0, equipped: false });
+      else if (item === "spirit_bow") inventory.spirit_bow = 1;
       else inventory[item]++;
       pushLog(message("log.item", { item: message(`item.${item}.name`) }));
     }
@@ -407,8 +411,9 @@ function collectLoot(): void {
 function useInventoryItem(kindKey: ItemKind): boolean {
   if ((phase !== "playing" && phase !== "inventory") || inventory[kindKey] <= 0) return false;
   if (kindKey === "scroll_upgrade") { upgradePage = 0; setPhase("upgrade"); return true; }
-  if (kindKey === "potion_liquid_flame") {
-    queuedPath = []; examining = false; phase = "playing"; targeting = true; publish(); drawUi(); return true;
+  if (kindKey === "potion_liquid_flame" || kindKey === "spirit_bow") {
+    queuedPath = []; examining = false; phase = "playing"; targeting = kindKey === "spirit_bow" ? "bow" : "flame";
+    publish(); drawUi(); return true;
   }
   inventory[kindKey]--;
   pushLog(message(`item.${kindKey}.effect`));
@@ -502,15 +507,18 @@ function roll(min: number, max: number): number {
   return Math.round(min + (random() + random()) * (max - min) / 2);
 }
 
-function attackMonster(id: string): void {
+function attackMonster(id: string, ranged = false): void {
   const type = kind(id) as EnemyKind, spec = mobCombat[type];
   const weapon = equippedGear(equipment, "weapon");
-  const surprised = (hasBuff("invisibility", "player") || field(id, "lifetime") === 0) && strengthDeficit(weapon, strength) === 0;
+  const encumbrance = ranged ? Math.max(0, spiritBowStrength(level) - strength) : strengthDeficit(weapon, strength);
+  const surprised = (hasBuff("invisibility", "player") || field(id, "lifetime") === 0) && encumbrance === 0;
   const enraged = type === "boss" && field(id, "health") <= enemySpecs.boss.health / 2;
-  const hit = surprised || random() * attackSkill(weapon, strength, level) >= random() * Math.floor(spec.defense * (enraged ? 1.5 : 1));
+  const accuracy = ranged ? spiritBowAccuracy(level, strength, cellDistance(cellPosition("player"), cellPosition(id))) : attackSkill(weapon, strength, level);
+  const hit = surprised || random() * accuracy >= random() * Math.floor(spec.defense * (enraged ? 1.5 : 1));
   scene_despawn(buffId("invisibility", "player")); change(id, "lifetime", 1);
   if (hit) {
-    const power = Math.max(0, weaponDamage(weapon, strength, surprised, roll) - roll(0, spec.armor));
+    const damage = ranged ? spiritBowDamage(level, strength, roll) : weaponDamage(weapon, strength, surprised, roll);
+    const power = Math.max(0, damage - roll(0, spec.armor));
     pushLog(message(surprised ? "log.surprise" : "log.hit", { monster: message(`monster.${type}`), damage: power }));
     damageMonster(id, power);
   } else pushLog(message("log.enemyDodged", { monster: message(`monster.${type}`) }));
@@ -611,12 +619,20 @@ function effectAction(id: string, now: number): number {
   return 1;
 }
 
-function throwLiquidFlame(target: Point): void {
+function fireAtTarget(target: Point): void {
   if (!floor || !targeting || phase !== "playing") return;
   if (!floor.visible.has(cellKey(floor, target))) { pushLog(message("target.notVisible")); drawUi(); return; }
-  if (inventory.potion_liquid_flame <= 0) { targeting = false; drawUi(); return; }
+  const item = targeting === "bow" ? "spirit_bow" : "potion_liquid_flame";
+  if (inventory[item] <= 0) { targeting = null; drawUi(); return; }
   const impact = projectileImpact(floor, cellPosition("player"), target,
     (point) => monsterIds().some((id) => sameCell(cellPosition(id), point)));
+  if (targeting === "bow") {
+    const enemy = monsterIds().find((id) => sameCell(cellPosition(id), impact));
+    const delay = spiritBowDelay(level, strength, enemy !== undefined);
+    if (enemy) attackMonster(enemy, true);
+    else pushLog(message("item.spirit_bow.effect"));
+    spendTurns(delay); return;
+  }
   inventory.potion_liquid_flame--;
   pushLog(message("item.potion_liquid_flame.effect"));
   seedLiquidFlame(floor, impact, field("player", "cooldown"));
@@ -689,7 +705,7 @@ function changeHunger(energy: number): void {
 }
 
 function spendTurns(duration = 1): void {
-  examining = targeting = false;
+  examining = false; targeting = null;
   queuedPath = duration > 1 ? [] : queuedPath;
   const start = field("player", "cooldown"), ready = timeAfter(start, duration);
   turns = ready; change("player", "lifetime", ready); change("player", "cooldown", ready);
@@ -732,7 +748,7 @@ function movePlayer(dx: number, dz: number): boolean {
 
 function descend(): void {
   queuedPath = [];
-  examining = targeting = false;
+  examining = false; targeting = null;
   if (!floor || !sameCell(cellPosition("player"), floor.exit)) { pushLog(message("log.stairs")); drawUi(); return; }
   if (depth === 5) {
     if (!gooDefeated || floorSealed) { pushLog(message("log.gooBlocks")); drawUi(); return; }
@@ -753,7 +769,7 @@ function descend(): void {
 
 function toggleExamine(): void {
   if (!floor || phase !== "playing") return;
-  targeting = false;
+  targeting = null;
   queuedPath = [];
   if (!examining) { examining = true; drawUi(); return; }
   const found = searchFloor(floor, cellPosition("player"), selectedClass === "rogue" ? 2 : 1);
@@ -784,12 +800,12 @@ function playerInput(dt: number, pointer: RuneweavePointerState): void {
   if (input_key_just_pressed("KeyF")) { toggleExamine(); return; }
   if (input_key_just_pressed("KeyE") || input_key_just_pressed("Period")) { descend(); return; }
   if (input_key_just_pressed("Space")) { queuedPath = []; spendTurns(); return; }
-  const shortcuts: ItemKind[] = ["potion_healing", "potion_liquid_flame", "potion_invisibility", "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration"];
+  const shortcuts: ItemKind[] = ["potion_healing", "potion_liquid_flame", "potion_invisibility", "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration", "spirit_bow"];
   for (const [index, item] of shortcuts.entries()) if (input_key_just_pressed(`Digit${index + 1}`)) { queuedPath = []; useInventoryItem(item); return; }
   const dx = Number(input_key_pressed("KeyD") || input_key_pressed("ArrowRight")) - Number(input_key_pressed("KeyA") || input_key_pressed("ArrowLeft"));
   const dz = Number(input_key_pressed("KeyS") || input_key_pressed("ArrowDown")) - Number(input_key_pressed("KeyW") || input_key_pressed("ArrowUp"));
   if (dx || dz) {
-    if (examining || targeting) { examining = targeting = false; drawUi(); }
+    if (examining || targeting) { examining = false; targeting = null; drawUi(); }
     queuedPath = [];
     if (actionCooldown <= 0) { movePlayer(dx, dz); actionCooldown = 0.16; }
     return;
@@ -803,7 +819,7 @@ function playerInput(dt: number, pointer: RuneweavePointerState): void {
     const worldY = (translation.get("y") as number) + 10 + pointer.y / pointerScale;
     const target = { x: Math.round(worldX / cellSize + 12), z: Math.round(12 - (worldY + 40) / cellSize) };
     if (target.x < 0 || target.z < 0 || target.x >= floor!.width || target.z >= floor!.height) return;
-    if (targeting) { throwLiquidFlame(target); return; }
+    if (targeting) { fireAtTarget(target); return; }
     if (!floor!.explored.has(cellKey(floor!, target))) return;
     if (examining) { examineCell(target); return; }
     if (sameCell(target, cellPosition("player"))) { if (sameCell(target, floor!.exit)) descend(); return; }
@@ -974,7 +990,7 @@ callbacks.on_update = (delta: number): void => {
 
   // Shortcut keys
   if (input_key_just_pressed("Escape")) {
-    if (phase === "playing" && targeting) { targeting = false; drawUi(); }
+    if (phase === "playing" && targeting) { targeting = null; drawUi(); }
     else if (phase === "playing" && examining) { examining = false; drawUi(); }
     else if (phase === "playing") setPhase("paused");
     else if (phase === "inventory" || phase === "item" || phase === "equipment" || phase === "upgrade" || phase === "hero" || phase === "message") closeModal();

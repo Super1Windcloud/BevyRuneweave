@@ -5,6 +5,7 @@ import { deflateSync, inflateSync } from "node:zlib";
 import { prepareUiAssets } from "./prepare-ui-assets.js";
 import { spdUiRevision } from "../modules/ember-arena/game/src/spd-ui-atlas.js";
 import { gearDefinitions } from "../modules/ember-arena/game/src/equipment.js";
+import { spiritBowImage } from "../modules/ember-arena/game/src/spirit-bow.js";
 
 const root = resolve(import.meta.dirname, "../../..");
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
@@ -502,7 +503,7 @@ for (const [name, index] of Object.entries({ floor: 0, entrance: 16, exit: 17, w
 // Fixed, identified appearances for the current seven-item subset. Upstream
 // random potion/scroll identification is tracked separately in PARITY.md.
 for (const [name, index] of Object.entries({ gold: 18, food_ration: 437, worn_key: 58, goo_blob: 471, potion_healing: 352, potion_liquid_flame: 353,
-  potion_invisibility: 358, potion_strength: 355, scroll_upgrade: 304, scroll_magic_mapping: 305 })) {
+  potion_invisibility: 358, potion_strength: 355, scroll_upgrade: 304, scroll_magic_mapping: 305, spirit_bow: spiritBowImage })) {
   cropSprite(name, "items.png", (index % 16) * 16, Math.floor(index / 16) * 16, 16, 16);
 }
 const obsoleteKey = join(dungeonSpritesDir, "skeleton_key.png");

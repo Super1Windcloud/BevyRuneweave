@@ -69,10 +69,10 @@
       splash: "sprites/spd/avatar_huntress.png",
       sprite: "sprites/spd/huntress.png",
       icon: "sprites/spd/hero_icons.png",
-      description: "A wilderness explorer. Starts with extra food and liquid flame. Bow abilities are pending.",
+      description: "A wilderness explorer carrying a spirit bow that grows with her level. Starts with extra food and liquid flame.",
       baseHealth: 20,
       baseSpeed: 1,
-      perks: "Gloves / cloth armor / extra food ration"
+      perks: "Spirit bow / gloves / cloth armor / extra food ration"
     }
   };
   var heroClassList = ["warrior", "mage", "rogue", "huntress"];
@@ -92,7 +92,8 @@
     "gloves",
     "shortsword",
     "cloth_armor",
-    "leather_armor"
+    "leather_armor",
+    "spirit_bow"
   ];
   var itemCatalog = {
     potion_healing: {
@@ -149,6 +150,14 @@
       category: "food",
       description: "Satisfies 300 hunger. Eating takes 3 turns; it does not heal.",
       effectText: "You eat the ration. Your hunger subsides.",
+      sprite: "sprites/spd/items.png"
+    },
+    spirit_bow: {
+      id: "spirit_bow",
+      name: "Spirit Bow",
+      category: "weapon",
+      description: "Fires unlimited spirit arrows and grows with hero level. Shooting does not replace your melee weapon. Cannot be upgraded with scrolls.",
+      effectText: "The spirit arrow fades away.",
       sprite: "sprites/spd/items.png"
     }
   };
@@ -419,7 +428,7 @@
     "hero.warrior.description": [heroClasses.warrior.description, "\u575A\u97E7\u7684\u8FD1\u6218\u6218\u58EB\u3002\u521D\u59CB\u6B66\u5668\u66F4\u5F3A\uFF0C\u5E76\u989D\u5916\u643A\u5E26\u4E00\u74F6\u6CBB\u7597\u836F\u6C34\u3002"],
     "hero.mage.description": [heroClasses.mage.description, "\u6301\u6709\u53E4\u8001\u6CD5\u6756\u7684\u5B66\u8005\u3002\u521D\u59CB\u989D\u5916\u643A\u5E26\u5347\u7EA7\u5377\u8F74\u548C\u63A2\u5730\u5377\u8F74\u3002"],
     "hero.rogue.description": [heroClasses.rogue.description, "\u64C5\u957F\u6F5C\u884C\u7684\u6218\u6597\u8005\u3002\u521D\u59CB\u989D\u5916\u643A\u5E26\u4E00\u74F6\u9690\u5F62\u836F\u6C34\uFF0C\u7528\u4E8E\u53D1\u52A8\u4F0F\u51FB\u3002"],
-    "hero.huntress.description": [heroClasses.huntress.description, "\u8352\u91CE\u4E2D\u7684\u63A2\u7D22\u8005\u3002\u521D\u59CB\u989D\u5916\u643A\u5E26\u98DF\u7269\u548C\u6DB2\u706B\u836F\u5242\u3002\u5F13\u7BAD\u80FD\u529B\u5C1A\u672A\u5B9E\u73B0\u3002"],
+    "hero.huntress.description": [heroClasses.huntress.description, "\u8352\u91CE\u4E2D\u7684\u63A2\u7D22\u8005\uFF0C\u643A\u5E26\u968F\u7B49\u7EA7\u6210\u957F\u7684\u7075\u80FD\u77ED\u5F13\u3002\u521D\u59CB\u989D\u5916\u643A\u5E26\u98DF\u7269\u548C\u6DB2\u706B\u836F\u5242\u3002"],
     "hero.unlockDuelist": ["To unlock the Duelist equip a tier 2 or higher weapon with no strength penalty.", "\u88C5\u5907\u4E00\u4EF6\u4E8C\u9636\u6216\u66F4\u9AD8\u9636\u7684\u6B66\u5668\uFF0C\u4E14\u4E0D\u53D7\u5230\u529B\u91CF\u4E0D\u8DB3\u7684\u60E9\u7F5A\uFF0C\u5373\u53EF\u89E3\u9501\u51B3\u6597\u5BB6\u3002"],
     "hero.unlockCleric": ["To unlock the Cleric fully cleanse the curse on any piece of cursed equipment.", "\u5F7B\u5E95\u51C0\u5316\u4EFB\u610F\u4E00\u4EF6\u53D7\u8BC5\u5492\u88C5\u5907\u4E0A\u7684\u8BC5\u5492\uFF0C\u5373\u53EF\u89E3\u9501\u7267\u5E08\u3002"],
     "hero.level": ["Level {level} {hero}", "{level}\u7EA7 {hero}"],
@@ -431,6 +440,8 @@
     "item.read": ["Read", "\u9605\u8BFB"],
     "item.drink": ["Drink", "\u996E\u7528"],
     "item.throw": ["Throw", "\u6295\u63B7"],
+    "item.shoot": ["Shoot", "\u5C04\u51FB"],
+    "target.bow": ["Choose a visible tile to shoot. Nearby targets are harder to hit. Esc cancels.", "\u9009\u62E9\u53EF\u89C1\u683C\u5B50\u5C04\u51FB\uFF0C\u8FD1\u8EAB\u76EE\u6807\u8F83\u96BE\u547D\u4E2D\u3002\u6309Esc\u53EF\u53D6\u6D88\u3002"],
     "target.flame": ["Choose a visible tile to throw. Fire can burn you too. Esc cancels.", "\u9009\u62E9\u53EF\u89C1\u683C\u5B50\u6295\u63B7\uFF0C\u706B\u7130\u4E5F\u4F1A\u707C\u4F24\u81EA\u5DF1\u3002\u6309Esc\u53EF\u53D6\u6D88\u3002"],
     "target.notVisible": ["Choose a tile in your current field of view.", "\u8BF7\u9009\u62E9\u5F53\u524D\u89C6\u91CE\u5185\u7684\u683C\u5B50\u3002"],
     "item.worn_shortsword.name": ["Worn Shortsword", "\u7834\u65E7\u77ED\u5251"],
@@ -486,6 +497,10 @@
     "item.food_ration.name": [itemCatalog.food_ration.name, "\u53E3\u7CAE"],
     "item.food_ration.description": [itemCatalog.food_ration.description, "\u7F13\u89E3300\u70B9\u9965\u997F\u3002\u8FDB\u98DF\u6D88\u80173\u56DE\u5408\uFF0C\u4E0D\u4F1A\u6062\u590D\u751F\u547D\u3002"],
     "item.food_ration.effect": [itemCatalog.food_ration.effectText, "\u4F60\u5403\u4E0B\u4E86\u53E3\u7CAE\uFF0C\u9965\u997F\u611F\u6E10\u6E10\u6D88\u9000\u3002"],
+    "item.spirit_bow.name": [itemCatalog.spirit_bow.name, "\u7075\u80FD\u77ED\u5F13"],
+    "item.spirit_bow.description": [itemCatalog.spirit_bow.description, "\u53D1\u5C04\u65E0\u9650\u7075\u80FD\u7BAD\u77E2\uFF0C\u968F\u82F1\u96C4\u7B49\u7EA7\u6210\u957F\u3002\u5C04\u51FB\u4E0D\u66FF\u6362\u8FD1\u6218\u6B66\u5668\uFF0C\u65E0\u6CD5\u4F7F\u7528\u5347\u7EA7\u5377\u8F74\u5F3A\u5316\u3002"],
+    "item.spirit_bow.effect": [itemCatalog.spirit_bow.effectText, "\u7075\u80FD\u7BAD\u77E2\u6D88\u6563\u4E86\u3002"],
+    "bow.stats": ["Bow level: +{level}\nDamage: {min}\u2013{max}\nStrength required: {strength}\nAttack time: {delay}", "\u77ED\u5F13\u7B49\u7EA7\uFF1A+{level}\n\u4F24\u5BB3\uFF1A{min}\u2013{max}\n\u529B\u91CF\u9700\u6C42\uFF1A{strength}\n\u5C04\u51FB\u8017\u65F6\uFF1A{delay}"],
     "monster.chaser": ["Marsupial Rat", "\u98DF\u8150\u8001\u9F20"],
     "monster.ranger": ["Gnoll Scout", "\u8C7A\u72FC\u4EBA\u4FA6\u5BDF\u5175"],
     "monster.charger": ["Sewer Crab", "\u4E0B\u6C34\u9053\u8783\u87F9"],
@@ -836,7 +851,7 @@
   var spd_pixel_metrics_default = { "0": 0.537109375, "1": 0.341796875, "2": 0.537109375, "3": 0.537109375, "4": 0.537109375, "5": 0.537109375, "6": 0.537109375, "7": 0.537109375, "8": 0.537109375, "9": 0.537109375, " ": 0.244140625, "!": 0.1953125, '"': 0.390625, "#": 0.537109375, $: 0.5859375, "%": 0.68359375, "&": 0.634765625, "'": 0.1953125, "(": 0.390625, ")": 0.390625, "*": 0.634765625, "+": 0.48828125, ",": 0.1953125, "-": 0.390625, ".": 0.1953125, "/": 0.48828125, ":": 0.1953125, ";": 0.1953125, "<": 0.439453125, "=": 0.390625, ">": 0.439453125, "?": 0.48828125, "@": 0.537109375, A: 0.537109375, B: 0.537109375, C: 0.537109375, D: 0.537109375, E: 0.537109375, F: 0.537109375, G: 0.537109375, H: 0.537109375, I: 0.29296875, J: 0.48828125, K: 0.537109375, L: 0.48828125, M: 0.634765625, N: 0.537109375, O: 0.537109375, P: 0.537109375, Q: 0.537109375, R: 0.537109375, S: 0.537109375, T: 0.48828125, U: 0.537109375, V: 0.537109375, W: 0.634765625, X: 0.537109375, Y: 0.48828125, Z: 0.537109375, "[": 0.29296875, "\\": 0.634765625, "]": 0.29296875, "^": 0.537109375, _: 0.48828125, "`": 0.29296875, a: 0.48828125, b: 0.48828125, c: 0.48828125, d: 0.48828125, e: 0.48828125, f: 0.390625, g: 0.48828125, h: 0.48828125, i: 0.1953125, j: 0.29296875, k: 0.48828125, l: 0.29296875, m: 0.5859375, n: 0.48828125, o: 0.48828125, p: 0.48828125, q: 0.48828125, r: 0.390625, s: 0.48828125, t: 0.390625, u: 0.48828125, v: 0.48828125, w: 0.5859375, x: 0.48828125, y: 0.48828125, z: 0.537109375, "{": 0.390625, "|": 0.1953125, "}": 0.390625, "~": 0.68359375 };
 
   // modules/ember-arena/game/assets/fonts/noto-sans-sc-metrics.json
-  var noto_sans_sc_metrics_default = { "0": 0.555, "1": 0.555, "2": 0.555, "3": 0.555, "4": 0.555, "5": 0.555, "6": 0.555, "7": 0.555, "8": 0.555, "9": 0.555, " ": 0.224, "!": 0.323, '"': 0.474, "#": 0.555, $: 0.555, "%": 0.921, "&": 0.68, "'": 0.278, "(": 0.338, ")": 0.338, "*": 0.467, "+": 0.555, ",": 0.278, "-": 0.347, ".": 0.278, "/": 0.392, ":": 0.278, ";": 0.278, "<": 0.555, "=": 0.555, ">": 0.555, "?": 0.474, "@": 0.946, A: 0.608, B: 0.657, C: 0.638, D: 0.688, E: 0.589, F: 0.552, G: 0.689, H: 0.728, I: 0.293, J: 0.535, K: 0.646, L: 0.543, M: 0.812, N: 0.723, O: 0.742, P: 0.633, Q: 0.742, R: 0.635, S: 0.596, T: 0.599, U: 0.721, V: 0.575, W: 0.878, X: 0.573, Y: 0.531, Z: 0.603, "[": 0.338, "\\": 0.392, "]": 0.338, "^": 0.555, _: 0.559, "`": 0.606, a: 0.563, b: 0.618, c: 0.51, d: 0.62, e: 0.554, f: 0.325, g: 0.564, h: 0.607, i: 0.275, j: 0.275, k: 0.552, l: 0.284, m: 0.926, n: 0.61, o: 0.606, p: 0.62, q: 0.62, r: 0.388, s: 0.468, t: 0.377, u: 0.607, v: 0.521, w: 0.802, x: 0.498, y: 0.521, z: 0.475, "{": 0.338, "|": 0.27, "}": 0.338, "~": 0.555, \u7834: 1, \u788E: 1, \u7684: 1, \u50CF: 1, \u7D20: 1, \u5730: 1, \u7262: 1, \u7B80: 1, \u4F53: 1, \u4E2D: 1, \u6587: 1, \u8FDB: 1, \u5165: 1, \u652F: 1, \u6301: 1, \u6E38: 1, \u620F: 1, \u6392: 1, \u884C: 1, \u699C: 1, \u65E5: 1, \u5FD7: 1, \u65B0: 1, \u95FB: 1, \u8BBE: 1, \u7F6E: 1, \u66F4: 1, \u8BB0: 1, \u5F55: 1, \u5173: 1, \u4E8E: 1, \u4E3B: 1, \u83DC: 1, \u5355: 1, \u5F00: 1, \u59CB: 1, \u95ED: 1, \u8FD4: 1, \u56DE: 1, \u4E0B: 1, \u4E00: 1, \u9875: 1, \u662F: 1, \u5426: 1, \u9009: 1, \u62E9: 1, \u4F60: 1, \u82F1: 1, \u96C4: 1, \u6218: 1, \u58EB: 1, \u6CD5: 1, \u5E08: 1, \u76D7: 1, \u8D3C: 1, \u5973: 1, \u730E: 1, \u624B: 1, \u575A: 1, \u97E7: 1, \u8FD1: 1, "\u3002": 1, \u521D: 1, \u6B66: 1, \u5668: 1, \u5F3A: 1, "\uFF0C": 1, \u5E76: 1, \u989D: 1, \u5916: 1, \u643A: 1, \u5E26: 1, \u74F6: 1, \u6CBB: 1, \u7597: 1, \u836F: 1, \u6C34: 1, \u6709: 1, \u53E4: 1, \u8001: 1, \u6756: 1, \u5B66: 1, \u8005: 1, \u5347: 1, \u7EA7: 1, \u5377: 1, \u8F74: 1, \u548C: 1, \u63A2: 1, \u64C5: 1, \u957F: 1, \u6F5C: 1, \u6597: 1, \u9690: 1, \u5F62: 1, \u7528: 1, \u53D1: 1, \u52A8: 1, \u4F0F: 1, \u51FB: 1, \u8352: 1, \u91CE: 1, \u7D22: 1, \u98DF: 1, \u7269: 1, \u6DB2: 1, \u706B: 1, \u5242: 1, \u5F13: 1, \u7BAD: 1, \u80FD: 1, \u529B: 1, \u5C1A: 1, \u672A: 1, \u5B9E: 1, \u73B0: 1, \u88C5: 1, \u5907: 1, \u4EF6: 1, \u4E8C: 1, \u9636: 1, \u6216: 1, \u9AD8: 1, \u4E14: 1, \u4E0D: 1, \u53D7: 1, \u5230: 1, \u91CF: 1, \u8DB3: 1, \u60E9: 1, \u7F5A: 1, \u5373: 1, \u53EF: 1, \u89E3: 1, \u9501: 1, \u51B3: 1, \u5BB6: 1, \u5F7B: 1, \u5E95: 1, \u51C0: 1, \u5316: 1, \u4EFB: 1, \u610F: 1, \u8BC5: 1, \u5492: 1, \u4E0A: 1, \u7267: 1, \u751F: 1, \u547D: 1, "\uFF1A": 1, \u7ECF: 1, \u9A8C: 1, \u91D1: 1, \u5E01: 1, \u5C5E: 1, \u6027: 1, \u5929: 1, \u8D4B: 1, \u80CC: 1, \u5305: 1, \u9605: 1, \u8BFB: 1, \u996E: 1, \u6295: 1, \u63B7: 1, \u89C1: 1, \u683C: 1, \u5B50: 1, \u7130: 1, \u4E5F: 1, \u4F1A: 1, \u707C: 1, \u4F24: 1, \u81EA: 1, \u5DF1: 1, \u6309: 1, \u53D6: 1, \u6D88: 1, \u8BF7: 1, \u5F53: 1, \u524D: 1, \u89C6: 1, \u5185: 1, \u65E7: 1, \u77ED: 1, \u5251: 1, \u9B54: 1, \u5315: 1, \u9996: 1, \u9576: 1, \u9489: 1, \u5957: 1, \u5E03: 1, \u7532: 1, \u76AE: 1, "\u2013": 0.536, \u5BB3: 1, \u9700: 1, \u6C42: 1, \u653B: 1, \u8017: 1, \u65F6: 1, \u6539: 1, \u5584: 1, \u8FD9: 1, \u51CF: 1, \u514D: 1, \u62A4: 1, \u9632: 1, \u4E0E: 1, \u901F: 1, \u95EA: 1, \u907F: 1, \u79FB: 1, \u5EA6: 1, \u672F: 1, \u5145: 1, \u5378: 1, \u4F5C: 1, \u8981: 1, \u94A5: 1, \u5319: 1, \u542F: 1, \u7B2C: 1, \u5C42: 1, \u9053: 1, \u51FA: 1, \u53E3: 1, \u5728: 1, \u697C: 1, \u68AF: 1, \u5904: 1, \u4F7F: 1, \u9ECF: 1, \u56E2: 1, \u7C98: 1, \u5495: 1, \u7559: 1, \u70BC: 1, \u6750: 1, \u6599: 1, \u672C: 1, \u690D: 1, \u7248: 1, \u6682: 1, \u653E: 1, \u4EA4: 1, \u6613: 1, \u5899: 1, \u58C1: 1, \u677F: 1, \u9762: 1, \u95E8: 1, \u6253: 1, \u5411: 1, \u70B9: 1, \u5DF2: 1, \u67E5: 1, \u770B: 1, \u8BE6: 1, \u60C5: 1, "\uFF1B": 1, \u518D: 1, \u6B21: 1, \u641C: 1, \u5468: 1, \u56F4: 1, "\uFF08": 1, \u5408: 1, "\uFF09": 1, \u9010: 1, \u6B65: 1, \u6062: 1, \u590D: 1, \u8150: 1, \u8680: 1, \u6E05: 1, \u9664: 1, \u6E29: 1, \u6696: 1, \u800C: 1, \u8212: 1, \u7F13: 1, \u6D41: 1, \u904D: 1, \u5168: 1, \u8EAB: 1, "\xD7": 1, \u540E: 1, \u71C3: 1, \u533A: 1, \u57DF: 1, \u88C2: 1, \u4E3A: 1, \u718A: 1, \u70C8: 1, "\uFF01": 1, \u4ECE: 1, \u654C: 1, \u4EBA: 1, \u5931: 1, \u4E86: 1, \u51C6: 1, \u6C38: 1, \u4E45: 1, \u589E: 1, \u52A0: 1, \u6D8C: 1, \u808C: 1, \u8089: 1, \u786E: 1, \u8BA4: 1, \u7B26: 1, \u878D: 1, \u63ED: 1, \u793A: 1, \u4F46: 1, \u5176: 1, \u5C40: 1, \u8111: 1, \u6D77: 1, \u6670: 1, \u8D77: 1, \u6765: 1, \u7CAE: 1, \u9965: 1, \u997F: 1, \u5403: 1, \u611F: 1, \u6E10: 1, \u9000: 1, \u9F20: 1, \u8C7A: 1, \u72FC: 1, \u4FA6: 1, \u5BDF: 1, \u5175: 1, \u8783: 1, \u87F9: 1, \u6781: 1, \u70E7: 1, \u505C: 1, \u663E: 1, \u754C: 1, \u8F93: 1, \u6570: 1, \u636E: 1, \u97F3: 1, \u9891: 1, \u8BED: 1, \u8A00: 1, \u6BD4: 1, \u4F8B: 1, \u6A2A: 1, \u5C4F: 1, \u7AD6: 1, \u64CD: 1, \u63D0: 1, \u5C11: 1, \u6001: 1, \u6548: 1, \u679C: 1, \u6307: 1, \u9488: 1, \u7075: 1, \u654F: 1, \u500D: 1, \u65B9: 1, \u952E: 1, \u7A7A: 1, \u7B49: 1, \u5F85: 1, \u53E5: 1, \u53F7: 1, \u7EDD: 1, \u5BF9: 1, \u5750: 1, \u6807: 1, \u8C03: 1, \u8282: 1, \u6700: 1, \u5206: 1, \u80DC: 1, \u5229: 1, \u5192: 1, \u9669: 1, \u968F: 1, \u673A: 1, \u79CD: 1, \u4FDD: 1, \u5B58: 1, \u5417: 1, "\uFF1F": 1, \u4E50: 1, \u7ACB: 1, \u6863: 1, \u4ECD: 1, \u8BDD: 1, \u6B63: 1, \u5E38: 1, \u73A9: 1, \u517C: 1, \u5BB9: 1, \u8986: 1, \u76D6: 1, \u8BE5: 1, \u8D25: 1, \u4EE5: 1, \u91CD: 1, \u8BD5: 1, \u539F: 1, \u5F71: 1, \u54CD: 1, \u91CC: 1, \u7A0B: 1, \u7891: 1, \u5B8C: 1, \u6210: 1, \u76D1: 1, \u72F1: 1, \u53CA: 1, \u7EED: 1, \u6B7B: 1, "\u2026": 1, \u9886: 1, \u88AB: 1, \u7ED3: 1, \u675F: 1, \u6DF1: 1, \u5357: 1, \u6536: 1, \u96C6: 1, \u54C1: 1, \u5236: 1, \u906D: 1, \u9047: 1, \u57FA: 1, \u521B: 1, \u8FD0: 1, \u7531: 1, \u6B22: 1, \u8FCE: 1, \u6BCF: 1, \u627E: 1, \u6361: 1, \u5C06: 1, \u679A: 1, \u6389: 1, \u843D: 1, \u62FE: 1, \u5148: 1, \u6BB5: 1, \u6247: 1, \u85CF: 1, \u5FEB: 1, \u4E9B: 1, \u5427: 1, \u9650: 1, \u9020: 1, \u8EB2: 1, \u7EE7: 1, \u81A8: 1, \u80C0: 1, \u79BB: 1, \u5B83: 1, \u8303: 1, \u84C4: 1, \u64A4: 1, \u7206: 1, \u7AD9: 1, \u6321: 1, \u4F4F: 1, \u53BB: 1, \u8DEF: 1, \u5DE2: 1, \u7A74: 1, \u68C0: 1, \u6240: 1, "\u3001": 1, \u53CD: 1, \u5C04: 1, \u7EC4: 1, \u8BE2: 1, \u62D2: 1, \u65E0: 1, \u503C: 1, \u7EF4: 1, \u7CBE: 1, \u5B57: 1, \u53D8: 1, \u6362: 1, \u76F8: 1, \u5207: 1, \u9500: 1, \u6BC1: 1, \u6821: 1, \u7406: 1, \u76D8: 1, \u89E6: 1, \u6478: 1, \u5B89: 1, \u77E5: 1, \u72B6: 1, \u5199: 1, \u5220: 1, \u50A8: 1, \u79C1: 1, \u76EE: 1, \u6574: 1, \u753B: 1, \u89C9: 1, \u9F50: 1, \u63A5: 1, \u7F3A: 1, \u4ED6: 1, \u5E73: 1, \u53F0: 1, \u70ED: 1, \u8F7D: 1, \u7F51: 1, \u7EDC: 1, \u94AE: 1 };
+  var noto_sans_sc_metrics_default = { "0": 0.555, "1": 0.555, "2": 0.555, "3": 0.555, "4": 0.555, "5": 0.555, "6": 0.555, "7": 0.555, "8": 0.555, "9": 0.555, " ": 0.224, "!": 0.323, '"': 0.474, "#": 0.555, $: 0.555, "%": 0.921, "&": 0.68, "'": 0.278, "(": 0.338, ")": 0.338, "*": 0.467, "+": 0.555, ",": 0.278, "-": 0.347, ".": 0.278, "/": 0.392, ":": 0.278, ";": 0.278, "<": 0.555, "=": 0.555, ">": 0.555, "?": 0.474, "@": 0.946, A: 0.608, B: 0.657, C: 0.638, D: 0.688, E: 0.589, F: 0.552, G: 0.689, H: 0.728, I: 0.293, J: 0.535, K: 0.646, L: 0.543, M: 0.812, N: 0.723, O: 0.742, P: 0.633, Q: 0.742, R: 0.635, S: 0.596, T: 0.599, U: 0.721, V: 0.575, W: 0.878, X: 0.573, Y: 0.531, Z: 0.603, "[": 0.338, "\\": 0.392, "]": 0.338, "^": 0.555, _: 0.559, "`": 0.606, a: 0.563, b: 0.618, c: 0.51, d: 0.62, e: 0.554, f: 0.325, g: 0.564, h: 0.607, i: 0.275, j: 0.275, k: 0.552, l: 0.284, m: 0.926, n: 0.61, o: 0.606, p: 0.62, q: 0.62, r: 0.388, s: 0.468, t: 0.377, u: 0.607, v: 0.521, w: 0.802, x: 0.498, y: 0.521, z: 0.475, "{": 0.338, "|": 0.27, "}": 0.338, "~": 0.555, \u7834: 1, \u788E: 1, \u7684: 1, \u50CF: 1, \u7D20: 1, \u5730: 1, \u7262: 1, \u7B80: 1, \u4F53: 1, \u4E2D: 1, \u6587: 1, \u8FDB: 1, \u5165: 1, \u652F: 1, \u6301: 1, \u6E38: 1, \u620F: 1, \u6392: 1, \u884C: 1, \u699C: 1, \u65E5: 1, \u5FD7: 1, \u65B0: 1, \u95FB: 1, \u8BBE: 1, \u7F6E: 1, \u66F4: 1, \u8BB0: 1, \u5F55: 1, \u5173: 1, \u4E8E: 1, \u4E3B: 1, \u83DC: 1, \u5355: 1, \u5F00: 1, \u59CB: 1, \u95ED: 1, \u8FD4: 1, \u56DE: 1, \u4E0B: 1, \u4E00: 1, \u9875: 1, \u662F: 1, \u5426: 1, \u9009: 1, \u62E9: 1, \u4F60: 1, \u82F1: 1, \u96C4: 1, \u6218: 1, \u58EB: 1, \u6CD5: 1, \u5E08: 1, \u76D7: 1, \u8D3C: 1, \u5973: 1, \u730E: 1, \u624B: 1, \u575A: 1, \u97E7: 1, \u8FD1: 1, "\u3002": 1, \u521D: 1, \u6B66: 1, \u5668: 1, \u5F3A: 1, "\uFF0C": 1, \u5E76: 1, \u989D: 1, \u5916: 1, \u643A: 1, \u5E26: 1, \u74F6: 1, \u6CBB: 1, \u7597: 1, \u836F: 1, \u6C34: 1, \u6709: 1, \u53E4: 1, \u8001: 1, \u6756: 1, \u5B66: 1, \u8005: 1, \u5347: 1, \u7EA7: 1, \u5377: 1, \u8F74: 1, \u548C: 1, \u63A2: 1, \u64C5: 1, \u957F: 1, \u6F5C: 1, \u6597: 1, \u9690: 1, \u5F62: 1, \u7528: 1, \u53D1: 1, \u52A8: 1, \u4F0F: 1, \u51FB: 1, \u8352: 1, \u91CE: 1, \u7D22: 1, \u968F: 1, \u7B49: 1, \u6210: 1, \u7075: 1, \u80FD: 1, \u77ED: 1, \u5F13: 1, \u98DF: 1, \u7269: 1, \u6DB2: 1, \u706B: 1, \u5242: 1, \u88C5: 1, \u5907: 1, \u4EF6: 1, \u4E8C: 1, \u9636: 1, \u6216: 1, \u9AD8: 1, \u4E14: 1, \u4E0D: 1, \u53D7: 1, \u5230: 1, \u529B: 1, \u91CF: 1, \u8DB3: 1, \u60E9: 1, \u7F5A: 1, \u5373: 1, \u53EF: 1, \u89E3: 1, \u9501: 1, \u51B3: 1, \u5BB6: 1, \u5F7B: 1, \u5E95: 1, \u51C0: 1, \u5316: 1, \u4EFB: 1, \u610F: 1, \u8BC5: 1, \u5492: 1, \u4E0A: 1, \u7267: 1, \u751F: 1, \u547D: 1, "\uFF1A": 1, \u7ECF: 1, \u9A8C: 1, \u91D1: 1, \u5E01: 1, \u5C5E: 1, \u6027: 1, \u5929: 1, \u8D4B: 1, \u80CC: 1, \u5305: 1, \u9605: 1, \u8BFB: 1, \u996E: 1, \u6295: 1, \u63B7: 1, \u5C04: 1, \u89C1: 1, \u683C: 1, \u5B50: 1, \u8EAB: 1, \u76EE: 1, \u6807: 1, \u8F83: 1, \u96BE: 1, \u6309: 1, \u53D6: 1, \u6D88: 1, \u7130: 1, \u4E5F: 1, \u4F1A: 1, \u707C: 1, \u4F24: 1, \u81EA: 1, \u5DF1: 1, \u8BF7: 1, \u5F53: 1, \u524D: 1, \u89C6: 1, \u5185: 1, \u65E7: 1, \u5251: 1, \u9B54: 1, \u5315: 1, \u9996: 1, \u9576: 1, \u9489: 1, \u5957: 1, \u5E03: 1, \u7532: 1, \u76AE: 1, "\u2013": 0.536, \u5BB3: 1, \u9700: 1, \u6C42: 1, \u653B: 1, \u8017: 1, \u65F6: 1, \u6539: 1, \u5584: 1, \u8FD9: 1, \u51CF: 1, \u514D: 1, \u62A4: 1, \u9632: 1, \u4E0E: 1, \u901F: 1, \u95EA: 1, \u907F: 1, \u79FB: 1, \u5EA6: 1, \u672F: 1, \u5145: 1, \u5C1A: 1, \u672A: 1, \u5B9E: 1, \u73B0: 1, \u5378: 1, \u4F5C: 1, \u8981: 1, \u94A5: 1, \u5319: 1, \u542F: 1, \u7B2C: 1, \u5C42: 1, \u9053: 1, \u51FA: 1, \u53E3: 1, \u5728: 1, \u697C: 1, \u68AF: 1, \u5904: 1, \u4F7F: 1, \u9ECF: 1, \u56E2: 1, \u7C98: 1, \u5495: 1, \u7559: 1, \u70BC: 1, \u6750: 1, \u6599: 1, \u672C: 1, \u690D: 1, \u7248: 1, \u6682: 1, \u653E: 1, \u4EA4: 1, \u6613: 1, \u5899: 1, \u58C1: 1, \u677F: 1, \u9762: 1, \u95E8: 1, \u6253: 1, \u5411: 1, \u70B9: 1, \u5DF2: 1, \u67E5: 1, \u770B: 1, \u8BE6: 1, \u60C5: 1, "\uFF1B": 1, \u518D: 1, \u6B21: 1, \u641C: 1, \u5468: 1, \u56F4: 1, "\uFF08": 1, \u5408: 1, "\uFF09": 1, \u9010: 1, \u6B65: 1, \u6062: 1, \u590D: 1, \u8150: 1, \u8680: 1, \u6E05: 1, \u9664: 1, \u6E29: 1, \u6696: 1, \u800C: 1, \u8212: 1, \u7F13: 1, \u6D41: 1, \u904D: 1, \u5168: 1, "\xD7": 1, \u540E: 1, \u71C3: 1, \u533A: 1, \u57DF: 1, \u88C2: 1, \u4E3A: 1, \u718A: 1, \u70C8: 1, "\uFF01": 1, \u4ECE: 1, \u654C: 1, \u4EBA: 1, \u5931: 1, \u4E86: 1, \u51C6: 1, \u6C38: 1, \u4E45: 1, \u589E: 1, \u52A0: 1, \u6D8C: 1, \u808C: 1, \u8089: 1, \u786E: 1, \u8BA4: 1, \u7B26: 1, \u878D: 1, \u63ED: 1, \u793A: 1, \u4F46: 1, \u5176: 1, \u5C40: 1, \u8111: 1, \u6D77: 1, \u6670: 1, \u8D77: 1, \u6765: 1, \u7CAE: 1, \u9965: 1, \u997F: 1, \u5403: 1, \u611F: 1, \u6E10: 1, \u9000: 1, \u65E0: 1, \u9650: 1, \u7BAD: 1, \u77E2: 1, \u66FF: 1, \u6362: 1, \u6563: 1, \u9F20: 1, \u8C7A: 1, \u72FC: 1, \u4FA6: 1, \u5BDF: 1, \u5175: 1, \u8783: 1, \u87F9: 1, \u6781: 1, \u70E7: 1, \u505C: 1, \u663E: 1, \u754C: 1, \u8F93: 1, \u6570: 1, \u636E: 1, \u97F3: 1, \u9891: 1, \u8BED: 1, \u8A00: 1, \u6BD4: 1, \u4F8B: 1, \u6A2A: 1, \u5C4F: 1, \u7AD6: 1, \u64CD: 1, \u63D0: 1, \u5C11: 1, \u6001: 1, \u6548: 1, \u679C: 1, \u6307: 1, \u9488: 1, \u654F: 1, \u500D: 1, \u65B9: 1, \u952E: 1, \u7A7A: 1, \u5F85: 1, \u53E5: 1, \u53F7: 1, \u7EDD: 1, \u5BF9: 1, \u5750: 1, \u8C03: 1, \u8282: 1, \u6700: 1, \u5206: 1, \u80DC: 1, \u5229: 1, \u5192: 1, \u9669: 1, \u673A: 1, \u79CD: 1, \u4FDD: 1, \u5B58: 1, \u5417: 1, "\uFF1F": 1, \u4E50: 1, \u7ACB: 1, \u6863: 1, \u4ECD: 1, \u8BDD: 1, \u6B63: 1, \u5E38: 1, \u73A9: 1, \u517C: 1, \u5BB9: 1, \u8986: 1, \u76D6: 1, \u8BE5: 1, \u8D25: 1, \u4EE5: 1, \u91CD: 1, \u8BD5: 1, \u539F: 1, \u5F71: 1, \u54CD: 1, \u91CC: 1, \u7A0B: 1, \u7891: 1, \u5B8C: 1, \u76D1: 1, \u72F1: 1, \u53CA: 1, \u7EED: 1, \u6B7B: 1, "\u2026": 1, \u9886: 1, \u88AB: 1, \u7ED3: 1, \u675F: 1, \u6DF1: 1, \u5357: 1, \u6536: 1, \u96C6: 1, \u54C1: 1, \u5236: 1, \u906D: 1, \u9047: 1, \u57FA: 1, \u521B: 1, \u8FD0: 1, \u7531: 1, \u6B22: 1, \u8FCE: 1, \u6BCF: 1, \u627E: 1, \u6361: 1, \u5C06: 1, \u679A: 1, \u6389: 1, \u843D: 1, \u62FE: 1, \u5148: 1, \u6BB5: 1, \u6247: 1, \u85CF: 1, \u5FEB: 1, \u4E9B: 1, \u5427: 1, \u9020: 1, \u8EB2: 1, \u7EE7: 1, \u81A8: 1, \u80C0: 1, \u79BB: 1, \u5B83: 1, \u8303: 1, \u84C4: 1, \u64A4: 1, \u7206: 1, \u7AD9: 1, \u6321: 1, \u4F4F: 1, \u53BB: 1, \u8DEF: 1, \u5DE2: 1, \u7A74: 1, \u68C0: 1, \u6240: 1, "\u3001": 1, \u53CD: 1, \u7EC4: 1, \u8BE2: 1, \u62D2: 1, \u503C: 1, \u7EF4: 1, \u7CBE: 1, \u5B57: 1, \u53D8: 1, \u76F8: 1, \u5207: 1, \u9500: 1, \u6BC1: 1, \u6821: 1, \u7406: 1, \u76D8: 1, \u89E6: 1, \u6478: 1, \u5B89: 1, \u77E5: 1, \u72B6: 1, \u5199: 1, \u5220: 1, \u50A8: 1, \u79C1: 1, \u6574: 1, \u753B: 1, \u89C9: 1, \u9F50: 1, \u63A5: 1, \u7F3A: 1, \u4ED6: 1, \u5E73: 1, \u53F0: 1, \u70ED: 1, \u8F7D: 1, \u7F51: 1, \u7EDC: 1, \u94AE: 1 };
 
   // modules/ember-arena/game/src/text-layout.ts
   var hasCjk = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/u;
@@ -888,6 +903,23 @@
       lines.push(line);
     }
     return lines;
+  }
+
+  // modules/ember-arena/game/src/spirit-bow.ts
+  var spiritBowLevel = (heroLevel) => Math.floor(heroLevel / 5);
+  var spiritBowRange = (heroLevel) => [1 + Math.floor(heroLevel / 5), 6 + Math.trunc(Math.fround(heroLevel / 2.5))];
+  var spiritBowStrength = (heroLevel) => 10 - Math.floor((Math.sqrt(8 * spiritBowLevel(heroLevel) + 1) - 1) / 2);
+  function spiritBowAccuracy(heroLevel, strength2, distance) {
+    const encumbrance = Math.max(0, spiritBowStrength(heroLevel) - strength2);
+    const factor = Math.fround(Math.fround(1 / Math.pow(1.5, encumbrance)) * (distance <= 1 ? 0.5 : 1.5));
+    return Math.max(1, Math.round(Math.fround((9 + heroLevel) * factor)));
+  }
+  function spiritBowDelay(heroLevel, strength2, hasTarget) {
+    return hasTarget ? Math.fround(Math.pow(1.2, Math.max(0, spiritBowStrength(heroLevel) - strength2))) : 1;
+  }
+  function spiritBowDamage(heroLevel, strength2, roll2) {
+    const [min, max] = spiritBowRange(heroLevel), excess = strength2 - spiritBowStrength(heroLevel);
+    return roll2(min, max) + (excess > 0 ? roll2(0, excess) : 0);
   }
 
   // modules/ember-arena/game/src/spd-ui.ts
@@ -1057,7 +1089,9 @@
           childrenSlot.push(art(`equipment_${index}`, ["empty_weapon", "empty_armor", "empty_artifact", "empty_ring", "empty_ring"][index], (slotWidth - 16) / 2, (slotHeight - 16) / 2));
         } else if (key) {
           childrenSlot.push(image(`item_ico_${key}`, `sprites/dungeon/${key}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
-          childrenSlot.push(label(`item_count_${key}`, `${quantity(key)}`, 1, 1, slotWidth - 2, 6));
+          if (key === "spirit_bow") {
+            if (spiritBowLevel(state.level)) childrenSlot.push(label("item_level_spirit_bow", `+${spiritBowLevel(state.level)}`, 1, 1, slotWidth - 2, 6));
+          } else childrenSlot.push(label(`item_count_${key}`, `${quantity(key)}`, 1, 1, slotWidth - 2, 6));
         }
         children.push({
           kind: "button",
@@ -1126,7 +1160,7 @@
       elements.push({ kind: "button", id: "wait", onClick: () => on("wait"), style: rect(waitX, toolbarY, 20, 26), children: [art("wait_tool", "wait_tool", 0, 0), art("wait_tool_icon", "wait_tool_icon", 2, 5)] });
       elements.push({ kind: "button", id: "search", onClick: () => on("search"), style: rect(searchX, toolbarY, 20, 26), children: [art("search_tool", "search_tool", 0, 0), art("search_tool_icon", "search_tool_icon", 2, 5)] });
       if (state.targeting) {
-        const promptWidth = Math.max(90, w - 30), lines = wrappedText(t("target.flame"), promptWidth, 6);
+        const promptWidth = Math.max(90, w - 30), lines = wrappedText(t(state.targeting === "bow" ? "target.bow" : "target.flame"), promptWidth, 6);
         elements.push(label("target_prompt", lines.join("\n"), 2, 44, promptWidth, 6, titleColor, lines.length * 8));
         elements.push(control("cancel_target", t("common.close"), w - 28, 44, 26, 14, "toast", void 0, "cancel_target", true, 6));
       } else if (state.examining) {
@@ -1137,7 +1171,7 @@
         const lines = wrappedText(t("log.guide"), w - 4, 6);
         elements.push(label("hud_hint", lines.join("\n"), 2, 44, w - 4, 6, grey, lines.length * 8));
       }
-      const quick = ["potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null, null];
+      const quick = state.inventory.spirit_bow > 0 ? ["spirit_bow", "potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null] : ["potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null, null];
       const count = 4 + Number(w > 152) + Number(w > 170);
       let quickRight = m.large ? searchX : toolbarX;
       for (let offset = 0; offset < count; offset++) {
@@ -1147,7 +1181,7 @@
         quickRight -= width;
         elements.push({ kind: "button", id: item ? `quick_${item}` : `quick_empty_${index}`, onClick: item ? () => on("quick", item) : void 0, style: rect(quickRight, h - 24, width, 24), children: [
           art(`quick_frame_${index}`, `quick_${side}`, 0, 0),
-          ...item ? [image(`quick_icon_${index}`, `sprites/dungeon/${item}.png`, rect((width - 16) / 2, 3, 16, 16)), label(`quick_count_${index}`, `${state.inventory[item]}`, 2, 2, 14, 5)] : []
+          ...item ? [image(`quick_icon_${index}`, `sprites/dungeon/${item}.png`, rect((width - 16) / 2, 3, 16, 16)), label(`quick_count_${index}`, item === "spirit_bow" ? spiritBowLevel(state.level) ? `+${spiritBowLevel(state.level)}` : "" : `${state.inventory[item]}`, 2, 2, 14, 5)] : []
         ] });
       }
       const logWidth = Math.max(90, w - 90);
@@ -1182,13 +1216,21 @@
       window("bag_window", bag.width, bag.height, bag.children);
       if (state.phase === "item") {
         const def = itemCatalog[state.item];
-        const lines = wrappedText(t(`item.${state.item}.description`), 120, 6), descriptionHeight = Math.ceil(lines.length * 7.2);
+        const bowStats = state.item === "spirit_bow" ? `
+${t("bow.stats", {
+          min: spiritBowRange(state.level)[0],
+          max: spiritBowRange(state.level)[1],
+          strength: spiritBowStrength(state.level),
+          delay: spiritBowDelay(state.level, state.strength, true).toFixed(2),
+          level: spiritBowLevel(state.level)
+        })}` : "";
+        const lines = wrappedText(t(`item.${state.item}.description`) + bowStats, 120, 6), descriptionHeight = Math.ceil(lines.length * 7.2);
         const buttonY = 20 + descriptionHeight;
         window("item_window", 120, buttonY + 16, [
           image("item_detail_icon", `sprites/dungeon/${state.item}.png`, rect(0, 0, 16, 16)),
           label("item_detail_title", t(`item.${state.item}.name`), 20, 1, 100, 9, titleColor, 26),
           label("item_detail_desc", lines.join("\n"), 0, 18, 120, 6, white, descriptionHeight),
-          control(`use_${state.item}`, state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", void 0, `use_${state.item}`, true, 8)
+          control(`use_${state.item}`, state.item === "spirit_bow" ? t("item.shoot") : state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", void 0, `use_${state.item}`, true, 8)
         ]);
       } else if (state.phase === "equipment") {
         const gear = state.equipment.find((item) => item.id === state.selectedGear);
@@ -1503,7 +1545,7 @@ ${t("gear.staffPending")}` : "");
   var uiNotice = null;
   var previewPhase = null;
   var examining = false;
-  var targeting = false;
+  var targeting = null;
   var cameraShake = 0;
   var wornKeys = 0;
   var gooBlobs = 0;
@@ -1522,7 +1564,8 @@ ${t("gear.staffPending")}` : "");
     potion_strength: 0,
     scroll_upgrade: 1,
     scroll_magic_mapping: 0,
-    food_ration: 1
+    food_ration: 1,
+    spirit_bow: 0
   };
   var uid = (prefix) => `${prefix}_${nextId++}`;
   var health = () => Math.max(0, field("player", "health"));
@@ -1742,7 +1785,7 @@ ${t("gear.staffPending")}` : "");
         drawUi();
         return;
       case "cancel_target":
-        targeting = false;
+        targeting = null;
         drawUi();
         return;
       case "worn_key":
@@ -1822,7 +1865,7 @@ ${t("gear.staffPending")}` : "");
   function setPhase(next) {
     previewPhase = null;
     examining = false;
-    targeting = false;
+    targeting = null;
     cameraShake = 0;
     if ((next === "won" || next === "lost") && !runRecorded) {
       runRecorded = true;
@@ -1842,7 +1885,8 @@ ${t("gear.staffPending")}` : "");
   }
   function room() {
     floor = null;
-    examining = targeting = false;
+    examining = false;
+    targeting = null;
     cameraShake = 0;
     scene_clear();
     ui_clear();
@@ -1888,7 +1932,8 @@ ${t("gear.staffPending")}` : "");
       potion_strength: 0,
       scroll_upgrade: selectedClass === "mage" ? 2 : 1,
       scroll_magic_mapping: selectedClass === "mage" ? 1 : 0,
-      food_ration: selectedClass === "huntress" ? 2 : 1
+      food_ration: selectedClass === "huntress" ? 2 : 1,
+      spirit_bow: selectedClass === "huntress" ? 1 : 0
     };
     dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) })];
     room();
@@ -1897,7 +1942,8 @@ ${t("gear.staffPending")}` : "");
     setPhase("playing");
   }
   function enterFloor() {
-    examining = targeting = false;
+    examining = false;
+    targeting = null;
     unsealFloor();
     for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id)) scene_despawn(id);
     for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
@@ -1986,6 +2032,7 @@ ${t("gear.staffPending")}` : "");
         if (item === "worn_key") wornKeys++;
         else if (item === "goo_blob") gooBlobs++;
         else if (isGearKind(item)) equipment.push({ id: Math.max(0, ...equipment.map((gear) => gear.id)) + 1, kind: item, level: 0, equipped: false });
+        else if (item === "spirit_bow") inventory.spirit_bow = 1;
         else inventory[item]++;
         pushLog(message("log.item", { item: message(`item.${item}.name`) }));
       } else {
@@ -2003,11 +2050,11 @@ ${t("gear.staffPending")}` : "");
       setPhase("upgrade");
       return true;
     }
-    if (kindKey === "potion_liquid_flame") {
+    if (kindKey === "potion_liquid_flame" || kindKey === "spirit_bow") {
       queuedPath = [];
       examining = false;
       phase = "playing";
-      targeting = true;
+      targeting = kindKey === "spirit_bow" ? "bow" : "flame";
       publish();
       drawUi();
       return true;
@@ -2102,16 +2149,19 @@ ${t("gear.staffPending")}` : "");
   function roll(min, max) {
     return Math.round(min + (random() + random()) * (max - min) / 2);
   }
-  function attackMonster(id) {
+  function attackMonster(id, ranged = false) {
     const type = kind(id), spec = mobCombat[type];
     const weapon = equippedGear(equipment, "weapon");
-    const surprised = (hasBuff("invisibility", "player") || field(id, "lifetime") === 0) && strengthDeficit(weapon, strength) === 0;
+    const encumbrance = ranged ? Math.max(0, spiritBowStrength(level) - strength) : strengthDeficit(weapon, strength);
+    const surprised = (hasBuff("invisibility", "player") || field(id, "lifetime") === 0) && encumbrance === 0;
     const enraged = type === "boss" && field(id, "health") <= enemySpecs.boss.health / 2;
-    const hit = surprised || random() * attackSkill(weapon, strength, level) >= random() * Math.floor(spec.defense * (enraged ? 1.5 : 1));
+    const accuracy = ranged ? spiritBowAccuracy(level, strength, cellDistance(cellPosition("player"), cellPosition(id))) : attackSkill(weapon, strength, level);
+    const hit = surprised || random() * accuracy >= random() * Math.floor(spec.defense * (enraged ? 1.5 : 1));
     scene_despawn(buffId("invisibility", "player"));
     change(id, "lifetime", 1);
     if (hit) {
-      const power = Math.max(0, weaponDamage(weapon, strength, surprised, roll) - roll(0, spec.armor));
+      const damage = ranged ? spiritBowDamage(level, strength, roll) : weaponDamage(weapon, strength, surprised, roll);
+      const power = Math.max(0, damage - roll(0, spec.armor));
       pushLog(message(surprised ? "log.surprise" : "log.hit", { monster: message(`monster.${type}`), damage: power }));
       damageMonster(id, power);
     } else pushLog(message("log.enemyDodged", { monster: message(`monster.${type}`) }));
@@ -2223,15 +2273,16 @@ ${t("gear.staffPending")}` : "");
     else change(id, "health", left - 1);
     return 1;
   }
-  function throwLiquidFlame(target) {
+  function fireAtTarget(target) {
     if (!floor || !targeting || phase !== "playing") return;
     if (!floor.visible.has(cellKey(floor, target))) {
       pushLog(message("target.notVisible"));
       drawUi();
       return;
     }
-    if (inventory.potion_liquid_flame <= 0) {
-      targeting = false;
+    const item = targeting === "bow" ? "spirit_bow" : "potion_liquid_flame";
+    if (inventory[item] <= 0) {
+      targeting = null;
       drawUi();
       return;
     }
@@ -2241,6 +2292,14 @@ ${t("gear.staffPending")}` : "");
       target,
       (point) => monsterIds().some((id) => sameCell(cellPosition(id), point))
     );
+    if (targeting === "bow") {
+      const enemy = monsterIds().find((id) => sameCell(cellPosition(id), impact));
+      const delay = spiritBowDelay(level, strength, enemy !== void 0);
+      if (enemy) attackMonster(enemy, true);
+      else pushLog(message("item.spirit_bow.effect"));
+      spendTurns(delay);
+      return;
+    }
     inventory.potion_liquid_flame--;
     pushLog(message("item.potion_liquid_flame.effect"));
     seedLiquidFlame(floor, impact, field("player", "cooldown"));
@@ -2320,7 +2379,8 @@ ${t("gear.staffPending")}` : "");
     recordHunger(affectHunger(field(id, "health"), field(id, "power"), energy, maxHealth));
   }
   function spendTurns(duration = 1) {
-    examining = targeting = false;
+    examining = false;
+    targeting = null;
     queuedPath = duration > 1 ? [] : queuedPath;
     const start = field("player", "cooldown"), ready = timeAfter(start, duration);
     turns = ready;
@@ -2369,7 +2429,8 @@ ${t("gear.staffPending")}` : "");
   }
   function descend() {
     queuedPath = [];
-    examining = targeting = false;
+    examining = false;
+    targeting = null;
     if (!floor || !sameCell(cellPosition("player"), floor.exit)) {
       pushLog(message("log.stairs"));
       drawUi();
@@ -2407,7 +2468,7 @@ ${t("gear.staffPending")}` : "");
   }
   function toggleExamine() {
     if (!floor || phase !== "playing") return;
-    targeting = false;
+    targeting = null;
     queuedPath = [];
     if (!examining) {
       examining = true;
@@ -2450,7 +2511,7 @@ ${t("gear.staffPending")}` : "");
       spendTurns();
       return;
     }
-    const shortcuts = ["potion_healing", "potion_liquid_flame", "potion_invisibility", "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration"];
+    const shortcuts = ["potion_healing", "potion_liquid_flame", "potion_invisibility", "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration", "spirit_bow"];
     for (const [index, item] of shortcuts.entries()) if (input_key_just_pressed(`Digit${index + 1}`)) {
       queuedPath = [];
       useInventoryItem(item);
@@ -2460,7 +2521,8 @@ ${t("gear.staffPending")}` : "");
     const dz = Number(input_key_pressed("KeyS") || input_key_pressed("ArrowDown")) - Number(input_key_pressed("KeyW") || input_key_pressed("ArrowUp"));
     if (dx || dz) {
       if (examining || targeting) {
-        examining = targeting = false;
+        examining = false;
+        targeting = null;
         drawUi();
       }
       queuedPath = [];
@@ -2480,7 +2542,7 @@ ${t("gear.staffPending")}` : "");
       const target = { x: Math.round(worldX / cellSize + 12), z: Math.round(12 - (worldY + 40) / cellSize) };
       if (target.x < 0 || target.z < 0 || target.x >= floor.width || target.z >= floor.height) return;
       if (targeting) {
-        throwLiquidFlame(target);
+        fireAtTarget(target);
         return;
       }
       if (!floor.explored.has(cellKey(floor, target))) return;
@@ -2659,7 +2721,7 @@ ${t("gear.staffPending")}` : "");
     }
     if (input_key_just_pressed("Escape")) {
       if (phase === "playing" && targeting) {
-        targeting = false;
+        targeting = null;
         drawUi();
       } else if (phase === "playing" && examining) {
         examining = false;

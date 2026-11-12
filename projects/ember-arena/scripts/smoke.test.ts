@@ -994,6 +994,135 @@ test("player buffs survive descending while environmental fire stays on the old 
   assert.equal(JSON.stringify([...game.entities]), before);
 });
 
+function huntress(game = harness()): Game {
+  game.click("start"); game.click("hero_huntress"); game.click("begin_run"); removeMonsters(game); return game;
+}
+
+test("only the Huntress starts with a carried spirit bow and its first quick slot", () => {
+  for (const hero of heroClassList) {
+    const game = harness(); game.click("start"); game.click(`hero_${hero}`); game.click("begin_run"); removeMonsters(game);
+    assert.equal(game.ui.has("quick_spirit_bow"), hero === "huntress");
+    game.key("KeyI"); assert.equal(game.ui.has("slot_spirit_bow"), hero === "huntress");
+    if (hero === "huntress") {
+      assert.equal(game.ui.get("item_ico_spirit_bow")!.image, "sprites/dungeon/spirit_bow.png");
+      assert.ok(!game.ui.has("item_count_spirit_bow"));
+      game.click("slot_spirit_bow"); assert.equal(game.ui.get("use_spirit_bow__label")!.text, "Shoot");
+      assert.match(game.ui.get("item_detail_desc")!.text!.replace(/\n/g, " "), /Damage: 1–6/);
+      assert.ok(!game.ui.has("toggle_equipment"));
+      game.click("use_spirit_bow"); assert.match(game.ui.get("target_prompt")!.text!, /shoot/);
+      game.click("cancel_target"); assert.equal(turnCount(game), 0);
+    } else {
+      game.key("Escape"); game.key("Digit8"); assert.ok(!game.ui.has("target_prompt")); assert.equal(turnCount(game), 0);
+    }
+  }
+});
+
+test("bow aim cancellation and switching to flame cannot consume items or advance effects", () => {
+  const game = huntress(), before = JSON.stringify([...game.entities]);
+  game.click("quick_spirit_bow"); game.tick(100);
+  assert.equal(JSON.stringify([...game.entities]), before);
+  game.tapCell({ x: 4, z: 12 }); assert.ok(game.ui.has("target_prompt")); assert.equal(turnCount(game), 0);
+  game.key("Digit2"); assert.match(game.ui.get("target_prompt")!.text!, /throw/);
+  game.key("Digit8"); assert.match(game.ui.get("target_prompt")!.text!, /shoot/);
+  game.key("Escape"); assert.ok(!game.ui.has("target_prompt")); assert.equal(game.state().message, "PLAYING");
+  game.key("KeyI"); assert.equal(game.ui.get("item_count_potion_liquid_flame")!.text, "2");
+  assert.ok(game.ui.has("slot_spirit_bow")); assert.equal(JSON.stringify([...game.entities]), before);
+});
+
+test("repeated spirit arrows hit the first character without consuming the bow or changing glove timing", () => {
+  const game = huntress();
+  putActor(game, "front", "chaser", { x: 13, z: 12 }); putActor(game, "behind", "chaser", { x: 14, z: 12 });
+  for (const id of ["front", "behind"]) game.entities.get(id)!.body!.cooldown = 1000;
+  for (let shot = 0; shot < 8; shot++) {
+    const before = Number(game.entities.get("front")!.body!.health);
+    game.entities.get("front")!.body!.lifetime = 0;
+    game.key("Digit8"); game.tapCell({ x: 14, z: 12 });
+    const damage = before - Number(game.entities.get("front")!.body!.health);
+    assert.ok(damage >= 0 && damage <= 6); assert.equal(turnCount(game), shot + 1);
+    assert.equal(game.entities.get("behind")!.body!.health, 1000);
+    assert.deepEqual(cell(game), { x: 12, z: 12 });
+  }
+  assert.ok(Number(game.entities.get("front")!.body!.health) < 1000);
+  game.step(1, 0); assert.equal(turnCount(game), 8.5, "bump melee still uses the equipped gloves");
+  game.key("KeyI"); assert.ok(game.ui.has("slot_spirit_bow"));
+  assert.equal(game.ui.get("gear_icon_1")!.image, "sprites/dungeon/gloves.png");
+  assert.ok(![...game.entities.values()].some((entity) => entity.body?.kind === "fire_cell"));
+});
+
+test("empty and self shots preserve invisibility while shooting a character dispels it", () => {
+  const game = huntress(); game.key("Digit3");
+  game.key("Digit8"); game.tapCell({ x: 12, z: 10 });
+  game.key("Digit8"); game.tapCell({ x: 12, z: 12 });
+  assert.equal(turnCount(game), 3); assert.equal(game.state().lives, 20);
+  assert.ok(game.entities.has(buffId("invisibility", "player")));
+  putActor(game, "target", "chaser", { x: 13, z: 12 }); game.entities.get("target")!.body!.cooldown = 1000;
+  game.key("Digit8"); game.tapCell({ x: 13, z: 12 });
+  assert.ok(!game.entities.has(buffId("invisibility", "player")));
+  assert.equal(game.entities.get("target")!.body!.lifetime, 1);
+  assert.match([...game.ui.values()].flatMap((element) => element.text ?? []).join(" "), /Surprise attack/);
+});
+
+test("the bow remains usable without equipped gloves and cannot be selected for scroll upgrades", () => {
+  const game = huntress(); game.key("KeyI"); game.click("gear_slot_1"); game.click("toggle_equipment");
+  assert.equal(turnCount(game), 1);
+  game.key("Digit5");
+  assert.ok(![...game.ui.values()].some((element) => element.text?.includes("Spirit Bow")));
+  game.click("upgrade_1"); game.key("Digit8"); game.tapCell({ x: 13, z: 12 });
+  assert.equal(turnCount(game), 3, "upgrading gloves and shooting each cost one tick");
+  game.key("KeyI"); assert.equal(game.ui.get("gear_level_1")!.text, "+1");
+  game.click("slot_spirit_bow");
+  const text = game.ui.get("item_detail_desc")!.text!.replace(/\n/g, " ");
+  assert.match(text, /Bow level: \+0/); assert.match(text, /Damage: 1–6/);
+});
+
+test("actual kill experience grows the carried bow and updates damage and strength details", () => {
+  const game = huntress();
+  // Seven ten-XP boss fixtures reach level five through the normal kill path.
+  for (let kill = 0; kill < 7; kill++) {
+    putActor(game, "warden", "boss", { x: 13, z: 12 }, 1); game.entities.get("warden")!.body!.cooldown = 1000;
+    for (let attempt = 0; attempt < 12 && game.entities.has("warden"); attempt++) {
+      game.entities.get("warden")!.body!.lifetime = 0;
+      game.key("Digit8"); game.tapCell({ x: 13, z: 12 });
+    }
+    assert.ok(!game.entities.has("warden"));
+  }
+  assert.equal(game.ui.get("quick_count_0")!.text, "+1");
+  game.key("KeyI"); assert.equal(game.ui.get("item_level_spirit_bow")!.text, "+1");
+  game.click("slot_spirit_bow"); const text = game.ui.get("item_detail_desc")!.text!.replace(/\n/g, " ");
+  assert.match(text, /Bow level: \+1/); assert.match(text, /Damage: 2–8/); assert.match(text, /Strength required: 9/);
+});
+
+test("descending preserves the bow and cancels aiming, while a different hero starts without it", () => {
+  const game = huntress(), map = generateFloor(1337, 1); walk(game, map, map.exit);
+  const before = turnCount(game); game.key("Digit8"); game.click("descend");
+  assert.equal(turnCount(game), before + 1); assert.ok(!game.ui.has("target_prompt"));
+  assert.ok(game.ui.has("quick_spirit_bow"));
+  game.key("KeyI"); assert.ok(game.ui.has("slot_spirit_bow")); game.key("Escape");
+  game.click("pause"); game.click("home"); game.click("start"); game.click("hero_warrior"); game.click("begin_run");
+  assert.ok(!game.ui.has("quick_spirit_bow")); game.key("KeyI"); assert.ok(!game.ui.has("slot_spirit_bow"));
+});
+
+test("Chinese bow details and held Shoot controls fit portrait and short landscape without spending a turn", () => {
+  for (const [width, height, mobile] of [[450, 800, true], [800, 320, false]] as const) {
+    const game = huntress(harness(width, height, mobile, new Map(), false, "zh-CN"));
+    game.key("KeyI"); game.click("slot_spirit_bow");
+    assert.equal(game.ui.get("item_detail_title")!.text, "灵能短弓");
+    assert.equal(game.ui.get("use_spirit_bow__label")!.text, "射击");
+    const bounds = game.ui.get("item_window")!.style!;
+    assert.ok(Number(bounds.top) >= 0);
+    assert.ok(Number(bounds.top) + Number(bounds.height) <= Number(game.ui.get("safe_root")!.style!.height));
+    const details = game.ui.get("item_detail_desc")!;
+    for (const line of details.text!.split("\n")) assert.ok(measureText("zh-CN", line, details.fontSize!) <= Number(details.style!.width) + 0.01);
+    const before = JSON.stringify([...game.entities]);
+    game.holdButton("use_spirit_bow"); game.tick(30); game.releaseButton();
+    assert.equal(turnCount(game), 0); assert.equal(JSON.stringify([...game.entities]), before);
+    const prompt = game.ui.get("target_prompt")!; assert.match(prompt.text!, /射击/);
+    for (const line of prompt.text!.split("\n")) assert.ok(measureText("zh-CN", line, prompt.fontSize!) <= Number(prompt.style!.width) + 0.01);
+    game.holdButton("cancel_target"); game.tick(30); game.releaseButton();
+    assert.ok(!game.ui.has("target_prompt")); assert.equal(turnCount(game), 0);
+  }
+});
+
 test("liquid flame targeting can be cancelled and rejects unseen tiles without spending anything", () => {
   const game = harness(); game.start(); removeMonsters(game);
   const before = JSON.stringify([...game.entities]);

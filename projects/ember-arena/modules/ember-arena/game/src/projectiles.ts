@@ -1,5 +1,6 @@
 import { passable, sameCell, terrainAt, type DungeonFloor } from "./dungeon.js";
 import type { Point } from "./rules.js";
+export type TargetKind = "flame" | "bow";
 
 // First collision for Ballistica.PROJECTILE at revision 57a4e06a. Keep its
 // integer half-error/major-axis rule, including a collision ON closed doors
