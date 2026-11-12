@@ -145,6 +145,22 @@ local generated artifacts. The game runs offline after preparation.
 
 ## Verification boundaries
 
+### System language and application icon verification on 2026-11-12 (macOS Debug)
+
+- Script tests: **52 passed**. Runtime tests: **41 passed, 1 performance test ignored**.
+  Coverage includes system-language defaults, manual overrides, legacy saves, resetting defaults,
+  pinned icon checksums, configured icon precedence and the registered Lua/QuickJS locale API.
+- The rebuilt unified macOS runtime ran through the desktop launcher's `--run-game` path with
+  isolated assets/saves under `target/ember-arena-icon-locale-native`. The native system preference
+  was `zh-Hans-CN`; a fresh profile displayed the Chinese menu. The activated-window screenshot
+  is `system-language-menu-active.png`. The host-prepared icon matches the upstream PNG byte for
+  byte, and `dock-icons.png` confirms the original green chest in the live Dock. The expected icon
+  SHA-256 and window geometry are in `verification.json`.
+- The iOS runtime library passed a cross-target Cargo check. Windows, Linux and Android builds/
+  native runs, iOS native execution and Release were **NOT_RUN**. The C ABI is unchanged.
+- The existing Bevy/Parley/ICU4X CJK segmentation diagnostic remains reproducible during native
+  Chinese text layout; this change does not patch or suppress that upstream issue.
+
 ### Window startup verification on 2026-11-12 (macOS Debug)
 
 - Script tests: **49 passed**. Runtime library tests: **40 passed, 1 performance test ignored**.
