@@ -80,6 +80,17 @@
     }
   };
   var heroClassList = ["warrior", "mage", "rogue", "huntress"];
+  var lootKinds = [
+    "potion_healing",
+    "potion_liquid_flame",
+    "potion_invisibility",
+    "potion_strength",
+    "scroll_upgrade",
+    "scroll_magic_mapping",
+    "food_ration",
+    "worn_key",
+    "goo_blob"
+  ];
   var itemCatalog = {
     potion_healing: {
       id: "potion_healing",
@@ -174,8 +185,19 @@
     if (point.x < 0 || point.z < 0 || point.x >= floor2.width || point.z >= floor2.height) return "wall";
     return floor2.tiles[cellKey(floor2, point)];
   }
-  var passable = (floor2, point) => terrainAt(floor2, point) !== "wall";
-  var opaque = (floor2, point) => ["wall", "door"].includes(terrainAt(floor2, point));
+  var passable = (floor2, point) => !["wall", "secret_door"].includes(terrainAt(floor2, point));
+  var opaque = (floor2, point) => ["wall", "door", "secret_door"].includes(terrainAt(floor2, point));
+  function searchFloor(floor2, origin, distance) {
+    let found = 0;
+    for (const key of floor2.visible) {
+      const point = { x: key % floor2.width, z: Math.floor(key / floor2.width) };
+      if (cellDistance(origin, point) <= distance && floor2.tiles[key] === "secret_door") {
+        floor2.tiles[key] = "door";
+        found++;
+      }
+    }
+    return found;
+  }
   function canStep(floor2, from, to) {
     if (cellDistance(from, to) !== 1 || !passable(floor2, to)) return false;
     return from.x === to.x || from.z === to.z || !opaque(floor2, { x: from.x, z: to.z }) && !opaque(floor2, { x: to.x, z: from.z });
@@ -221,19 +243,32 @@
       connections.push(edge);
       visited.add(edge[1]);
     }
-    for (const [a, b] of connections) {
-      const start = floor2.rooms[a], end = floor2.rooms[b];
-      const dx = Math.sign(end.x - start.x), dz = Math.sign(end.z - start.z);
-      for (let point = { ...start }; !sameCell(point, end); point = { x: point.x + dx, z: point.z + dz }) {
+    for (const [a2, b2] of connections) {
+      const start2 = floor2.rooms[a2], end2 = floor2.rooms[b2];
+      const dx2 = Math.sign(end2.x - start2.x), dz2 = Math.sign(end2.z - start2.z);
+      for (let point = { ...start2 }; !sameCell(point, end2); point = { x: point.x + dx2, z: point.z + dz2 }) {
         if (terrainAt(floor2, point) === "wall") set(point, "floor");
       }
-      for (const index of [a, b]) {
-        const room2 = floor2.rooms[index], box = bounds[index];
-        const toward = index === a ? end : start;
-        const door = room2.x === toward.x ? { x: room2.x, z: toward.z < room2.z ? box.top - 1 : box.bottom + 1 } : { x: toward.x < room2.x ? box.left - 1 : box.right + 1, z: room2.z };
+      for (const index of [a2, b2]) {
+        const room2 = floor2.rooms[index], box2 = bounds[index];
+        const toward = index === a2 ? end2 : start2;
+        const door = room2.x === toward.x ? { x: room2.x, z: toward.z < room2.z ? box2.top - 1 : box2.bottom + 1 } : { x: toward.x < room2.x ? box2.left - 1 : box2.right + 1, z: room2.z };
         set(door, "door");
       }
     }
+    const shortcuts = [];
+    for (let a2 = 0; a2 < 9; a2++) for (const b2 of [a2 + 1, a2 + 3]) {
+      if (b2 >= 9 || b2 === a2 + 1 && Math.floor(a2 / 3) !== Math.floor(b2 / 3)) continue;
+      if (!connections.some(([x, y]) => x === a2 && y === b2 || x === b2 && y === a2)) shortcuts.push([a2, b2]);
+    }
+    const [a, b] = shortcuts[Math.floor(random2() * shortcuts.length)];
+    const start = floor2.rooms[a], end = floor2.rooms[b];
+    const dx = Math.sign(end.x - start.x), dz = Math.sign(end.z - start.z);
+    for (let point = { ...start }; !sameCell(point, end); point = { x: point.x + dx, z: point.z + dz }) {
+      if (terrainAt(floor2, point) === "wall") set(point, "floor");
+    }
+    const box = bounds[a];
+    set(dx ? { x: box.right + 1, z: start.z } : { x: start.x, z: box.bottom + 1 }, "secret_door");
     let longest = -1;
     for (const room2 of floor2.rooms) {
       const path = findPath(floor2, floor2.entrance, room2);
@@ -391,6 +426,22 @@
     "item.eat": ["Eat", "\u98DF\u7528"],
     "item.read": ["Read", "\u9605\u8BFB"],
     "item.drink": ["Drink", "\u996E\u7528"],
+    "item.worn_key.name": ["Worn Key", "\u65E7\u94A5\u5319"],
+    "item.worn_key.description": ["Opens the locked sewer exit on depth 5. Use the stairs to unlock it.", "\u7528\u4E8E\u5F00\u542F\u7B2C5\u5C42\u4E0B\u6C34\u9053\u7684\u4E0A\u9501\u51FA\u53E3\u3002\u5728\u697C\u68AF\u5904\u4F7F\u7528\u5373\u53EF\u89E3\u9501\u3002"],
+    "item.goo_blob.name": ["Blob of Goo", "\u9ECF\u6DB2\u56E2"],
+    "item.goo_blob.description": ["Goo's alchemical remains. Alchemy and trading are not available in this port yet.", "\u7C98\u5495\u7559\u4E0B\u7684\u70BC\u91D1\u6750\u6599\u3002\u672C\u79FB\u690D\u7248\u6682\u672A\u5F00\u653E\u70BC\u91D1\u4E0E\u4EA4\u6613\u3002"],
+    "terrain.wall": ["Wall", "\u5899\u58C1"],
+    "terrain.floor": ["Floor", "\u5730\u677F"],
+    "terrain.water": ["Water", "\u6C34\u9762"],
+    "terrain.door": ["Closed door", "\u5173\u95ED\u7684\u95E8"],
+    "terrain.open_door": ["Open door", "\u6253\u5F00\u7684\u95E8"],
+    "terrain.entrance": ["Upward stairs", "\u5411\u4E0A\u7684\u697C\u68AF"],
+    "terrain.exit": ["Downward stairs", "\u5411\u4E0B\u7684\u697C\u68AF"],
+    "terrain.locked_exit": ["Locked downward stairs", "\u4E0A\u9501\u7684\u5411\u4E0B\u697C\u68AF"],
+    "examine.prompt": ["Tap a known tile to examine. Tap search again to search nearby (2 turns).", "\u70B9\u51FB\u5DF2\u63A2\u7D22\u7684\u683C\u5B50\u67E5\u770B\u8BE6\u60C5\uFF1B\u518D\u6B21\u70B9\u51FB\u641C\u7D22\uFF0C\u641C\u67E5\u5468\u56F4\uFF082\u56DE\u5408\uFF09\u3002"],
+    "examine.cell": ["{terrain}\n\n{occupant}", "{terrain}\n\n{occupant}"],
+    "examine.monster": ["{monster}\nHealth: {health}", "{monster}\n\u751F\u547D\uFF1A{health}"],
+    "examine.gold": ["Gold", "\u91D1\u5E01"],
     "item.potion_healing.name": [itemCatalog.potion_healing.name, "\u6CBB\u7597\u836F\u6C34"],
     "item.potion_healing.description": [itemCatalog.potion_healing.description, "\u6062\u590D\u751F\u547D\u5E76\u6E05\u9664\u8150\u8680\u9ECF\u6DB2\u3002\u6D88\u80171\u56DE\u5408\u3002"],
     "item.potion_healing.effect": [itemCatalog.potion_healing.effectText, "\u6E29\u6696\u800C\u8212\u7F13\u7684\u80FD\u91CF\u6D41\u904D\u4F60\u7684\u5168\u8EAB\u3002"],
@@ -432,7 +483,8 @@
     "settings.hints": ["Hints: {value}", "\u64CD\u4F5C\u63D0\u793A\uFF1A{value}"],
     "settings.motion": ["Reduced effects: {value}", "\u51CF\u5C11\u52A8\u6001\u6548\u679C\uFF1A{value}"],
     "settings.sensitivity": ["Pointer sensitivity: {value}x", "\u6307\u9488\u7075\u654F\u5EA6\uFF1A{value}\u500D"],
-    "settings.bindings": ["WASD / Arrows: Move\nSpace: Wait   I: Inventory\nEscape: Menu", "WASD / \u65B9\u5411\u952E\uFF1A\u79FB\u52A8\n\u7A7A\u683C\uFF1A\u7B49\u5F85  I\uFF1A\u80CC\u5305\nEscape\uFF1A\u83DC\u5355"],
+    "settings.bindings": ["WASD / Arrows: Move\nSpace: Wait   I: Inventory\nF: Examine / Search\nE / Period: Downstairs\nEscape: Cancel / Menu", "WASD / \u65B9\u5411\u952E\uFF1A\u79FB\u52A8\n\u7A7A\u683C\uFF1A\u7B49\u5F85  I\uFF1A\u80CC\u5305\nF\uFF1A\u67E5\u770B / \u641C\u7D22\nE / \u53E5\u53F7\uFF1A\u4E0B\u697C\nEscape\uFF1A\u53D6\u6D88 / \u83DC\u5355"],
+    "settings.absolutePointer": ["Sensitivity is unavailable for absolute tile selection.", "\u683C\u5B50\u70B9\u51FB\u4F7F\u7528\u7EDD\u5BF9\u5750\u6807\uFF0C\u7075\u654F\u5EA6\u8C03\u8282\u6682\u4E0D\u53EF\u7528\u3002"],
     "settings.stats": ["Best: {best}   Wins: {wins}\nRuns: {runs}", "\u6700\u9AD8\u5206\uFF1A{best}  \u80DC\u5229\uFF1A{wins}\n\u5192\u9669\u6B21\u6570\uFF1A{runs}"],
     "settings.seed": ["Seed: {seed}", "\u968F\u673A\u79CD\u5B50\uFF1A{seed}"],
     "settings.save": ["Save", "\u4FDD\u5B58"],
@@ -449,7 +501,8 @@
     "save.failed": ["Save failed ({error}). You can retry in settings.", "\u4FDD\u5B58\u5931\u8D25\uFF08{error}\uFF09\uFF0C\u53EF\u4EE5\u5728\u8BBE\u7F6E\u4E2D\u91CD\u8BD5\u3002"],
     "save.resetFailed": ["Reset failed ({error}). Existing save retained.", "\u91CD\u7F6E\u5931\u8D25\uFF08{error}\uFF09\uFF0C\u539F\u5B58\u6863\u5DF2\u4FDD\u7559\u3002"],
     "save.reset": ["Saved progress reset. Your current run is unchanged.", "\u5DF2\u91CD\u7F6E\u4FDD\u5B58\u7684\u8FDB\u5EA6\uFF0C\u5F53\u524D\u5192\u9669\u4E0D\u53D7\u5F71\u54CD\u3002"],
-    "result.win": ["Goo defeated!", "\u51FB\u8D25\u7C98\u5495\uFF01"],
+    "result.win": ["Sewers milestone complete", "\u4E0B\u6C34\u9053\u91CC\u7A0B\u7891\u5B8C\u6210"],
+    "result.boundary": ["Prison and later regions are not available yet.", "\u76D1\u72F1\u53CA\u540E\u7EED\u533A\u57DF\u5C1A\u672A\u5F00\u653E\u3002"],
     "result.lose": ["You died...", "\u4F60\u6B7B\u4E86\u2026\u2026"],
     "result.bannerWin": ["Boss slain", "\u9996\u9886\u5DF2\u88AB\u51FB\u8D25"],
     "result.bannerLose": ["Game over", "\u5192\u9669\u7ED3\u675F"],
@@ -466,7 +519,12 @@
     "log.item": ["You pick up {item}.", "\u4F60\u6361\u8D77\u4E86{item}\u3002"],
     "log.gold": ["You pick up {gold} gold.", "\u4F60\u6361\u8D77\u4E86{gold}\u679A\u91D1\u5E01\u3002"],
     "log.defeated": ["{monster} defeated.", "{monster}\u88AB\u51FB\u8D25\u4E86\u3002"],
-    "log.sewersCleared": ["Goo drops the Skeleton Key. The sewers are cleared!", "\u7C98\u5495\u6389\u843D\u4E86\u9AB7\u9AC5\u94A5\u5319\uFF0C\u4E0B\u6C34\u9053\u5DF2\u88AB\u6E05\u7406\uFF01"],
+    "log.sewersCleared": ["Goo drops a Worn Key and blobs of goo. Collect the key to unlock the exit.", "\u7C98\u5495\u6389\u843D\u4E86\u65E7\u94A5\u5319\u548C\u9ECF\u6DB2\u56E2\uFF0C\u62FE\u53D6\u94A5\u5319\u540E\u53EF\u89E3\u9501\u51FA\u53E3\u3002"],
+    "log.keyNeeded": ["Collect the Worn Key to unlock this exit.", "\u8BF7\u5148\u62FE\u53D6\u65E7\u94A5\u5319\uFF0C\u518D\u89E3\u9501\u51FA\u53E3\u3002"],
+    "log.exitUnlocked": ["You unlock the sewer exit. Use the stairs again to finish this milestone.", "\u4F60\u89E3\u9501\u4E86\u4E0B\u6C34\u9053\u51FA\u53E3\uFF0C\u518D\u6B21\u4F7F\u7528\u697C\u68AF\u53EF\u5B8C\u6210\u672C\u9636\u6BB5\u3002"],
+    "log.milestone": ["Sewers milestone complete. The prison is not available yet.", "\u4E0B\u6C34\u9053\u91CC\u7A0B\u7891\u5DF2\u5B8C\u6210\uFF0C\u76D1\u72F1\u6682\u672A\u5F00\u653E\u3002"],
+    "log.searched": ["You search the surrounding tiles.", "\u4F60\u641C\u67E5\u4E86\u5468\u56F4\u7684\u683C\u5B50\u3002"],
+    "log.secretFound": ["You discover a hidden door!", "\u4F60\u53D1\u73B0\u4E86\u4E00\u6247\u9690\u85CF\u7684\u95E8\uFF01"],
     "log.level": ["You reached level {level} (+5 maximum HP).", "\u4F60\u5347\u5230\u4E86{level}\u7EA7\uFF0C\u751F\u547D\u4E0A\u9650\u589E\u52A05\u70B9\u3002"],
     "log.hit": ["You hit {monster} for {damage}.", "\u4F60\u51FB\u4E2D\u4E86{monster}\uFF0C\u9020\u6210{damage}\u70B9\u4F24\u5BB3\u3002"],
     "log.surprise": ["Surprise attack! You hit {monster} for {damage}.", "\u4F0F\u51FB\uFF01\u4F60\u51FB\u4E2D\u4E86{monster}\uFF0C\u9020\u6210{damage}\u70B9\u4F24\u5BB3\u3002"],
@@ -693,7 +751,7 @@
   var spd_pixel_metrics_default = { "0": 0.537109375, "1": 0.341796875, "2": 0.537109375, "3": 0.537109375, "4": 0.537109375, "5": 0.537109375, "6": 0.537109375, "7": 0.537109375, "8": 0.537109375, "9": 0.537109375, " ": 0.244140625, "!": 0.1953125, '"': 0.390625, "#": 0.537109375, $: 0.5859375, "%": 0.68359375, "&": 0.634765625, "'": 0.1953125, "(": 0.390625, ")": 0.390625, "*": 0.634765625, "+": 0.48828125, ",": 0.1953125, "-": 0.390625, ".": 0.1953125, "/": 0.48828125, ":": 0.1953125, ";": 0.1953125, "<": 0.439453125, "=": 0.390625, ">": 0.439453125, "?": 0.48828125, "@": 0.537109375, A: 0.537109375, B: 0.537109375, C: 0.537109375, D: 0.537109375, E: 0.537109375, F: 0.537109375, G: 0.537109375, H: 0.537109375, I: 0.29296875, J: 0.48828125, K: 0.537109375, L: 0.48828125, M: 0.634765625, N: 0.537109375, O: 0.537109375, P: 0.537109375, Q: 0.537109375, R: 0.537109375, S: 0.537109375, T: 0.48828125, U: 0.537109375, V: 0.537109375, W: 0.634765625, X: 0.537109375, Y: 0.48828125, Z: 0.537109375, "[": 0.29296875, "\\": 0.634765625, "]": 0.29296875, "^": 0.537109375, _: 0.48828125, "`": 0.29296875, a: 0.48828125, b: 0.48828125, c: 0.48828125, d: 0.48828125, e: 0.48828125, f: 0.390625, g: 0.48828125, h: 0.48828125, i: 0.1953125, j: 0.29296875, k: 0.48828125, l: 0.29296875, m: 0.5859375, n: 0.48828125, o: 0.48828125, p: 0.48828125, q: 0.48828125, r: 0.390625, s: 0.48828125, t: 0.390625, u: 0.48828125, v: 0.48828125, w: 0.5859375, x: 0.48828125, y: 0.48828125, z: 0.537109375, "{": 0.390625, "|": 0.1953125, "}": 0.390625, "~": 0.68359375 };
 
   // modules/ember-arena/game/assets/fonts/noto-sans-sc-metrics.json
-  var noto_sans_sc_metrics_default = { "0": 0.555, "1": 0.555, "2": 0.555, "3": 0.555, "4": 0.555, "5": 0.555, "6": 0.555, "7": 0.555, "8": 0.555, "9": 0.555, " ": 0.224, "!": 0.323, '"': 0.474, "#": 0.555, $: 0.555, "%": 0.921, "&": 0.68, "'": 0.278, "(": 0.338, ")": 0.338, "*": 0.467, "+": 0.555, ",": 0.278, "-": 0.347, ".": 0.278, "/": 0.392, ":": 0.278, ";": 0.278, "<": 0.555, "=": 0.555, ">": 0.555, "?": 0.474, "@": 0.946, A: 0.608, B: 0.657, C: 0.638, D: 0.688, E: 0.589, F: 0.552, G: 0.689, H: 0.728, I: 0.293, J: 0.535, K: 0.646, L: 0.543, M: 0.812, N: 0.723, O: 0.742, P: 0.633, Q: 0.742, R: 0.635, S: 0.596, T: 0.599, U: 0.721, V: 0.575, W: 0.878, X: 0.573, Y: 0.531, Z: 0.603, "[": 0.338, "\\": 0.392, "]": 0.338, "^": 0.555, _: 0.559, "`": 0.606, a: 0.563, b: 0.618, c: 0.51, d: 0.62, e: 0.554, f: 0.325, g: 0.564, h: 0.607, i: 0.275, j: 0.275, k: 0.552, l: 0.284, m: 0.926, n: 0.61, o: 0.606, p: 0.62, q: 0.62, r: 0.388, s: 0.468, t: 0.377, u: 0.607, v: 0.521, w: 0.802, x: 0.498, y: 0.521, z: 0.475, "{": 0.338, "|": 0.27, "}": 0.338, "~": 0.555, \u7834: 1, \u788E: 1, \u7684: 1, \u50CF: 1, \u7D20: 1, \u5730: 1, \u7262: 1, \u7B80: 1, \u4F53: 1, \u4E2D: 1, \u6587: 1, \u8FDB: 1, \u5165: 1, \u652F: 1, \u6301: 1, \u6E38: 1, \u620F: 1, \u6392: 1, \u884C: 1, \u699C: 1, \u65E5: 1, \u5FD7: 1, \u65B0: 1, \u95FB: 1, \u8BBE: 1, \u7F6E: 1, \u66F4: 1, \u8BB0: 1, \u5F55: 1, \u5173: 1, \u4E8E: 1, \u4E3B: 1, \u83DC: 1, \u5355: 1, \u5F00: 1, \u59CB: 1, \u95ED: 1, \u8FD4: 1, \u56DE: 1, \u4E0B: 1, \u4E00: 1, \u9875: 1, \u662F: 1, \u5426: 1, \u9009: 1, \u62E9: 1, \u4F60: 1, \u82F1: 1, \u96C4: 1, \u6218: 1, \u58EB: 1, \u6CD5: 1, \u5E08: 1, \u76D7: 1, \u8D3C: 1, \u5973: 1, \u730E: 1, \u624B: 1, \u575A: 1, \u97E7: 1, \u8FD1: 1, "\u3002": 1, \u521D: 1, \u6B66: 1, \u5668: 1, \u5F3A: 1, "\uFF0C": 1, \u5E76: 1, \u989D: 1, \u5916: 1, \u643A: 1, \u5E26: 1, \u74F6: 1, \u6CBB: 1, \u7597: 1, \u836F: 1, \u6C34: 1, \u6709: 1, \u53E4: 1, \u8001: 1, \u6756: 1, \u5B66: 1, \u8005: 1, \u5347: 1, \u7EA7: 1, \u5377: 1, \u8F74: 1, \u548C: 1, \u63A2: 1, \u64C5: 1, \u957F: 1, \u6F5C: 1, \u6597: 1, \u9690: 1, \u5F62: 1, \u7528: 1, \u53D1: 1, \u52A8: 1, \u4F0F: 1, \u51FB: 1, \u8352: 1, \u91CE: 1, \u7D22: 1, \u98DF: 1, \u7269: 1, \u6DB2: 1, \u706B: 1, \u5242: 1, \u5F13: 1, \u7BAD: 1, \u80FD: 1, \u529B: 1, \u5C1A: 1, \u672A: 1, \u5B9E: 1, \u73B0: 1, \u88C5: 1, \u5907: 1, \u4EF6: 1, \u4E8C: 1, \u9636: 1, \u6216: 1, \u9AD8: 1, \u4E14: 1, \u4E0D: 1, \u53D7: 1, \u5230: 1, \u91CF: 1, \u8DB3: 1, \u60E9: 1, \u7F5A: 1, \u5373: 1, \u53EF: 1, \u89E3: 1, \u9501: 1, \u51B3: 1, \u5BB6: 1, \u5F7B: 1, \u5E95: 1, \u51C0: 1, \u5316: 1, \u4EFB: 1, \u610F: 1, \u8BC5: 1, \u5492: 1, \u4E0A: 1, \u7267: 1, \u751F: 1, \u547D: 1, "\uFF1A": 1, \u7ECF: 1, \u9A8C: 1, \u91D1: 1, \u5E01: 1, \u5C5E: 1, \u6027: 1, \u5929: 1, \u8D4B: 1, \u80CC: 1, \u5305: 1, \u9605: 1, \u8BFB: 1, \u996E: 1, \u6062: 1, \u590D: 1, \u6E05: 1, \u9664: 1, \u8150: 1, \u8680: 1, \u9ECF: 1, \u6D88: 1, \u8017: 1, \u5408: 1, \u6E29: 1, \u6696: 1, \u800C: 1, \u8212: 1, \u7F13: 1, \u6D41: 1, \u904D: 1, \u5168: 1, \u8EAB: 1, \u5BF9: 1, \u9644: 1, \u89C1: 1, \u654C: 1, \u4EBA: 1, \u9020: 1, \u6210: 1, \u70B9: 1, \u4F24: 1, \u5BB3: 1, \u88C2: 1, \u4E3A: 1, \u718A: 1, \u70C8: 1, \u7130: 1, "\uFF01": 1, \u4F7F: 1, \u653B: 1, \u4F1A: 1, \u4ECE: 1, \u89C6: 1, \u5931: 1, \u4E86: 1, \u51C6: 1, \u6C38: 1, \u4E45: 1, \u589E: 1, \u52A0: 1, \u6D8C: 1, \u808C: 1, \u8089: 1, \u6B21: 1, \u7B26: 1, \u878D: 1, \u63ED: 1, \u793A: 1, \u672C: 1, \u5C42: 1, \u4F46: 1, \u5176: 1, \u5E03: 1, \u5C40: 1, \u5728: 1, \u8111: 1, \u6D77: 1, \u6670: 1, \u8D77: 1, \u6765: 1, \u53E3: 1, \u7CAE: 1, \u9965: 1, \u997F: 1, \u5403: 1, \u611F: 1, \u6E10: 1, \u9000: 1, \u9F20: 1, \u8C7A: 1, \u72FC: 1, \u4FA6: 1, \u5BDF: 1, \u5175: 1, \u9053: 1, \u8783: 1, \u87F9: 1, \u7C98: 1, \u5495: 1, \u6781: 1, \u5EA6: 1, \u663E: 1, \u754C: 1, \u9762: 1, \u8F93: 1, \u6570: 1, \u636E: 1, \u97F3: 1, \u9891: 1, \u8BED: 1, \u8A00: 1, \u6BD4: 1, \u4F8B: 1, \u6A2A: 1, \u5C4F: 1, \u7AD6: 1, \u64CD: 1, \u4F5C: 1, \u63D0: 1, \u51CF: 1, \u5C11: 1, \u6001: 1, \u6548: 1, \u679C: 1, \u6307: 1, \u9488: 1, \u7075: 1, \u654F: 1, \u500D: 1, \u65B9: 1, \u5411: 1, \u952E: 1, \u79FB: 1, \u7A7A: 1, \u683C: 1, \u7B49: 1, \u5F85: 1, \u6700: 1, \u5206: 1, \u80DC: 1, \u5229: 1, \u5192: 1, \u9669: 1, \u968F: 1, \u673A: 1, \u79CD: 1, \u5B50: 1, \u4FDD: 1, \u5B58: 1, \u8981: 1, \u5DF2: 1, \u5417: 1, "\uFF1F": 1, \u4E50: 1, \u7ACB: 1, \u6863: 1, "\uFF08": 1, "\uFF09": 1, \u4ECD: 1, \u8BDD: 1, \u6B63: 1, \u5E38: 1, \u73A9: 1, \u517C: 1, \u5BB9: 1, \u8986: 1, \u76D6: 1, \u8BE5: 1, \u8D25: 1, \u4EE5: 1, \u91CD: 1, \u8BD5: 1, \u539F: 1, \u7559: 1, \u5F53: 1, \u524D: 1, \u5F71: 1, \u54CD: 1, \u6B7B: 1, "\u2026": 1, \u9996: 1, \u9886: 1, \u88AB: 1, \u7ED3: 1, \u675F: 1, \u6DF1: 1, \u5357: 1, \u6536: 1, \u96C6: 1, \u54C1: 1, \u70BC: 1, \u672F: 1, \u81EA: 1, \u5236: 1, \u906D: 1, \u9047: 1, \u4E0E: 1, \u6750: 1, \u57FA: 1, \u521B: 1, \u8FD0: 1, \u65F6: 1, \u690D: 1, \u7248: 1, \u7531: 1, \u6B22: 1, \u8FCE: 1, \u6BCF: 1, \u627E: 1, \u697C: 1, \u68AF: 1, \u540E: 1, \u6361: 1, \u679A: 1, \u6389: 1, \u843D: 1, \u9AB7: 1, \u9AC5: 1, \u94A5: 1, \u5319: 1, \u7406: 1, \u9650: 1, \u8EB2: 1, \u7EE7: 1, \u7EED: 1, \u81A8: 1, \u80C0: 1, \u5FEB: 1, \u79BB: 1, \u5B83: 1, \u8303: 1, \u56F4: 1, \u84C4: 1, \u64A4: 1, \u7206: 1, \u6253: 1, \u95E8: 1, \u8BF7: 1, \u7AD9: 1, \u518D: 1, \u6321: 1, \u4F4F: 1, \u53BB: 1, \u8DEF: 1, \u5148: 1, \u7B2C: 1, \u5DE2: 1, \u7A74: 1, \u68C0: 1, \u67E5: 1, \u6240: 1, "\u3001": 1, \u53CD: 1, \u5C04: 1, \u7EC4: 1, \u8BE2: 1, \u62D2: 1, \u7EDD: 1, \u65E0: 1, \u503C: 1, \u7EF4: 1, \u7CBE: 1, \u5B57: 1, \u53D8: 1, \u6362: 1, \u76F8: 1, \u5207: 1, \u9500: 1, \u6BC1: 1, \u6821: 1, \u8282: 1, \u76D8: 1, \u89E6: 1, \u6478: 1, \u5B89: 1, \u533A: 1, \u57DF: 1, \u53D6: 1, \u77E5: 1, \u6C42: 1, \u72B6: 1, \u5199: 1, \u5220: 1, \u50A8: 1, \u79C1: 1, \u76EE: 1, \u5B8C: 1, \u6574: 1, \u5185: 1, \u753B: 1, \u89C9: 1, \u9F50: 1, \u63A5: 1, \u7F3A: 1, \u4ED6: 1, \u5E73: 1, \u53F0: 1, \u70ED: 1, \u8F7D: 1, \u7F51: 1, \u7EDC: 1, \u6309: 1, \u94AE: 1 };
+  var noto_sans_sc_metrics_default = { "0": 0.555, "1": 0.555, "2": 0.555, "3": 0.555, "4": 0.555, "5": 0.555, "6": 0.555, "7": 0.555, "8": 0.555, "9": 0.555, " ": 0.224, "!": 0.323, '"': 0.474, "#": 0.555, $: 0.555, "%": 0.921, "&": 0.68, "'": 0.278, "(": 0.338, ")": 0.338, "*": 0.467, "+": 0.555, ",": 0.278, "-": 0.347, ".": 0.278, "/": 0.392, ":": 0.278, ";": 0.278, "<": 0.555, "=": 0.555, ">": 0.555, "?": 0.474, "@": 0.946, A: 0.608, B: 0.657, C: 0.638, D: 0.688, E: 0.589, F: 0.552, G: 0.689, H: 0.728, I: 0.293, J: 0.535, K: 0.646, L: 0.543, M: 0.812, N: 0.723, O: 0.742, P: 0.633, Q: 0.742, R: 0.635, S: 0.596, T: 0.599, U: 0.721, V: 0.575, W: 0.878, X: 0.573, Y: 0.531, Z: 0.603, "[": 0.338, "\\": 0.392, "]": 0.338, "^": 0.555, _: 0.559, "`": 0.606, a: 0.563, b: 0.618, c: 0.51, d: 0.62, e: 0.554, f: 0.325, g: 0.564, h: 0.607, i: 0.275, j: 0.275, k: 0.552, l: 0.284, m: 0.926, n: 0.61, o: 0.606, p: 0.62, q: 0.62, r: 0.388, s: 0.468, t: 0.377, u: 0.607, v: 0.521, w: 0.802, x: 0.498, y: 0.521, z: 0.475, "{": 0.338, "|": 0.27, "}": 0.338, "~": 0.555, \u7834: 1, \u788E: 1, \u7684: 1, \u50CF: 1, \u7D20: 1, \u5730: 1, \u7262: 1, \u7B80: 1, \u4F53: 1, \u4E2D: 1, \u6587: 1, \u8FDB: 1, \u5165: 1, \u652F: 1, \u6301: 1, \u6E38: 1, \u620F: 1, \u6392: 1, \u884C: 1, \u699C: 1, \u65E5: 1, \u5FD7: 1, \u65B0: 1, \u95FB: 1, \u8BBE: 1, \u7F6E: 1, \u66F4: 1, \u8BB0: 1, \u5F55: 1, \u5173: 1, \u4E8E: 1, \u4E3B: 1, \u83DC: 1, \u5355: 1, \u5F00: 1, \u59CB: 1, \u95ED: 1, \u8FD4: 1, \u56DE: 1, \u4E0B: 1, \u4E00: 1, \u9875: 1, \u662F: 1, \u5426: 1, \u9009: 1, \u62E9: 1, \u4F60: 1, \u82F1: 1, \u96C4: 1, \u6218: 1, \u58EB: 1, \u6CD5: 1, \u5E08: 1, \u76D7: 1, \u8D3C: 1, \u5973: 1, \u730E: 1, \u624B: 1, \u575A: 1, \u97E7: 1, \u8FD1: 1, "\u3002": 1, \u521D: 1, \u6B66: 1, \u5668: 1, \u5F3A: 1, "\uFF0C": 1, \u5E76: 1, \u989D: 1, \u5916: 1, \u643A: 1, \u5E26: 1, \u74F6: 1, \u6CBB: 1, \u7597: 1, \u836F: 1, \u6C34: 1, \u6709: 1, \u53E4: 1, \u8001: 1, \u6756: 1, \u5B66: 1, \u8005: 1, \u5347: 1, \u7EA7: 1, \u5377: 1, \u8F74: 1, \u548C: 1, \u63A2: 1, \u64C5: 1, \u957F: 1, \u6F5C: 1, \u6597: 1, \u9690: 1, \u5F62: 1, \u7528: 1, \u53D1: 1, \u52A8: 1, \u4F0F: 1, \u51FB: 1, \u8352: 1, \u91CE: 1, \u7D22: 1, \u98DF: 1, \u7269: 1, \u6DB2: 1, \u706B: 1, \u5242: 1, \u5F13: 1, \u7BAD: 1, \u80FD: 1, \u529B: 1, \u5C1A: 1, \u672A: 1, \u5B9E: 1, \u73B0: 1, \u88C5: 1, \u5907: 1, \u4EF6: 1, \u4E8C: 1, \u9636: 1, \u6216: 1, \u9AD8: 1, \u4E14: 1, \u4E0D: 1, \u53D7: 1, \u5230: 1, \u91CF: 1, \u8DB3: 1, \u60E9: 1, \u7F5A: 1, \u5373: 1, \u53EF: 1, \u89E3: 1, \u9501: 1, \u51B3: 1, \u5BB6: 1, \u5F7B: 1, \u5E95: 1, \u51C0: 1, \u5316: 1, \u4EFB: 1, \u610F: 1, \u8BC5: 1, \u5492: 1, \u4E0A: 1, \u7267: 1, \u751F: 1, \u547D: 1, "\uFF1A": 1, \u7ECF: 1, \u9A8C: 1, \u91D1: 1, \u5E01: 1, \u5C5E: 1, \u6027: 1, \u5929: 1, \u8D4B: 1, \u80CC: 1, \u5305: 1, \u9605: 1, \u8BFB: 1, \u996E: 1, \u65E7: 1, \u94A5: 1, \u5319: 1, \u542F: 1, \u7B2C: 1, \u5C42: 1, \u9053: 1, \u51FA: 1, \u53E3: 1, \u5728: 1, \u697C: 1, \u68AF: 1, \u5904: 1, \u4F7F: 1, \u9ECF: 1, \u56E2: 1, \u7C98: 1, \u5495: 1, \u7559: 1, \u70BC: 1, \u6750: 1, \u6599: 1, \u672C: 1, \u79FB: 1, \u690D: 1, \u7248: 1, \u6682: 1, \u653E: 1, \u4E0E: 1, \u4EA4: 1, \u6613: 1, \u5899: 1, \u58C1: 1, \u677F: 1, \u9762: 1, \u95E8: 1, \u6253: 1, \u5411: 1, \u70B9: 1, \u5DF2: 1, \u683C: 1, \u5B50: 1, \u67E5: 1, \u770B: 1, \u8BE6: 1, \u60C5: 1, "\uFF1B": 1, \u518D: 1, \u6B21: 1, \u641C: 1, \u5468: 1, \u56F4: 1, "\uFF08": 1, \u5408: 1, "\uFF09": 1, \u6062: 1, \u590D: 1, \u6E05: 1, \u9664: 1, \u8150: 1, \u8680: 1, \u6D88: 1, \u8017: 1, \u6E29: 1, \u6696: 1, \u800C: 1, \u8212: 1, \u7F13: 1, \u6D41: 1, \u904D: 1, \u5168: 1, \u8EAB: 1, \u5BF9: 1, \u9644: 1, \u89C1: 1, \u654C: 1, \u4EBA: 1, \u9020: 1, \u6210: 1, \u4F24: 1, \u5BB3: 1, \u88C2: 1, \u4E3A: 1, \u718A: 1, \u70C8: 1, \u7130: 1, "\uFF01": 1, \u653B: 1, \u4F1A: 1, \u4ECE: 1, \u89C6: 1, \u5931: 1, \u4E86: 1, \u51C6: 1, \u6C38: 1, \u4E45: 1, \u589E: 1, \u52A0: 1, \u6D8C: 1, \u808C: 1, \u8089: 1, \u7B26: 1, \u878D: 1, \u63ED: 1, \u793A: 1, \u4F46: 1, \u5176: 1, \u5E03: 1, \u5C40: 1, \u8111: 1, \u6D77: 1, \u6670: 1, \u8D77: 1, \u6765: 1, \u7CAE: 1, \u9965: 1, \u997F: 1, \u5403: 1, \u611F: 1, \u6E10: 1, \u9000: 1, \u9F20: 1, \u8C7A: 1, \u72FC: 1, \u4FA6: 1, \u5BDF: 1, \u5175: 1, \u8783: 1, \u87F9: 1, \u6781: 1, \u5EA6: 1, \u663E: 1, \u754C: 1, \u8F93: 1, \u6570: 1, \u636E: 1, \u97F3: 1, \u9891: 1, \u8BED: 1, \u8A00: 1, \u6BD4: 1, \u4F8B: 1, \u6A2A: 1, \u5C4F: 1, \u7AD6: 1, \u64CD: 1, \u4F5C: 1, \u63D0: 1, \u51CF: 1, \u5C11: 1, \u6001: 1, \u6548: 1, \u679C: 1, \u6307: 1, \u9488: 1, \u7075: 1, \u654F: 1, \u500D: 1, \u65B9: 1, \u952E: 1, \u7A7A: 1, \u7B49: 1, \u5F85: 1, \u53E5: 1, \u53F7: 1, \u53D6: 1, \u7EDD: 1, \u5750: 1, \u6807: 1, \u8C03: 1, \u8282: 1, \u6700: 1, \u5206: 1, \u80DC: 1, \u5229: 1, \u5192: 1, \u9669: 1, \u968F: 1, \u673A: 1, \u79CD: 1, \u4FDD: 1, \u5B58: 1, \u8981: 1, \u5417: 1, "\uFF1F": 1, \u4E50: 1, \u7ACB: 1, \u6863: 1, \u4ECD: 1, \u8BDD: 1, \u6B63: 1, \u5E38: 1, \u73A9: 1, \u517C: 1, \u5BB9: 1, \u8986: 1, \u76D6: 1, \u8BE5: 1, \u8D25: 1, \u4EE5: 1, \u91CD: 1, \u8BD5: 1, \u539F: 1, \u5F53: 1, \u524D: 1, \u5F71: 1, \u54CD: 1, \u91CC: 1, \u7A0B: 1, \u7891: 1, \u5B8C: 1, \u76D1: 1, \u72F1: 1, \u53CA: 1, \u540E: 1, \u7EED: 1, \u533A: 1, \u57DF: 1, \u6B7B: 1, "\u2026": 1, \u9996: 1, \u9886: 1, \u88AB: 1, \u7ED3: 1, \u675F: 1, \u6DF1: 1, \u5357: 1, \u6536: 1, \u96C6: 1, \u54C1: 1, \u672F: 1, \u81EA: 1, \u5236: 1, \u906D: 1, \u9047: 1, \u57FA: 1, \u521B: 1, \u8FD0: 1, \u65F6: 1, \u7531: 1, \u6B22: 1, \u8FCE: 1, \u6BCF: 1, \u627E: 1, \u6361: 1, \u679A: 1, \u6389: 1, \u843D: 1, \u62FE: 1, \u8BF7: 1, \u5148: 1, \u6BB5: 1, \u6247: 1, \u85CF: 1, \u9650: 1, \u8EB2: 1, \u7EE7: 1, \u81A8: 1, \u80C0: 1, \u5FEB: 1, \u79BB: 1, \u5B83: 1, \u8303: 1, \u84C4: 1, \u64A4: 1, \u7206: 1, \u7AD9: 1, \u6321: 1, \u4F4F: 1, \u53BB: 1, \u8DEF: 1, \u5DE2: 1, \u7A74: 1, \u68C0: 1, \u6240: 1, "\u3001": 1, \u53CD: 1, \u5C04: 1, \u7EC4: 1, \u8BE2: 1, \u62D2: 1, \u65E0: 1, \u503C: 1, \u7EF4: 1, \u7CBE: 1, \u5B57: 1, \u53D8: 1, \u6362: 1, \u76F8: 1, \u5207: 1, \u9500: 1, \u6BC1: 1, \u6821: 1, \u7406: 1, \u76D8: 1, \u89E6: 1, \u6478: 1, \u5B89: 1, \u77E5: 1, \u6C42: 1, \u72B6: 1, \u5199: 1, \u5220: 1, \u50A8: 1, \u79C1: 1, \u76EE: 1, \u6574: 1, \u5185: 1, \u753B: 1, \u89C9: 1, \u9F50: 1, \u63A5: 1, \u7F3A: 1, \u4ED6: 1, \u5E73: 1, \u53F0: 1, \u70ED: 1, \u8F7D: 1, \u7F51: 1, \u7EDC: 1, \u6309: 1, \u94AE: 1 };
 
   // modules/ember-arena/game/src/text-layout.ts
   var hasCjk = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/u;
@@ -893,22 +951,24 @@
       }
       const width = slotWidth * 5 + 4, height = 14 + slotHeight * 5 + 4;
       const children = [label("bag_title", t("bag.title"), 0, 2, width - 25, 8, titleColor), image("bag_gold", "sprites/dungeon/gold.png", rect(width - 15, 0, 12, 12)), label("bag_gold_count", `${state.gold}`, width - 38, 3, 23, 6, titleColor)];
-      const items = Object.keys(itemCatalog).filter((key) => state.inventory[key] > 0);
+      const quantity = (key) => key === "worn_key" ? state.wornKeys : key === "goo_blob" ? state.gooBlobs : state.inventory[key];
+      const items = [...Object.keys(itemCatalog), "worn_key", "goo_blob"];
+      const carried = items.filter((key) => quantity(key) > 0);
       for (let index = 0; index < 25; index++) {
         const x = index % 5 * (slotWidth + 1), y = 14 + Math.floor(index / 5) * (slotHeight + 1);
-        const key = items[index - 5];
+        const key = carried[index - 5];
         const equipped = index < 5;
         const childrenSlot = [];
         if (equipped) {
           childrenSlot.push(art(`equipment_${index}`, [state.selectedClass === "warrior" ? "sword" : `weapon_${state.selectedClass}`, "armor", "empty_artifact", "empty_ring", "empty_ring"][index], (slotWidth - 16) / 2, (slotHeight - 16) / 2));
         } else if (key) {
           childrenSlot.push(image(`item_ico_${key}`, `sprites/dungeon/${key}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
-          childrenSlot.push(label(`item_count_${key}`, `${state.inventory[key]}`, 1, 1, slotWidth - 2, 6));
+          childrenSlot.push(label(`item_count_${key}`, `${quantity(key)}`, 1, 1, slotWidth - 2, 6));
         }
         children.push({
           kind: "button",
           id: key ? `slot_${key}` : `bag_slot_${index}`,
-          onClick: key ? () => on("item", key) : equipped ? () => on("hero_info") : void 0,
+          onClick: key ? () => on(key === "worn_key" || key === "goo_blob" ? key : "item", key) : equipped ? () => on("hero_info") : void 0,
           style: { ...rect(x, y, slotWidth, slotHeight), background: equipped ? [145 / 255, 147 / 255, 140 / 255, 153 / 255] : [83 / 255, 86 / 255, 77 / 255, 153 / 255] },
           children: childrenSlot
         });
@@ -943,7 +1003,7 @@
       elements.push(label("hud_version", "v0.1.0", w - 28, 1, 27, 5, grey));
       elements.push({ kind: "button", id: "pause", onClick: () => on("pause"), style: rect(w - 16, 0, 16, 21), children: [art("menu_icon", "menu", 2, 8)] });
       elements.push({ kind: "button", id: "game_journal", onClick: () => on("game_journal"), style: rect(w - 31, 0, 17, 21), children: [art("journal_button", "journal_button", 2, 8), art("journal_button_icon", "journal_button_icon", 3, 10.5)] });
-      elements.push(art("hud_stairs", "stairs", w - 38, 8, 7, 8));
+      elements.push({ kind: "button", id: "descend", onClick: () => on("descend"), style: rect(w - 43, 4, 12, 24), children: [art("hud_stairs", "stairs", 5, 4, 7, 8)] });
       elements.push(label("hud_wave", `${state.depth}`, w - 38, 16, 7, 4));
       if (state.hunger !== "satiated") elements.push(label("hud_hunger", state.hunger === "starving" ? t("hud.starving") : t("hud.hungry"), large ? 32 : 33, large ? 4 : 10, 80, 6, titleColor));
       if (state.invisible) elements.push(label("hud_invisible", t("hud.invisible"), 33, large ? 10 : 18, 70, 6, titleColor));
@@ -952,7 +1012,15 @@
       const searchX = m.large ? w - 64 : m.landscape ? w - 40 : 20;
       elements.push({ kind: "button", id: "bag_btn", onClick: () => on("bag_btn"), style: rect(toolbarX, toolbarY, 24, 26), children: [art("bag_tool", "bag_tool", 0, 0), art("bag_tool_icon", "bag_tool_icon", 4, 5)] });
       elements.push({ kind: "button", id: "wait", onClick: () => on("wait"), style: rect(waitX, toolbarY, 20, 26), children: [art("wait_tool", "wait_tool", 0, 0), art("wait_tool_icon", "wait_tool_icon", 2, 5)] });
-      elements.push({ kind: "button", id: "descend", onClick: () => on("descend"), style: rect(searchX, toolbarY, 20, 26), children: [art("search_tool", "search_tool", 0, 0), art("search_tool_icon", "search_tool_icon", 2, 5)] });
+      elements.push({ kind: "button", id: "search", onClick: () => on("search"), style: rect(searchX, toolbarY, 20, 26), children: [art("search_tool", "search_tool", 0, 0), art("search_tool_icon", "search_tool_icon", 2, 5)] });
+      if (state.examining) {
+        const promptWidth = Math.max(90, w - 30), lines = wrappedText(t("examine.prompt"), promptWidth, 6);
+        elements.push(label("examine_prompt", lines.join("\n"), 2, 44, promptWidth, 6, titleColor, lines.length * 8));
+        elements.push(control("cancel_examine", t("common.close"), w - 28, 44, 26, 14, "toast", void 0, "cancel_examine", true, 6));
+      } else if (state.profile.showHints) {
+        const lines = wrappedText(t("log.guide"), w - 4, 6);
+        elements.push(label("hud_hint", lines.join("\n"), 2, 44, w - 4, 6, grey, lines.length * 8));
+      }
       const quick = ["potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null, null];
       const count = 4 + Number(w > 152) + Number(w > 170);
       let quickRight = m.large ? searchX : toolbarX;
@@ -1029,8 +1097,9 @@
         content.push(control("hints", t("settings.hints", { value: t(state.profile.showHints ? "common.on" : "common.off") }), 0, 24, width, 18, "grey"));
         content.push(control("motion", t("settings.motion", { value: t(state.profile.reducedMotion ? "common.on" : "common.off") }), 0, 45, width, 18, "grey"));
       } else if (state.settingsTab === 2) {
-        content.push(control("sensitivity", t("settings.sensitivity", { value: state.profile.sensitivity.toFixed(2) }), 0, 24, width, 18, "grey"));
-        content.push(label("input_bindings", t("settings.bindings"), 0, 49, width, 7, white, 50));
+        content.push(control("sensitivity", t("settings.sensitivity", { value: state.profile.sensitivity.toFixed(2) }), 0, 24, width, 18, "toast", void 0, "sensitivity", false));
+        content.push(label("input_bindings", wrappedText(t("settings.bindings"), width, 7).join("\n"), 0, 49, width, 7, white, 50));
+        content.push(label("sensitivity_unavailable", wrappedText(t("settings.absolutePointer"), width, 6).join("\n"), 0, 102, width, 6, grey, 28));
       } else if (state.settingsTab === 3) {
         content.push(label("saved_stats", t("settings.stats", { best: state.profile.bestScore, wins: state.profile.wins, runs: state.profile.runs }), 0, 18, width, 7, white, 24));
         content.push(label("save_notice", state.saveNotice || t("save.device"), 0, 43, width, 6, grey, 25));
@@ -1053,12 +1122,13 @@
         const title = t(state.phase === "won" ? "result.bannerWin" : "result.bannerLose"), width = textWidth(title, 16);
         elements.push(label("result_banner", title, (w - width) / 2, h * 0.12, width + 1, 16, titleColor, 24));
       }
-      window("result_window", 120, 88, [
+      window("result_window", 120, 100, [
         label("result_title", state.phase === "won" ? t("result.win") : t("result.lose"), 0, 0, 120, 9, titleColor),
         label("result_stats", t("result.stats", { score: state.score, depth: state.depth, level: state.level }), 0, 18, 120, 7, white, 26),
-        control("restart", t("result.restart"), 0, 46, 120, 20, "red", "enter"),
-        control("home", t("menu.home"), 0, 68, 120, 20, "red", "display")
-      ], true, h * 0.66);
+        ...state.phase === "won" ? [label("result_boundary", wrappedText(t("result.boundary"), 120, 6).join("\n"), 0, 40, 120, 6, grey, 16)] : [],
+        control("restart", t("result.restart"), 0, 58, 120, 20, "red", "enter"),
+        control("home", t("menu.home"), 0, 80, 120, 20, "red", "display")
+      ], true, Math.min(h * 0.66, h - 58));
     } else if (state.phase === "checks") {
       const lines = state.checks.slice(state.checkPage * 6, state.checkPage * 6 + 6);
       window("checks_window", 190, 146, [
@@ -1114,6 +1184,13 @@
   var overlayReturn = "playing";
   var uiNotice = null;
   var previewPhase = null;
+  var examining = false;
+  var cameraShake = 0;
+  var wornKeys = 0;
+  var gooBlobs = 0;
+  var gooDefeated = false;
+  var exitUnlocked = false;
+  var floorSealed = false;
   var gold = 0;
   var hungerTimer = 0;
   var invisTimer = 0;
@@ -1199,6 +1276,9 @@
       ooze: causticOozeTimer,
       bossHealth: scene_actor("warden") ? field("warden", "health") : null,
       inventory,
+      wornKeys,
+      gooBlobs,
+      examining,
       logs: dungeonLogs.map(localized),
       profile,
       settingsTab,
@@ -1309,6 +1389,23 @@
         queuedPath = [];
         spendTurns();
         return;
+      case "search":
+        toggleExamine();
+        return;
+      case "cancel_examine":
+        examining = false;
+        drawUi();
+        return;
+      case "worn_key":
+        uiNotice = message("item.worn_key.description");
+        overlayReturn = "inventory";
+        setPhase("message");
+        return;
+      case "goo_blob":
+        uiNotice = message("item.goo_blob.description");
+        overlayReturn = "inventory";
+        setPhase("message");
+        return;
       case "descend":
         descend();
         return;
@@ -1343,12 +1440,9 @@
         break;
       case "motion":
         profile.reducedMotion = !profile.reducedMotion;
+        cameraShake = 0;
+        updateCamera();
         break;
-      case "sensitivity": {
-        const values = [0.75, 1, 1.25, 1.5];
-        profile.sensitivity = values[(values.indexOf(profile.sensitivity) + 1) % values.length];
-        break;
-      }
       case "seed":
         profile.seed = profile.seed + 1 >>> 0;
         break;
@@ -1378,6 +1472,8 @@
   }
   function setPhase(next) {
     previewPhase = null;
+    examining = false;
+    cameraShake = 0;
     if ((next === "won" || next === "lost") && !runRecorded) {
       runRecorded = true;
       profile.runs++;
@@ -1390,11 +1486,14 @@
     }
     phase = next;
     queuedPath = [];
+    updateCamera();
     publish();
     drawUi();
   }
   function room() {
     floor = null;
+    examining = false;
+    cameraShake = 0;
     scene_clear();
     ui_clear();
     scene_set_3d_enabled(false);
@@ -1423,6 +1522,8 @@
     elapsed = score = experience = nextId = gold = hungerTimer = invisTimer = causticOozeTimer = turns = 0;
     level = depth = 1;
     strength = 10;
+    wornKeys = gooBlobs = 0;
+    gooDefeated = exitUnlocked = floorSealed = false;
     damage = heroClasses[selectedClass].baseDamage;
     maxHealth = heroClasses[selectedClass].baseHealth;
     runRecorded = false;
@@ -1438,12 +1539,14 @@
       scroll_magic_mapping: selectedClass === "mage" ? 1 : 0,
       food_ration: selectedClass === "huntress" ? 2 : 1
     };
-    dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) }), message("log.guide")];
+    dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) })];
     room();
     enterFloor();
     setPhase("playing");
   }
   function enterFloor() {
+    examining = false;
+    floorSealed = false;
     for (const id of scene_actor_ids()) if (id !== "player") scene_despawn(id);
     for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
     for (const key of renderedFog) scene_despawn(`fog_${key}`);
@@ -1476,19 +1579,26 @@
     const id = uid("loot");
     sprite(id, item ?? "gold", point, 1, 0.7);
     scene_actor_set(id, "loot", 1, 0, 0.2);
-    change(id, "power", item ? Object.keys(itemCatalog).indexOf(item) + 1 : 0);
+    change(id, "power", item ? lootKinds.indexOf(item) + 1 : 0);
+  }
+  function shakeOffset() {
+    return cameraShake > 0 ? Math.sin(cameraShake * 80) * 3 * cameraShake / 0.2 : 0;
+  }
+  function updateCamera() {
+    if (!floor || window_metrics().height <= 0) return;
+    const hero = scene_transform("player").get("translation");
+    scene_set_camera_2d(hero.get("x") + shakeOffset(), hero.get("y") + 10, window_metrics().height / uiMetrics().scale);
   }
   function refreshDungeon() {
     if (!floor) return;
     reveal(floor, cellPosition("player"));
-    const hero = scene_transform("player").get("translation");
-    scene_set_camera_2d(hero.get("x"), hero.get("y") + 10, window_metrics().height / uiMetrics().scale);
+    updateCamera();
     paintBackdrop();
     for (const key of floor.explored) {
       const point = { x: key % floor.width, z: Math.floor(key / floor.width) };
       const tile = terrainAt(floor, point);
       if (renderedTiles.get(key) !== tile) {
-        sprite(`terrain_${key}`, tile, point);
+        sprite(`terrain_${key}`, tile === "secret_door" ? "wall" : tile, point);
         renderedTiles.set(key, tile);
       }
       if (!floor.visible.has(key)) {
@@ -1498,7 +1608,7 @@
     }
     for (const id of scene_actor_ids()) {
       if (kind(id) === "loot") {
-        const item = Object.keys(itemCatalog)[field(id, "power") - 1];
+        const item = lootKinds[field(id, "power") - 1];
         sprite(id, item ?? "gold", cellPosition(id), 1, 0.7);
         const scale = scene_transform(id).get("scale");
         const visible = floor.visible.has(cellKey(floor, cellPosition(id)));
@@ -1510,9 +1620,11 @@
     const point = cellPosition("player");
     for (const id of scene_actor_ids()) {
       if (kind(id) !== "loot" || !sameCell(point, cellPosition(id))) continue;
-      const item = Object.keys(itemCatalog)[field(id, "power") - 1];
+      const item = lootKinds[field(id, "power") - 1];
       if (item) {
-        inventory[item]++;
+        if (item === "worn_key") wornKeys++;
+        else if (item === "goo_blob") gooBlobs++;
+        else inventory[item]++;
         pushLog(message("log.item", { item: message(`item.${item}.name`) }));
       } else {
         const coins = 3 + Math.floor(random() * 8);
@@ -1537,7 +1649,10 @@
     else if (kindKey === "potion_strength") strength++;
     else if (kindKey === "scroll_upgrade") damage++;
     else if (kindKey === "scroll_magic_mapping") {
-      for (let key = 0; key < floor.tiles.length; key++) floor.explored.add(key);
+      for (let key = 0; key < floor.tiles.length; key++) {
+        floor.explored.add(key);
+        if (floor.tiles[key] === "secret_door") floor.tiles[key] = "door";
+      }
     } else if (kindKey === "food_ration") hungerTimer = Math.max(0, hungerTimer - 300);
     if (phase !== "won") {
       phase = "playing";
@@ -1547,6 +1662,7 @@
   }
   function damageMonster(id, power) {
     const type = kind(id);
+    if (type === "boss") floorSealed = true;
     const hp = field(id, "health") - power;
     change(id, "health", hp);
     if (hp > 0) return;
@@ -1556,11 +1672,18 @@
     if (level <= spec.maxLevel) experience += spec.experience;
     pushLog(message("log.defeated", { monster: message(`monster.${type}`) }));
     if (type === "boss") {
+      gooDefeated = true;
+      floorSealed = false;
+      spawnLoot(point, "worn_key");
+      const chance = random(), count = chance < 0.6 ? 2 : chance < 0.9 ? 3 : 4;
+      const neighbours = [];
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+        const cell = { x: point.x + dx, z: point.z + dz };
+        if ((dx || dz) && passable(floor, cell)) neighbours.push(cell);
+      }
+      for (let index = 0; index < count; index++) spawnLoot(neighbours[Math.floor(random() * neighbours.length)] ?? point, "goo_blob");
       pushLog(message("log.sewersCleared"));
-      setPhase("won");
-      return;
-    }
-    if (random() < 0.5) spawnLoot(point);
+    } else if (random() < 0.5) spawnLoot(point);
     while (experience >= targetExperience()) {
       experience -= targetExperience();
       level++;
@@ -1601,6 +1724,7 @@
         change(id, "velocity_x", hero.x);
         change(id, "velocity_z", hero.z);
       }
+      if (type === "boss" && field(id, "lifetime")) floorSealed = true;
       if (type === "boss" && terrainAt(floor, current) === "water") change(id, "health", Math.min(100, field(id, "health") + 1));
       if (!field(id, "lifetime")) continue;
       const charged = type === "boss" && field(id, "power") >= 2;
@@ -1628,6 +1752,7 @@
           hurtPlayer(power);
           if (type === "boss" && random() < 1 / 3) causticOozeTimer = 5;
         } else pushLog(message("log.dodged", { monster: message(`monster.${type}`) }));
+        if (charged && !profile.reducedMotion) cameraShake = 0.2;
         change(id, "power", 0);
         if (phase !== "playing") return;
         continue;
@@ -1651,11 +1776,12 @@
     }
   }
   function spendTurns(count = 1) {
+    examining = false;
     queuedPath = count > 1 ? [] : queuedPath;
     for (let turn = 0; turn < count && phase === "playing"; turn++) {
       turns++;
       change("player", "lifetime", turns);
-      hungerTimer++;
+      if (!floorSealed) hungerTimer++;
       if (invisTimer > 0) invisTimer--;
       if (terrainAt(floor, cellPosition("player")) === "water") causticOozeTimer = 0;
       if (causticOozeTimer > 0) {
@@ -1663,8 +1789,8 @@
         hurtPlayer(1);
       }
       if (phase !== "playing") break;
-      if (hungerTimer >= 450 && turns % 10 === 0) hurtPlayer(1);
-      else if (hungerTimer < 450 && turns % 10 === 0) change("player", "health", Math.min(maxHealth, health() + 1));
+      if (!floorSealed && hungerTimer >= 450 && turns % 10 === 0) hurtPlayer(1);
+      else if (!floorSealed && hungerTimer < 450 && turns % 10 === 0) change("player", "health", Math.min(maxHealth, health() + 1));
       if (phase !== "playing") break;
       monstersTurn();
     }
@@ -1692,14 +1818,32 @@
   }
   function descend() {
     queuedPath = [];
+    examining = false;
     if (!floor || !sameCell(cellPosition("player"), floor.exit)) {
       pushLog(message("log.stairs"));
       drawUi();
       return;
     }
     if (depth === 5) {
-      pushLog(message("log.gooBlocks"));
-      drawUi();
+      if (!gooDefeated || floorSealed) {
+        pushLog(message("log.gooBlocks"));
+        drawUi();
+        return;
+      }
+      if (!exitUnlocked) {
+        if (!wornKeys) {
+          pushLog(message("log.keyNeeded"));
+          drawUi();
+          return;
+        }
+        wornKeys--;
+        exitUnlocked = true;
+        pushLog(message("log.exitUnlocked"));
+        spendTurns();
+        return;
+      }
+      pushLog(message("log.milestone"));
+      setPhase("won");
       return;
     }
     depth++;
@@ -1711,8 +1855,41 @@
     publish();
     drawUi();
   }
+  function toggleExamine() {
+    if (!floor || phase !== "playing") return;
+    queuedPath = [];
+    if (!examining) {
+      examining = true;
+      drawUi();
+      return;
+    }
+    const found = searchFloor(floor, cellPosition("player"), selectedClass === "rogue" ? 2 : 1);
+    if (!floorSealed) hungerTimer += 4;
+    pushLog(message(found ? "log.secretFound" : "log.searched"));
+    spendTurns(2);
+  }
+  function examineCell(point) {
+    if (!floor) return;
+    const tile = terrainAt(floor, point);
+    let occupant = "";
+    if (floor.visible.has(cellKey(floor, point))) {
+      const mob = monsterIds().find((id) => sameCell(point, cellPosition(id)));
+      const loot = scene_actor_ids().find((id) => kind(id) === "loot" && sameCell(point, cellPosition(id)));
+      const item = loot ? lootKinds[field(loot, "power") - 1] : void 0;
+      if (mob) occupant = message("examine.monster", { monster: message(`monster.${kind(mob)}`), health: field(mob, "health") });
+      else if (loot) occupant = item ? message(`item.${item}.name`) : message("examine.gold");
+    }
+    const terrain = tile === "secret_door" ? "wall" : tile === "exit" && depth === 5 && !exitUnlocked ? "locked_exit" : tile;
+    uiNotice = message("examine.cell", { terrain: message(`terrain.${terrain}`), occupant });
+    overlayReturn = "playing";
+    setPhase("message");
+  }
   function playerInput(dt, pointer) {
     actionCooldown = Math.max(0, actionCooldown - dt);
+    if (input_key_just_pressed("KeyF")) {
+      toggleExamine();
+      return;
+    }
     if (input_key_just_pressed("KeyE") || input_key_just_pressed("Period")) {
       descend();
       return;
@@ -1731,6 +1908,10 @@
     const dx = Number(input_key_pressed("KeyD") || input_key_pressed("ArrowRight")) - Number(input_key_pressed("KeyA") || input_key_pressed("ArrowLeft"));
     const dz = Number(input_key_pressed("KeyS") || input_key_pressed("ArrowDown")) - Number(input_key_pressed("KeyW") || input_key_pressed("ArrowUp"));
     if (dx || dz) {
+      if (examining) {
+        examining = false;
+        drawUi();
+      }
       queuedPath = [];
       if (actionCooldown <= 0) {
         movePlayer(dx, dz);
@@ -1743,10 +1924,15 @@
       if (pointer.y > window_safe_area().top - 150 || pointer.y < window_safe_area().bottom + 80) return;
       const translation = scene_transform("player").get("translation");
       const pointerScale = pointer.viewportHeight / window_metrics().height * uiMetrics().scale;
-      const worldX = translation.get("x") + pointer.x / pointerScale;
+      const worldX = translation.get("x") + shakeOffset() + pointer.x / pointerScale;
       const worldY = translation.get("y") + 10 + pointer.y / pointerScale;
       const target = { x: Math.round(worldX / cellSize + 12), z: Math.round(12 - (worldY + 40) / cellSize) };
+      if (target.x < 0 || target.z < 0 || target.x >= floor.width || target.z >= floor.height) return;
       if (!floor.explored.has(cellKey(floor, target))) return;
+      if (examining) {
+        examineCell(target);
+        return;
+      }
       if (sameCell(target, cellPosition("player"))) {
         if (sameCell(target, floor.exit)) descend();
         return;
@@ -1877,6 +2063,10 @@
       refreshDungeon();
       drawUi();
     }
+    if (phase === "playing" && cameraShake > 0) {
+      cameraShake = Math.max(0, cameraShake - dt);
+      updateCamera();
+    }
     const previousPhase = phase;
     const previousTurns = turns;
     const uiActivated = updateUi();
@@ -1903,7 +2093,10 @@
       }
     }
     if (input_key_just_pressed("Escape")) {
-      if (phase === "playing") setPhase("paused");
+      if (phase === "playing" && examining) {
+        examining = false;
+        drawUi();
+      } else if (phase === "playing") setPhase("paused");
       else if (phase === "inventory" || phase === "item" || phase === "hero" || phase === "message") closeModal();
       else if (phase === "paused") setPhase("playing");
       else if (phase === "checks") setPhase(returnPhase);

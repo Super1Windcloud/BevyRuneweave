@@ -1,8 +1,8 @@
 const callbacks = globalThis as unknown as RuneweaveCallbacks;
 import { actor, change, field, kind, position } from "./actors.js";
-import { clamp, enemySpecs, getHungerStatus, heroClasses, heroClassList, itemCatalog, mobCombat, seededRandom,
-  type EnemyKind, type HeroClass, type ItemKind, type Point } from "./rules.js";
-import { canStep, cellDistance, cellKey, findPath, generateFloor, lineOfSight, reveal, sameCell, terrainAt, type DungeonFloor, type Terrain } from "./dungeon.js";
+import { clamp, enemySpecs, getHungerStatus, heroClasses, heroClassList, itemCatalog, lootKinds, mobCombat, seededRandom,
+  type EnemyKind, type HeroClass, type ItemKind, type LootKind, type Point } from "./rules.js";
+import { canStep, cellDistance, cellKey, findPath, generateFloor, lineOfSight, passable, reveal, sameCell, searchFloor, terrainAt, type DungeonFloor, type Terrain } from "./dungeon.js";
 import { actorSprite, cellPosition, cellSize, mobSprites, monsterIds, placeCell, sprite } from "./dungeon-actors.js";
 import { defaultProfile, parseProfile, type Profile } from "./profile.js";
 import { message, renderMessage, type Message, type MessageKey } from "./i18n.js";
@@ -53,6 +53,13 @@ let settingsTab = 0;
 let overlayReturn: Phase = "playing";
 let uiNotice: Message | null = null;
 let previewPhase: Phase | null = null;
+let examining = false;
+let cameraShake = 0;
+let wornKeys = 0;
+let gooBlobs = 0;
+let gooDefeated = false;
+let exitUnlocked = false;
+let floorSealed = false;
 
 // Shattered Pixel Dungeon core state
 let gold = 0;
@@ -133,7 +140,7 @@ function drawUi(): void {
     phase: previewPhase ?? phase, selectedClass, item: selectedItem, health: previewPhase === "lost" ? 0 : health(), maxHealth, level, strength, experience,
     targetExperience: targetExperience(), depth, gold, score, turns, hunger: getHungerStatus(hungerTimer),
     invisible: invisTimer, ooze: causticOozeTimer, bossHealth: scene_actor("warden") ? field("warden", "health") : null,
-    inventory, logs: dungeonLogs.map(localized), profile, settingsTab, gameBehind: phase === "settings" ? !["menu", "heroes"].includes(settingsReturn) : phase === "journal" ? overlayReturn !== "menu" : ["hero", "message"].includes(phase) ? overlayReturn !== "heroes" : true,
+    inventory, wornKeys, gooBlobs, examining, logs: dungeonLogs.map(localized), profile, settingsTab, gameBehind: phase === "settings" ? !["menu", "heroes"].includes(settingsReturn) : phase === "journal" ? overlayReturn !== "menu" : ["hero", "message"].includes(phase) ? overlayReturn !== "heroes" : true,
     saveNotice: saveNotice ? localized(saveNotice) : "", resetPending, checks: checks.map(localized), checkPage,
     networkStatus: networkLines.length ? networkLines.map(localized).join("\n") : localized(networkStatus),
     notice: uiNotice ? localized(uiNotice) : "",
@@ -180,6 +187,10 @@ function uiAction(id: string, value?: string | number): void {
     case "check_page": checkPage = (checkPage + 1) % Math.ceil(checks.length / 6); drawUi(); return;
     case "network": checkNetwork(); return;
     case "wait": queuedPath = []; spendTurns(); return;
+    case "search": toggleExamine(); return;
+    case "cancel_examine": examining = false; drawUi(); return;
+    case "worn_key": uiNotice = message("item.worn_key.description"); overlayReturn = "inventory"; setPhase("message"); return;
+    case "goo_blob": uiNotice = message("item.goo_blob.description"); overlayReturn = "inventory"; setPhase("message"); return;
     case "descend": descend(); return;
     case "modal_close": case "close_bag": case "settings_back": closeModal(); return;
     case "back": if (phase === "heroes") loadMenu(); else closeModal(); return;
@@ -189,8 +200,7 @@ function uiAction(id: string, value?: string | number): void {
     case "language_english": profile.language = "en"; profile.followSystemLanguage = false; break;
     case "language_chinese": profile.language = "zh-CN"; profile.followSystemLanguage = false; break;
     case "hints": profile.showHints = !profile.showHints; break;
-    case "motion": profile.reducedMotion = !profile.reducedMotion; break;
-    case "sensitivity": { const values = [0.75, 1, 1.25, 1.5]; profile.sensitivity = values[(values.indexOf(profile.sensitivity) + 1) % values.length]!; break; }
+    case "motion": profile.reducedMotion = !profile.reducedMotion; cameraShake = 0; updateCamera(); break;
     case "seed": profile.seed = (profile.seed + 1) >>> 0; break;
     case "retry_save": persistProfile(); drawUi(); return;
     case "reset_save": resetPending = true; drawUi(); return;
@@ -207,6 +217,8 @@ function publish(): void {
 
 function setPhase(next: Phase): void {
   previewPhase = null;
+  examining = false;
+  cameraShake = 0;
   if ((next === "won" || next === "lost") && !runRecorded) {
     runRecorded = true;
     profile.runs++;
@@ -219,12 +231,14 @@ function setPhase(next: Phase): void {
   }
   phase = next;
   queuedPath = [];
+  updateCamera();
   publish();
   drawUi();
 }
 
 function room(): void {
   floor = null;
+  examining = false; cameraShake = 0;
   scene_clear();
   ui_clear();
   scene_set_3d_enabled(false);
@@ -255,6 +269,8 @@ function startRun(): void {
   elapsed = score = experience = nextId = gold = hungerTimer = invisTimer = causticOozeTimer = turns = 0;
   level = depth = 1;
   strength = 10;
+  wornKeys = gooBlobs = 0;
+  gooDefeated = exitUnlocked = floorSealed = false;
   damage = heroClasses[selectedClass].baseDamage;
   maxHealth = heroClasses[selectedClass].baseHealth;
   runRecorded = false;
@@ -270,13 +286,14 @@ function startRun(): void {
     scroll_magic_mapping: selectedClass === "mage" ? 1 : 0,
     food_ration: selectedClass === "huntress" ? 2 : 1,
   };
-  dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) }), message("log.guide")];
+  dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) })];
   room();
   enterFloor();
   setPhase("playing");
 }
 
 function enterFloor(): void {
+  examining = false; floorSealed = false;
   for (const id of scene_actor_ids()) if (id !== "player") scene_despawn(id);
   for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
   for (const key of renderedFog) scene_despawn(`fog_${key}`);
@@ -306,24 +323,31 @@ function spawnMonster(id: string, type: EnemyKind, point: Point): void {
   change(id, "lifetime", 0); change(id, "cooldown", 0); change(id, "power", 0);
 }
 
-function spawnLoot(point: Point, item?: ItemKind): void {
+function spawnLoot(point: Point, item?: LootKind): void {
   const id = uid("loot");
   sprite(id, item ?? "gold", point, 1, 0.7);
   scene_actor_set(id, "loot", 1, 0, 0.2);
-  change(id, "power", item ? Object.keys(itemCatalog).indexOf(item) + 1 : 0);
+  change(id, "power", item ? lootKinds.indexOf(item) + 1 : 0);
+}
+
+function shakeOffset(): number { return cameraShake > 0 ? Math.sin(cameraShake * 80) * 3 * cameraShake / 0.2 : 0; }
+
+function updateCamera(): void {
+  if (!floor || window_metrics().height <= 0) return;
+  const hero = scene_transform("player")!.get("translation") as BmsReflectReference;
+  scene_set_camera_2d((hero.get("x") as number) + shakeOffset(), (hero.get("y") as number) + 10, window_metrics().height / uiMetrics().scale);
 }
 
 function refreshDungeon(): void {
   if (!floor) return;
   reveal(floor, cellPosition("player"));
-  const hero = scene_transform("player")!.get("translation") as BmsReflectReference;
-  scene_set_camera_2d(hero.get("x") as number, (hero.get("y") as number) + 10, window_metrics().height / uiMetrics().scale);
+  updateCamera();
   paintBackdrop();
   for (const key of floor.explored) {
     const point = { x: key % floor.width, z: Math.floor(key / floor.width) };
     const tile = terrainAt(floor, point);
     if (renderedTiles.get(key) !== tile) {
-      sprite(`terrain_${key}`, tile, point); renderedTiles.set(key, tile);
+      sprite(`terrain_${key}`, tile === "secret_door" ? "wall" : tile, point); renderedTiles.set(key, tile);
     }
     if (!floor.visible.has(key)) {
       if (!renderedFog.has(key)) sprite(`fog_${key}`, "fog", point, 3);
@@ -332,7 +356,7 @@ function refreshDungeon(): void {
   }
   for (const id of scene_actor_ids()) {
     if (kind(id) === "loot") {
-      const item = (Object.keys(itemCatalog) as ItemKind[])[field(id, "power") - 1];
+      const item = lootKinds[field(id, "power") - 1];
       sprite(id, item ?? "gold", cellPosition(id), 1, 0.7);
       const scale = scene_transform(id)!.get("scale") as BmsReflectReference;
       const visible = floor.visible.has(cellKey(floor, cellPosition(id)));
@@ -345,8 +369,13 @@ function collectLoot(): void {
   const point = cellPosition("player");
   for (const id of scene_actor_ids()) {
     if (kind(id) !== "loot" || !sameCell(point, cellPosition(id))) continue;
-    const item = (Object.keys(itemCatalog) as ItemKind[])[field(id, "power") - 1];
-    if (item) { inventory[item]++; pushLog(message("log.item", { item: message(`item.${item}.name`) })); }
+    const item = lootKinds[field(id, "power") - 1];
+    if (item) {
+      if (item === "worn_key") wornKeys++;
+      else if (item === "goo_blob") gooBlobs++;
+      else inventory[item]++;
+      pushLog(message("log.item", { item: message(`item.${item}.name`) }));
+    }
     else { const coins = 3 + Math.floor(random() * 8); gold += coins; pushLog(message("log.gold", { gold: coins })); }
     scene_despawn(id);
   }
@@ -366,7 +395,10 @@ function useInventoryItem(kindKey: ItemKind): boolean {
   else if (kindKey === "potion_strength") strength++;
   else if (kindKey === "scroll_upgrade") damage++;
   else if (kindKey === "scroll_magic_mapping") {
-    for (let key = 0; key < floor!.tiles.length; key++) floor!.explored.add(key);
+    for (let key = 0; key < floor!.tiles.length; key++) {
+      floor!.explored.add(key);
+      if (floor!.tiles[key] === "secret_door") floor!.tiles[key] = "door";
+    }
   } else if (kindKey === "food_ration") hungerTimer = Math.max(0, hungerTimer - 300);
   if ((phase as Phase) !== "won") {
     phase = "playing";
@@ -377,6 +409,7 @@ function useInventoryItem(kindKey: ItemKind): boolean {
 
 function damageMonster(id: string, power: number): void {
   const type = kind(id) as EnemyKind;
+  if (type === "boss") floorSealed = true;
   const hp = field(id, "health") - power;
   change(id, "health", hp);
   if (hp > 0) return;
@@ -386,10 +419,17 @@ function damageMonster(id: string, power: number): void {
   if (level <= spec.maxLevel) experience += spec.experience;
   pushLog(message("log.defeated", { monster: message(`monster.${type}`) }));
   if (type === "boss") {
+    gooDefeated = true; floorSealed = false;
+    spawnLoot(point, "worn_key");
+    const chance = random(), count = chance < 0.6 ? 2 : chance < 0.9 ? 3 : 4;
+    const neighbours: Point[] = [];
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      const cell = { x: point.x + dx, z: point.z + dz };
+      if ((dx || dz) && passable(floor!, cell)) neighbours.push(cell);
+    }
+    for (let index = 0; index < count; index++) spawnLoot(neighbours[Math.floor(random() * neighbours.length)] ?? point, "goo_blob");
     pushLog(message("log.sewersCleared"));
-    setPhase("won"); return;
-  }
-  if (random() < 0.5) spawnLoot(point);
+  } else if (random() < 0.5) spawnLoot(point);
   while (experience >= targetExperience()) {
     experience -= targetExperience(); level++; maxHealth += 5;
     change("player", "health", Math.min(maxHealth, health() + 5));
@@ -430,6 +470,7 @@ function monstersTurn(): void {
     if (seesHero) {
       change(id, "lifetime", 1); change(id, "velocity_x", hero.x); change(id, "velocity_z", hero.z);
     }
+    if (type === "boss" && field(id, "lifetime")) floorSealed = true;
     if (type === "boss" && terrainAt(floor!, current) === "water") change(id, "health", Math.min(100, field(id, "health") + 1));
     if (!field(id, "lifetime")) continue;
     const charged = type === "boss" && field(id, "power") >= 2;
@@ -452,6 +493,7 @@ function monstersTurn(): void {
         hurtPlayer(power);
         if (type === "boss" && random() < 1 / 3) causticOozeTimer = 5;
       } else pushLog(message("log.dodged", { monster: message(`monster.${type}`) }));
+      if (charged && !profile.reducedMotion) cameraShake = 0.2;
       change(id, "power", 0);
       if (phase !== "playing") return;
       continue; // Crab moves twice, but its attack delay is still one turn.
@@ -473,16 +515,17 @@ function monstersTurn(): void {
 }
 
 function spendTurns(count = 1): void {
+  examining = false;
   queuedPath = count > 1 ? [] : queuedPath;
   for (let turn = 0; turn < count && phase === "playing"; turn++) {
     turns++; change("player", "lifetime", turns);
-    hungerTimer++;
+    if (!floorSealed) hungerTimer++;
     if (invisTimer > 0) invisTimer--;
     if (terrainAt(floor!, cellPosition("player")) === "water") causticOozeTimer = 0;
     if (causticOozeTimer > 0) { causticOozeTimer--; hurtPlayer(1); }
     if (phase !== "playing") break;
-    if (hungerTimer >= 450 && turns % 10 === 0) hurtPlayer(1);
-    else if (hungerTimer < 450 && turns % 10 === 0) change("player", "health", Math.min(maxHealth, health() + 1));
+    if (!floorSealed && hungerTimer >= 450 && turns % 10 === 0) hurtPlayer(1);
+    else if (!floorSealed && hungerTimer < 450 && turns % 10 === 0) change("player", "health", Math.min(maxHealth, health() + 1));
     if (phase !== "playing") break;
     monstersTurn();
   }
@@ -506,15 +549,53 @@ function movePlayer(dx: number, dz: number): boolean {
 
 function descend(): void {
   queuedPath = [];
+  examining = false;
   if (!floor || !sameCell(cellPosition("player"), floor.exit)) { pushLog(message("log.stairs")); drawUi(); return; }
-  if (depth === 5) { pushLog(message("log.gooBlocks")); drawUi(); return; }
+  if (depth === 5) {
+    if (!gooDefeated || floorSealed) { pushLog(message("log.gooBlocks")); drawUi(); return; }
+    if (!exitUnlocked) {
+      if (!wornKeys) { pushLog(message("log.keyNeeded")); drawUi(); return; }
+      wornKeys--; exitUnlocked = true;
+      pushLog(message("log.exitUnlocked")); spendTurns(); return;
+    }
+    // Explicit boundary for the current content package; the prison is not ported.
+    pushLog(message("log.milestone")); setPhase("won"); return;
+  }
   depth++; turns++; change("player", "lifetime", turns); hungerTimer++;
   pushLog(message(depth === 5 ? "log.lair" : "log.descend", { depth }));
   enterFloor(); publish(); drawUi();
 }
 
+function toggleExamine(): void {
+  if (!floor || phase !== "playing") return;
+  queuedPath = [];
+  if (!examining) { examining = true; drawUi(); return; }
+  const found = searchFloor(floor, cellPosition("player"), selectedClass === "rogue" ? 2 : 1);
+  // v4.0.2 Hero.search: two action ticks and six hunger units, before talents.
+  if (!floorSealed) hungerTimer += 4;
+  pushLog(message(found ? "log.secretFound" : "log.searched"));
+  spendTurns(2);
+}
+
+function examineCell(point: Point): void {
+  if (!floor) return;
+  const tile = terrainAt(floor, point);
+  let occupant: Message | string = "";
+  if (floor.visible.has(cellKey(floor, point))) {
+    const mob = monsterIds().find((id) => sameCell(point, cellPosition(id)));
+    const loot = scene_actor_ids().find((id) => kind(id) === "loot" && sameCell(point, cellPosition(id)));
+    const item = loot ? lootKinds[field(loot, "power") - 1] : undefined;
+    if (mob) occupant = message("examine.monster", { monster: message(`monster.${kind(mob) as EnemyKind}`), health: field(mob, "health") });
+    else if (loot) occupant = item ? message(`item.${item}.name`) : message("examine.gold");
+  }
+  const terrain = tile === "secret_door" ? "wall" : tile === "exit" && depth === 5 && !exitUnlocked ? "locked_exit" : tile;
+  uiNotice = message("examine.cell", { terrain: message(`terrain.${terrain}`), occupant });
+  overlayReturn = "playing"; setPhase("message");
+}
+
 function playerInput(dt: number, pointer: RuneweavePointerState): void {
   actionCooldown = Math.max(0, actionCooldown - dt);
+  if (input_key_just_pressed("KeyF")) { toggleExamine(); return; }
   if (input_key_just_pressed("KeyE") || input_key_just_pressed("Period")) { descend(); return; }
   if (input_key_just_pressed("Space")) { queuedPath = []; spendTurns(); return; }
   const shortcuts: ItemKind[] = ["potion_healing", "potion_liquid_flame", "potion_invisibility", "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration"];
@@ -522,6 +603,7 @@ function playerInput(dt: number, pointer: RuneweavePointerState): void {
   const dx = Number(input_key_pressed("KeyD") || input_key_pressed("ArrowRight")) - Number(input_key_pressed("KeyA") || input_key_pressed("ArrowLeft"));
   const dz = Number(input_key_pressed("KeyS") || input_key_pressed("ArrowDown")) - Number(input_key_pressed("KeyW") || input_key_pressed("ArrowUp"));
   if (dx || dz) {
+    if (examining) { examining = false; drawUi(); }
     queuedPath = [];
     if (actionCooldown <= 0) { movePlayer(dx, dz); actionCooldown = 0.16; }
     return;
@@ -531,10 +613,12 @@ function playerInput(dt: number, pointer: RuneweavePointerState): void {
     if (pointer.y > window_safe_area().top - 150 || pointer.y < window_safe_area().bottom + 80) return;
     const translation = scene_transform("player")!.get("translation") as BmsReflectReference;
     const pointerScale = pointer.viewportHeight / window_metrics().height * uiMetrics().scale;
-    const worldX = (translation.get("x") as number) + pointer.x / pointerScale;
+    const worldX = (translation.get("x") as number) + shakeOffset() + pointer.x / pointerScale;
     const worldY = (translation.get("y") as number) + 10 + pointer.y / pointerScale;
     const target = { x: Math.round(worldX / cellSize + 12), z: Math.round(12 - (worldY + 40) / cellSize) };
+    if (target.x < 0 || target.z < 0 || target.x >= floor!.width || target.z >= floor!.height) return;
     if (!floor!.explored.has(cellKey(floor!, target))) return;
+    if (examining) { examineCell(target); return; }
     if (sameCell(target, cellPosition("player"))) { if (sameCell(target, floor!.exit)) descend(); return; }
     const blocked = new Set(monsterIds().filter((id) => !sameCell(cellPosition(id), target)).map((id) => cellKey(floor!, cellPosition(id))));
     queuedPath = findPath(floor!, cellPosition("player"), target, blocked, true);
@@ -671,6 +755,9 @@ callbacks.on_update = (delta: number): void => {
     refreshDungeon();
     drawUi();
   }
+  if (phase === "playing" && cameraShake > 0) {
+    cameraShake = Math.max(0, cameraShake - dt); updateCamera();
+  }
   const previousPhase = phase;
   const previousTurns = turns;
   const uiActivated = updateUi();
@@ -692,7 +779,8 @@ callbacks.on_update = (delta: number): void => {
 
   // Shortcut keys
   if (input_key_just_pressed("Escape")) {
-    if (phase === "playing") setPhase("paused");
+    if (phase === "playing" && examining) { examining = false; drawUi(); }
+    else if (phase === "playing") setPhase("paused");
     else if (phase === "inventory" || phase === "item" || phase === "hero" || phase === "message") closeModal();
     else if (phase === "paused") setPhase("playing");
     else if (phase === "checks") setPhase(returnPhase);

@@ -12,9 +12,10 @@ import {
   enemySpecs,
   mobCombat,
   seededRandom,
+  lootKinds,
   type Point,
 } from "../modules/ember-arena/game/src/rules.js";
-import { canStep, cellKey, findPath, generateFloor, lineOfSight, reveal, sameCell, terrainAt, type DungeonFloor, type Terrain } from "../modules/ember-arena/game/src/dungeon.js";
+import { canStep, cellKey, findPath, generateFloor, lineOfSight, passable, reveal, sameCell, searchFloor, terrainAt, type DungeonFloor, type Terrain } from "../modules/ember-arena/game/src/dungeon.js";
 import { defaultProfile, parseProfile } from "../modules/ember-arena/game/src/profile.js";
 import { message, messages, renderMessage, translate, type MessageKey } from "../modules/ember-arena/game/src/i18n.js";
 import { fontForText, measureText, wrapText } from "../modules/ember-arena/game/src/text-layout.js";
@@ -169,6 +170,7 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
         x: ((point.x - 12) * size - camera.x) * 800 / camera.height,
         y: ((12 - point.z) * size - 40 - camera.y) * 800 / camera.height };
       tick();
+      pointer.pressed = false;
     },
     exitRequested: () => exitRequested,
     resize: (w: number, h: number) => { width = w; height = h; pointer.viewportWidth = w / h * 800; },
@@ -248,10 +250,10 @@ test("settings persist across sessions, and reset requires confirmation", () => 
   const game = harness(1280, 800, false, saves);
   game.click("settings"); game.setting("sensitivity"); game.setting("hints"); game.setting("motion"); game.setting("seed");
   const saved = parseProfile(saves.get("profile")!);
-  assert.equal(saved.sensitivity, 1.25); assert.equal(saved.showHints, false);
+  assert.equal(saved.sensitivity, 1, "unavailable sensitivity must not change"); assert.equal(saved.showHints, false);
   assert.equal(saved.reducedMotion, true); assert.equal(saved.seed, 1338);
   const reopened = harness(1280, 800, false, saves);
-  reopened.click("settings"); reopened.click("settings_tab_2"); assert.match(reopened.ui.get("sensitivity__label")!.text!, /1.25x/);
+  reopened.click("settings"); reopened.click("settings_tab_2"); assert.match(reopened.ui.get("sensitivity__label")!.text!, /1.00x/);
   reopened.setting("reset_save"); assert.ok(saves.has("profile"));
   reopened.click("cancel_reset"); assert.ok(saves.has("profile"));
   reopened.setting("reset_save"); reopened.click("confirm_reset"); assert.ok(!saves.has("profile"));
@@ -428,6 +430,76 @@ test("closed doors block vision, opening reveals the room, and memory retains te
   assert.deepEqual(findPath(map, map.entrance, map.exit, new Set([cellKey(map, { x: 3, z: 2 })])), []);
 });
 
+test("secret doors block movement and sight until a visible in-range search reveals them", () => {
+  const map: DungeonFloor = { width: 7, height: 5, depth: 1, entrance: { x: 1, z: 2 }, exit: { x: 5, z: 2 }, rooms: [],
+    tiles: Array<Terrain>(35).fill("wall"), explored: new Set(), visible: new Set() };
+  for (let x = 1; x <= 5; x++) map.tiles[cellKey(map, { x, z: 2 })] = "floor";
+  const door = { x: 3, z: 2 };
+  map.tiles[cellKey(map, door)] = "secret_door";
+  reveal(map, map.entrance);
+  assert.equal(passable(map, door), false);
+  assert.equal(lineOfSight(map, map.entrance, map.exit), false);
+  assert.equal(searchFloor(map, map.entrance, 1), 0);
+  assert.equal(searchFloor(map, map.entrance, 2), 1, "starting Rogue range reaches two tiles");
+  assert.equal(terrainAt(map, door), "door");
+  assert.equal(lineOfSight(map, map.entrance, map.exit), false, "discovery does not open the door");
+  map.tiles[cellKey(map, door)] = "secret_door"; map.visible.clear();
+  assert.equal(searchFloor(map, map.entrance, 2), 0, "search must not discover unseen secrets");
+  for (let seed = 0; seed < 40; seed++) {
+    const generated = generateFloor(seed, 1);
+    assert.equal(generated.tiles.filter((tile) => tile === "secret_door").length, 1);
+    for (const room of generated.rooms) assert.ok(sameCell(room, generated.entrance) || findPath(generated, generated.entrance, room).length);
+  }
+});
+
+test("search icon examines without turns, active search costs two ticks and six hunger, and cancel is safe", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  putActor(game, "visible_rat", "chaser", { x: 13, z: 12 }, 8);
+  game.click("search");
+  assert.ok(game.ui.has("examine_prompt"));
+  assert.equal(turnCount(game), 0);
+  const before = JSON.stringify([...game.entities]); game.tick(50);
+  assert.equal(JSON.stringify([...game.entities]), before);
+  game.tapCell({ x: 13, z: 12 });
+  assert.equal(game.state().message, "MESSAGE");
+  assert.match(game.ui.get("message_text")!.text!.replace(/\n/g, ""), /Marsupial Rat.*Health: 8/);
+  assert.deepEqual(cell(game), { x: 12, z: 12 }); assert.equal(turnCount(game), 0);
+  game.key("Escape"); removeMonsters(game);
+  game.key("KeyF"); game.key("Escape");
+  assert.equal(game.state().message, "PLAYING"); assert.ok(!game.ui.has("examine_prompt"));
+  game.click("search"); game.click("cancel_examine"); assert.equal(turnCount(game), 0);
+  for (let search = 0; search < 49; search++) { game.click("search"); game.click("search"); }
+  assert.equal(turnCount(game), 98); assert.ok(!game.ui.has("hud_hunger"));
+  game.key("KeyF"); game.key("KeyF");
+  assert.equal(turnCount(game), 100); assert.equal(game.ui.get("hud_hunger")!.text, "Hungry");
+  assert.equal(game.ui.get("hud_wave")!.text, "1", "search never descends");
+});
+
+test("examining remembered terrain does not disclose a hidden monster", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const map = generateFloor(1337, 1);
+  const remembered = { x: 4, z: 12 };
+  walk(game, map, remembered);
+  walk(game, map, map.entrance);
+  putActor(game, "unseen_rat", "chaser", remembered, 99);
+  game.resize(1281, 800); game.tick();
+  const hp = game.state().lives, turns = turnCount(game);
+  game.click("search"); game.tapCell(remembered);
+  assert.equal(game.state().message, "MESSAGE");
+  assert.ok(!game.ui.get("message_text")!.text!.includes("99"));
+  assert.ok(!game.ui.get("message_text")!.text!.includes("Rat"));
+  assert.equal(turnCount(game), turns); assert.equal(game.state().lives, hp);
+});
+
+test("held search clicks cannot repeat an active search after the UI is remounted", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  game.holdButton("search"); game.tick(20);
+  assert.ok(game.ui.has("examine_prompt")); assert.equal(turnCount(game), 0);
+  game.releaseButton(); game.holdButton("search"); game.tick(20);
+  assert.ok(!game.ui.has("examine_prompt")); assert.equal(turnCount(game), 2);
+  game.releaseButton();
+});
+
 test("waiting without input freezes actors, hunger and depth; blocked movement costs no turn", () => {
   const game = harness(); game.start();
   const before = JSON.stringify([...game.entities]);
@@ -440,9 +512,11 @@ test("waiting without input freezes actors, hunger and depth; blocked movement c
   const target = { x: 10, z: 10 };
   walk(game, map, target);
   const turn = turnCount(game);
+  game.click("search");
   game.step(-1, -1); // The wall outside the north-west corner of the starting room.
   assert.deepEqual(cell(game), target);
   assert.equal(turnCount(game), turn);
+  assert.ok(!game.ui.has("examine_prompt"), "blocked movement still cancels examine mode");
   game.key("Digit4");
   assert.equal(turnCount(game), turn, "an empty item slot consumes no turn");
 });
@@ -480,13 +554,73 @@ test("stairs require the exit tile and preserve hero health and inventory across
   assert.ok(game.ui.has("boss_panel"));
   removeMonsters(game);
   putActor(game, "warden", "boss", { x: 13, z: 12 }, 1, 1);
-  for (let attempt = 0; attempt < 5 && game.state().message === "PLAYING"; attempt++) game.step(1, 0);
+  for (let attempt = 0; attempt < 20 && game.entities.has("warden"); attempt++) game.step(1, 0);
+  assert.ok(!game.entities.has("warden"));
+  assert.equal(game.state().message, "PLAYING", "boss death must not end the run");
+  assert.ok(!game.saves.has("profile"), "boss death must not record a milestone");
+  const drops = [...game.entities].filter(([, entity]) => entity.body?.kind === "loot");
+  const keyDrops = drops.filter(([, entity]) => lootKinds[Number(entity.body!.power) - 1] === "worn_key");
+  const blobs = drops.filter(([, entity]) => lootKinds[Number(entity.body!.power) - 1] === "goo_blob");
+  assert.equal(keyDrops.length, 1); assert.deepEqual(cell(game, keyDrops[0]![0]), { x: 13, z: 12 });
+  assert.ok(blobs.length >= 2 && blobs.length <= 4);
+  game.step(1, 0);
+  assert.ok(!game.entities.has(keyDrops[0]![0]), "the key must be picked up from its actual tile");
+  game.key("KeyI");
+  assert.equal(game.ui.get("item_count_worn_key")!.text, "1");
+  game.click("slot_worn_key"); assert.match(game.ui.get("message_text")!.text!, /depth 5/);
+  game.key("Escape"); game.key("Escape");
+  const map = generateFloor(1337, 5);
+  walk(game, map, map.exit);
+  const beforeUnlock = turnCount(game);
+  game.click("descend");
+  assert.equal(game.state().message, "PLAYING");
+  assert.equal(turnCount(game), beforeUnlock + 1, "unlocking spends a turn");
+  game.key("KeyI"); assert.ok(!game.ui.has("slot_worn_key")); game.key("Escape");
+  game.click("descend");
   assert.equal(game.state().message, "WON");
-  assert.match(game.ui.get("result_title")!.text!, /Goo defeated/);
+  assert.match(game.ui.get("result_title")!.text!, /Sewers milestone complete/);
+  assert.match(game.ui.get("result_boundary")!.text!, /not available yet/);
   assert.equal(parseProfile(game.saves.get("profile")!).wins, 1);
   game.tick(50); assert.equal(parseProfile(game.saves.get("profile")!).runs, 1);
   game.click("restart"); game.click("begin_run");
   assert.equal(game.state().lives, 20); assert.equal(turnCount(game), 0);
+});
+
+test("the sewer exit requires both the defeated boss and a physically collected key", () => {
+  const game = harness(); game.start();
+  for (let depth = 1; depth < 5; depth++) {
+    removeMonsters(game);
+    const map = generateFloor(1337, depth); walk(game, map, map.exit); game.click("descend");
+  }
+  const map = generateFloor(1337, 5);
+  // Fixture placement checks the exit gate independently of the boss's pathfinding.
+  putActor(game, "player", "player", map.exit, 100);
+  game.resize(1281, 800); game.tick();
+  const before = turnCount(game); game.click("descend");
+  assert.equal(turnCount(game), before); assert.equal(game.state().message, "PLAYING");
+  assert.ok(!game.saves.has("profile"));
+  removeMonsters(game);
+  const target = findPath(map, map.exit, map.entrance)[0]!;
+  putActor(game, "warden", "boss", target, 1);
+  for (let attempt = 0; attempt < 30 && game.entities.has("warden"); attempt++) {
+    game.entities.get("warden")!.body!.lifetime = 0;
+    game.step(target.x - map.exit.x, target.z - map.exit.z);
+  }
+  assert.ok(!game.entities.has("warden")); assert.deepEqual(cell(game), map.exit);
+  const killedAt = turnCount(game); game.click("descend");
+  assert.equal(game.state().message, "PLAYING"); assert.equal(turnCount(game), killedAt);
+  assert.match([...game.ui.values()].flatMap((element) => element.text ?? []).join(" "), /Collect the Worn Key/);
+  assert.ok(!game.saves.has("profile"));
+  const blobDrop = [...game.entities].find(([, entity]) => entity.body?.kind === "loot" && lootKinds[Number(entity.body.power) - 1] === "goo_blob")!;
+  assert.ok(blobDrop);
+  const blobCell = cell(game, blobDrop[0]);
+  // A drop on the current tile is collected when the hero steps off and back.
+  walk(game, map, target); walk(game, map, blobCell);
+  if (game.entities.has(blobDrop[0])) { walk(game, map, target); walk(game, map, blobCell); }
+  game.key("KeyI"); assert.ok(game.ui.has("slot_goo_blob"));
+  const beforeInfo = turnCount(game); game.click("slot_goo_blob");
+  assert.match(game.ui.get("message_text")!.text!, /not available/);
+  assert.equal(turnCount(game), beforeInfo); assert.ok(!game.ui.has("use_goo_blob"));
 });
 
 test("bump attacks consume turns, break invisibility and never move into an occupied cell", () => {
@@ -568,6 +702,49 @@ test("generated native sprites retain upstream frame sizes and manifest checksum
     assert.equal(png.readUInt32BE(16), width); assert.equal(png.readUInt32BE(20), height);
     assert.equal(png[25], 6, "indexed upstream assets must become real RGBA sprites");
   }
+});
+
+test("original images and new Goo drops have immutable source provenance and verified hashes", () => {
+  const source = JSON.parse(readFileSync(resolve(assets, "licenses/sources.json"), "utf8")) as {
+    revision: string; sourceRecords: { file: string; source: string; sha256: string }[];
+    spriteRecords: { file: string; source: string; sha256: string }[];
+  };
+  assert.equal(source.revision, "57a4e06a4caf162446d1c28caa7983f0493fecf0");
+  assert.equal(source.sourceRecords.length, 33);
+  for (const record of [...source.sourceRecords, ...source.spriteRecords]) {
+    assert.ok(record.source.includes(`/${source.revision}/`));
+    assert.equal(createHash("sha256").update(readFileSync(resolve(assets, record.file))).digest("hex"), record.sha256);
+  }
+  for (const item of ["worn_key", "goo_blob"]) assert.ok(source.spriteRecords.some((record) => record.file === `sprites/dungeon/${item}.png`));
+});
+
+test("hints affect the HUD and unavailable sensitivity preserves legacy settings and exact tile input", () => {
+  const profile = { ...defaultProfile(), sensitivity: 1.25 };
+  const game = harness(1280, 800, false, new Map([["profile", JSON.stringify(profile)]]));
+  game.start(); removeMonsters(game); assert.ok(game.ui.has("hud_hint"));
+  game.click("pause"); game.click("settings"); game.setting("hints");
+  game.setting("sensitivity");
+  assert.ok(game.ui.has("sensitivity_unavailable"));
+  assert.equal(parseProfile(game.saves.get("profile")!).sensitivity, 1.25);
+  game.key("Escape"); assert.ok(!game.ui.has("hud_hint"));
+  const turn = turnCount(game); game.tapCell({ x: 13, z: 12 }); game.tick(5);
+  assert.deepEqual(cell(game), { x: 13, z: 12 }); assert.equal(turnCount(game), turn + 1);
+});
+
+test("reduced effects disables Goo camera shake without changing authoritative actor positions", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  game.entities.get("player")!.body!.health = 1000;
+  putActor(game, "warden", "boss", { x: 13, z: 12 }, 40);
+  game.entities.get("warden")!.body!.power = 2;
+  game.click("wait");
+  const heroX = (game.entities.get("player")!.transform.translation as { x: number }).x;
+  assert.notEqual(game.camera().x, heroX);
+  const before = JSON.stringify([...game.entities]); game.tick(10);
+  assert.equal(game.camera().x, heroX); assert.equal(JSON.stringify([...game.entities]), before);
+  game.click("pause"); game.click("settings"); game.setting("motion"); game.key("Escape");
+  game.entities.get("warden")!.body!.power = 2;
+  game.click("wait"); assert.equal(game.camera().x, heroX);
+  assert.equal(parseProfile(game.saves.get("profile")!).reducedMotion, true);
 });
 
 test("Goo charges before its burst and heals in water even while sleeping", () => {
@@ -741,11 +918,11 @@ test("desktop uses six joined quick slots on the right and portrait uses four sp
   assert.equal(desktop.ui.get("quick_frame_0")!.image, "sprites/spd-ui/quick_left.png");
   assert.equal(desktop.ui.get("quick_potion_healing")!.style!.left, 755);
   assert.equal(desktop.ui.get("quick_empty_5")!.style!.left, 1031);
-  assert.equal(desktop.ui.get("descend")!.style!.left, 1088);
+  assert.equal(desktop.ui.get("search")!.style!.left, 1088);
   const portrait = harness(450, 800); portrait.start();
   assert.equal(quickIds(portrait).length, 4);
   assert.equal(portrait.ui.get("wait")!.style!.left, 0);
-  assert.equal(portrait.ui.get("descend")!.style!.left, 60);
+  assert.equal(portrait.ui.get("search")!.style!.left, 60);
   assert.equal(portrait.ui.get("quick_scroll_upgrade")!.style!.left, 153);
   assert.equal(portrait.ui.get("bag_btn")!.style!.left, 378);
 });
@@ -890,7 +1067,7 @@ test("Chinese menus, hero messages, settings tabs and read-only results are loca
   assert.match(game.ui.get("hero_description")!.text!, /古老法杖/);
   game.click("hero_duelist"); assert.match(game.ui.get("message_text")!.text!.replace(/\n/g, ""), /决斗家/);
   game.key("Escape"); game.click("begin_run"); game.key("F12"); game.key("Digit8");
-  assert.equal(game.ui.get("result_title")!.text, "击败粘咕！");
+  assert.equal(game.ui.get("result_title")!.text, "下水道里程碑完成");
   assert.equal(game.ui.get("result_banner")!.text, "首领已被击败");
   game.key("Digit9"); assert.equal(game.ui.get("result_title")!.text, "你死了……");
   assert.equal(parseProfile(game.saves.get("profile")!).runs, 0, "previews cannot record a run");

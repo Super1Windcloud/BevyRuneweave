@@ -1,7 +1,7 @@
 import { seededRandom, type Point } from "./rules.js";
 
 // Terrain and exploration metadata only. Actors and their positions remain in Bevy.
-export type Terrain = "wall" | "floor" | "water" | "door" | "open_door" | "entrance" | "exit";
+export type Terrain = "wall" | "floor" | "water" | "door" | "secret_door" | "open_door" | "entrance" | "exit";
 export interface DungeonFloor {
   width: number;
   height: number;
@@ -21,8 +21,21 @@ export function terrainAt(floor: DungeonFloor, point: Point): Terrain {
   if (point.x < 0 || point.z < 0 || point.x >= floor.width || point.z >= floor.height) return "wall";
   return floor.tiles[cellKey(floor, point)]!;
 }
-export const passable = (floor: DungeonFloor, point: Point): boolean => terrainAt(floor, point) !== "wall";
-export const opaque = (floor: DungeonFloor, point: Point): boolean => ["wall", "door"].includes(terrainAt(floor, point));
+export const passable = (floor: DungeonFloor, point: Point): boolean => !["wall", "secret_door"].includes(terrainAt(floor, point));
+export const opaque = (floor: DungeonFloor, point: Point): boolean => ["wall", "door", "secret_door"].includes(terrainAt(floor, point));
+
+// Hero.search in v4.0.2: intentional searches reveal visible regular secrets;
+// the Rogue has a two-tile radius, other starting classes have one.
+export function searchFloor(floor: DungeonFloor, origin: Point, distance: number): number {
+  let found = 0;
+  for (const key of floor.visible) {
+    const point = { x: key % floor.width, z: Math.floor(key / floor.width) };
+    if (cellDistance(origin, point) <= distance && floor.tiles[key] === "secret_door") {
+      floor.tiles[key] = "door"; found++;
+    }
+  }
+  return found;
+}
 
 export function canStep(floor: DungeonFloor, from: Point, to: Point): boolean {
   if (cellDistance(from, to) !== 1 || !passable(floor, to)) return false;
@@ -78,6 +91,21 @@ export function generateFloor(seed: number, depth: number): DungeonFloor {
       set(door, "door");
     }
   }
+  // An optional concealed shortcut never blocks the connected main route.
+  // This remains a custom generator, not the upstream room builder/painter.
+  const shortcuts: [number, number][] = [];
+  for (let a = 0; a < 9; a++) for (const b of [a + 1, a + 3]) {
+    if (b >= 9 || (b === a + 1 && Math.floor(a / 3) !== Math.floor(b / 3))) continue;
+    if (!connections.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) shortcuts.push([a, b]);
+  }
+  const [a, b] = shortcuts[Math.floor(random() * shortcuts.length)]!;
+  const start = floor.rooms[a]!, end = floor.rooms[b]!;
+  const dx = Math.sign(end.x - start.x), dz = Math.sign(end.z - start.z);
+  for (let point = { ...start }; !sameCell(point, end); point = { x: point.x + dx, z: point.z + dz }) {
+    if (terrainAt(floor, point) === "wall") set(point, "floor");
+  }
+  const box = bounds[a]!;
+  set(dx ? { x: box.right + 1, z: start.z } : { x: start.x, z: box.bottom + 1 }, "secret_door");
   let longest = -1;
   for (const room of floor.rooms) {
     const path = findPath(floor, floor.entrance, room);

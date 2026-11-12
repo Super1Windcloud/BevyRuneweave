@@ -43,6 +43,7 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
 - The world retains fixed 16-unit tiles. A real orthographic camera follows the hero and uses
   integer UI zoom; resizing does not move or rescale actors in the authoritative Bevy world.
 - A seeded 25×25 floor contains nine rooms, connecting corridors, doors, water and stairs.
+  An optional concealed shortcut adds a searchable secret door without blocking the main route.
   This generator guarantees connectivity; it does not reproduce upstream's room generator.
 - Movement and combat are turn based. Standing idle does not move monsters, consume food,
   or advance dungeon depth. Walls and occupied cells stop movement. Bumping a monster attacks it;
@@ -59,8 +60,16 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
   three turns. Waiting does not instantly heal; basic regeneration is gradual and stops
   during starvation. Several potion/scroll effects remain simplified; see the parity table.
 - Depth changes require standing on downward stairs and explicitly descending. Health and
-  supplies carry forward. Defeating Goo completes the **sewer milestone** and records the
-  Skeleton Key; it does not award the Amulet of Yendor or claim the full game is complete.
+  supplies carry forward. Defeating Goo drops a real Worn Key and 2–4 blobs of goo, without
+  ending the run. Collect the key, use the stairs to unlock the exit (one turn), then use
+  them again to complete the **sewer milestone**. The result explicitly states that prison
+  content is unavailable; this does not award the Amulet or complete the original game.
+- Search first enters a turn-free examine mode. Tap known terrain to inspect it without
+  revealing hidden occupants; tap Search again to search nearby visible tiles. Searching
+  spends two turns and six hunger units outside a sealed boss fight. Starting Rogue search
+  range is two tiles; the other classes search one tile. Traps, passive detection and search
+  talents remain pending. Goo seals the encounter after noticing or being attacked; hunger
+  and basic regeneration pause until its defeat. The original timed LockedFloor buff is pending.
 
 | Input | Action |
 | --- | --- |
@@ -68,6 +77,7 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
 | Click / tap an explored tile | Walk a known route; stop if hurt or a new monster appears |
 | Space / WAIT | Wait one turn |
 | E / period / DESCEND | Use downward stairs |
+| F / Search icon | Examine a tile; press again to search nearby |
 | I / B / BAG | Open or close the inventory |
 | 1–7 | Healing, flame, invisibility, strength, upgrade, mapping, food |
 | Escape | Pause/resume or close the current menu |
@@ -78,6 +88,10 @@ backpack slot opens an item-detail window before Drink/Read/Eat is confirmed.
 Inventory browsing and pausing cost no turns. Successfully using an item returns to play and
 allows monster responses. Empty item slots and blocked moves cost no turns. Keyboard holds
 repeat at a bounded rate; clicks never path through unexplored terrain.
+The HUD stairs icon also descends. Hints now control the HUD guide, and Reduced effects
+disables Goo's burst camera shake without moving actors. Pointer sensitivity remains stored
+for compatibility but its control is disabled: absolute tile selection uses exact coordinates.
+Blobs of goo can be collected and inspected; alchemy and selling are not implemented yet.
 
 ## Languages
 
@@ -139,11 +153,27 @@ npm --prefix projects/ember-arena run prepare:assets
 ```
 
 The preparation script reuses `dist/asset-downloads/ember-arena/` and emits PNG crops and GLBs.
-Generated crops include source URLs and SHA-256 checksums in `licenses/sources.json`. Original
-downloads are cached from upstream `master`, not an immutable release; checksums describe the
-local generated artifacts. The game runs offline after preparation.
+Both original images and generated crops include source URLs and SHA-256 checksums in
+`licenses/sources.json`. Downloads and cache keys use immutable revision
+`57a4e06a4caf162446d1c28caa7983f0493fecf0`, shared with UI/icon preparation. Existing source
+hashes are checked before reusing that revision's cached bytes. The game runs offline after
+preparation. The old misnamed `skeleton_key.png` crop is replaced by `worn_key.png`.
 
 ## Verification boundaries
+
+### Search and Goo exit interaction batch on 2026-11-12
+
+- TypeScript game/tooling checks and bundle generation pass; **60 script tests pass**.
+  Added coverage includes examine/cancel without time, hidden-occupant protection, search
+  time/hunger/range, secret-door connectivity, real key/blob drops and pickup, boss/key exit
+  gates, one-time milestone accounting, live hints, reduced camera motion and legacy settings.
+- All 33 original image hashes and generated sprite hashes match the pinned source manifest.
+  A deliberately corrupted cached warrior image was rejected by preparation; original cache
+  bytes were restored afterward.
+- Tests use platform doubles. No Rust/runtime interface changed. Windows, macOS, Linux,
+  Android and iOS native interaction, touch/long-press, GPU rendering and reference-client
+  pixel comparison were **NOT_RUN for this batch**. Older native evidence below belongs to
+  its named changes and does not validate these new interactions.
 
 ### System language and application icon verification on 2026-11-12 (macOS Debug)
 

@@ -13,13 +13,13 @@ This ledger separates source-based implementation from pixel-parity acceptance.
 | Hero selection | `scenes/HeroSelectScene.java`, `sprites/HeroSprite.java`, `messages/actors/actors.properties` | Separate full-screen scene, six original hero icons, landscape grid / portrait strip, original splash, left fade and locked-class message windows. Duelist/Cleric remain locked because their gameplay kits are absent. The four playable classes retain truthful port descriptions, rather than claiming unimplemented powers. |
 | Status pane | `ui/StatusPane.java` | Original 82×38 and large 160×39 layouts, 128×9 / 50×4 health bars, source hero portrait, XP bar and level. Compass, complete buff icons, shields, DOT overlays and blink animations remain absent. |
 | Menu pane | `ui/MenuPane.java` | Source pane, menu/journal artwork, version and depth positions. Journal data/layout is still a subset. |
-| Toolbar | `ui/Toolbar.java` | Original 20/18/19-pixel joined slot frames, 4/5/6 visible-slot thresholds, desktop grouping, mobile landscape grouping and portrait split, source bag/wait/search icons. The port exposes its currently implemented consumables; full assignment/targeting and swap behavior remain absent. |
-| Backpack | `windows/WndBag.java`, `ui/InventorySlot.java` | Five columns and 25 slots, 28-pixel slot base, one-pixel margins, adaptive narrow/short layout, equipped/normal colors, quantity labels and bag tab. Full equipment/bag contents and equipment actions are not implemented. |
+| Toolbar | `ui/Toolbar.java` | Original 20/18/19-pixel joined slot frames, 4/5/6 visible-slot thresholds and desktop/mobile grouping. Search enters tile examination, a second click performs a two-turn search, and F exposes the same flow. Descent uses the HUD stairs, E/period or the hero's exit tile. Full quickslot assignment/targeting, swap and native long-press remain absent. |
+| Backpack | `windows/WndBag.java`, `ui/InventorySlot.java` | Five columns and 25 slots, adaptive layout, equipped/normal colors, quantity labels and bag tab. Collected Worn Key and goo blobs have quantities and read-only descriptions. Equipment slots are still presentation icons, with no equipment objects or equip/unequip actions. |
 | Item window | `windows/WndInfoItem.java`, `windows/WndUseItem.java` | Original window chrome, item icon/title, measured text wrapping, content-dependent height and Drink/Read/Eat action. Descriptions accurately reflect the existing simplified effects; throw/drop/equip/quickslot dialogs remain absent. |
 | Pause | `windows/WndGame.java` | Original 120-pixel content width, 20-pixel buttons, two-pixel gaps, Settings and Main Menu actions. Challenges are not present in the port. |
-| Settings | `windows/WndSettings.java` | Original landscape/portrait content widths, six icon tabs, original chrome and functioning settings/save/reset controls, including persisted English/Simplified Chinese selection. This is still a reduced settings implementation: full display, UI, keybinding, audio and the broader upstream locale catalog are not equivalent to upstream. Audio controls are noninteractive because audio is absent. |
+| Settings | `windows/WndSettings.java` | Original content widths, six icon tabs, chrome and persisted English/Simplified Chinese selection. Hints affect the HUD; reduced effects disables burst camera shake. Sensitivity is explicitly disabled for absolute tile selection while preserving old settings. Full display, UI, keybinding, audio and broader locale support remain pending; audio controls are noninteractive. |
 | Hero info | `windows/WndHero.java` | Original-style stats window using actual current hero values. Talent trees and complete equipment/stat tabs remain absent. |
-| Results | `effects/BannerSprites.java`, `windows/WndGame.java` | Original Boss Slain / Game Over art in English, localized text banners in Chinese, and original chrome. Completion remains a sewer milestone, not the upstream Amulet ending; result content and progression are different. |
+| Results | `effects/BannerSprites.java`, `windows/WndGame.java` | Original banners/chrome and Chinese text banners. Goo death leaves the run playable; the milestone result requires picking up the key, unlocking the exit and explicitly leaving. Results state that prison is unavailable. This is not the upstream Amulet ending. |
 | Secondary title pages | `scenes/{Rankings,Journal,About}Scene.java`, title button sources | Original entry names/icons and common window art. Rankings currently shows local aggregates; journal/news/changes/about/support are reduced informational pages. Their full original scenes, services and data are not ported. |
 | Other original windows | Upstream `windows/` and game scenes | Shops, full alchemy, quest/NPC dialogs, badges, challenges, keybindings, subclasses/talents, resurrection, full save-slot management and region/interlevel scenes remain to be migrated. |
 
@@ -57,6 +57,11 @@ gaps. UI and scene images use nearest sampling. Source icons preserve their own 
   areas/touch and platform font rasterization remain unverified for this UI change.
 
 ## Visual inspection and acceptance
+
+The search/Goo-exit interaction batch passes 60 script tests, including hidden-occupant
+protection, held-click latching, key/blob collection, exit gates and setting effects. Its
+new prompts, HUD hints, descriptions and result layout have NOT_RUN native visual/touch
+acceptance on Windows, macOS, Linux, Android and iOS. Captures below predate this batch.
 
 Windows GPU captures live under `dist/asset-downloads/ember-arena/ui-parity/`. Actual title,
 hero-selection, HUD and backpack captures are distinct from the read-only fixture captures.

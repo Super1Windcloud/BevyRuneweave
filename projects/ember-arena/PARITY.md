@@ -1,9 +1,10 @@
 # Shattered Pixel Dungeon parity tracking
 
-Reference: [00-Evan/shattered-pixel-dungeon, master](https://github.com/00-Evan/shattered-pixel-dungeon/tree/master),
-reviewed 2026-11-11. This is a port in progress, not a claim of full game or visual parity.
-The upstream Java game remains the behavior reference. Existing asset-cache contents may
-predate this review; generated file checksums are recorded separately.
+Reference: [00-Evan/shattered-pixel-dungeon, v4.0.2](https://github.com/00-Evan/shattered-pixel-dungeon/tree/57a4e06a4caf162446d1c28caa7983f0493fecf0),
+revision `57a4e06a4caf162446d1c28caa7983f0493fecf0`, reviewed 2026-11-12.
+This is a port in progress, not a claim of full game or visual parity. The upstream Java
+game remains the behavior reference. Original art, UI and icon preparation share this
+immutable revision; source and crop checksums are recorded in the asset manifests.
 
 ## Current sewer milestone
 
@@ -13,21 +14,23 @@ predate this review; generated file checksums are recorded separately.
 | Terrain | Rooms, corridors, doors, water, entrance/exit | Custom 25×25 connected-room generator, not upstream builders/painters |
 | Movement | Grid steps, bump melee, blocking, door action, known-tile click routes, real orthographic camera follow/zoom | Exact diagonal corner rules, auto-explore, running, upstream camera smoothing/deadzone and manual zoom controls pending |
 | Sight | Wall/door occlusion, explored memory, hidden mobs/loot | Bresenham rays, not upstream shadow casting; no lighting/grass/blindness system |
-| Stairs | Explicit descent through five floors; supplies/HP retained | No return upstairs, floor persistence, boss-floor sealing, locked exits or prison transition |
+| Search/examine | Turn-free tile examination; visible secret-door discovery; two-tick/six-hunger intentional search; Rogue radius 2, others 1 | Custom optional secret shortcut; no traps, passive discovery, talents or native long-press |
+| Stairs | Explicit descent through five floors; supplies/HP retained; Goo encounter sealing; key pickup and one-turn exit unlock | No return upstairs, floor persistence or prison transition; timed LockedFloor behavior pending |
 | Rendering | Correctly cropped native 2D hero, mob, item and sewer sprites | Static frames; no original sprite animations, stitched raised walls, particle effects or exact UI layout |
 | Native UI | Original atlas chrome/font, title and hero-selection scenes, joined toolbars, five-column backpack, item windows and tabbed settings | See [UI_PARITY.md](UI_PARITY.md); all original scenes/content and pixel-difference acceptance remain incomplete |
 | Heroes | Warrior/Mage/Rogue/Huntress; 20 starting HP, 10 strength | Full equipment effects, wand/staff charges, spirit bow, cloak/seal, other classes/subclasses/talents pending |
 | Rats/Gnolls/Crabs | Upstream base HP, attack/defense, damage/armor ranges and XP; melee gnolls, faster crabs | Simplified sleeping/hunting and movement scheduling; loot distributions not identical |
-| Goo | 100 HP, water healing, half-health enhancement, two-stage charge, range-2 burst, removable ooze | Custom floor; simplified charge cancellation, ooze duration, hit processing, no boss badge/score rules |
+| Goo | 100 HP, water healing, half-health enhancement, two-stage charge, range-2 burst, removable ooze; real Worn Key and 2–4 blob drops; optional burst camera shake | Custom floor; simplified charge cancellation, ooze duration, hit processing, no boss badge/score rules |
 | Progression | Kill XP, 5+5×level XP requirement, +5 maximum HP per level | No talent allocation, full item-based accuracy/damage/defense, challenge modifiers or ascension |
 | Hunger | Hungry at 300, starving at 450, ration satisfies 300 and takes 3 turns | Simplified regeneration/starvation rates and locked-floor interaction |
 | Healing | Restores health and clears ooze; spends a turn | Immediate recovery rather than upstream healing buff; no full status interactions |
 | Invisibility | 20 action turns, blocks detection, attacks break it; surprise hits | Potion-only implementation, no complete cloak/artifact mechanics |
 | Strength/upgrade | Strength +1; weapon upgrade +1 | Simplified damage bonus; no equipment selection, strength requirements, curse handling or upgrade formulas |
-| Mapping | Reveals terrain without exposing occupants | No traps/secrets/challenges to map yet |
+| Mapping | Reveals terrain and discovers secret doors without exposing occupants | No traps or challenge modifiers yet |
 | Liquid flame | One-turn nearby visible-target damage | Immediate area damage rather than thrown targeting, persistent fire and Burning buffs |
-| Items/loot | Seven identified consumables, gold, real Bevy loot entities, collection on entering a tile | Fixed appearances; no randomized identification, equipment inventory, throwing, chest/key, shop or alchemy systems |
-| End condition | Goo defeat records one sewer milestone and Skeleton Key | **No Amulet award**; remaining regions, bosses, Amulet level and return journey pending |
+| Items/loot | Seven identified consumables, gold, Worn Key and goo blobs, real Bevy loot entities, collection on entering a tile | Fixed appearances; no randomized identification, equipment inventory, throwing, other keys/chests, shops or alchemy |
+| Settings | Hints affect the HUD; reduced effects suppresses burst camera shake; inactive sensitivity explicitly disabled while preserving old values | No relative-pointer sensitivity, audio controls or complete upstream settings |
+| End condition | Goo death keeps playing; physically collect its Worn Key, unlock the exit, then explicitly leave to record one sewer milestone | **No Amulet award**; prison and later content remain pending and are identified as unavailable in the result |
 | Persistence | Settings and completed milestone records, save-error recovery | No in-progress run serialization or save/resume |
 
 ## Source anchors
@@ -39,12 +42,16 @@ All paths below are relative to the upstream repository's
 - `actors/hero/HeroClass.java`: class-specific equipment; used to identify the gaps above.
 - `actors/mobs/{Rat,Gnoll,Crab,Goo}.java`: basic stats, crab speed, Goo charge, water healing and enrage.
 - `actors/buffs/Hunger.java`: 300/450 hunger thresholds.
+- `actors/hero/Hero.java#search`: two action ticks, six hunger units, visible secret discovery and starting class search radii.
+- `actors/mobs/Goo.java#die`, `items/keys/WornKey.java`, `items/quest/GooBlob.java`: source drop identities and 60/30/10 percent blob-count weights.
 - `sprites/{HeroSprite,RatSprite,GnollSprite,CrabSprite,GooSprite}.java`: native animation frame sizes.
 - `tiles/DungeonTileSheet.java`: floor 0, entrance 16, exit 17, water 32, flat wall 48, doors 56/57.
 - `sprites/ItemSpriteSheet.java`: consumable, gold, ration and key atlas locations.
 
 New behavior should cite an upstream source and add a focused behavior test. Tests using
 platform doubles and a custom generator must not be described as proof of one-to-one parity.
+The interaction batch passes 60 script tests and TypeScript checks. Native execution and
+reference-client pixel comparison for this batch are NOT_RUN on all five supported platforms.
 
 ## Next migration order
 

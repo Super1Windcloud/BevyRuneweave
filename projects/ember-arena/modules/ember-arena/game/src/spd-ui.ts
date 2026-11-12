@@ -1,6 +1,6 @@
 import { image, node, text, type UiElement, type UiStyle, type UiColor } from "../../api/ui.js";
 import { chromeFrames, uiFrames } from "./spd-ui-atlas.js";
-import { heroClassList, itemCatalog, type HeroClass, type ItemKind } from "./rules.js";
+import { heroClassList, itemCatalog, type HeroClass, type ItemKind, type LootKind } from "./rules.js";
 import type { Profile } from "./profile.js";
 import { translate, type MessageKey, type MessageParameters } from "./i18n.js";
 import { fontForText, measureText, wrapText } from "./text-layout.js";
@@ -25,6 +25,9 @@ export interface SpdUiState {
   ooze: number;
   bossHealth: number | null;
   inventory: Record<ItemKind, number>;
+  wornKeys: number;
+  gooBlobs: number;
+  examining: boolean;
   logs: readonly string[];
   profile: Profile;
   settingsTab: number;
@@ -177,19 +180,21 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     }
     const width = slotWidth * 5 + 4, height = 14 + slotHeight * 5 + 4;
     const children: UiElement[] = [label("bag_title", t("bag.title"), 0, 2, width - 25, 8, titleColor), image("bag_gold", "sprites/dungeon/gold.png", rect(width - 15, 0, 12, 12)), label("bag_gold_count", `${state.gold}`, width - 38, 3, 23, 6, titleColor)];
-    const items = (Object.keys(itemCatalog) as ItemKind[]).filter((key) => state.inventory[key] > 0);
+    const quantity = (key: LootKind): number => key === "worn_key" ? state.wornKeys : key === "goo_blob" ? state.gooBlobs : state.inventory[key];
+    const items: LootKind[] = [...Object.keys(itemCatalog) as ItemKind[], "worn_key", "goo_blob"];
+    const carried = items.filter((key) => quantity(key) > 0);
     for (let index = 0; index < 25; index++) {
       const x = index % 5 * (slotWidth + 1), y = 14 + Math.floor(index / 5) * (slotHeight + 1);
-      const key = items[index - 5];
+      const key = carried[index - 5];
       const equipped = index < 5;
       const childrenSlot: UiElement[] = [];
       if (equipped) {
         childrenSlot.push(art(`equipment_${index}`, [state.selectedClass === "warrior" ? "sword" : `weapon_${state.selectedClass}`, "armor", "empty_artifact", "empty_ring", "empty_ring"][index]!, (slotWidth - 16) / 2, (slotHeight - 16) / 2));
       } else if (key) {
         childrenSlot.push(image(`item_ico_${key}`, `sprites/dungeon/${key}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
-        childrenSlot.push(label(`item_count_${key}`, `${state.inventory[key]}`, 1, 1, slotWidth - 2, 6));
+        childrenSlot.push(label(`item_count_${key}`, `${quantity(key)}`, 1, 1, slotWidth - 2, 6));
       }
-      children.push({ kind: "button", id: key ? `slot_${key}` : `bag_slot_${index}`, onClick: key ? () => on("item", key) : equipped ? () => on("hero_info") : undefined,
+      children.push({ kind: "button", id: key ? `slot_${key}` : `bag_slot_${index}`, onClick: key ? () => on(key === "worn_key" || key === "goo_blob" ? key : "item", key) : equipped ? () => on("hero_info") : undefined,
         style: { ...rect(x, y, slotWidth, slotHeight), background: equipped ? [145 / 255, 147 / 255, 140 / 255, 153 / 255] : [83 / 255, 86 / 255, 77 / 255, 153 / 255] }, children: childrenSlot });
     }
     children.push(control("close_bag", "", -3, height + 2, 25, 17, "toast", "bag_icon"));
@@ -223,7 +228,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     elements.push(label("hud_version", "v0.1.0", w - 28, 1, 27, 5, grey));
     elements.push({ kind: "button", id: "pause", onClick: () => on("pause"), style: rect(w - 16, 0, 16, 21), children: [art("menu_icon", "menu", 2, 8)] });
     elements.push({ kind: "button", id: "game_journal", onClick: () => on("game_journal"), style: rect(w - 31, 0, 17, 21), children: [art("journal_button", "journal_button", 2, 8), art("journal_button_icon", "journal_button_icon", 3, 10.5)] });
-    elements.push(art("hud_stairs", "stairs", w - 38, 8, 7, 8));
+    elements.push({ kind: "button", id: "descend", onClick: () => on("descend"), style: rect(w - 43, 4, 12, 24), children: [art("hud_stairs", "stairs", 5, 4, 7, 8)] });
     elements.push(label("hud_wave", `${state.depth}`, w - 38, 16, 7, 4));
     if (state.hunger !== "satiated") elements.push(label("hud_hunger", state.hunger === "starving" ? t("hud.starving") : t("hud.hungry"), large ? 32 : 33, large ? 4 : 10, 80, 6, titleColor));
     if (state.invisible) elements.push(label("hud_invisible", t("hud.invisible"), 33, large ? 10 : 18, 70, 6, titleColor));
@@ -232,7 +237,15 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     const searchX = m.large ? w - 64 : m.landscape ? w - 40 : 20;
     elements.push({ kind: "button", id: "bag_btn", onClick: () => on("bag_btn"), style: rect(toolbarX, toolbarY, 24, 26), children: [art("bag_tool", "bag_tool", 0, 0), art("bag_tool_icon", "bag_tool_icon", 4, 5)] });
     elements.push({ kind: "button", id: "wait", onClick: () => on("wait"), style: rect(waitX, toolbarY, 20, 26), children: [art("wait_tool", "wait_tool", 0, 0), art("wait_tool_icon", "wait_tool_icon", 2, 5)] });
-    elements.push({ kind: "button", id: "descend", onClick: () => on("descend"), style: rect(searchX, toolbarY, 20, 26), children: [art("search_tool", "search_tool", 0, 0), art("search_tool_icon", "search_tool_icon", 2, 5)] });
+    elements.push({ kind: "button", id: "search", onClick: () => on("search"), style: rect(searchX, toolbarY, 20, 26), children: [art("search_tool", "search_tool", 0, 0), art("search_tool_icon", "search_tool_icon", 2, 5)] });
+    if (state.examining) {
+      const promptWidth = Math.max(90, w - 30), lines = wrappedText(t("examine.prompt"), promptWidth, 6);
+      elements.push(label("examine_prompt", lines.join("\n"), 2, 44, promptWidth, 6, titleColor, lines.length * 8));
+      elements.push(control("cancel_examine", t("common.close"), w - 28, 44, 26, 14, "toast", undefined, "cancel_examine", true, 6));
+    } else if (state.profile.showHints) {
+      const lines = wrappedText(t("log.guide"), w - 4, 6);
+      elements.push(label("hud_hint", lines.join("\n"), 2, 44, w - 4, 6, grey, lines.length * 8));
+    }
     const quick: (ItemKind | null)[] = ["potion_healing", "potion_liquid_flame", "potion_invisibility", "scroll_upgrade", null, null];
     const count = 4 + Number(w > 152) + Number(w > 170);
     let quickRight = m.large ? searchX : toolbarX;
@@ -308,8 +321,9 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       content.push(control("hints", t("settings.hints", { value: t(state.profile.showHints ? "common.on" : "common.off") }), 0, 24, width, 18, "grey"));
       content.push(control("motion", t("settings.motion", { value: t(state.profile.reducedMotion ? "common.on" : "common.off") }), 0, 45, width, 18, "grey"));
     } else if (state.settingsTab === 2) {
-      content.push(control("sensitivity", t("settings.sensitivity", { value: state.profile.sensitivity.toFixed(2) }), 0, 24, width, 18, "grey"));
-      content.push(label("input_bindings", t("settings.bindings"), 0, 49, width, 7, white, 50));
+      content.push(control("sensitivity", t("settings.sensitivity", { value: state.profile.sensitivity.toFixed(2) }), 0, 24, width, 18, "toast", undefined, "sensitivity", false));
+      content.push(label("input_bindings", wrappedText(t("settings.bindings"), width, 7).join("\n"), 0, 49, width, 7, white, 50));
+      content.push(label("sensitivity_unavailable", wrappedText(t("settings.absolutePointer"), width, 6).join("\n"), 0, 102, width, 6, grey, 28));
     } else if (state.settingsTab === 3) {
       content.push(label("saved_stats", t("settings.stats", { best: state.profile.bestScore, wins: state.profile.wins, runs: state.profile.runs }), 0, 18, width, 7, white, 24));
       content.push(label("save_notice", state.saveNotice || t("save.device"), 0, 43, width, 6, grey, 25));
@@ -332,12 +346,13 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       const title = t(state.phase === "won" ? "result.bannerWin" : "result.bannerLose"), width = textWidth(title, 16);
       elements.push(label("result_banner", title, (w - width) / 2, h * 0.12, width + 1, 16, titleColor, 24));
     }
-    window("result_window", 120, 88, [
+    window("result_window", 120, 100, [
       label("result_title", state.phase === "won" ? t("result.win") : t("result.lose"), 0, 0, 120, 9, titleColor),
       label("result_stats", t("result.stats", { score: state.score, depth: state.depth, level: state.level }), 0, 18, 120, 7, white, 26),
-      control("restart", t("result.restart"), 0, 46, 120, 20, "red", "enter"),
-      control("home", t("menu.home"), 0, 68, 120, 20, "red", "display"),
-    ], true, h * 0.66);
+      ...(state.phase === "won" ? [label("result_boundary", wrappedText(t("result.boundary"), 120, 6).join("\n"), 0, 40, 120, 6, grey, 16)] : []),
+      control("restart", t("result.restart"), 0, 58, 120, 20, "red", "enter"),
+      control("home", t("menu.home"), 0, 80, 120, 20, "red", "display"),
+    ], true, Math.min(h * 0.66, h - 58));
   } else if (state.phase === "checks") {
     const lines = state.checks.slice(state.checkPage * 6, state.checkPage * 6 + 6);
     window("checks_window", 190, 146, [label("checks_title", t("checks.title"), 0, 0, 190, 9, titleColor),

@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
 import { prepareUiAssets } from "./prepare-ui-assets.js";
+import { spdUiRevision } from "../modules/ember-arena/game/src/spd-ui-atlas.js";
 
 const root = resolve(import.meta.dirname, "../../..");
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
@@ -265,7 +266,7 @@ function buildTexturedBoxGlb(
   return glb(doc, bin);
 }
 
-// Download and cache Shattered Pixel Dungeon official assets from GitHub master branch
+// Use the same immutable source revision as the UI and application icon.
 const spdFiles: Record<string, string> = {
   // Heroes
   "warrior.png": "sprites/warrior.png",
@@ -311,15 +312,25 @@ const spdFiles: Record<string, string> = {
   "huntress.jpg": "splashes/huntress.jpg",
 };
 
-const spdBase = "https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/master/core/src/main/assets";
+const spdBase = `https://raw.githubusercontent.com/00-Evan/shattered-pixel-dungeon/${spdUiRevision}/core/src/main/assets`;
+const sourceRecords: { file: string; source: string; sha256: string }[] = [];
+const existingManifest = join(licensesDir, "sources.json");
+const previous = existsSync(existingManifest) ? JSON.parse(readFileSync(existingManifest, "utf8")) as {
+  revision?: string; sourceRecords?: { source: string; sha256: string }[];
+} : null;
 for (const [localName, remotePath] of Object.entries(spdFiles)) {
-  const cached = join(cache, `spd-${localName}`);
+  const cached = join(cache, `spd-${spdUiRevision}-${localName}`);
   if (!existsSync(cached)) {
     const res = await fetch(`${spdBase}/${remotePath}`, { signal: AbortSignal.timeout(60_000) });
     if (!res.ok) throw new Error(`SPD asset download failed: ${remotePath} (${res.status})`);
     writeFileSync(cached, Buffer.from(await res.arrayBuffer()));
   }
-  writeFileSync(join(spdAssetsDir, localName), readFileSync(cached));
+  const bytes = readFileSync(cached);
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const expected = previous?.revision === spdUiRevision ? previous.sourceRecords?.find((record) => record.source === `${spdBase}/${remotePath}`) : undefined;
+  if (expected && expected.sha256 !== sha256) throw new Error(`SPD source checksum mismatch: ${localName}`);
+  writeFileSync(join(spdAssetsDir, localName), bytes);
+  sourceRecords.push({ file: `sprites/spd/${localName}`, source: `${spdBase}/${remotePath}`, sha256 });
 }
 
 // Read needed image buffers
@@ -489,10 +500,12 @@ for (const [name, index] of Object.entries({ floor: 0, entrance: 16, exit: 17, w
 }
 // Fixed, identified appearances for the current seven-item subset. Upstream
 // random potion/scroll identification is tracked separately in PARITY.md.
-for (const [name, index] of Object.entries({ gold: 18, food_ration: 437, skeleton_key: 58, potion_healing: 352, potion_liquid_flame: 353,
+for (const [name, index] of Object.entries({ gold: 18, food_ration: 437, worn_key: 58, goo_blob: 471, potion_healing: 352, potion_liquid_flame: 353,
   potion_invisibility: 358, potion_strength: 355, scroll_upgrade: 304, scroll_magic_mapping: 305 })) {
   cropSprite(name, "items.png", (index % 16) * 16, Math.floor(index / 16) * 16, 16, 16);
 }
+const obsoleteKey = join(dungeonSpritesDir, "skeleton_key.png");
+if (existsSync(obsoleteKey)) unlinkSync(obsoleteKey);
 writeFileSync(join(dungeonSpritesDir, "fog.png"), encodePngRgba(1, 1, Buffer.from([0, 0, 0, 175])));
 writeFileSync(join(dungeonSpritesDir, "void.png"), encodePngRgba(1, 1, Buffer.from([7, 7, 6, 255])));
 await prepareUiAssets(assets, cache, decodePngRgba, encodePngRgba);
@@ -586,6 +599,8 @@ const manifest = {
   author: "Evan Debenham (00-Evan) & Watabou",
   license: "GPL-3.0 & CC-BY-NC-SA-4.0",
   source: "https://github.com/00-Evan/shattered-pixel-dungeon",
+  revision: spdUiRevision,
+  sourceRecords,
   records,
   spriteRecords,
 };

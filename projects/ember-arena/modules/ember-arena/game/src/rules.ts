@@ -139,7 +139,7 @@ export const dungeonMonsters: Record<EnemyKind, DungeonMonsterInfo> = {
     name: "Goo",
     depth: 5,
     lore: "The colossal caustic slime ruling the sewer depths. Pumps itself up before explosive blasts!",
-    drops: "Skeleton Key (sewer milestone; the Amulet lies much deeper)",
+    drops: "Worn Key and 2–4 blobs of goo",
     sprite: "sprites/spd/goo.png",
   },
 };
@@ -152,6 +152,11 @@ export type ItemKind =
   | "scroll_upgrade"
   | "scroll_magic_mapping"
   | "food_ration";
+
+export type LootKind = ItemKind | "worn_key" | "goo_blob";
+// Stable indices stored in reflected ScriptActor.power, shared by spawning and pickup.
+export const lootKinds: readonly LootKind[] = ["potion_healing", "potion_liquid_flame", "potion_invisibility",
+  "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration", "worn_key", "goo_blob"];
 
 export interface ItemDef {
   id: ItemKind;
