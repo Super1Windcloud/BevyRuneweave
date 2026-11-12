@@ -429,6 +429,7 @@ mod tests {
                 function on_script_loaded() {
                     function check(value) { if (!value) throw Error("storage contract"); }
                     check(window_metrics().width === 640 && window_metrics().height === 360);
+                    check(typeof app_locale() === "string" && app_locale().length > 0);
                     check(storage_read("profile").state === "missing");
                     check(storage_write("profile", "saved").state === "ok");
                     check(storage_read("profile").value === "saved");
@@ -472,6 +473,7 @@ mod tests {
                 br#"
                 function on_script_loaded()
                     assert(window_metrics().width == 640 and window_metrics().height == 360)
+                    assert(type(app_locale()) == "string" and #app_locale() > 0)
                     assert(storage_read("profile").state == "missing")
                     assert(storage_write("profile", "saved").state == "ok")
                     assert(storage_read("profile").value == "saved")

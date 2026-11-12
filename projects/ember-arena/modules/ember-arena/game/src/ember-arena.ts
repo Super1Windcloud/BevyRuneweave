@@ -83,14 +83,15 @@ function pushLog(entry: Message): void {
 function loadProfile(): void {
   saveBlocked = false;
   saveNotice = null;
-  profile = defaultProfile();
+  const locale = typeof app_locale === "function" ? app_locale() : "en-US";
+  profile = defaultProfile(locale);
   const result = storage_read("profile");
   if (result.state === "error") {
     saveNotice = message("save.unavailable", { error: result.error });
     saveBlocked = result.error === "invalid_data" || result.error === "too_large";
   } else if (result.state === "ok") {
     try {
-      profile = parseProfile(result.value);
+      profile = parseProfile(result.value, locale);
     } catch {
       saveBlocked = true;
       saveNotice = message("save.incompatible");
@@ -115,7 +116,7 @@ function resetProfile(): void {
   if (result.state === "error") {
     saveNotice = message("save.resetFailed", { error: result.error });
   } else {
-    profile = defaultProfile();
+    profile = defaultProfile(typeof app_locale === "function" ? app_locale() : "en-US");
     saveBlocked = false;
     saveNotice = message("save.reset");
   }
@@ -185,8 +186,8 @@ function uiAction(id: string, value?: string | number): void {
     case "exit": app_request_exit(); return;
     case "window_landscape": window_set_size(1280, 800); return;
     case "window_portrait": window_set_size(450, 800); return;
-    case "language_english": profile.language = "en"; break;
-    case "language_chinese": profile.language = "zh-CN"; break;
+    case "language_english": profile.language = "en"; profile.followSystemLanguage = false; break;
+    case "language_chinese": profile.language = "zh-CN"; profile.followSystemLanguage = false; break;
     case "hints": profile.showHints = !profile.showHints; break;
     case "motion": profile.reducedMotion = !profile.reducedMotion; break;
     case "sensitivity": { const values = [0.75, 1, 1.25, 1.5]; profile.sensitivity = values[(values.indexOf(profile.sensitivity) + 1) % values.length]!; break; }

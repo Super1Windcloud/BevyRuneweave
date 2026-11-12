@@ -3,7 +3,7 @@
   "name": "ember-arena",
   "version": "0.1.0",
   "appName": "Shattered Pixel Dungeon",
-  "icon": "sprites/settings-icon.png",
+  "icon": "branding/shattered-pixel-dungeon.png",
   "window": {
     "width": 800,
     "height": 600

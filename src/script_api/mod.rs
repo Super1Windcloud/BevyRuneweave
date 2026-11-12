@@ -446,6 +446,13 @@ fn game_state_set(
     })
 }
 
+/// Read the native system preference through one portable BMS function.
+fn app_locale() -> String {
+    sys_locale::get_locale()
+        .filter(|locale| !locale.trim().is_empty())
+        .unwrap_or_else(|| "en-US".to_owned())
+}
+
 fn app_request_exit(context: FunctionCallContext) -> Result<bool, InteropError> {
     context
         .world()?
@@ -701,6 +708,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("ui_clear", ui_clear)
             .register("game_state_set", game_state_set)
             .register("app_request_exit", app_request_exit)
+            .register("app_locale", app_locale)
             .register("window_set_size", window_set_size)
             .register("window_safe_area", window_safe_area)
             .register("window_metrics", window_metrics)

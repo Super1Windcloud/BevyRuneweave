@@ -384,7 +384,15 @@ mod tests {
                 let label =
                     super::super::find_owned_entity(world, &attachment, "item_detail_title")
                         .unwrap();
-                assert_eq!(world.get::<Text>(label).unwrap().0, "Food Ration");
+                let expected = if super::super::app_locale()
+                    .to_ascii_lowercase()
+                    .starts_with("zh")
+                {
+                    "口粮"
+                } else {
+                    "Food Ration"
+                };
+                assert_eq!(world.get::<Text>(label).unwrap().0, expected);
                 assert_eq!(
                     world.get::<TextFont>(label).unwrap().font_smoothing,
                     bevy::text::FontSmoothing::None

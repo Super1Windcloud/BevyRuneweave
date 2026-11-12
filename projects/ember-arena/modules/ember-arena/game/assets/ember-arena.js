@@ -503,6 +503,9 @@
   function normalizeLanguage(value) {
     return value === "zh-CN" || value === "zh" ? "zh-CN" : "en";
   }
+  function systemLanguage(locale) {
+    return typeof locale === "string" && /^zh(?:[-_]|$)/i.test(locale.trim()) ? "zh-CN" : "en";
+  }
   function message(key, parameters) {
     return { key, parameters };
   }
@@ -517,7 +520,7 @@
   }
 
   // modules/ember-arena/game/src/profile.ts
-  function defaultProfile() {
+  function defaultProfile(locale = "en-US") {
     return {
       schemaVersion: 1,
       bestScore: 0,
@@ -528,10 +531,11 @@
       sensitivity: 1,
       showHints: true,
       reducedMotion: false,
-      language: "en"
+      language: systemLanguage(locale),
+      followSystemLanguage: true
     };
   }
-  function parseProfile(raw) {
+  function parseProfile(raw, locale = "en-US") {
     const value = JSON.parse(raw);
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid profile");
     const data = value;
@@ -540,6 +544,7 @@
       if (!Number.isSafeInteger(data[key]) || data[key] < 0) throw new Error(`invalid ${key}`);
     }
     if (data.wins > data.runs || data.seed > 4294967295 || typeof data.bestTime !== "number" || !Number.isFinite(data.bestTime) || data.bestTime < 0 || ![0.75, 1, 1.25, 1.5].includes(data.sensitivity) || typeof data.showHints !== "boolean" || typeof data.reducedMotion !== "boolean") throw new Error("invalid settings");
+    const followSystemLanguage = data.followSystemLanguage === true || data.language === void 0;
     return {
       schemaVersion: 1,
       bestScore: data.bestScore,
@@ -550,7 +555,8 @@
       sensitivity: data.sensitivity,
       showHints: data.showHints,
       reducedMotion: data.reducedMotion,
-      language: normalizeLanguage(data.language)
+      language: followSystemLanguage ? systemLanguage(locale) : normalizeLanguage(data.language),
+      followSystemLanguage
     };
   }
 
@@ -1132,14 +1138,15 @@
   function loadProfile() {
     saveBlocked = false;
     saveNotice = null;
-    profile = defaultProfile();
+    const locale = typeof app_locale === "function" ? app_locale() : "en-US";
+    profile = defaultProfile(locale);
     const result = storage_read("profile");
     if (result.state === "error") {
       saveNotice = message("save.unavailable", { error: result.error });
       saveBlocked = result.error === "invalid_data" || result.error === "too_large";
     } else if (result.state === "ok") {
       try {
-        profile = parseProfile(result.value);
+        profile = parseProfile(result.value, locale);
       } catch {
         saveBlocked = true;
         saveNotice = message("save.incompatible");
@@ -1161,7 +1168,7 @@
     if (result.state === "error") {
       saveNotice = message("save.resetFailed", { error: result.error });
     } else {
-      profile = defaultProfile();
+      profile = defaultProfile(typeof app_locale === "function" ? app_locale() : "en-US");
       saveBlocked = false;
       saveNotice = message("save.reset");
     }
@@ -1325,9 +1332,11 @@
         return;
       case "language_english":
         profile.language = "en";
+        profile.followSystemLanguage = false;
         break;
       case "language_chinese":
         profile.language = "zh-CN";
+        profile.followSystemLanguage = false;
         break;
       case "hints":
         profile.showHints = !profile.showHints;

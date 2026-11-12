@@ -118,6 +118,14 @@ Its top-right settings icon and menu scale with the visible playfield. The menu 
 their process-owned event loop alive and return to the native home screen instead of terminating the
 application.
 
+`app_locale()` returns the native preferred language as a BCP 47 tag (for example `zh-Hans-CN`
+or `en-US`), with `en-US` as the fallback when unavailable. It is registered once through BMS
+and has the same Lua and QuickJS/TypeScript contract on Windows, macOS, Linux, Android and iOS.
+Android reads the system language, rather than an Android per-app language override. It does not
+change system settings or subscribe to language changes; games decide when to read it and how to
+map unsupported languages. Existing runtime libraries must be rebuilt to expose the new function;
+the public C ABI is unchanged.
+
 `window_set_size(width, height)` lets scripts choose their desktop window dimensions on Windows,
 macOS, and Linux. It returns `true` when the primary window accepts a finite size between 1 and
 16384 logical pixels. Android and iOS own their window geometry through the native host, run the

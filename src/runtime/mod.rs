@@ -62,7 +62,10 @@ const DESKTOP_ICON_CORNER_RADIUS_RATIO: f32 = 0.2;
 #[serde(rename_all = "camelCase")]
 struct RuntimeConfig {
     app_name: Option<String>,
-    #[allow(dead_code)]
+    #[cfg_attr(
+        not(any(target_os = "windows", target_os = "macos", target_os = "linux")),
+        allow(dead_code)
+    )]
     icon: Option<String>,
     window: Option<serde_json::Value>,
 }
@@ -262,6 +265,32 @@ fn decode_desktop_icon(bytes: &[u8]) -> Result<image::RgbaImage, image::ImageErr
 
 #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
 fn load_desktop_icon(asset_root: &Path) -> Result<image::RgbaImage, image::ImageError> {
+    // Cargo launchers use the project icon directly; downloaded HTTP icons are
+    // still provided by the native host at .runtime-icon.png.
+    let configured_icon = fs::read(asset_root.join("engineConfig.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<RuntimeConfig>(&bytes).ok())
+        .and_then(|config| config.icon)
+        .filter(|icon| {
+            !icon.is_empty()
+                && !icon.contains("://")
+                && Path::new(icon)
+                    .components()
+                    .all(|part| matches!(part, std::path::Component::Normal(_)))
+        });
+    if let Some(icon) = configured_icon {
+        let path = asset_root.join(icon);
+        match fs::read(&path)
+            .ok()
+            .and_then(|bytes| decode_desktop_icon(&bytes).ok())
+        {
+            Some(image) => return Ok(image),
+            None => warn!(
+                "Could not load configured application icon {}",
+                path.display()
+            ),
+        }
+    }
     let custom_icon = asset_root.join(".runtime-icon.png");
     match fs::read(&custom_icon) {
         Ok(bytes) => match decode_desktop_icon(&bytes) {
@@ -833,6 +862,45 @@ mod tests {
         assert_eq!(rounded.get_pixel(0, 31).0[3], 0);
         assert_eq!(rounded.get_pixel(31, 31).0[3], 0);
         assert_eq!(rounded.get_pixel(16, 16).0, [40, 80, 120, 73]);
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn configured_project_icon_overrides_cached_icon_without_allowing_parent_paths() {
+        let directory = tempfile::tempdir().unwrap();
+        let assets = directory.path();
+        fs::create_dir(assets.join("branding")).unwrap();
+        image::RgbaImage::from_pixel(32, 32, image::Rgba([12, 34, 56, 255]))
+            .save(assets.join("branding/icon.png"))
+            .unwrap();
+        image::RgbaImage::from_pixel(32, 32, image::Rgba([90, 80, 70, 255]))
+            .save(assets.join(".runtime-icon.png"))
+            .unwrap();
+        fs::write(
+            assets.join("engineConfig.json"),
+            r#"{"icon":"branding/icon.png"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            load_desktop_icon(assets).unwrap().get_pixel(16, 16).0,
+            [12, 34, 56, 255]
+        );
+
+        for icon in [
+            "../outside.png",
+            "/outside.png",
+            "https://example.com/icon.png",
+        ] {
+            fs::write(
+                assets.join("engineConfig.json"),
+                serde_json::json!({ "icon": icon }).to_string(),
+            )
+            .unwrap();
+            assert_eq!(
+                load_desktop_icon(assets).unwrap().get_pixel(16, 16).0,
+                [90, 80, 70, 255]
+            );
+        }
     }
 
     #[test]

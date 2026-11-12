@@ -51,6 +51,8 @@ declare function ui_despawn(id: string): boolean;
 declare function ui_clear(): void;
 declare function game_state_set(score: number, lives: number, message: string): void;
 declare function app_request_exit(): boolean;
+/** Native preferred language tag, or en-US when unavailable. */
+declare function app_locale(): string;
 declare function window_set_size(width: number, height: number): boolean;
 declare function window_safe_area(): RuneweaveWindowSafeArea;
 declare function input_key_pressed(key: string): boolean;

@@ -35,7 +35,7 @@ class Reference {
   }
   set(key: string, value: unknown): void { this.value[key] = value; }
 }
-function harness(width = 1280, height = 800, mobile = false, saves = new Map<string, string>(), stickyUi = false) {
+function harness(width = 1280, height = 800, mobile = false, saves = new Map<string, string>(), stickyUi = false, locale = "en-US") {
   const entities = new Map<string, Entity>();
   const ui = new Map<string, Ui>();
   const pressed = new Set<string>();
@@ -56,6 +56,7 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
   };
   const context = createContext({
     console,
+    app_locale: () => locale,
     storage_read: (key: string) => storageFailure ? { state: "error", error: storageFailure }
       : saves.has(key) ? { state: "ok", value: saves.get(key) } : { state: "missing" },
     storage_write: (key: string, value: string) => {
@@ -349,6 +350,17 @@ test("official shattered pixel dungeon sprite assets exist and are valid", () =>
     const stat = readFileSync(fullPath);
     assert.ok(stat.length > 0, `Empty asset: ${file}`);
   }
+});
+
+test("the application icon is the pinned upstream desktop icon", () => {
+  const config = JSON.parse(readFileSync(resolve(assets, "engineConfig.json"), "utf8"));
+  const source = JSON.parse(readFileSync(resolve(assets, "licenses/icon-source.json"), "utf8"));
+  assert.equal(config.icon, source.file);
+  const icon = readFileSync(resolve(assets, config.icon));
+  assert.equal(icon.readUInt32BE(16), 256); assert.equal(icon.readUInt32BE(20), 256);
+  assert.equal(createHash("sha256").update(icon).digest("hex"), source.sha256);
+  assert.match(source.source, /desktop\/src\/main\/assets\/icons\/icon_256\.png$/);
+  assert.ok(source.source.includes(source.revision));
 });
 
 type Game = ReturnType<typeof harness>;
@@ -776,7 +788,7 @@ test("English and Chinese catalogs are complete and share interpolation paramete
 });
 
 test("legacy and unsupported language values preserve statistics without blocking saves", () => {
-  const { language: _, ...legacy } = { ...defaultProfile(), bestScore: 123, runs: 8, wins: 2 };
+  const { language: _, followSystemLanguage: __, ...legacy } = { ...defaultProfile(), bestScore: 123, runs: 8, wins: 2 };
   for (const language of [undefined, "fr", "zh-TW", null, 42]) {
     const parsed = parseProfile(JSON.stringify({ ...legacy, language }));
     assert.equal(parsed.language, "en");
@@ -784,6 +796,41 @@ test("legacy and unsupported language values preserve statistics without blockin
   }
   assert.equal(parseProfile(JSON.stringify({ ...legacy, language: "zh" })).language, "zh-CN");
   assert.equal(parseProfile(JSON.stringify({ ...legacy, language: "zh-CN" })).language, "zh-CN");
+});
+
+test("default language follows the system until the user saves an explicit choice", () => {
+  for (const locale of ["zh-CN", "zh-Hans-CN", "zh-TW", "ZH_hant_HK"]) {
+    assert.equal(defaultProfile(locale).language, "zh-CN");
+    const game = harness(800, 600, false, new Map(), false, locale);
+    assert.equal(game.ui.get("start__label")!.text, "进入地牢");
+  }
+  for (const locale of ["en-GB", "fr-FR", "ja-JP", ""]) assert.equal(defaultProfile(locale).language, "en");
+  const saves = new Map<string, string>();
+  const chinese = harness(800, 600, false, saves, false, "zh-CN");
+  chinese.click("settings");
+  chinese.setting("hints");
+  assert.equal(JSON.parse(saves.get("profile")!).followSystemLanguage, true);
+  const english = harness(800, 600, false, saves, false, "en-US");
+  assert.equal(english.ui.get("start__label")!.text, "Enter the Dungeon");
+  changeLanguage(english, "zh-CN");
+  assert.equal(JSON.parse(saves.get("profile")!).followSystemLanguage, false);
+  const reopened = harness(800, 600, false, saves, false, "en-US");
+  assert.equal(reopened.ui.get("start__label")!.text, "进入地牢");
+  reopened.click("settings"); reopened.click("settings_tab_3");
+  reopened.click("reset_save"); reopened.click("confirm_reset");
+  assert.equal(reopened.ui.get("settings_title")!.text, "Data");
+  assert.equal(saves.has("profile"), false);
+});
+
+test("legacy profiles without a language follow the system and explicit choices retain progress", () => {
+  const { language: _, followSystemLanguage: __, ...legacy } = { ...defaultProfile(), bestScore: 123, runs: 8, wins: 2 };
+  const migrated = parseProfile(JSON.stringify(legacy), "zh-CN");
+  assert.equal(migrated.language, "zh-CN");
+  assert.equal(migrated.followSystemLanguage, true);
+  const selected = parseProfile(JSON.stringify({ ...legacy, language: "en" }), "zh-CN");
+  assert.equal(selected.language, "en");
+  assert.equal(selected.followSystemLanguage, false);
+  assert.equal(selected.bestScore, 123); assert.equal(selected.runs, 8); assert.equal(selected.wins, 2);
 });
 
 test("language choices apply immediately, persist, and restore English without losing progress", () => {

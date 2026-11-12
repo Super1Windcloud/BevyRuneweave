@@ -163,6 +163,10 @@ export function normalizeLanguage(value: unknown): Language {
   return value === "zh-CN" || value === "zh" ? "zh-CN" : "en";
 }
 
+export function systemLanguage(locale: unknown): Language {
+  return typeof locale === "string" && /^zh(?:[-_]|$)/i.test(locale.trim()) ? "zh-CN" : "en";
+}
+
 export function message(key: MessageKey, parameters?: MessageParameters): Message {
   return { key, parameters };
 }

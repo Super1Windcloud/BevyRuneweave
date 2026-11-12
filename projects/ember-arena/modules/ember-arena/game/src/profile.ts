@@ -1,4 +1,4 @@
-import { normalizeLanguage, type Language } from "./i18n.js";
+import { normalizeLanguage, systemLanguage, type Language } from "./i18n.js";
 
 export interface Profile {
   schemaVersion: 1;
@@ -11,12 +11,14 @@ export interface Profile {
   showHints: boolean;
   reducedMotion: boolean;
   language: Language;
+  followSystemLanguage: boolean;
 }
-export function defaultProfile(): Profile {
+export function defaultProfile(locale: unknown = "en-US"): Profile {
   return { schemaVersion: 1, bestScore: 0, runs: 0, wins: 0, bestTime: 0,
-    seed: 1337, sensitivity: 1, showHints: true, reducedMotion: false, language: "en" };
+    seed: 1337, sensitivity: 1, showHints: true, reducedMotion: false,
+    language: systemLanguage(locale), followSystemLanguage: true };
 }
-export function parseProfile(raw: string): Profile {
+export function parseProfile(raw: string, locale: unknown = "en-US"): Profile {
   const value: unknown = JSON.parse(raw);
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid profile");
   const data = value as Record<string, unknown>;
@@ -28,8 +30,9 @@ export function parseProfile(raw: string): Profile {
     || typeof data.bestTime !== "number" || !Number.isFinite(data.bestTime) || data.bestTime < 0
     || ![0.75, 1, 1.25, 1.5].includes(data.sensitivity as number)
     || typeof data.showHints !== "boolean" || typeof data.reducedMotion !== "boolean") throw new Error("invalid settings");
+  const followSystemLanguage = data.followSystemLanguage === true || data.language === undefined;
   return { schemaVersion: 1, bestScore: data.bestScore as number, runs: data.runs as number,
     wins: data.wins as number, bestTime: data.bestTime, seed: data.seed as number,
     sensitivity: data.sensitivity as number, showHints: data.showHints, reducedMotion: data.reducedMotion,
-    language: normalizeLanguage(data.language) };
+    language: followSystemLanguage ? systemLanguage(locale) : normalizeLanguage(data.language), followSystemLanguage };
 }

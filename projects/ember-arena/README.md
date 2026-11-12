@@ -31,6 +31,9 @@ The desktop window starts at **800×600 logical pixels**, centered on the primar
 does not resize an already visible window. Manual resizing and the Display tab's landscape/
 portrait controls remain available. Android and iOS keep their native fullscreen geometry.
 This startup behavior requires a runtime rebuilt with support for `engineConfig.window`.
+The application icon is the original Shattered Pixel Dungeon desktop icon, bundled at
+`assets/branding/shattered-pixel-dungeon.png`. Its pinned revision and checksum are recorded in
+`assets/licenses/icon-source.json`; both Cargo launches and the desktop launcher use it offline.
 
 ## Current gameplay
 
@@ -78,7 +81,8 @@ repeat at a bounded rate; clicks never path through unexplored terrain.
 
 ## Languages
 
-Open **Settings → Language** and choose **English** or **简体中文**. The default is English.
+Open **Settings → Language** and choose **English** or **简体中文**. By default the game follows
+the system language at startup/reload: Chinese locales use Simplified Chinese, all others use English.
 The choice applies immediately and is saved with the profile. Switching during an expedition
 preserves actors, inventory and turns, and also retranslates existing combat logs and notices.
 Menus, hero/item details, HUD states, results, settings, informational pages and diagnostic captions
@@ -86,9 +90,12 @@ support both languages. Runtime phase IDs, HTTP methods, status tokens and raw e
 stable. Chinese title/result captions replace the English bitmap lettering; English retains the
 original artwork.
 
-Version-1 profiles without a language field continue in English. Unknown language values fall back
-to English while retaining statistics. Incompatible saves remain protected; language switching
-still works for the session. **Clear data** resets settings, including the language, to defaults.
+Version-1 profiles without a language field also follow the system. Profiles with an existing
+explicit language keep that choice; a manual selection disables automatic language changes.
+Unknown explicit language values fall back to English while retaining statistics. Incompatible
+saves remain protected; language switching still works for the session. **Clear data** resets
+settings and restores system-language following. This requires a runtime with the BMS `app_locale`
+function; older runtime packages safely fall back to English.
 
 English uses the original pixel font. Chinese and the Chinese language-choice label use bundled
 Noto Sans SC 2.004 (SIL OFL 1.1), including measured Chinese/Latin advances and character wrapping.
