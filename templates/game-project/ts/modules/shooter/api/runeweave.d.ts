@@ -6,6 +6,8 @@ interface BmsReflectReference {
 
 declare function scene_spawn(id: string, x: number, y: number, z: number): boolean;
 declare function scene_set_sprite(id: string, path: string, width: number, height: number): boolean;
+/** Sprite-local drawing offset from its center; leaves the actor Transform unchanged. */
+declare function scene_set_sprite_offset(id: string, x: number, y: number): boolean;
 declare function scene_set_model(id: string, path: string): boolean;
 declare function scene_set_transform_3d(
   id: string,

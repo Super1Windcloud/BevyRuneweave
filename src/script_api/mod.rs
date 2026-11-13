@@ -183,6 +183,39 @@ fn scene_set_sprite(
     })
 }
 
+/// Shift a sprite's drawing origin without moving its authoritative Transform.
+fn scene_set_sprite_offset(
+    context: FunctionCallContext,
+    id: String,
+    x: f32,
+    y: f32,
+) -> Result<bool, InteropError> {
+    if !x.is_finite() || !y.is_finite() {
+        return Ok(false);
+    }
+    let (world, owner) = current_script(&context)?;
+    world.with_world_mut(|world| {
+        let Some(entity) = find_owned_entity(world, &owner, &id) else {
+            return false;
+        };
+        let Some(size) = world
+            .get::<Sprite>(entity)
+            .and_then(|sprite| sprite.custom_size)
+        else {
+            return false;
+        };
+        if !size.is_finite() || size.x <= 0.0 || size.y <= 0.0 {
+            return false;
+        }
+        let anchor = Vec2::new(-x, -y) / size;
+        if !anchor.is_finite() {
+            return false;
+        }
+        set_component_if_neq(world, entity, Anchor(anchor));
+        true
+    })
+}
+
 fn scene_set_model(
     context: FunctionCallContext,
     id: String,
@@ -657,6 +690,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register_type::<ScriptUiNode>()
             .register_type::<Transform>()
             .register_type::<Sprite>()
+            .register_type::<Anchor>()
             .register_type::<Text2d>()
             .register_type::<TextFont>()
             .register_type::<TextColor>()
@@ -688,6 +722,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("scene_actor", scene_actor)
             .register("scene_actor_ids", scene_actor_ids)
             .register("scene_set_sprite", scene_set_sprite)
+            .register("scene_set_sprite_offset", scene_set_sprite_offset)
             .register("scene_set_model", scene_set_model)
             .register("scene_set_transform_3d", scene_set_transform_3d)
             .register("scene_play_animation", scene_play_animation)
@@ -830,6 +865,67 @@ mod tests {
         assert_eq!(id.0, "player");
         assert_eq!(transform.translation, Vec3::new(7.0, 8.0, 9.0));
         assert_eq!(transform.scale, Vec3::splat(1.5));
+        Ok(())
+    }
+
+    #[test]
+    fn sprite_offset_preserves_world_position_and_rejects_invalid_offsets()
+    -> Result<(), InteropError> {
+        let mut world = World::new();
+        world.init_resource::<AppScriptFunctionRegistry>();
+        world.init_resource::<AppTypeRegistry>();
+        let attachment = ScriptAttachment::StaticScript(Handle::<ScriptAsset>::default());
+        let position = Transform::from_xyz(16.0, -40.0, 2.0);
+        let entity = world
+            .spawn((
+                ScriptOwnedBy(attachment.clone()),
+                ScriptEntityId("actor".to_owned()),
+                position,
+                Sprite {
+                    custom_size: Some(Vec2::new(20.0, 10.0)),
+                    ..default()
+                },
+            ))
+            .id();
+        let cache = WorldGuard::setup_cache(&world, CurrentScriptAttachment(Some(attachment)));
+        WorldGuard::with_static_guard(&mut world, cache, |_guard| {
+            let context = FunctionCallContext::new(Language::Unknown);
+            assert!(scene_set_sprite_offset(
+                context.clone(),
+                "actor".to_owned(),
+                3.0,
+                -2.0
+            )?);
+            let (anchor, actual) = context.world()?.with_world(|world| {
+                (
+                    *world.get::<Anchor>(entity).unwrap(),
+                    *world.get::<Transform>(entity).unwrap(),
+                )
+            })?;
+            assert_eq!(anchor, Anchor(Vec2::new(-0.15, 0.2)));
+            assert_eq!(actual, position);
+            assert!(!scene_set_sprite_offset(
+                context.clone(),
+                "actor".to_owned(),
+                f32::NAN,
+                0.0
+            )?);
+            assert!(!scene_set_sprite_offset(
+                context.clone(),
+                "missing".to_owned(),
+                0.0,
+                0.0
+            )?);
+            assert!(scene_set_sprite_offset(
+                context,
+                "actor".to_owned(),
+                0.0,
+                0.0
+            )?);
+            Ok::<(), InteropError>(())
+        })?;
+        assert_eq!(*world.get::<Anchor>(entity).unwrap(), Anchor::CENTER);
+        assert_eq!(*world.get::<Transform>(entity).unwrap(), position);
         Ok(())
     }
 

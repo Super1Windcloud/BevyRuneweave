@@ -3,10 +3,11 @@ import { actor, change, field, kind, position } from "./actors.js";
 import { clamp, enemySpecs, getHungerStatus, heroClasses, heroClassList, lootKinds, mobCombat, seededRandom,
   type EnemyKind, type HeroClass, type ItemKind, type LootKind, type Point } from "./rules.js";
 import { canStep, cellDistance, cellKey, findPath, generateFloor, lineOfSight, passable, reveal, sameCell, searchFloor, terrainAt, type DungeonFloor, type Terrain } from "./dungeon.js";
-import { actorSprite, cellPosition, cellSize, mobSprites, monsterIds, placeCell, sprite } from "./dungeon-actors.js";
+import { actorCellAt, actorSprite, advanceSpriteMotion, cellPosition, cellSize, clearDungeonVisuals, mobSprites, monsterIds, placeCell, renderedPosition, settleSpriteMotion, sprite, spriteVisibility } from "./dungeon-actors.js";
 import { defaultProfile, parseProfile, type Profile } from "./profile.js";
 import { message, renderMessage, type Message, type MessageKey } from "./i18n.js";
-import { mountUi, updateUi } from "../../api/ui.js";
+import { mountUi, setUiStyle, unmountUi, updateUi } from "../../api/ui.js";
+import { stepSeconds } from "./sprite-motion.js";
 import { renderSpdUi, uiMetrics, type UiPhase } from "./spd-ui.js";
 import { armorReduction, attackDelay, attackSkill, defenseSkill, equippedGear, gearDefinitions, isGearKind,
   moveDelay, startingEquipment, strengthDeficit, timeAfter, weaponDamage } from "./equipment.js";
@@ -63,6 +64,7 @@ let previewPhase: Phase | null = null;
 let examining = false;
 let targeting: TargetKind | null = null;
 let cameraShake = 0;
+let cameraState = "";
 let wornKeys = 0;
 let gooBlobs = 0;
 let gooDefeated = false;
@@ -149,7 +151,7 @@ function mobileAction(action: MobileAction): void {
     if (staff) beginStaffZap(staff.id);
   } else if (selectedClass === "huntress") useInventoryItem("spirit_bow");
   else if (selectedClass === "rogue") toggleCloak();
-  actionCooldown = 0.16;
+  actionCooldown = stepSeconds;
 }
 
 function pushLog(entry: Message): void {
@@ -312,6 +314,7 @@ function publish(): void {
 }
 
 function setPhase(next: Phase): void {
+  settleSpriteMotion();
   if (mobileEnabled) mobileControls.reset(mobileContacts());
   previewPhase = null;
   examining = false;
@@ -338,7 +341,9 @@ function room(): void {
   floor = null;
   examining = false; targeting = null; cameraShake = 0;
   scene_clear();
-  ui_clear();
+  clearDungeonVisuals();
+  unmountUi();
+  cameraState = "";
   scene_set_3d_enabled(false);
   scene_set_camera_2d(0, 0, 800);
   paintBackdrop();
@@ -351,8 +356,8 @@ function paintBackdrop(): void {
   const pointer = input_primary_pointer();
   if (!scene_transform("dungeon_backdrop")) scene_spawn("dungeon_backdrop", 0, 0, -10);
   if (floor) {
-    const translation = scene_transform("player")!.get("translation") as BmsReflectReference;
-    scene_set_transform("dungeon_backdrop", translation.get("x") as number, (translation.get("y") as number) + 10, -10);
+    const position = renderedPosition("player");
+    scene_set_transform("dungeon_backdrop", position.x, position.y + 10, -10);
     const metrics = window_metrics(), scale = uiMetrics().scale;
     scene_set_sprite("dungeon_backdrop", "sprites/dungeon/void.png", metrics.width / scale, metrics.height / scale);
   } else scene_set_sprite("dungeon_backdrop", "sprites/dungeon/void.png", pointer.viewportWidth, pointer.viewportHeight);
@@ -399,6 +404,7 @@ function startRun(): void {
 
 function enterFloor(): void {
   examining = false; targeting = null; unsealFloor();
+  clearDungeonVisuals();
   for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id) && kind(id) !== staffChargerKind && id !== cloakId && id !== sealId) scene_despawn(id);
   for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
   for (const key of renderedFog) scene_despawn(`fog_${key}`);
@@ -441,9 +447,14 @@ function spawnLoot(point: Point, item?: LootKind): void {
 function shakeOffset(): number { return cameraShake > 0 ? Math.sin(cameraShake * 80) * 3 * cameraShake / 0.2 : 0; }
 
 function updateCamera(): void {
-  if (!floor || window_metrics().height <= 0) return;
-  const hero = scene_transform("player")!.get("translation") as BmsReflectReference;
-  scene_set_camera_2d((hero.get("x") as number) + shakeOffset(), (hero.get("y") as number) + 10, window_metrics().height / uiMetrics().scale);
+  const metrics = window_metrics();
+  if (!floor || metrics.height <= 0) return;
+  const hero = renderedPosition("player"), x = hero.x + shakeOffset(), y = hero.y + 10;
+  const height = metrics.height / uiMetrics().scale, signature = `${x}:${y}:${height}`;
+  if (signature === cameraState) return;
+  cameraState = signature;
+  scene_set_camera_2d(x, y, height);
+  scene_set_transform("dungeon_backdrop", x, y, -10);
 }
 
 function refreshDungeon(): void {
@@ -466,14 +477,12 @@ function refreshDungeon(): void {
     if (kind(id) === "loot") {
       const item = lootKinds[field(id, "power") - 1];
       sprite(id, item ?? "gold", cellPosition(id), 1, 0.7);
-      const scale = scene_transform(id)!.get("scale") as BmsReflectReference;
       const visible = floor.visible.has(cellKey(floor, cellPosition(id)));
-      for (const axis of ["x", "y"]) scale.set(axis, visible ? 1 : 0);
+      spriteVisibility(id, visible);
     } else if (kind(id) === "fire_cell") {
       sprite(id, "fire", cellPosition(id), 2.5);
-      const scale = scene_transform(id)!.get("scale") as BmsReflectReference;
       const visible = floor.visible.has(cellKey(floor, cellPosition(id)));
-      for (const axis of ["x", "y"]) scale.set(axis, visible ? 1 : 0);
+      spriteVisibility(id, visible);
     } else actorSprite(id, selectedClass, id === "player" || floor.visible.has(cellKey(floor, cellPosition(id))));
   }
 }
@@ -890,7 +899,7 @@ function monsterAction(id: string, now: number): number {
     const next = findPath(floor!, current, destination, blocked)[0];
     if (!next || sameCell(next, hero) || monsterIds().some((other) => other !== id && sameCell(cellPosition(other), next))) return 1;
     if (terrainAt(floor!, next) === "door") { floor!.tiles[cellKey(floor!, next)] = "open_door"; return 1; }
-    placeCell(id, next); current = next;
+    placeCell(id, next, 2, true); current = next;
     exposeToFire(id, now);
   }
   if (!seesHero && sameCell(current, destination)) change(id, "lifetime", 0);
@@ -947,7 +956,7 @@ function movePlayer(dx: number, dz: number): boolean {
   else if (terrainAt(floor, next) === "door") {
     floor.tiles[cellKey(floor, next)] = "open_door";
     pushLog(message("log.door"));
-  } else { placeCell("player", next); collectLoot(); exposeToFire("player", field("player", "cooldown")); }
+  } else { placeCell("player", next, 2, true); collectLoot(); exposeToFire("player", field("player", "cooldown")); }
   if (phase === "playing") spendTurns(duration);
   return true;
 }
@@ -1015,24 +1024,25 @@ function playerInput(dt: number, pointer: RuneweavePointerState, mobile?: Mobile
   if (dx || dz) {
     if (examining || targeting) { examining = false; targeting = null; drawUi(); }
     queuedPath = [];
-    if (actionCooldown <= 0) { movePlayer(dx, dz); actionCooldown = 0.16; }
+    if (actionCooldown <= 0) { movePlayer(dx, dz); actionCooldown = stepSeconds; }
     return;
   }
   if (mobile?.engaged && !targeting && !examining) {
     queuedPath = [];
     if ((mobile.direction.x || mobile.direction.y) && actionCooldown <= 0) {
-      movePlayer(mobile.direction.x, mobile.direction.y); actionCooldown = 0.16;
+      movePlayer(mobile.direction.x, mobile.direction.y); actionCooldown = stepSeconds;
     }
     return;
   }
   if (pointer.justPressed) {
     queuedPath = [];
     if (pointer.y > window_safe_area().top - 150 || pointer.y < window_safe_area().bottom + 80) return;
-    const translation = scene_transform("player")!.get("translation") as BmsReflectReference;
+    const hero = renderedPosition("player");
     const pointerScale = pointer.viewportHeight / window_metrics().height * uiMetrics().scale;
-    const worldX = (translation.get("x") as number) + shakeOffset() + pointer.x / pointerScale;
-    const worldY = (translation.get("y") as number) + 10 + pointer.y / pointerScale;
-    const target = { x: Math.round(worldX / cellSize + 12), z: Math.round(12 - (worldY + 40) / cellSize) };
+    const worldX = hero.x + shakeOffset() + pointer.x / pointerScale;
+    const worldY = hero.y + 10 + pointer.y / pointerScale;
+    const target = actorCellAt(worldX, worldY, selectedClass)
+      ?? { x: Math.round(worldX / cellSize + 12), z: Math.round(12 - (worldY + 40) / cellSize) };
     if (target.x < 0 || target.z < 0 || target.x >= floor!.width || target.z >= floor!.height) return;
     if (targeting) { fireAtTarget(target); return; }
     if (!floor!.explored.has(cellKey(floor!, target))) return;
@@ -1050,7 +1060,7 @@ function playerInput(dt: number, pointer: RuneweavePointerState, mobile?: Mobile
       if (sameCell(cellPosition("player"), next)) queuedPath.shift();
       if (monsterIds().some((id) => floor!.visible.has(cellKey(floor!, cellPosition(id))) && !visibleEnemies.has(id))) queuedPath = [];
     }
-    actionCooldown = 0.16;
+    actionCooldown = stepSeconds;
   }
 }
 
@@ -1170,6 +1180,7 @@ callbacks.on_script_reloaded = (): void => {
 };
 
 callbacks.on_suspend = (): void => {
+  settleSpriteMotion();
   if (mobileEnabled) mobileControls.reset(mobileContacts());
   queuedPath = []; targeting = null; examining = false;
   actionCooldown = 0; cameraShake = 0;
@@ -1177,21 +1188,24 @@ callbacks.on_suspend = (): void => {
 };
 
 callbacks.on_update = (delta: number): void => {
-  const dt = clamp(Number.isFinite(delta) ? delta : 0, 0, 0.05);
+  const frameDelta = clamp(Number.isFinite(delta) ? delta : 0, 0, 0.25);
+  const dt = Math.min(frameDelta, 0.05);
   const pointer = input_primary_pointer();
   const safe = window_safe_area();
   const metrics = window_metrics();
   if (metrics.width <= 0 || metrics.height <= 0) return;
+  const movingSprites = advanceSpriteMotion(frameDelta);
   const signature = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
   if (viewport !== signature) {
+    settleSpriteMotion();
     if (mobileEnabled) mobileControls.reset(mobileContacts(pointer));
     viewport = signature;
     refreshDungeon();
     drawUi();
   }
-  if (phase === "playing" && cameraShake > 0) {
-    cameraShake = Math.max(0, cameraShake - dt); updateCamera();
-  }
+  const shaking = phase === "playing" && cameraShake > 0;
+  if (shaking) cameraShake = Math.max(0, cameraShake - dt);
+  if (movingSprites || shaking) updateCamera();
   const previousPhase = phase;
   const previousTurns = turns;
   const mobile = mobileEnabled ? mobileControls.sample(mobileContacts(pointer), uiMetrics(), { x: metrics.width, y: metrics.height }, phase === "playing") : undefined;
@@ -1199,7 +1213,7 @@ callbacks.on_update = (delta: number): void => {
     const visual = `${mobileControls.stick.x.toFixed(3)}:${mobileControls.stick.y.toFixed(3)}:${mobileControls.stick.active}`;
     if (visual !== joystickVisual) {
       joystickVisual = visual;
-      ui_set_style("mobile_joystick_thumb", JSON.stringify(joystickThumbStyle(uiMetrics(), mobileControls.stick)));
+      setUiStyle("mobile_joystick_thumb", joystickThumbStyle(uiMetrics(), mobileControls.stick));
     }
     const action = mobile.actions[0];
     if (action) { mobileAction(action); return; }

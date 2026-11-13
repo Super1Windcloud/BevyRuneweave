@@ -11,6 +11,8 @@ declare function scene_set_sprite(
   width: number,
   height: number,
 ): boolean;
+/** Sprite-local drawing offset from its center; leaves the actor Transform unchanged. */
+declare function scene_set_sprite_offset(id: string, x: number, y: number): boolean;
 declare function scene_set_model(id: string, path: string): boolean;
 declare function scene_set_transform_3d(
   id: string,

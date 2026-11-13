@@ -73,6 +73,23 @@ not change the incomplete full-game parity status.
 
 ## Current gameplay
 
+Movement presentation updates every render frame. A logical move still advances one grid action
+at the existing 0.16-second input cadence; a transient sprite waypoint path interpolates the image
+to that destination using Bevy `Anchor` offsets. Actor `Transform` coordinates remain authoritative
+whole-tile positions for collision, sight, targeting and turn scheduling. Multiple crab steps keep
+their intermediate corners. The camera follows the rendered position, and clicking a moving actor
+uses its drawn bounds before selecting its logical cell. Pause, suspension and floor changes
+finish presentation offsets without advancing gameplay. This is smooth translation, not the
+original multi-frame walking/attack artwork, which remains pending.
+
+HUD updates reuse native entities when topology and style-property sets stay the same, writing
+only changed properties. Structure changes rebuild once to restore native defaults. Sprite image
+and visibility writes are also cached. These changes remove per-step full HUD destruction and
+unchanged asset reloads; actual device FPS and performance gains have not been measured.
+Both mobile runtimes must expose `scene_set_sprite_offset`, and hosts/game assets must be updated.
+Older runtimes retain discrete movement. Windows/Linux native acceptance and device/performance
+tests remain NOT_RUN; only static checks and available native builds were run for this change.
+
 - Native top-down 2D sprites use the original hero, monster, item and sewer tile atlases.
   Frame sizes follow upstream `HeroSprite`, mob sprites and `DungeonTileSheet`; the previous
   2.5D standee models remain available as assets but are not used in this mode.

@@ -57,6 +57,8 @@ export interface UiButtonOptions {
 }
 
 const buttonCallbacks = new Map<string, () => void>();
+const mountedProperties = new Map<string, Map<string, string>>();
+let mountedTopology = "";
 let pointerActionHandled = false;
 const defaultTextColor: UiColor = [1, 1, 1, 1];
 
@@ -87,24 +89,54 @@ export function button(id: string, label: string, options: UiButtonOptions = {})
 function requireUi(result: boolean, operation: string, id: string): void {
   if (!result) throw new Error(`Runeweave UI ${operation} failed for "${id}"`);
 }
+function syncProperty(id: string, property: string, value: string, write: () => boolean): void {
+  const previous = mountedProperties.get(id);
+  if (previous?.get(property) === value) return;
+  requireUi(write(), property, id);
+  previous?.set(property, value);
+}
+export function setUiStyle(id: string, style: UiStyle): void {
+  const value = JSON.stringify(style);
+  syncProperty(id, "style", value, () => ui_set_style(id, value));
+}
 function mountElement(element: UiElement, parentId: string): void {
-  requireUi(ui_spawn(element.id, parentId, element.kind), "spawn", element.id);
-  if (element.style) requireUi(ui_set_style(element.id, JSON.stringify(element.style)), "style", element.id);
+  if (!mountedProperties.has(element.id)) {
+    requireUi(ui_spawn(element.id, parentId, element.kind), "spawn", element.id);
+    mountedProperties.set(element.id, new Map());
+  }
+  setUiStyle(element.id, element.style ?? {});
   if (element.kind === "text") {
     const [red, green, blue, alpha] = element.color;
-    requireUi(ui_set_text(element.id, element.value, element.fontSize, red, green, blue, alpha), "text", element.id);
-    if (element.font) requireUi(ui_set_font(element.id, element.font), "font", element.id);
+    syncProperty(element.id, "text", JSON.stringify([element.value, element.fontSize, element.color]),
+      () => ui_set_text(element.id, element.value, element.fontSize, red, green, blue, alpha));
+    if (element.font) syncProperty(element.id, "font", element.font, () => ui_set_font(element.id, element.font!));
   } else if (element.kind === "image") {
-    requireUi(ui_set_image(element.id, element.path), "image", element.id);
+    syncProperty(element.id, "image", element.path, () => ui_set_image(element.id, element.path));
   } else if (element.kind === "button" && element.onClick) {
     buttonCallbacks.set(element.id, element.onClick);
   }
   for (const child of element.children ?? []) mountElement(child, element.id);
 }
 export function mountUi(root: UiElement): void {
-  ui_clear();
+  const topology: unknown[] = [];
+  const visit = (element: UiElement, parent: string): void => {
+    // Native style writes are patches. A removed property needs fresh defaults.
+    topology.push([element.id, parent, element.kind, element.kind === "text" && !!element.font,
+      Object.entries(element.style ?? {}).filter(([, value]) => value !== undefined).map(([key]) => key).sort()]);
+    for (const child of element.children ?? []) visit(child, element.id);
+  };
+  visit(root, "");
+  const next = JSON.stringify(topology);
+  // Changes to tree structure still rebuild once. Normal HUD updates keep the
+  // same native entities and only write changed text/style/image properties.
+  if (next !== mountedTopology) {
+    ui_clear();
+    mountedProperties.clear();
+    mountedTopology = "";
+  }
   buttonCallbacks.clear();
   mountElement(root, "");
+  mountedTopology = next;
 }
 export function updateUi(): boolean {
   // A held pointer can press a replacement button again after a remount.
@@ -119,5 +151,5 @@ export function updateUi(): boolean {
   }
   return false;
 }
-export function unmountUi(): void { buttonCallbacks.clear(); ui_clear(); }
-export function removeUi(id: string): boolean { buttonCallbacks.delete(id); return ui_despawn(id); }
+export function unmountUi(): void { buttonCallbacks.clear(); mountedProperties.clear(); mountedTopology = ""; ui_clear(); }
+export function removeUi(id: string): boolean { buttonCallbacks.delete(id); mountedProperties.delete(id); mountedTopology = ""; return ui_despawn(id); }

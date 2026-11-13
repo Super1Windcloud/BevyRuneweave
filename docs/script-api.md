@@ -28,6 +28,7 @@ it does not serialize in-progress runs or provide recovery after process termina
 | --- | --- |
 | `scene_spawn(id, x, y, z)` | Creates or updates an owned entity with Bevy `Transform`. |
 | `scene_set_sprite(id, path, width, height)` | Inserts a Bevy `Sprite` that loads from the runtime asset root. |
+| `scene_set_sprite_offset(id, x, y)` | Sets a drawing offset from the sprite's center in sprite-local units via its reflected Bevy `Anchor`, preserving the actor `Transform`. Requires a sprite with positive finite custom size; returns false for missing/non-sprite entities or invalid values. `(0, 0)` restores the centered anchor. |
 | `scene_set_model(id, path)` | Loads scene 0 from a standard glTF 2.0 GLB into the owned entity. Proprietary containers that only use a `.glb` suffix are not supported. |
 | `scene_set_transform_3d(id, x, y, z, rx, ry, rz, scale)` | Applies a 3D translation, Euler rotation in radians, and uniform scale. |
 | `scene_play_animation(id, path, repeat)` | Loads animation 0 from a standard glTF 2.0 GLB and binds it after the model hierarchy is ready. |

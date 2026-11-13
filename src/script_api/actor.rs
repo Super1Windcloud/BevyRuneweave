@@ -202,6 +202,7 @@ mod tests {
                 function on_script_loaded() {
                     scene_spawn("actor", 1, 0, 2);
                     if (!scene_actor_set("actor", "player", 100, 4, 0.4)) throw Error("actor set");
+                    if (scene_set_sprite_offset("actor", 1, 0)) throw Error("sprite offset requires a sprite");
                     const actor = scene_actor("actor");
                     actor.set("health", 73);
                     const position = scene_transform("actor").get("translation");
@@ -742,6 +743,7 @@ mod tests {
                     assert(type(app_platform()) == "string" and #input_touches() == 0)
                     scene_spawn("actor", 1, 0, 2)
                     assert(scene_actor_set("actor", "player", 100, 4, 0.4))
+                    assert(not scene_set_sprite_offset("actor", 1, 0))
                     local actor = scene_actor("actor")
                     actor.health = 73
                     local transform = scene_transform("actor")

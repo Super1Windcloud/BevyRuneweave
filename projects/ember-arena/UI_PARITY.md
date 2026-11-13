@@ -59,6 +59,14 @@ gaps. UI and scene images use nearest sampling. Source icons preserve their own 
 
 ## Visual inspection and acceptance
 
+Movement presentation now interpolates sprite-local drawing offsets and camera position every
+render frame while retaining whole-cell Bevy Transform state. Retargeted motions preserve tile
+corners, and moving-actor hit testing maps back to logical cells. Stable HUD trees reuse native
+nodes and patch changed properties; structural changes still rebuild. This is a source-level
+performance/presentation change, not original walking-frame artwork or native FPS evidence.
+The interpolation/retained-UI test sources compile; suites and device/performance acceptance were
+NOT_RUN at the user's request. Current runtime rebuilds are required for the drawing-offset API.
+
 Mobile adaptation batch, 2026-11-12: fresh unified runtimes and the current bundle were exercised
 on Pixel 8 / Android 17 and iPhone 14 Pro / iOS 27.0.1. Native GPU captures cover title, hero
 selection, dungeon HUD in portrait/landscape and the pause modal after Home/resume. Real touch
