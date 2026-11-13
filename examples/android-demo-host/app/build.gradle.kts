@@ -8,7 +8,7 @@ plugins {
 }
 
 val supportedRuntimeAbis = setOf("arm64-v8a", "x86_64")
-val runtimeAbis = providers.gradleProperty("runeweaveAbis").orElse(supportedRuntimeAbis.joinToString(","))
+val runtimeAbis = providers.gradleProperty("runeweaveAbis").orElse("arm64-v8a")
 val requestedRelease = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
 val runtimeProfile = if (requestedRelease) "release" else "debug"
 val runtimeDist = rootProject.layout.projectDirectory.dir("../../dist/runtimes/android")

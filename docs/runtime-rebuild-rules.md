@@ -52,8 +52,11 @@ just build-runtime-android --release
 just build-runtime-ios --release
 ```
 
-Android runtime 只支持并默认构建 `arm64-v8a` 和 `x86_64`。`ANDROID_ABIS` 可以选择其中
-一个或两个，但不能重新启用 `armeabi-v7a` 或 `x86`。
+Android runtime 和示例 APK 默认只构建、打包 `arm64-v8a`，减少默认产物体积。
+需要模拟器等其他架构时，可显式使用 `ANDROID_ABIS=arm64-v8a,x86_64 just build-runtime-android`
+构建运行库，再用 `just build-android-demo "" arm64-v8a,x86_64` 打包对应架构。
+直接调用 Gradle 时使用 `-PruneweaveAbis=arm64-v8a,x86_64`。仅支持 `arm64-v8a` 和
+`x86_64`，不能重新启用 `armeabi-v7a` 或 `x86`。
 
 ## 只需重新生成 Runtime Package
 

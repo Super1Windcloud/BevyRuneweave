@@ -228,8 +228,12 @@ package-macos-dmg profile="":
     npm exec -- tsx scripts/package-desktop.ts macos {{profile}}
 
 # Install, launch, and stream Debug logcat, or assemble the unsigned Release host.
-build-android-demo profile="" abis="arm64-v8a,x86_64":
+build-android-demo profile="" abis="arm64-v8a":
     npm exec -- tsx scripts/build-android-demo-host.ts {{profile}} --abis="{{abis}}"
+
+# Package only the APK using prebuilt runtimes, without installation or device access.
+package-android-apk profile="" abis="arm64-v8a":
+    npm exec -- tsx scripts/package-android.ts {{profile}} --abis="{{abis}}"
 
 # Install and launch the Debug iOS host, or only build the Release host.
 build-ios-demo profile="":

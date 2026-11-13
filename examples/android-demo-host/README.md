@@ -20,21 +20,40 @@ filtered to the application process. Press `Ctrl-C` to stop the log stream. When
 are connected, set `ANDROID_SERIAL` to select one. The Release variant is not signed, so
 `just build-android-demo --release` only assembles the Release APK.
 
+To package an APK without installing, launching or streaming logs, use the dedicated script:
+
+```bash
+npm run package:android
+npm run package:android -- --release
+just package-android-apk
+```
+
+This reuses the existing runtime `.so` under `dist/runtimes/android` and never invokes Cargo or
+adb. It defaults to Debug and `arm64-v8a`; `--abis=arm64-v8a,x86_64` selects both supported ABIs.
+Each runtime must already match the requested Debug/Release profile. Debug output is
+`examples/android-demo-host/app/build/outputs/apk/debug/app-debug.apk`; Release output is
+`examples/android-demo-host/app/build/outputs/apk/release/app-release-unsigned.apk`.
+Use `npm run package:android -- --dry-run` to print the selected ABI and Gradle task without building.
+
 Both runtime and APK recipes default to debug. For release, run `just build-runtime-android --release`
 once before `just build-android-demo --release`. The APK build checks that every selected ABI exists
 and matches the requested profile. Android Debug builds accept invalid TLS certificate chains and
 hostnames in both the launcher downloader and script HTTP API. Release builds always use strict TLS
 validation.
 
-Select an ABI set through the repository recipe:
+Runtime builds and APK packaging default to `arm64-v8a` only, including direct Gradle builds.
+Previously built x86_64 runtime outputs may remain on disk but are not copied into the default APK.
+To opt into both supported ABIs, build and package the same set explicitly:
 
 ```bash
-just build-android-demo "" arm64-v8a
+ANDROID_ABIS=arm64-v8a,x86_64 just build-runtime-android
+just build-android-demo "" arm64-v8a,x86_64
 ```
 
 The repository-level command delegates profile selection, ABI validation, and Gradle invocation to
 `scripts/build-android-demo-host.ts`. Use `--dry-run` on that script to validate arguments without
 building, installing, launching, or attaching logcat.
+For direct Gradle builds, use `-PruneweaveAbis=arm64-v8a,x86_64` to override the default.
 
 Building the runtime requires an Android SDK, NDK, Rust Android targets, and `cargo-ndk`. Building
 the APK from an existing dist runtime does not invoke Cargo. Downloaded Lua, JavaScript, and

@@ -7,15 +7,16 @@ const supportedAbis = new Set(["arm64-v8a", "x86_64"]);
 const options = process.argv.slice(2);
 const release = options.includes("--release");
 const dryRun = options.includes("--dry-run");
+const apkOnly = options.includes("--apk-only");
 const abiArguments = options.filter((option) => option.startsWith("--abis="));
 const unknown = options.filter((option) =>
-  option !== "--release" && option !== "--dry-run" && !option.startsWith("--abis="),
+  option !== "--release" && option !== "--dry-run" && option !== "--apk-only" && !option.startsWith("--abis="),
 );
 
 if (unknown.length) throw new Error(`Unsupported argument: ${unknown.join(", ")}`);
 if (abiArguments.length > 1) throw new Error("--abis may only be specified once");
 
-const abis = [...new Set((abiArguments[0]?.slice("--abis=".length) ?? "arm64-v8a,x86_64")
+const abis = [...new Set((abiArguments[0]?.slice("--abis=".length) ?? "arm64-v8a")
   .split(",")
   .map((abi) => abi.trim())
   .filter(Boolean))];
@@ -30,10 +31,10 @@ if (unsupportedAbis.length) {
 const gradle = process.platform === "win32"
   ? resolve(hostRoot, "gradlew.bat")
   : resolve(hostRoot, "gradlew");
-const task = release ? ":app:assembleRelease" : ":app:logcatDebug";
+const task = release ? ":app:assembleRelease" : apkOnly ? ":app:assembleDebug" : ":app:logcatDebug";
 const args = ["-p", hostRoot, task, `-PruneweaveAbis=${abis.join(",")}`];
 
-console.log(`Android demo: ${release ? "release build" : "debug install, launch, and logcat"}`);
+console.log(`Android demo: ${release ? "release build" : apkOnly ? "debug APK build" : "debug install, launch, and logcat"}`);
 console.log(`Android ABIs: ${abis.join(", ")}`);
 console.log(`Gradle task: ${task}`);
 if (!dryRun) {
@@ -43,4 +44,7 @@ if (!dryRun) {
     env: process.env,
     shell: process.platform === "win32",
   });
+  if (apkOnly || release) {
+    console.log(`APK output: ${resolve(hostRoot, "app/build/outputs/apk", release ? "release" : "debug")}`);
+  }
 }

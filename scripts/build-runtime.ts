@@ -150,7 +150,7 @@ function android() {
   }
   const ndk = androidNdk();
   console.log(`Android NDK: ${ndk}`);
-  for (const abi of values("ANDROID_ABIS", "arm64-v8a,x86_64")) {
+  for (const abi of values("ANDROID_ABIS", "arm64-v8a")) {
     const target = mapping[abi]; if (!target) throw new Error(`Unsupported Android ABI '${abi}'; supported ABIs: arm64-v8a, x86_64`); requireTarget(target);
     const destination = fresh("android", abi);
     run("cargo", ["ndk", "-t", abi, "-P", process.env.ANDROID_PLATFORM ?? "26", "-o", join(destination, "lib"), "build", ...cargoProfileArgs, ...cargoFeatureArgs, "--lib", "-p", "bevy-runeweave-runtime-cdylib"], { ANDROID_NDK_HOME: ndk, ANDROID_NDK_ROOT: ndk });
