@@ -8,7 +8,7 @@ import { lockedFloorDuration } from "./survival.js";
 // v4.0.2 Healing/Burning/Ooze/Invisibility and Fire. Effect state lives in
 // real, script-owned Bevy entities accessed through the existing BMS registry.
 // ScriptEntityId encodes the target relationship; no actor/status mirror is kept.
-const buffKinds = ["healing", "burning", "ooze", "invisibility", "hunger", "regeneration", "locked_floor", "cloak"] as const;
+const buffKinds = ["healing", "burning", "ooze", "invisibility", "hunger", "regeneration", "locked_floor", "cloak", "warrior_shield"] as const;
 export type BuffKind = typeof buffKinds[number];
 export const fireRoot = "blob_fire";
 export const buffId = (type: BuffKind, target: string): string => `buff_${type}:${target}`;
@@ -23,6 +23,7 @@ export function buffKind(tag: string): BuffKind | undefined {
     case "buff_regeneration": return "regeneration";
     case "buff_locked_floor": return "locked_floor";
     case "buff_cloak": return "cloak";
+    case "buff_warrior_shield": return "warrior_shield";
     default: return undefined;
   }
 }

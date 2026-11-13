@@ -607,6 +607,92 @@ mod tests {
                 let player = super::super::find_owned_entity(world, &attachment, "player").unwrap();
                 assert_eq!(world.get::<ScriptActor>(player).unwrap().cooldown, 1.0);
             })?;
+            call("on_script_reloaded", &mut context)?;
+            click("start")?;
+            call("on_update", &mut context)?;
+            click("hero_warrior")?;
+            call("on_update", &mut context)?;
+            click("begin_run")?;
+            call("on_update", &mut context)?;
+            let shield = guard.with_world_mut(|world| {
+                let seal =
+                    super::super::find_owned_entity(world, &attachment, "item_seal").unwrap();
+                assert_eq!(world.get::<ScriptActor>(seal).unwrap().power, 2.0);
+                let shield = super::super::find_owned_entity(
+                    world,
+                    &attachment,
+                    "buff_warrior_shield:player",
+                )
+                .unwrap();
+                assert_eq!(world.get::<ScriptActor>(shield).unwrap().health, 0.0);
+                let player = super::super::find_owned_entity(world, &attachment, "player").unwrap();
+                world.get_mut::<ScriptActor>(player).unwrap().health = 10.0;
+                let transform = *world.get::<Transform>(player).unwrap();
+                let enemies: Vec<_> = world
+                    .query::<(Entity, &ScriptActor)>()
+                    .iter(world)
+                    .filter(|(_, actor)| actor.kind == "chaser")
+                    .map(|(entity, _)| entity)
+                    .collect();
+                let burning = enemies[0];
+                for &enemy in &enemies[1..] {
+                    world.despawn(enemy);
+                }
+                world.get_mut::<ScriptEntityId>(burning).unwrap().0 = "buff_burning:player".into();
+                *world.get_mut::<Transform>(burning).unwrap() = transform;
+                let mut actor = world.get_mut::<ScriptActor>(burning).unwrap();
+                actor.kind = "buff_burning".into();
+                actor.health = 1.0;
+                actor.power = 1.0;
+                actor.speed = 0.0;
+                actor.lifetime = 0.0;
+                actor.cooldown = 0.0;
+                shield
+            })?;
+            click("wait")?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                let actor = world.get::<ScriptActor>(shield).unwrap();
+                assert_eq!(actor.health, 4.0);
+                assert_eq!(actor.power, 149.0);
+                assert_eq!(actor.speed, 1.0);
+                assert_eq!(actor.lifetime, 5.0);
+                assert_eq!(actor.cooldown, 1.0);
+                let player = super::super::find_owned_entity(world, &attachment, "player").unwrap();
+                assert_eq!(world.get::<ScriptActor>(player).unwrap().health, 10.0);
+                assert!(
+                    super::super::find_owned_entity(world, &attachment, "hud_shield").is_some()
+                );
+            })?;
+            click("bag_btn")?;
+            call("on_update", &mut context)?;
+            click("gear_slot_2")?;
+            call("on_update", &mut context)?;
+            click("detach_seal")?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                let seal =
+                    super::super::find_owned_entity(world, &attachment, "item_seal").unwrap();
+                assert_eq!(world.get::<ScriptActor>(seal).unwrap().power, 0.0);
+                assert_eq!(world.get::<ScriptActor>(shield).unwrap().power, 149.0);
+            })?;
+            click("equipment_window_outside")?;
+            call("on_update", &mut context)?;
+            click("slot_broken_seal")?;
+            call("on_update", &mut context)?;
+            click("use_broken_seal")?;
+            call("on_update", &mut context)?;
+            click("affix_2")?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                let seal =
+                    super::super::find_owned_entity(world, &attachment, "item_seal").unwrap();
+                assert_eq!(world.get::<ScriptActor>(seal).unwrap().power, 2.0);
+                assert_eq!(world.get::<ScriptActor>(shield).unwrap().health, 4.0);
+                assert_eq!(world.get::<ScriptActor>(shield).unwrap().power, 149.0);
+                let player = super::super::find_owned_entity(world, &attachment, "player").unwrap();
+                assert_eq!(world.get::<ScriptActor>(player).unwrap().cooldown, 1.0);
+            })?;
             Ok(())
         })
     }

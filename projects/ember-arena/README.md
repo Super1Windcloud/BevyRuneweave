@@ -109,7 +109,20 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
   and armor reduction/evasion/movement depend on the equipped items and strength requirements.
   Leather armor and shortsword pickups are added to the custom floor-2–4 loot fixtures; their
   generation distribution is not upstream-equivalent.
-- Upgrade scrolls select a carried weapon or armor, including unequipped items. Opening or
+- The Warrior starts with a broken seal affixed to cloth armor. Positive non-hunger damage
+  triggers shielding when current HP is at half maximum or below, or that hit would cross the
+  threshold after existing shielding. Activation precedes absorption and grants 3 + 2×armor tier
+  shielding (five for cloth), then starts a 150-tick cooldown. Five ticks without visible enemies
+  remove the remaining shield and refund up to half the cooldown in proportion to that shield.
+  Starvation bypasses shielding and does not prevent cooldown progression; a depleted LockedFloor
+  window pauses cooldown, while out-of-combat decay still proceeds. Armor details expose free
+  detach, and the loose seal exposes free affix with an armor chooser. Replacing Warrior armor
+  asks whether to transfer the seal before actors resume. Upgrading sealed armor marks one level
+  for the seal; detachment moves that level, retaining other upgrades on the old armor. A loose
+  seal accepts one scroll upgrade directly. Talents, glyph transfer, magic immunity, other shield
+  interactions and original shield visuals/audio remain pending.
+- Upgrade scrolls select a carried weapon or armor, including unequipped items, or an unupgraded
+  loose seal. Opening or
   cancelling the chooser costs nothing. Confirming consumes one scroll and one tick, improving
   that particular item's stats. Required strength drops at +1/+3/+6/+10 as in the original.
 - Hunger begins at 300 and starvation at 450. Crossing into starvation deals one damage;
@@ -238,6 +251,24 @@ hashes are checked before reusing that revision's cached bytes. The game runs of
 preparation. The old misnamed `skeleton_key.png` crop is replaced by `worn_key.png`.
 
 ## Verification boundaries
+
+### Broken seal and Warrior shield on 2026-11-12
+
+- **162 tests pass**: thirty-five source-rule tests and 127 gameplay/UI/asset tests. New coverage
+  checks half-health activation and absorption, cooldown eligibility, visibility-based decay and
+  float refund, hunger bypass, free detach/affix, transferable upgrades, direct one-time seal
+  upgrade, both armor-transfer choices, floor preservation and death/restart cleanup. Chinese
+  portrait/short-landscape controls and held detach/affix actions are covered.
+- Biome remains the fast `check` command; independent TypeScript checks, asset preparation,
+  generated bundle and Rust formatting pass. The original seal crop is 13×13 at item index 50,
+  with pinned source provenance and a verified checksum.
+- The headless macOS Debug QuickJS/Bevy integration test passes with actual reflected seal and
+  shield entities: a Burning actor triggers shielding before HP damage, and BMS item actions
+  detach/reaffix without advancing clocks. No runtime API or public ABI changed.
+- **NOT_RUN**: native GPU screenshots, OS input, real mobile touch/lifecycle and matched upstream
+  visual acceptance for the new surfaces on all five platforms. Current FOV and same-priority
+  scheduling retain the existing port limitations. Talents, glyphs, magic immunity, shield
+  stacking and original shield presentation/audio remain outside this batch.
 
 ### Cloak of Shadows and invisibility sources on 2026-11-12
 

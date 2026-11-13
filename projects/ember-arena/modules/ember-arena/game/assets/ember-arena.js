@@ -30,10 +30,10 @@
       splash: "sprites/spd/avatar_warrior.png",
       sprite: "sprites/spd/warrior.png",
       icon: "sprites/spd/hero_icons.png",
-      description: "A sturdy melee fighter. Starts with a stronger blade and an extra healing potion.",
+      description: "A melee fighter with a broken seal on his armor. Its shield triggers when a hit would leave him at half health or below.",
       baseHealth: 20,
       baseSpeed: 1,
-      perks: "Worn shortsword / cloth armor / extra healing potion"
+      perks: "Broken seal / worn shortsword / cloth armor"
     },
     mage: {
       id: "mage",
@@ -94,7 +94,8 @@
     "cloth_armor",
     "leather_armor",
     "spirit_bow",
-    "cloak_of_shadows"
+    "cloak_of_shadows",
+    "broken_seal"
   ];
   var itemCatalog = {
     potion_healing: {
@@ -133,7 +134,7 @@
       id: "scroll_upgrade",
       name: "Scroll of Upgrade",
       category: "scroll",
-      description: "Choose a carried weapon or armor to upgrade by 1. Costs 1 turn after selection.",
+      description: "Upgrade a carried weapon, armor or unupgraded loose seal by 1. Costs 1 turn after selection.",
       effectText: "Ancient runes infuse the selected equipment (+1 upgrade)!",
       sprite: "sprites/spd/items.png"
     },
@@ -167,6 +168,14 @@
       category: "artifact",
       description: "Activate for 1 turn; stop for free. Each charge grants 4 turns of stealth. Recharges while equipped and inactive; grows through use.",
       effectText: "You blend into the shadows.",
+      sprite: "sprites/spd/items.png"
+    },
+    broken_seal: {
+      id: "broken_seal",
+      name: "Broken Seal",
+      category: "seal",
+      description: "Affix to armor to gain a shield when damage would leave you at half health or below. Recharges in 150 turns. Can carry one upgrade between armors; affixing and detaching are free.",
+      effectText: "You affix the seal to your armor.",
       sprite: "sprites/spd/items.png"
     }
   };
@@ -434,7 +443,7 @@
     "hero.mage.name": ["Mage", "\u6CD5\u5E08"],
     "hero.rogue.name": ["Rogue", "\u76D7\u8D3C"],
     "hero.huntress.name": ["Huntress", "\u5973\u730E\u624B"],
-    "hero.warrior.description": [heroClasses.warrior.description, "\u575A\u97E7\u7684\u8FD1\u6218\u6218\u58EB\u3002\u521D\u59CB\u6B66\u5668\u66F4\u5F3A\uFF0C\u5E76\u989D\u5916\u643A\u5E26\u4E00\u74F6\u6CBB\u7597\u836F\u6C34\u3002"],
+    "hero.warrior.description": [heroClasses.warrior.description, "\u62A4\u7532\u4E0A\u9644\u6709\u7834\u635F\u7EB9\u7AE0\u7684\u8FD1\u6218\u6218\u58EB\u3002\u53D7\u51FB\u5C06\u4F7F\u751F\u547D\u964D\u81F3\u4E00\u534A\u6216\u4EE5\u4E0B\u65F6\u89E6\u53D1\u62A4\u76FE\u3002"],
     "hero.mage.description": [heroClasses.mage.description, "\u6301\u6709\u53E4\u8001\u6CD5\u6756\u7684\u5B66\u8005\u3002\u521D\u59CB\u989D\u5916\u643A\u5E26\u5347\u7EA7\u5377\u8F74\u548C\u63A2\u5730\u5377\u8F74\u3002"],
     "hero.rogue.description": [heroClasses.rogue.description, "\u62E5\u6709\u53EF\u5145\u80FD\u6697\u5F71\u6597\u7BF7\u7684\u6F5C\u884C\u8005\u3002\u521D\u59CB\u989D\u5916\u643A\u5E26\u4E00\u74F6\u9690\u5F62\u836F\u6C34\uFF0C\u7528\u4E8E\u53D1\u52A8\u4F0F\u51FB\u3002"],
     "hero.huntress.description": [heroClasses.huntress.description, "\u8352\u91CE\u4E2D\u7684\u63A2\u7D22\u8005\uFF0C\u643A\u5E26\u968F\u7B49\u7EA7\u6210\u957F\u7684\u7075\u80FD\u77ED\u5F13\u3002\u521D\u59CB\u989D\u5916\u643A\u5E26\u98DF\u7269\u548C\u6DB2\u706B\u836F\u5242\u3002"],
@@ -504,7 +513,7 @@
     "item.potion_strength.description": [itemCatalog.potion_strength.description, "\u6C38\u4E45\u589E\u52A01\u70B9\u529B\u91CF\u3002\u6D88\u80171\u56DE\u5408\u3002"],
     "item.potion_strength.effect": [itemCatalog.potion_strength.effectText, "\u65B0\u7684\u529B\u91CF\u6D8C\u5165\u4F60\u7684\u808C\u8089\uFF01"],
     "item.scroll_upgrade.name": [itemCatalog.scroll_upgrade.name, "\u5347\u7EA7\u5377\u8F74"],
-    "item.scroll_upgrade.description": [itemCatalog.scroll_upgrade.description, "\u9009\u62E9\u4E00\u4EF6\u643A\u5E26\u7684\u6B66\u5668\u6216\u62A4\u7532\u5347\u7EA71\u6B21\uFF0C\u786E\u8BA4\u540E\u6D88\u80171\u56DE\u5408\u3002"],
+    "item.scroll_upgrade.description": [itemCatalog.scroll_upgrade.description, "\u5C06\u643A\u5E26\u7684\u6B66\u5668\u3001\u62A4\u7532\u6216\u672A\u5347\u7EA7\u7684\u72EC\u7ACB\u7EB9\u7AE0\u53471\u7EA7\uFF0C\u786E\u8BA4\u540E\u6D88\u80171\u56DE\u5408\u3002"],
     "item.scroll_upgrade.effect": [itemCatalog.scroll_upgrade.effectText, "\u53E4\u8001\u7684\u7B26\u6587\u878D\u5165\u9009\u4E2D\u7684\u88C5\u5907\uFF0C\u5347\u7EA7+1\uFF01"],
     "item.scroll_magic_mapping.name": [itemCatalog.scroll_magic_mapping.name, "\u63A2\u5730\u5377\u8F74"],
     "item.scroll_magic_mapping.description": [itemCatalog.scroll_magic_mapping.description, "\u63ED\u793A\u672C\u5C42\u5730\u5F62\uFF0C\u4F46\u4E0D\u4F1A\u63ED\u793A\u5176\u4E2D\u7684\u654C\u4EBA\u3002"],
@@ -524,6 +533,17 @@
     "cloak.empty": ["The cloak has run out of energy.", "\u6597\u7BF7\u80FD\u91CF\u5DF2\u7ECF\u8017\u5C3D\u3002"],
     "cloak.levelup": ["Your cloak grows stronger through use.", "\u4F60\u7684\u6597\u7BF7\u5728\u4F7F\u7528\u4E2D\u53D8\u5F3A\u4E86\u3002"],
     "cloak.stats": ["Level: +{level}\nEnergy: {charges}/{capacity}\nExperience: {experience}/{target}", "\u7B49\u7EA7\uFF1A+{level}\n\u80FD\u91CF\uFF1A{charges}/{capacity}\n\u7ECF\u9A8C\uFF1A{experience}/{target}"],
+    "item.broken_seal.name": [itemCatalog.broken_seal.name, "\u7834\u635F\u7EB9\u7AE0"],
+    "item.broken_seal.description": [itemCatalog.broken_seal.description, "\u9644\u4E8E\u62A4\u7532\uFF0C\u53D7\u51FB\u5C06\u4F7F\u751F\u547D\u964D\u81F3\u4E00\u534A\u6216\u4EE5\u4E0B\u65F6\u89E6\u53D1\u62A4\u76FE\uFF0C\u51B7\u5374150\u56DE\u5408\u3002\u53EF\u5728\u62A4\u7532\u4E4B\u95F4\u8F6C\u79FB\u4E00\u7EA7\u5347\u7EA7\uFF0C\u9644\u52A0\u4E0E\u62C6\u5378\u514D\u8D39\u3002"],
+    "item.broken_seal.effect": [itemCatalog.broken_seal.effectText, "\u4F60\u5C06\u7EB9\u7AE0\u9644\u4E8E\u62A4\u7532\u3002"],
+    "seal.affix": ["Affix", "\u9644\u52A0"],
+    "seal.detach": ["Detach seal (free)", "\u62C6\u5378\u7EB9\u7AE0\uFF08\u514D\u8D39\uFF09"],
+    "seal.detached": ["You detach the seal from the armor.", "\u4F60\u4ECE\u62A4\u7532\u4E0A\u62C6\u4E0B\u4E86\u7EB9\u7AE0\u3002"],
+    "seal.chooseArmor": ["Choose armor for the seal", "\u9009\u62E9\u9644\u52A0\u7EB9\u7AE0\u7684\u62A4\u7532"],
+    "seal.transferPrompt": ["Transfer the seal from your previous armor?", "\u5C06\u539F\u62A4\u7532\u7684\u7EB9\u7AE0\u8F6C\u79FB\u5230\u65B0\u62A4\u7532\u5417\uFF1F"],
+    "seal.armorStats": ["Seal: +{level}\nShield capacity: {amount}", "\u7EB9\u7AE0\uFF1A+{level}\n\u62A4\u76FE\u4E0A\u9650\uFF1A{amount}"],
+    "hud.shield": ["Shield {amount}", "\u62A4\u76FE{amount}"],
+    "hud.shieldCooldown": ["Shield CD {amount}", "\u62A4\u76FE\u51B7\u5374{amount}"],
     "bow.stats": ["Bow level: +{level}\nDamage: {min}\u2013{max}\nStrength required: {strength}\nAttack time: {delay}", "\u77ED\u5F13\u7B49\u7EA7\uFF1A+{level}\n\u4F24\u5BB3\uFF1A{min}\u2013{max}\n\u529B\u91CF\u9700\u6C42\uFF1A{strength}\n\u5C04\u51FB\u8017\u65F6\uFF1A{delay}"],
     "monster.chaser": ["Marsupial Rat", "\u98DF\u8150\u8001\u9F20"],
     "monster.ranger": ["Gnoll Scout", "\u8C7A\u72FC\u4EBA\u4FA6\u5BDF\u5175"],
@@ -875,7 +895,7 @@
   var spd_pixel_metrics_default = { "0": 0.537109375, "1": 0.341796875, "2": 0.537109375, "3": 0.537109375, "4": 0.537109375, "5": 0.537109375, "6": 0.537109375, "7": 0.537109375, "8": 0.537109375, "9": 0.537109375, " ": 0.244140625, "!": 0.1953125, '"': 0.390625, "#": 0.537109375, $: 0.5859375, "%": 0.68359375, "&": 0.634765625, "'": 0.1953125, "(": 0.390625, ")": 0.390625, "*": 0.634765625, "+": 0.48828125, ",": 0.1953125, "-": 0.390625, ".": 0.1953125, "/": 0.48828125, ":": 0.1953125, ";": 0.1953125, "<": 0.439453125, "=": 0.390625, ">": 0.439453125, "?": 0.48828125, "@": 0.537109375, A: 0.537109375, B: 0.537109375, C: 0.537109375, D: 0.537109375, E: 0.537109375, F: 0.537109375, G: 0.537109375, H: 0.537109375, I: 0.29296875, J: 0.48828125, K: 0.537109375, L: 0.48828125, M: 0.634765625, N: 0.537109375, O: 0.537109375, P: 0.537109375, Q: 0.537109375, R: 0.537109375, S: 0.537109375, T: 0.48828125, U: 0.537109375, V: 0.537109375, W: 0.634765625, X: 0.537109375, Y: 0.48828125, Z: 0.537109375, "[": 0.29296875, "\\": 0.634765625, "]": 0.29296875, "^": 0.537109375, _: 0.48828125, "`": 0.29296875, a: 0.48828125, b: 0.48828125, c: 0.48828125, d: 0.48828125, e: 0.48828125, f: 0.390625, g: 0.48828125, h: 0.48828125, i: 0.1953125, j: 0.29296875, k: 0.48828125, l: 0.29296875, m: 0.5859375, n: 0.48828125, o: 0.48828125, p: 0.48828125, q: 0.48828125, r: 0.390625, s: 0.48828125, t: 0.390625, u: 0.48828125, v: 0.48828125, w: 0.5859375, x: 0.48828125, y: 0.48828125, z: 0.537109375, "{": 0.390625, "|": 0.1953125, "}": 0.390625, "~": 0.68359375 };
 
   // modules/ember-arena/game/assets/fonts/noto-sans-sc-metrics.json
-  var noto_sans_sc_metrics_default = { "0": 0.555, "1": 0.555, "2": 0.555, "3": 0.555, "4": 0.555, "5": 0.555, "6": 0.555, "7": 0.555, "8": 0.555, "9": 0.555, " ": 0.224, "!": 0.323, '"': 0.474, "#": 0.555, $: 0.555, "%": 0.921, "&": 0.68, "'": 0.278, "(": 0.338, ")": 0.338, "*": 0.467, "+": 0.555, ",": 0.278, "-": 0.347, ".": 0.278, "/": 0.392, ":": 0.278, ";": 0.278, "<": 0.555, "=": 0.555, ">": 0.555, "?": 0.474, "@": 0.946, A: 0.608, B: 0.657, C: 0.638, D: 0.688, E: 0.589, F: 0.552, G: 0.689, H: 0.728, I: 0.293, J: 0.535, K: 0.646, L: 0.543, M: 0.812, N: 0.723, O: 0.742, P: 0.633, Q: 0.742, R: 0.635, S: 0.596, T: 0.599, U: 0.721, V: 0.575, W: 0.878, X: 0.573, Y: 0.531, Z: 0.603, "[": 0.338, "\\": 0.392, "]": 0.338, "^": 0.555, _: 0.559, "`": 0.606, a: 0.563, b: 0.618, c: 0.51, d: 0.62, e: 0.554, f: 0.325, g: 0.564, h: 0.607, i: 0.275, j: 0.275, k: 0.552, l: 0.284, m: 0.926, n: 0.61, o: 0.606, p: 0.62, q: 0.62, r: 0.388, s: 0.468, t: 0.377, u: 0.607, v: 0.521, w: 0.802, x: 0.498, y: 0.521, z: 0.475, "{": 0.338, "|": 0.27, "}": 0.338, "~": 0.555, \u7834: 1, \u788E: 1, \u7684: 1, \u50CF: 1, \u7D20: 1, \u5730: 1, \u7262: 1, \u7B80: 1, \u4F53: 1, \u4E2D: 1, \u6587: 1, \u8FDB: 1, \u5165: 1, \u652F: 1, \u6301: 1, \u6E38: 1, \u620F: 1, \u6392: 1, \u884C: 1, \u699C: 1, \u65E5: 1, \u5FD7: 1, \u65B0: 1, \u95FB: 1, \u8BBE: 1, \u7F6E: 1, \u66F4: 1, \u8BB0: 1, \u5F55: 1, \u5173: 1, \u4E8E: 1, \u4E3B: 1, \u83DC: 1, \u5355: 1, \u5F00: 1, \u59CB: 1, \u95ED: 1, \u8FD4: 1, \u56DE: 1, \u4E0B: 1, \u4E00: 1, \u9875: 1, \u662F: 1, \u5426: 1, \u9009: 1, \u62E9: 1, \u4F60: 1, \u82F1: 1, \u96C4: 1, \u6218: 1, \u58EB: 1, \u6CD5: 1, \u5E08: 1, \u76D7: 1, \u8D3C: 1, \u5973: 1, \u730E: 1, \u624B: 1, \u575A: 1, \u97E7: 1, \u8FD1: 1, "\u3002": 1, \u521D: 1, \u6B66: 1, \u5668: 1, \u5F3A: 1, "\uFF0C": 1, \u5E76: 1, \u989D: 1, \u5916: 1, \u643A: 1, \u5E26: 1, \u74F6: 1, \u6CBB: 1, \u7597: 1, \u836F: 1, \u6C34: 1, \u6709: 1, \u53E4: 1, \u8001: 1, \u6756: 1, \u5B66: 1, \u8005: 1, \u5347: 1, \u7EA7: 1, \u5377: 1, \u8F74: 1, \u548C: 1, \u63A2: 1, \u62E5: 1, \u53EF: 1, \u5145: 1, \u80FD: 1, \u6697: 1, \u5F71: 1, \u6597: 1, \u7BF7: 1, \u6F5C: 1, \u9690: 1, \u5F62: 1, \u7528: 1, \u53D1: 1, \u52A8: 1, \u4F0F: 1, \u51FB: 1, \u8352: 1, \u91CE: 1, \u7D22: 1, \u968F: 1, \u7B49: 1, \u6210: 1, \u957F: 1, \u7075: 1, \u77ED: 1, \u5F13: 1, \u98DF: 1, \u7269: 1, \u6DB2: 1, \u706B: 1, \u5242: 1, \u88C5: 1, \u5907: 1, \u4EF6: 1, \u4E8C: 1, \u9636: 1, \u6216: 1, \u9AD8: 1, \u4E14: 1, \u4E0D: 1, \u53D7: 1, \u5230: 1, \u529B: 1, \u91CF: 1, \u8DB3: 1, \u60E9: 1, \u7F5A: 1, \u5373: 1, \u89E3: 1, \u9501: 1, \u51B3: 1, \u5BB6: 1, \u5F7B: 1, \u5E95: 1, \u51C0: 1, \u5316: 1, \u4EFB: 1, \u610F: 1, \u8BC5: 1, \u5492: 1, \u4E0A: 1, \u7267: 1, \u751F: 1, \u547D: 1, "\uFF1A": 1, \u7ECF: 1, \u9A8C: 1, \u91D1: 1, \u5E01: 1, \u5C5E: 1, \u6027: 1, \u5929: 1, \u8D4B: 1, \u80CC: 1, \u5305: 1, \u9605: 1, \u8BFB: 1, \u996E: 1, \u6295: 1, \u63B7: 1, \u5C04: 1, \u65BD: 1, \u89C1: 1, \u683C: 1, \u5B50: 1, \u7784: 1, \u51C6: 1, \u9B54: 1, \u5F39: 1, \u4F1A: 1, \u98DE: 1, \u8FC7: 1, \u7A7A: 1, \u6309: 1, \u53D6: 1, \u6D88: 1, \u8017: 1, \u5C3D: 1, \u8BF7: 1, \u5F85: 1, \u5BF9: 1, \u81EA: 1, \u5DF1: 1, \u9020: 1, \u4E86: 1, \u70B9: 1, \u4F24: 1, \u5BB3: 1, \u6563: 1, \u8EAB: 1, \u76EE: 1, \u6807: 1, \u8F83: 1, \u96BE: 1, \u7130: 1, \u4E5F: 1, \u707C: 1, \u5F53: 1, \u524D: 1, \u89C6: 1, \u5185: 1, \u65E7: 1, \u5251: 1, \u5315: 1, \u9996: 1, \u9576: 1, \u9489: 1, \u5957: 1, \u5E03: 1, \u7532: 1, \u76AE: 1, "\u2013": 0.536, \u9700: 1, \u6C42: 1, \u653B: 1, \u65F6: 1, \u6539: 1, \u5584: 1, \u8FD9: 1, \u51CF: 1, \u514D: 1, \u62A4: 1, \u9632: 1, \u4E0E: 1, \u901F: 1, \u95EA: 1, \u907F: 1, \u79FB: 1, \u5EA6: 1, \u5408: 1, \u5378: 1, \u4F5C: 1, \u8981: 1, \u94A5: 1, \u5319: 1, \u542F: 1, \u7B2C: 1, \u5C42: 1, \u9053: 1, \u51FA: 1, \u53E3: 1, \u5728: 1, \u697C: 1, \u68AF: 1, \u5904: 1, \u4F7F: 1, \u9ECF: 1, \u56E2: 1, \u7C98: 1, \u5495: 1, \u7559: 1, \u70BC: 1, \u6750: 1, \u6599: 1, \u672C: 1, \u690D: 1, \u7248: 1, \u6682: 1, \u672A: 1, \u653E: 1, \u4EA4: 1, \u6613: 1, \u5899: 1, \u58C1: 1, \u677F: 1, \u9762: 1, \u95E8: 1, \u6253: 1, \u5411: 1, \u5DF2: 1, \u67E5: 1, \u770B: 1, \u8BE6: 1, \u60C5: 1, "\uFF1B": 1, \u518D: 1, \u6B21: 1, \u641C: 1, \u5468: 1, \u56F4: 1, "\uFF08": 1, "\uFF09": 1, \u9010: 1, \u6B65: 1, \u6062: 1, \u590D: 1, \u8150: 1, \u8680: 1, \u6E05: 1, \u9664: 1, \u6E29: 1, \u6696: 1, \u800C: 1, \u8212: 1, \u7F13: 1, \u6D41: 1, \u904D: 1, \u5168: 1, "\xD7": 1, \u540E: 1, \u71C3: 1, \u533A: 1, \u57DF: 1, \u88C2: 1, \u4E3A: 1, \u718A: 1, \u70C8: 1, "\uFF01": 1, \u4ECE: 1, \u654C: 1, \u4EBA: 1, \u5931: 1, \u6C38: 1, \u4E45: 1, \u589E: 1, \u52A0: 1, \u6D8C: 1, \u808C: 1, \u8089: 1, \u786E: 1, \u8BA4: 1, \u7B26: 1, \u878D: 1, \u63ED: 1, \u793A: 1, \u4F46: 1, \u5176: 1, \u5C40: 1, \u8111: 1, \u6D77: 1, \u6670: 1, \u8D77: 1, \u6765: 1, \u7CAE: 1, \u9965: 1, \u997F: 1, \u5403: 1, \u611F: 1, \u6E10: 1, \u9000: 1, \u65E0: 1, \u9650: 1, \u7BAD: 1, \u77E2: 1, \u66FF: 1, \u6362: 1, \u8D39: 1, \u6BCF: 1, \u7EF4: 1, \u9634: 1, \u505C: 1, \u6B62: 1, \u5148: 1, \u53D8: 1, \u9F20: 1, \u8C7A: 1, \u72FC: 1, \u4FA6: 1, \u5BDF: 1, \u5175: 1, \u8783: 1, \u87F9: 1, \u6781: 1, \u70E7: 1, \u663E: 1, \u754C: 1, \u8F93: 1, \u6570: 1, \u636E: 1, \u97F3: 1, \u9891: 1, \u8BED: 1, \u8A00: 1, \u6BD4: 1, \u4F8B: 1, \u6A2A: 1, \u5C4F: 1, \u7AD6: 1, \u64CD: 1, \u63D0: 1, \u5C11: 1, \u6001: 1, \u6548: 1, \u679C: 1, \u6307: 1, \u9488: 1, \u654F: 1, \u500D: 1, \u65B9: 1, \u952E: 1, \u53E5: 1, \u53F7: 1, \u7EDD: 1, \u5750: 1, \u8C03: 1, \u8282: 1, \u6700: 1, \u5206: 1, \u80DC: 1, \u5229: 1, \u5192: 1, \u9669: 1, \u673A: 1, \u79CD: 1, \u4FDD: 1, \u5B58: 1, \u5417: 1, "\uFF1F": 1, \u4E50: 1, \u7ACB: 1, \u6863: 1, \u4ECD: 1, \u8BDD: 1, \u6B63: 1, \u5E38: 1, \u73A9: 1, \u73B0: 1, \u517C: 1, \u5BB9: 1, \u8986: 1, \u76D6: 1, \u8BE5: 1, \u8D25: 1, \u4EE5: 1, \u91CD: 1, \u8BD5: 1, \u539F: 1, \u54CD: 1, \u91CC: 1, \u7A0B: 1, \u7891: 1, \u5B8C: 1, \u76D1: 1, \u72F1: 1, \u53CA: 1, \u7EED: 1, \u5C1A: 1, \u6B7B: 1, "\u2026": 1, \u9886: 1, \u88AB: 1, \u7ED3: 1, \u675F: 1, \u6DF1: 1, \u5357: 1, \u6536: 1, \u96C6: 1, \u54C1: 1, \u672F: 1, \u5236: 1, \u906D: 1, \u9047: 1, \u57FA: 1, \u521B: 1, \u8FD0: 1, \u7531: 1, \u6B22: 1, \u8FCE: 1, \u627E: 1, \u6361: 1, \u5C06: 1, \u679A: 1, \u6389: 1, \u843D: 1, \u62FE: 1, \u6BB5: 1, \u6247: 1, \u85CF: 1, \u5FEB: 1, \u4E9B: 1, \u5427: 1, \u8EB2: 1, \u7EE7: 1, \u81A8: 1, \u80C0: 1, \u79BB: 1, \u5B83: 1, \u8303: 1, \u84C4: 1, \u64A4: 1, \u7206: 1, \u7AD9: 1, \u6321: 1, \u4F4F: 1, \u53BB: 1, \u8DEF: 1, \u5DE2: 1, \u7A74: 1, \u68C0: 1, \u6240: 1, \u5B9E: 1, "\u3001": 1, \u53CD: 1, \u7EC4: 1, \u8BE2: 1, \u62D2: 1, \u503C: 1, \u7CBE: 1, \u5B57: 1, \u76F8: 1, \u5207: 1, \u9500: 1, \u6BC1: 1, \u6821: 1, \u7406: 1, \u76D8: 1, \u89E6: 1, \u6478: 1, \u5B89: 1, \u77E5: 1, \u72B6: 1, \u5199: 1, \u5220: 1, \u50A8: 1, \u79C1: 1, \u6574: 1, \u753B: 1, \u89C9: 1, \u9F50: 1, \u63A5: 1, \u7F3A: 1, \u4ED6: 1, \u5E73: 1, \u53F0: 1, \u70ED: 1, \u8F7D: 1, \u7F51: 1, \u7EDC: 1, \u94AE: 1 };
+  var noto_sans_sc_metrics_default = { "0": 0.555, "1": 0.555, "2": 0.555, "3": 0.555, "4": 0.555, "5": 0.555, "6": 0.555, "7": 0.555, "8": 0.555, "9": 0.555, " ": 0.224, "!": 0.323, '"': 0.474, "#": 0.555, $: 0.555, "%": 0.921, "&": 0.68, "'": 0.278, "(": 0.338, ")": 0.338, "*": 0.467, "+": 0.555, ",": 0.278, "-": 0.347, ".": 0.278, "/": 0.392, ":": 0.278, ";": 0.278, "<": 0.555, "=": 0.555, ">": 0.555, "?": 0.474, "@": 0.946, A: 0.608, B: 0.657, C: 0.638, D: 0.688, E: 0.589, F: 0.552, G: 0.689, H: 0.728, I: 0.293, J: 0.535, K: 0.646, L: 0.543, M: 0.812, N: 0.723, O: 0.742, P: 0.633, Q: 0.742, R: 0.635, S: 0.596, T: 0.599, U: 0.721, V: 0.575, W: 0.878, X: 0.573, Y: 0.531, Z: 0.603, "[": 0.338, "\\": 0.392, "]": 0.338, "^": 0.555, _: 0.559, "`": 0.606, a: 0.563, b: 0.618, c: 0.51, d: 0.62, e: 0.554, f: 0.325, g: 0.564, h: 0.607, i: 0.275, j: 0.275, k: 0.552, l: 0.284, m: 0.926, n: 0.61, o: 0.606, p: 0.62, q: 0.62, r: 0.388, s: 0.468, t: 0.377, u: 0.607, v: 0.521, w: 0.802, x: 0.498, y: 0.521, z: 0.475, "{": 0.338, "|": 0.27, "}": 0.338, "~": 0.555, \u7834: 1, \u788E: 1, \u7684: 1, \u50CF: 1, \u7D20: 1, \u5730: 1, \u7262: 1, \u7B80: 1, \u4F53: 1, \u4E2D: 1, \u6587: 1, \u8FDB: 1, \u5165: 1, \u652F: 1, \u6301: 1, \u6E38: 1, \u620F: 1, \u6392: 1, \u884C: 1, \u699C: 1, \u65E5: 1, \u5FD7: 1, \u65B0: 1, \u95FB: 1, \u8BBE: 1, \u7F6E: 1, \u66F4: 1, \u8BB0: 1, \u5F55: 1, \u5173: 1, \u4E8E: 1, \u4E3B: 1, \u83DC: 1, \u5355: 1, \u5F00: 1, \u59CB: 1, \u95ED: 1, \u8FD4: 1, \u56DE: 1, \u4E0B: 1, \u4E00: 1, \u9875: 1, \u662F: 1, \u5426: 1, \u9009: 1, \u62E9: 1, \u4F60: 1, \u82F1: 1, \u96C4: 1, \u6218: 1, \u58EB: 1, \u6CD5: 1, \u5E08: 1, \u76D7: 1, \u8D3C: 1, \u5973: 1, \u730E: 1, \u624B: 1, \u62A4: 1, \u7532: 1, \u4E0A: 1, \u9644: 1, \u6709: 1, \u635F: 1, \u7EB9: 1, \u7AE0: 1, \u8FD1: 1, "\u3002": 1, \u53D7: 1, \u51FB: 1, \u5C06: 1, \u4F7F: 1, \u751F: 1, \u547D: 1, \u964D: 1, \u81F3: 1, \u534A: 1, \u6216: 1, \u4EE5: 1, \u65F6: 1, \u89E6: 1, \u53D1: 1, \u76FE: 1, \u53E4: 1, \u8001: 1, \u6756: 1, \u5B66: 1, \u8005: 1, \u521D: 1, \u989D: 1, \u5916: 1, \u643A: 1, \u5E26: 1, \u5347: 1, \u7EA7: 1, \u5377: 1, \u8F74: 1, \u548C: 1, \u63A2: 1, \u62E5: 1, \u53EF: 1, \u5145: 1, \u80FD: 1, \u6697: 1, \u5F71: 1, \u6597: 1, \u7BF7: 1, \u6F5C: 1, \u74F6: 1, \u9690: 1, \u5F62: 1, \u836F: 1, \u6C34: 1, "\uFF0C": 1, \u7528: 1, \u52A8: 1, \u4F0F: 1, \u8352: 1, \u91CE: 1, \u7D22: 1, \u968F: 1, \u7B49: 1, \u6210: 1, \u957F: 1, \u7075: 1, \u77ED: 1, \u5F13: 1, \u98DF: 1, \u7269: 1, \u6DB2: 1, \u706B: 1, \u5242: 1, \u88C5: 1, \u5907: 1, \u4EF6: 1, \u4E8C: 1, \u9636: 1, \u9AD8: 1, \u6B66: 1, \u5668: 1, \u4E14: 1, \u4E0D: 1, \u5230: 1, \u529B: 1, \u91CF: 1, \u8DB3: 1, \u60E9: 1, \u7F5A: 1, \u5373: 1, \u89E3: 1, \u9501: 1, \u51B3: 1, \u5BB6: 1, \u5F7B: 1, \u5E95: 1, \u51C0: 1, \u5316: 1, \u4EFB: 1, \u610F: 1, \u8BC5: 1, \u5492: 1, \u7267: 1, "\uFF1A": 1, \u7ECF: 1, \u9A8C: 1, \u91D1: 1, \u5E01: 1, \u5C5E: 1, \u6027: 1, \u5929: 1, \u8D4B: 1, \u80CC: 1, \u5305: 1, \u9605: 1, \u8BFB: 1, \u996E: 1, \u6295: 1, \u63B7: 1, \u5C04: 1, \u65BD: 1, \u89C1: 1, \u683C: 1, \u5B50: 1, \u7784: 1, \u51C6: 1, \u9B54: 1, \u5F39: 1, \u4F1A: 1, \u98DE: 1, \u8FC7: 1, \u7A7A: 1, \u6309: 1, \u53D6: 1, \u6D88: 1, \u8017: 1, \u5C3D: 1, \u8BF7: 1, \u5F85: 1, \u5BF9: 1, \u81EA: 1, \u5DF1: 1, \u9020: 1, \u4E86: 1, \u70B9: 1, \u4F24: 1, \u5BB3: 1, \u6563: 1, \u8EAB: 1, \u76EE: 1, \u6807: 1, \u8F83: 1, \u96BE: 1, \u7130: 1, \u4E5F: 1, \u707C: 1, \u5F53: 1, \u524D: 1, \u89C6: 1, \u5185: 1, \u65E7: 1, \u5251: 1, \u5315: 1, \u9996: 1, \u9576: 1, \u9489: 1, \u5957: 1, \u5E03: 1, \u76AE: 1, "\u2013": 0.536, \u9700: 1, \u6C42: 1, \u653B: 1, \u6539: 1, \u5584: 1, \u8FD9: 1, \u51CF: 1, \u514D: 1, \u9632: 1, \u4E0E: 1, \u901F: 1, \u95EA: 1, \u907F: 1, \u79FB: 1, \u5EA6: 1, \u5408: 1, \u5378: 1, \u4F5C: 1, \u8981: 1, \u94A5: 1, \u5319: 1, \u542F: 1, \u7B2C: 1, \u5C42: 1, \u9053: 1, \u51FA: 1, \u53E3: 1, \u5728: 1, \u697C: 1, \u68AF: 1, \u5904: 1, \u9ECF: 1, \u56E2: 1, \u7C98: 1, \u5495: 1, \u7559: 1, \u70BC: 1, \u6750: 1, \u6599: 1, \u672C: 1, \u690D: 1, \u7248: 1, \u6682: 1, \u672A: 1, \u653E: 1, \u4EA4: 1, \u6613: 1, \u5899: 1, \u58C1: 1, \u677F: 1, \u9762: 1, \u95E8: 1, \u6253: 1, \u5411: 1, \u5DF2: 1, \u67E5: 1, \u770B: 1, \u8BE6: 1, \u60C5: 1, "\uFF1B": 1, \u518D: 1, \u6B21: 1, \u641C: 1, \u5468: 1, \u56F4: 1, "\uFF08": 1, "\uFF09": 1, \u6CBB: 1, \u7597: 1, \u9010: 1, \u6B65: 1, \u6062: 1, \u590D: 1, \u8150: 1, \u8680: 1, \u6E05: 1, \u9664: 1, \u6E29: 1, \u6696: 1, \u800C: 1, \u8212: 1, \u7F13: 1, \u6D41: 1, \u904D: 1, \u5168: 1, "\xD7": 1, \u540E: 1, \u71C3: 1, \u533A: 1, \u57DF: 1, \u88C2: 1, \u4E3A: 1, \u718A: 1, \u70C8: 1, "\uFF01": 1, \u4ECE: 1, \u654C: 1, \u4EBA: 1, \u5931: 1, \u6C38: 1, \u4E45: 1, \u589E: 1, \u52A0: 1, \u6D8C: 1, \u808C: 1, \u8089: 1, "\u3001": 1, \u72EC: 1, \u7ACB: 1, \u786E: 1, \u8BA4: 1, \u7B26: 1, \u878D: 1, \u63ED: 1, \u793A: 1, \u4F46: 1, \u5176: 1, \u5C40: 1, \u8111: 1, \u6D77: 1, \u6670: 1, \u8D77: 1, \u6765: 1, \u7CAE: 1, \u9965: 1, \u997F: 1, \u5403: 1, \u611F: 1, \u6E10: 1, \u9000: 1, \u65E0: 1, \u9650: 1, \u7BAD: 1, \u77E2: 1, \u66FF: 1, \u6362: 1, \u5F3A: 1, \u8D39: 1, \u6BCF: 1, \u7EF4: 1, \u9634: 1, \u505C: 1, \u6B62: 1, \u5148: 1, \u53D8: 1, \u51B7: 1, \u5374: 1, \u4E4B: 1, \u95F4: 1, \u8F6C: 1, \u62C6: 1, \u539F: 1, \u5417: 1, "\uFF1F": 1, \u9F20: 1, \u8C7A: 1, \u72FC: 1, \u4FA6: 1, \u5BDF: 1, \u5175: 1, \u8783: 1, \u87F9: 1, \u6781: 1, \u70E7: 1, \u663E: 1, \u754C: 1, \u8F93: 1, \u6570: 1, \u636E: 1, \u97F3: 1, \u9891: 1, \u8BED: 1, \u8A00: 1, \u6BD4: 1, \u4F8B: 1, \u6A2A: 1, \u5C4F: 1, \u7AD6: 1, \u64CD: 1, \u63D0: 1, \u5C11: 1, \u6001: 1, \u6548: 1, \u679C: 1, \u6307: 1, \u9488: 1, \u654F: 1, \u500D: 1, \u65B9: 1, \u952E: 1, \u53E5: 1, \u53F7: 1, \u7EDD: 1, \u5750: 1, \u8C03: 1, \u8282: 1, \u6700: 1, \u5206: 1, \u80DC: 1, \u5229: 1, \u5192: 1, \u9669: 1, \u673A: 1, \u79CD: 1, \u4FDD: 1, \u5B58: 1, \u4E50: 1, \u5E76: 1, \u6863: 1, \u4ECD: 1, \u8BDD: 1, \u6B63: 1, \u5E38: 1, \u73A9: 1, \u73B0: 1, \u517C: 1, \u5BB9: 1, \u8986: 1, \u76D6: 1, \u8BE5: 1, \u8D25: 1, \u91CD: 1, \u8BD5: 1, \u54CD: 1, \u91CC: 1, \u7A0B: 1, \u7891: 1, \u5B8C: 1, \u76D1: 1, \u72F1: 1, \u53CA: 1, \u7EED: 1, \u5C1A: 1, \u6B7B: 1, "\u2026": 1, \u9886: 1, \u88AB: 1, \u7ED3: 1, \u675F: 1, \u6DF1: 1, \u5357: 1, \u6536: 1, \u96C6: 1, \u54C1: 1, \u672F: 1, \u5236: 1, \u906D: 1, \u9047: 1, \u57FA: 1, \u521B: 1, \u8FD0: 1, \u7531: 1, \u6B22: 1, \u8FCE: 1, \u627E: 1, \u6361: 1, \u679A: 1, \u6389: 1, \u843D: 1, \u62FE: 1, \u6BB5: 1, \u6247: 1, \u85CF: 1, \u5FEB: 1, \u4E9B: 1, \u5427: 1, \u8EB2: 1, \u7EE7: 1, \u81A8: 1, \u80C0: 1, \u79BB: 1, \u5B83: 1, \u8303: 1, \u84C4: 1, \u64A4: 1, \u7206: 1, \u7AD9: 1, \u6321: 1, \u4F4F: 1, \u53BB: 1, \u8DEF: 1, \u5DE2: 1, \u7A74: 1, \u68C0: 1, \u6240: 1, \u5B9E: 1, \u53CD: 1, \u7EC4: 1, \u8BE2: 1, \u62D2: 1, \u503C: 1, \u7CBE: 1, \u5B57: 1, \u76F8: 1, \u5207: 1, \u9500: 1, \u6BC1: 1, \u6821: 1, \u7406: 1, \u76D8: 1, \u6478: 1, \u5B89: 1, \u77E5: 1, \u72B6: 1, \u5199: 1, \u5220: 1, \u50A8: 1, \u79C1: 1, \u6574: 1, \u753B: 1, \u89C9: 1, \u9F50: 1, \u63A5: 1, \u7F3A: 1, \u4ED6: 1, \u5E73: 1, \u53F0: 1, \u70ED: 1, \u8F7D: 1, \u7F51: 1, \u7EDC: 1, \u94AE: 1 };
 
   // modules/ember-arena/game/src/text-layout.ts
   var hasCjk = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/u;
@@ -1014,7 +1034,7 @@
   var extendLockedFloor = (left, damage) => Math.min(lockedFloorDuration, Math.fround(left + Math.fround(damage * 1.5)));
 
   // modules/ember-arena/game/src/effects.ts
-  var buffKinds = ["healing", "burning", "ooze", "invisibility", "hunger", "regeneration", "locked_floor", "cloak"];
+  var buffKinds = ["healing", "burning", "ooze", "invisibility", "hunger", "regeneration", "locked_floor", "cloak", "warrior_shield"];
   var fireRoot = "blob_fire";
   var buffId = (type, target) => `buff_${type}:${target}`;
   var buffTarget = (id) => id.slice(id.indexOf(":") + 1);
@@ -1036,6 +1056,8 @@
         return "locked_floor";
       case "buff_cloak":
         return "cloak";
+      case "buff_warrior_shield":
+        return "warrior_shield";
       default:
         return void 0;
     }
@@ -1173,6 +1195,68 @@
       partial = Math.fround(partial - 1);
     }
     return { charges, partial: charges === capacity ? 0 : partial };
+  }
+
+  // modules/ember-arena/game/src/seal.ts
+  var sealId = "item_seal";
+  var shieldId = buffId("warrior_shield", "player");
+  var sealValue = (name) => scene_actor(sealId) ? field(sealId, name) : 0;
+  var shieldValue = (name) => scene_actor(shieldId) ? field(shieldId, name) : 0;
+  var sealArmor = () => sealValue("power");
+  var sealMaximum = (tier) => 3 + 2 * tier;
+  function maximumShield(equipment2) {
+    const armor = equipment2.find((item) => item.id === sealArmor() && item.equipped && gearDefinitions[item.kind].slot === "armor");
+    return armor ? sealMaximum(gearDefinitions[armor.kind].tier) : 0;
+  }
+  function ensureWarriorShield(equipment2, now) {
+    if (maximumShield(equipment2) <= 0 || scene_actor(shieldId)) return;
+    if (!scene_spawn(shieldId, 0, 0, -20) || !scene_actor_set(shieldId, "buff_warrior_shield", 0, 0, 1)) throw new Error("Cannot create warrior shield");
+    change(shieldId, "cooldown", now);
+  }
+  function createSeal(armor, equipment2, now) {
+    if (scene_actor(sealId)) return;
+    if (!scene_spawn(sealId, 0, 0, -20) || !scene_actor_set(sealId, "broken_seal", 1, 0, 1)) throw new Error("Cannot create seal");
+    change(sealId, "power", armor);
+    ensureWarriorShield(equipment2, now);
+  }
+  function detachSeal(equipment2) {
+    const armor = equipment2.find((item) => item.id === sealArmor());
+    if (armor && sealValue("lifetime") > 0) armor.level--;
+    change(sealId, "power", 0);
+  }
+  function affixSeal(armor, equipment2, now) {
+    if (gearDefinitions[armor.kind].slot !== "armor" || armor.id === sealArmor()) return;
+    detachSeal(equipment2);
+    change(sealId, "power", armor.id);
+    if (sealValue("lifetime") > 0) armor.level++;
+    ensureWarriorShield(equipment2, now);
+  }
+  function shieldDamage(health2, maxHealth2, damage, shield, cooldown, capacity, hunger = false) {
+    const activated = !hunger && damage > 0 && cooldown <= 0 && (health2 <= Math.floor(maxHealth2 / 2) || health2 + shield - damage <= Math.floor(maxHealth2 / 2));
+    if (activated) {
+      shield += capacity;
+      cooldown = Math.max(0, cooldown + 150);
+    }
+    if (!hunger) {
+      const absorbed = Math.min(shield, damage);
+      shield -= absorbed;
+      damage -= absorbed;
+    }
+    return { damage, shield, cooldown, activated };
+  }
+  function shieldStep(shield, cooldown, absent, initial, enemiesVisible, regenOn, capacity) {
+    if (cooldown > 0 && regenOn) cooldown--;
+    if (shield > 0) {
+      absent = enemiesVisible ? 0 : Math.fround(absent + 1);
+      if (absent >= 5) {
+        if (cooldown > 0) {
+          const percent = Math.fround(shield / initial);
+          cooldown = Math.max(0, Math.trunc(Math.fround(cooldown - Math.fround(150 * Math.fround(percent / 2)))));
+        }
+        shield = 0;
+      }
+    }
+    return { shield, cooldown, absent, detach: shield <= 0 && capacity <= 0 && cooldown === 0 };
   }
 
   // modules/ember-arena/game/src/spd-ui.ts
@@ -1324,7 +1408,7 @@
       const quantity = (key) => key === "worn_key" ? state.wornKeys : key === "goo_blob" ? state.gooBlobs : state.inventory[key];
       const items = [...Object.keys(itemCatalog), "worn_key", "goo_blob"];
       const carried = [
-        ...items.filter((key) => quantity(key) > 0 && !(key === "cloak_of_shadows" && cloakEquipped())).map((key) => ({ type: "supply", key })),
+        ...items.filter((key) => quantity(key) > 0 && !(key === "cloak_of_shadows" && cloakEquipped()) && !(key === "broken_seal" && sealArmor() > 0)).map((key) => ({ type: "supply", key })),
         ...state.equipment.filter((item) => !item.equipped).map((item) => ({ type: "gear", item }))
       ];
       for (let index = 0; index < 25; index++) {
@@ -1339,6 +1423,7 @@
           childrenSlot.push(image(`gear_icon_${gear.id}`, `sprites/dungeon/${gear.kind}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
           if (gear.level) childrenSlot.push(label(`gear_level_${gear.id}`, `+${gear.level}`, 1, 1, slotWidth - 2, 6, titleColor));
           if (gear.kind === "mages_staff") childrenSlot.push(label(`gear_charge_${gear.id}`, `${staffCharges(gear.id)}/${staffCapacity(gear.level)}`, 1, slotHeight - 8, slotWidth - 2, 5));
+          if (gear.id === sealArmor()) childrenSlot.push(image(`gear_seal_${gear.id}`, "sprites/dungeon/broken_seal.png", rect(slotWidth - 9, slotHeight - 9, 8, 8)));
         } else if (equipped && !key) {
           childrenSlot.push(art(`equipment_${index}`, ["empty_weapon", "empty_armor", "empty_artifact", "empty_ring", "empty_ring"][index], (slotWidth - 16) / 2, (slotHeight - 16) / 2));
         } else if (key) {
@@ -1348,6 +1433,8 @@
           } else if (key === "cloak_of_shadows") {
             if (cloakValue("lifetime")) childrenSlot.push(label("item_level_cloak", `+${cloakValue("lifetime")}`, 1, 1, slotWidth - 2, 6));
             childrenSlot.push(label("item_charge_cloak", `${cloakValue("health")}/${cloakCapacity(cloakValue("lifetime"))}`, 1, slotHeight - 8, slotWidth - 2, 5));
+          } else if (key === "broken_seal") {
+            if (sealValue("lifetime")) childrenSlot.push(label("item_level_seal", `+${sealValue("lifetime")}`, 1, 1, slotWidth - 2, 6));
           } else childrenSlot.push(label(`item_count_${key}`, `${quantity(key)}`, 1, 1, slotWidth - 2, 6));
         }
         children.push({
@@ -1409,6 +1496,16 @@
         6,
         titleColor,
         9
+      ));
+      if (shieldValue("health") > 0 || shieldValue("power") > 0) elements.push(label(
+        "hud_shield",
+        shieldValue("health") > 0 ? t("hud.shield", { amount: shieldValue("health") }) : t("hud.shieldCooldown", { amount: shieldValue("power") }),
+        large ? 162 : 86,
+        38,
+        large ? 82 : 40,
+        6,
+        titleColor,
+        6
       ));
       const toolbarX = !m.large && m.landscape ? w - 64 : w - 24, toolbarY = h - 26;
       const waitX = m.large ? w - 44 : m.landscape ? w - 20 : 0;
@@ -1478,7 +1575,7 @@
       control("settings", t("menu.settings"), 0, 0, 120, 20, "red", "settings"),
       control("home", t("menu.home"), 0, 22, 120, 20, "red", "display")
     ]);
-    else if (state.phase === "inventory" || state.phase === "item" || state.phase === "equipment" || state.phase === "upgrade") {
+    else if (state.phase === "inventory" || state.phase === "item" || state.phase === "equipment" || state.phase === "upgrade" || state.phase === "affix" || state.phase === "seal_transfer") {
       const bag = inventoryContent();
       window("bag_window", bag.width, bag.height, bag.children);
       if (state.phase === "item") {
@@ -1508,7 +1605,7 @@ ${t("cloak.stats", {
           ...state.item === "cloak_of_shadows" ? [
             control("toggle_cloak_equipment", t(cloakEquipped() ? "gear.remove" : "gear.equip"), 0, buttonY, 58, 16, "red", void 0, "toggle_cloak_equipment", true, 8),
             control("use_cloak_of_shadows", t(cloakActive() ? "cloak.stop" : "cloak.stealth"), 62, buttonY, 58, 16, "red", void 0, "use_cloak_of_shadows", cloakEquipped() && (cloakValue("health") > 0 || cloakActive()), 8)
-          ] : [control(`use_${state.item}`, state.item === "spirit_bow" ? t("item.shoot") : state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", void 0, `use_${state.item}`, true, 8)]
+          ] : [control(`use_${state.item}`, state.item === "broken_seal" ? t("seal.affix") : state.item === "spirit_bow" ? t("item.shoot") : state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", void 0, `use_${state.item}`, true, 8)]
         ]);
       } else if (state.phase === "equipment") {
         const gear = state.equipment.find((item) => item.id === state.selectedGear);
@@ -1526,25 +1623,38 @@ ${t("gear.staffMagic", {
             max: staffDamageRange(gear.level)[1],
             charges: staffCharges(gear.id),
             capacity: staffCapacity(gear.level)
-          })}` : "");
+          })}` : "") + (gear.id === sealArmor() ? `
+${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifetime") })}` : "");
           const lines = wrappedText(description, 132, 6), buttonY = 26 + Math.ceil(lines.length * 7.2);
           const cost = !gear.equipped && equippedGear(state.equipment, spec.slot) ? 2 : 1;
-          window("equipment_window", 132, buttonY + 30, [
+          const sealAttached = gear.id === sealArmor(), extra = sealAttached ? 18 : 0;
+          window("equipment_window", 132, buttonY + 30 + extra, [
             image("gear_detail_icon", `sprites/dungeon/${gear.kind}.png`, rect(0, 0, 16, 16)),
             label("gear_detail_title", `${t(`item.${gear.kind}.name`)}${gear.level ? ` +${gear.level}` : ""}`, 20, 1, 112, 8, titleColor, 24),
             label("gear_detail_stats", lines.join("\n"), 0, 24, 132, 6, white, buttonY - 24),
             control("toggle_equipment", t(gear.equipped ? "gear.remove" : "gear.equip"), 0, buttonY, gear.kind === "mages_staff" ? 64 : 132, 16),
             ...gear.kind === "mages_staff" ? [control("zap_staff", t("item.zap"), 68, buttonY, 64, 16, "red", void 0, `zap:${gear.id}`, staffCharges(gear.id) > 0)] : [],
-            label("gear_action_cost", t("gear.cost", { cost }), 0, buttonY + 19, 132, 6, grey, 10)
+            ...sealAttached ? [control("detach_seal", t("seal.detach"), 0, buttonY + 18, 132, 16)] : [],
+            label("gear_action_cost", t("gear.cost", { cost }), 0, buttonY + extra + 19, 132, 6, grey, 10)
           ]);
         }
-      } else if (state.phase === "upgrade") {
+      } else if (state.phase === "seal_transfer") {
+        const lines = wrappedText(t("seal.transferPrompt"), 132, 7), buttonY = 18 + lines.length * 9;
+        window("seal_transfer_window", 132, buttonY + 18, [
+          label("seal_transfer_title", t("item.broken_seal.name"), 0, 0, 132, 8, titleColor),
+          label("seal_transfer_prompt", lines.join("\n"), 0, 14, 132, 7, white, lines.length * 9),
+          control("seal_transfer_yes", t("common.yes"), 0, buttonY, 64, 16),
+          control("seal_transfer_no", t("common.no"), 68, buttonY, 64, 16)
+        ]);
+      } else if (state.phase === "upgrade" || state.phase === "affix") {
+        const affixing = state.phase === "affix";
+        const items = affixing ? state.equipment.filter((item) => gearDefinitions[item.kind].slot === "armor" && item.id !== sealArmor()) : [...state.equipment, ...state.inventory.broken_seal > 0 && sealArmor() === 0 && sealValue("lifetime") === 0 ? [{ id: 0, kind: "broken_seal", level: 0 }] : []];
         const perPage = Math.max(1, Math.min(5, Math.floor((h - 60) / 18)));
-        const pages = Math.max(1, Math.ceil(state.equipment.length / perPage));
-        const page = state.upgradePage % pages, choices = state.equipment.slice(page * perPage, (page + 1) * perPage);
+        const pages = Math.max(1, Math.ceil(items.length / perPage));
+        const page = state.upgradePage % pages, choices = items.slice(page * perPage, (page + 1) * perPage);
         window("upgrade_window", 132, 34 + choices.length * 18, [
-          label("upgrade_title", t("gear.chooseUpgrade"), 0, 0, 132, 8, titleColor),
-          ...choices.map((item, index) => control(`upgrade_${item.id}`, `${t(`item.${item.kind}.name`)} +${item.level}`, 0, 14 + index * 18, 132, 16, "red", void 0, `upgrade:${item.id}`, true, 7)),
+          label("upgrade_title", t(affixing ? "seal.chooseArmor" : "gear.chooseUpgrade"), 0, 0, 132, 8, titleColor),
+          ...choices.map((item, index) => control(`${affixing ? "affix" : "upgrade"}_${item.id}`, `${t(`item.${item.kind}.name`)} +${item.level}`, 0, 14 + index * 18, 132, 16, "red", void 0, `${affixing ? "affix" : "upgrade"}:${item.id}`, true, 7)),
           control("upgrade_cancel", t("common.close"), 0, 16 + choices.length * 18, pages > 1 ? 64 : 132, 16, "toast", void 0, "modal_close"),
           ...pages > 1 ? [control("upgrade_page", t("common.next"), 68, 16 + choices.length * 18, 64, 16, "toast")] : []
         ]);
@@ -1709,7 +1819,8 @@ ${t("gear.staffMagic", {
     scroll_magic_mapping: 0,
     food_ration: 1,
     spirit_bow: 0,
-    cloak_of_shadows: 0
+    cloak_of_shadows: 0,
+    broken_seal: 0
   };
   var uid = (prefix) => `${prefix}_${nextId++}`;
   var health = () => Math.max(0, field("player", "health"));
@@ -1807,12 +1918,13 @@ ${t("gear.staffMagic", {
     }, uiAction));
   }
   function closeModal() {
+    if (phase === "seal_transfer") return;
     if (phase === "settings" && resetPending) {
       resetPending = false;
       drawUi();
       return;
     }
-    if (phase === "item" || phase === "equipment" || phase === "upgrade") setPhase("inventory");
+    if (phase === "item" || phase === "equipment" || phase === "upgrade" || phase === "affix") setPhase("inventory");
     else if (phase === "settings") setPhase(settingsReturn);
     else if (phase === "hero" || phase === "message" || phase === "journal") setPhase(overlayReturn);
     else if (phase === "checks") setPhase(returnPhase);
@@ -1852,6 +1964,10 @@ ${t("gear.staffMagic", {
     }
     if (id.startsWith("upgrade:")) {
       upgradeEquipment(Number(id.slice(8)));
+      return;
+    }
+    if (id.startsWith("affix:")) {
+      affixArmor(Number(id.slice(6)));
       return;
     }
     if (id.startsWith("zap:")) {
@@ -1900,6 +2016,19 @@ ${t("gear.staffMagic", {
         return;
       case "toggle_cloak_equipment":
         changeCloakEquipment();
+        return;
+      case "detach_seal":
+        if (phase !== "equipment" || selectedGear !== sealArmor()) return;
+        detachSeal(equipment);
+        pushLog(message("seal.detached"));
+        drawUi();
+        return;
+      case "seal_transfer_yes":
+      case "seal_transfer_no":
+        if (phase !== "seal_transfer") return;
+        if (id === "seal_transfer_yes") affixArmor(selectedGear);
+        phase = "playing";
+        spendTurns(2);
         return;
       case "upgrade_page":
         upgradePage++;
@@ -2086,13 +2215,15 @@ ${t("gear.staffMagic", {
       scroll_magic_mapping: selectedClass === "mage" ? 1 : 0,
       food_ration: selectedClass === "huntress" ? 2 : 1,
       spirit_bow: selectedClass === "huntress" ? 1 : 0,
-      cloak_of_shadows: selectedClass === "rogue" ? 1 : 0
+      cloak_of_shadows: selectedClass === "rogue" ? 1 : 0,
+      broken_seal: selectedClass === "warrior" ? 1 : 0
     };
     dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) })];
     room();
     startVitals("player", 0);
     for (const gear of equipment) createStaffCharger(gear, 0);
     if (inventory.cloak_of_shadows) createCloak(true, 0);
+    if (inventory.broken_seal) createSeal(equippedGear(equipment, "armor").id, equipment, 0);
     enterFloor();
     setPhase("playing");
   }
@@ -2100,7 +2231,7 @@ ${t("gear.staffMagic", {
     examining = false;
     targeting = null;
     unsealFloor();
-    for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id) && kind(id) !== staffChargerKind && id !== cloakId) scene_despawn(id);
+    for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id) && kind(id) !== staffChargerKind && id !== cloakId && id !== sealId) scene_despawn(id);
     for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
     for (const key of renderedFog) scene_despawn(`fog_${key}`);
     renderedTiles.clear();
@@ -2194,6 +2325,9 @@ ${t("gear.staffMagic", {
         else if (item === "cloak_of_shadows") {
           inventory.cloak_of_shadows = 1;
           createCloak(false, field("player", "cooldown"));
+        } else if (item === "broken_seal") {
+          inventory.broken_seal = 1;
+          createSeal(0, equipment, field("player", "cooldown"));
         } else inventory[item]++;
         pushLog(message("log.item", { item: message(`item.${item}.name`) }));
       } else {
@@ -2208,6 +2342,11 @@ ${t("gear.staffMagic", {
     if (phase !== "playing" && phase !== "inventory" || inventory[kindKey] <= 0) return false;
     if (kindKey === "cloak_of_shadows") {
       toggleCloak();
+      return true;
+    }
+    if (kindKey === "broken_seal") {
+      upgradePage = 0;
+      setPhase("affix");
       return true;
     }
     if (kindKey === "scroll_upgrade") {
@@ -2291,16 +2430,42 @@ ${t("gear.staffMagic", {
     const cost = !takingOff && old ? 2 : 1;
     if (old) old.equipped = false;
     item.equipped = !takingOff;
+    ensureWarriorShield(equipment, field("player", "cooldown"));
     pushLog(message(takingOff ? "log.gearRemoved" : "log.gearEquipped", { item: message(`item.${item.kind}.name`) }));
+    if (selectedClass === "warrior" && slot === "armor" && !takingOff && old?.id === sealArmor()) {
+      setPhase("seal_transfer");
+      return;
+    }
     phase = "playing";
     spendTurns(cost);
   }
+  function affixArmor(id) {
+    if (phase !== "affix" && phase !== "seal_transfer" || !inventory.broken_seal) return;
+    const armor = equipment.find((item) => item.id === id && gearDefinitions[item.kind].slot === "armor");
+    if (!armor || armor.id === sealArmor()) return;
+    affixSeal(armor, equipment, field("player", "cooldown"));
+    pushLog(message("item.broken_seal.effect"));
+    if (phase === "affix") {
+      selectedGear = id;
+      setPhase("equipment");
+    }
+  }
   function upgradeEquipment(id) {
     if (phase !== "upgrade" || inventory.scroll_upgrade <= 0) return;
+    if (id === 0) {
+      if (!inventory.broken_seal || sealArmor() !== 0 || sealValue("lifetime") !== 0) return;
+      change(sealId, "lifetime", 1);
+      inventory.scroll_upgrade--;
+      pushLog(message("log.gearUpgraded", { item: message("item.broken_seal.name"), level: 1 }));
+      phase = "playing";
+      spendTurns();
+      return;
+    }
     const item = equipment.find((gear) => gear.id === id);
     if (!item) return;
     item.level++;
     inventory.scroll_upgrade--;
+    if (item.id === sealArmor() && sealValue("lifetime") === 0) change(sealId, "lifetime", 1);
     upgradeStaffCharge(item);
     pushLog(message("log.gearUpgraded", { item: message(`item.${item.kind}.name`), level: item.level }));
     phase = "playing";
@@ -2372,13 +2537,24 @@ ${t("gear.staffMagic", {
       damageMonster(id, power);
     } else pushLog(message("log.enemyDodged", { monster: message(`monster.${type}`) }));
   }
-  function hurtPlayer(power) {
+  function hurtPlayer(power, hunger = false) {
+    if (scene_actor(shieldId)) {
+      const capacity = maximumShield(equipment), result = shieldDamage(health(), maxHealth, power, field(shieldId, "health"), field(shieldId, "power"), capacity, hunger);
+      change(shieldId, "health", result.shield);
+      change(shieldId, "power", result.cooldown);
+      if (result.activated) {
+        change(shieldId, "speed", 0);
+        change(shieldId, "lifetime", capacity);
+      }
+      power = result.damage;
+    }
     change("player", "health", Math.max(0, health() - power));
     queuedPath = [];
     if (health() <= 0) {
       removeBuffs("player");
       for (const id of scene_actor_ids()) if (kind(id) === staffChargerKind) scene_despawn(id);
       scene_despawn(cloakId);
+      scene_despawn(sealId);
       setPhase("lost");
     }
   }
@@ -2449,6 +2625,17 @@ ${t("gear.staffMagic", {
     const type = buffKind(kind(id)), target = buffTarget(id);
     if (!type || !scene_actor(target) || field(target, "health") <= 0) {
       scene_despawn(id);
+      return 1;
+    }
+    if (type === "warrior_shield") {
+      const regenOn = !hasBuff("locked_floor", target) || remainingBuff("locked_floor", target) >= 1;
+      reveal(floor, cellPosition("player"));
+      const visible = monsterIds().some((enemy) => floor.visible.has(cellKey(floor, cellPosition(enemy))));
+      const step = shieldStep(field(id, "health"), field(id, "power"), field(id, "speed"), field(id, "lifetime"), visible, regenOn, maximumShield(equipment));
+      change(id, "health", step.shield);
+      change(id, "power", step.cooldown);
+      change(id, "speed", step.absent);
+      if (step.detach) scene_despawn(id);
       return 1;
     }
     if (type === "cloak") {
@@ -2670,7 +2857,7 @@ ${t("gear.staffMagic", {
     change(id, "health", step.level);
     change(id, "power", step.partialDamage);
     if (step.notice) pushLog(message(`log.${step.notice}`));
-    if (step.damage) hurtPlayer(step.damage);
+    if (step.damage) hurtPlayer(step.damage, true);
   }
   function changeHunger(energy) {
     const id = buffId("hunger", "player");
@@ -3034,7 +3221,7 @@ ${t("gear.staffMagic", {
         examining = false;
         drawUi();
       } else if (phase === "playing") setPhase("paused");
-      else if (phase === "inventory" || phase === "item" || phase === "equipment" || phase === "upgrade" || phase === "hero" || phase === "message") closeModal();
+      else if (phase === "inventory" || phase === "item" || phase === "equipment" || phase === "upgrade" || phase === "affix" || phase === "seal_transfer" || phase === "hero" || phase === "message") closeModal();
       else if (phase === "paused") setPhase("playing");
       else if (phase === "checks") setPhase(returnPhase);
       else if (phase === "settings") setPhase(settingsReturn);

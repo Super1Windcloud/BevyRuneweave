@@ -16,6 +16,7 @@ import { projectileImpact, type TargetKind } from "./projectiles.js";
 import { spiritBowAccuracy, spiritBowDamage, spiritBowDelay, spiritBowStrength } from "./spirit-bow.js";
 import { createStaffCharger, rechargeStaff, staffCapacity, staffChargeId, staffChargerKind, staffCharges, staffDamageRange, staffGearId, upgradeStaffCharge } from "./staff.js";
 import { cloakActive, cloakEquipped, cloakId, cloakKind, cloakRechargeStep, cloakStealthStep, cloakValue, createCloak, startCloak, stopCloak } from "./cloak.js";
+import { affixSeal, createSeal, detachSeal, ensureWarriorShield, maximumShield, sealArmor, sealId, sealValue, shieldDamage, shieldId, shieldStep } from "./seal.js";
 import { affectHunger, extendLockedFloor, hungerStep, lockedFloorStep, regenerationStep, starvingAt, type HungerStep } from "./survival.js";
 
 type Phase = UiPhase;
@@ -80,6 +81,7 @@ let inventory: Record<ItemKind, number> = {
   food_ration: 1,
   spirit_bow: 0,
   cloak_of_shadows: 0,
+  broken_seal: 0,
 };
 
 const uid = (prefix: string): string => `${prefix}_${nextId++}`;
@@ -157,8 +159,9 @@ function drawUi(): void {
 }
 
 function closeModal(): void {
+  if (phase === "seal_transfer") return; // The equipment action must resolve before actors resume.
   if (phase === "settings" && resetPending) { resetPending = false; drawUi(); return; }
-  if (phase === "item" || phase === "equipment" || phase === "upgrade") setPhase("inventory");
+  if (phase === "item" || phase === "equipment" || phase === "upgrade" || phase === "affix") setPhase("inventory");
   else if (phase === "settings") setPhase(settingsReturn);
   else if (phase === "hero" || phase === "message" || phase === "journal") setPhase(overlayReturn);
   else if (phase === "checks") setPhase(returnPhase);
@@ -184,6 +187,7 @@ function uiAction(id: string, value?: string | number): void {
     selectedGear = idNumber; setPhase("equipment"); return;
   }
   if (id.startsWith("upgrade:")) { upgradeEquipment(Number(id.slice(8))); return; }
+  if (id.startsWith("affix:")) { affixArmor(Number(id.slice(6))); return; }
   if (id.startsWith("zap:")) { beginStaffZap(Number(id.slice(4))); return; }
   if (id.startsWith("use_")) { phase = "inventory"; useInventoryItem(id.slice(4) as ItemKind); return; }
   if (id === "journal" || id === "game_journal") { overlayReturn = phase === "menu" ? "menu" : "playing"; setPhase("journal"); return; }
@@ -198,6 +202,13 @@ function uiAction(id: string, value?: string | number): void {
     case "item": selectedItem = value as ItemKind; setPhase("item"); return;
     case "toggle_equipment": changeEquipment(); return;
     case "toggle_cloak_equipment": changeCloakEquipment(); return;
+    case "detach_seal":
+      if (phase !== "equipment" || selectedGear !== sealArmor()) return;
+      detachSeal(equipment); pushLog(message("seal.detached")); drawUi(); return;
+    case "seal_transfer_yes": case "seal_transfer_no":
+      if (phase !== "seal_transfer") return;
+      if (id === "seal_transfer_yes") affixArmor(selectedGear);
+      phase = "playing"; spendTurns(2); return;
     case "upgrade_page": upgradePage++; drawUi(); return;
     case "quick": useInventoryItem(value as ItemKind); return;
     case "hero_info": overlayReturn = phase; setPhase("hero"); return;
@@ -308,19 +319,21 @@ function startRun(): void {
     food_ration: selectedClass === "huntress" ? 2 : 1,
     spirit_bow: selectedClass === "huntress" ? 1 : 0,
     cloak_of_shadows: selectedClass === "rogue" ? 1 : 0,
+    broken_seal: selectedClass === "warrior" ? 1 : 0,
   };
   dungeonLogs = [message("log.welcome", { hero: message(`hero.${selectedClass}.name`) })];
   room();
   startVitals("player", 0);
   for (const gear of equipment) createStaffCharger(gear, 0);
   if (inventory.cloak_of_shadows) createCloak(true, 0);
+  if (inventory.broken_seal) createSeal(equippedGear(equipment, "armor")!.id, equipment, 0);
   enterFloor();
   setPhase("playing");
 }
 
 function enterFloor(): void {
   examining = false; targeting = null; unsealFloor();
-  for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id) && kind(id) !== staffChargerKind && id !== cloakId) scene_despawn(id);
+  for (const id of scene_actor_ids()) if (id !== "player" && !playerBuff(id) && kind(id) !== staffChargerKind && id !== cloakId && id !== sealId) scene_despawn(id);
   for (const key of renderedTiles.keys()) scene_despawn(`terrain_${key}`);
   for (const key of renderedFog) scene_despawn(`fog_${key}`);
   renderedTiles.clear(); renderedFog.clear(); queuedPath = [];
@@ -413,6 +426,7 @@ function collectLoot(): void {
       }
       else if (item === "spirit_bow") inventory.spirit_bow = 1;
       else if (item === "cloak_of_shadows") { inventory.cloak_of_shadows = 1; createCloak(false, field("player", "cooldown")); }
+      else if (item === "broken_seal") { inventory.broken_seal = 1; createSeal(0, equipment, field("player", "cooldown")); }
       else inventory[item]++;
       pushLog(message("log.item", { item: message(`item.${item}.name`) }));
     }
@@ -424,6 +438,7 @@ function collectLoot(): void {
 function useInventoryItem(kindKey: ItemKind): boolean {
   if ((phase !== "playing" && phase !== "inventory") || inventory[kindKey] <= 0) return false;
   if (kindKey === "cloak_of_shadows") { toggleCloak(); return true; }
+  if (kindKey === "broken_seal") { upgradePage = 0; setPhase("affix"); return true; }
   if (kindKey === "scroll_upgrade") { upgradePage = 0; setPhase("upgrade"); return true; }
   if (kindKey === "potion_liquid_flame" || kindKey === "spirit_bow") {
     queuedPath = []; examining = false; phase = "playing"; targeting = kindKey === "spirit_bow" ? "bow" : "flame";
@@ -482,15 +497,34 @@ function changeEquipment(): void {
   const cost = !takingOff && old ? 2 : 1;
   if (old) old.equipped = false;
   item.equipped = !takingOff;
+  ensureWarriorShield(equipment, field("player", "cooldown"));
   pushLog(message(takingOff ? "log.gearRemoved" : "log.gearEquipped", { item: message(`item.${item.kind}.name`) }));
+  if (selectedClass === "warrior" && slot === "armor" && !takingOff && old?.id === sealArmor()) {
+    setPhase("seal_transfer"); return;
+  }
   phase = "playing"; spendTurns(cost);
+}
+
+function affixArmor(id: number): void {
+  if ((phase !== "affix" && phase !== "seal_transfer") || !inventory.broken_seal) return;
+  const armor = equipment.find((item) => item.id === id && gearDefinitions[item.kind].slot === "armor");
+  if (!armor || armor.id === sealArmor()) return;
+  affixSeal(armor, equipment, field("player", "cooldown")); pushLog(message("item.broken_seal.effect"));
+  if (phase === "affix") { selectedGear = id; setPhase("equipment"); }
 }
 
 function upgradeEquipment(id: number): void {
   if (phase !== "upgrade" || inventory.scroll_upgrade <= 0) return;
+  if (id === 0) {
+    if (!inventory.broken_seal || sealArmor() !== 0 || sealValue("lifetime") !== 0) return;
+    change(sealId, "lifetime", 1); inventory.scroll_upgrade--;
+    pushLog(message("log.gearUpgraded", { item: message("item.broken_seal.name"), level: 1 }));
+    phase = "playing"; spendTurns(); return;
+  }
   const item = equipment.find((gear) => gear.id === id);
   if (!item) return;
   item.level++; inventory.scroll_upgrade--;
+  if (item.id === sealArmor() && sealValue("lifetime") === 0) change(sealId, "lifetime", 1);
   upgradeStaffCharge(item);
   pushLog(message("log.gearUpgraded", { item: message(`item.${item.kind}.name`), level: item.level }));
   phase = "playing"; spendTurns();
@@ -562,13 +596,20 @@ function attackMonster(id: string, ranged = false): void {
   } else pushLog(message("log.enemyDodged", { monster: message(`monster.${type}`) }));
 }
 
-function hurtPlayer(power: number): void {
+function hurtPlayer(power: number, hunger = false): void {
+  if (scene_actor(shieldId)) {
+    const capacity = maximumShield(equipment), result = shieldDamage(health(), maxHealth, power, field(shieldId, "health"), field(shieldId, "power"), capacity, hunger);
+    change(shieldId, "health", result.shield); change(shieldId, "power", result.cooldown);
+    if (result.activated) { change(shieldId, "speed", 0); change(shieldId, "lifetime", capacity); }
+    power = result.damage;
+  }
   change("player", "health", Math.max(0, health() - power));
   queuedPath = [];
   if (health() <= 0) {
     removeBuffs("player");
     for (const id of scene_actor_ids()) if (kind(id) === staffChargerKind) scene_despawn(id);
     scene_despawn(cloakId);
+    scene_despawn(sealId);
     setPhase("lost");
   }
 }
@@ -633,6 +674,16 @@ function effectAction(id: string, now: number): number {
   }
   const type = buffKind(kind(id)), target = buffTarget(id);
   if (!type || !scene_actor(target) || field(target, "health") <= 0) { scene_despawn(id); return 1; }
+  if (type === "warrior_shield") {
+    const regenOn = !hasBuff("locked_floor", target) || remainingBuff("locked_floor", target) >= 1;
+    // Visibility must reflect the hero's current action, including movement and door changes.
+    reveal(floor!, cellPosition("player"));
+    const visible = monsterIds().some((enemy) => floor!.visible.has(cellKey(floor!, cellPosition(enemy))));
+    const step = shieldStep(field(id, "health"), field(id, "power"), field(id, "speed"), field(id, "lifetime"), visible, regenOn, maximumShield(equipment));
+    change(id, "health", step.shield); change(id, "power", step.cooldown); change(id, "speed", step.absent);
+    if (step.detach) scene_despawn(id);
+    return 1;
+  }
   if (type === "cloak") {
     if (!cloakEquipped()) { stopCloak(); return 1; }
     const oldLevel = cloakValue("lifetime"), step = cloakStealthStep(cloakValue("health"), oldLevel, cloakValue("speed"), field(id, "health"), level);
@@ -784,7 +835,7 @@ function recordHunger(step: HungerStep): void {
   const id = buffId("hunger", "player");
   change(id, "health", step.level); change(id, "power", step.partialDamage);
   if (step.notice) pushLog(message(`log.${step.notice}`));
-  if (step.damage) hurtPlayer(step.damage);
+  if (step.damage) hurtPlayer(step.damage, true);
 }
 
 function changeHunger(energy: number): void {
@@ -1084,7 +1135,7 @@ callbacks.on_update = (delta: number): void => {
     if (phase === "playing" && targeting) { targeting = null; drawUi(); }
     else if (phase === "playing" && examining) { examining = false; drawUi(); }
     else if (phase === "playing") setPhase("paused");
-    else if (phase === "inventory" || phase === "item" || phase === "equipment" || phase === "upgrade" || phase === "hero" || phase === "message") closeModal();
+    else if (phase === "inventory" || phase === "item" || phase === "equipment" || phase === "upgrade" || phase === "affix" || phase === "seal_transfer" || phase === "hero" || phase === "message") closeModal();
     else if (phase === "paused") setPhase("playing");
     else if (phase === "checks") setPhase(returnPhase);
     else if (phase === "settings") setPhase(settingsReturn);

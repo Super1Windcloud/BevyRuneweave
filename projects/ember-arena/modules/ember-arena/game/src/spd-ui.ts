@@ -9,8 +9,9 @@ import { spiritBowDelay, spiritBowLevel, spiritBowRange, spiritBowStrength } fro
 import type { TargetKind } from "./projectiles.js";
 import { staffCapacity, staffCharges, staffDamageRange } from "./staff.js";
 import { cloakActive, cloakCapacity, cloakEquipped, cloakValue } from "./cloak.js";
+import { sealArmor, sealMaximum, sealValue, shieldValue } from "./seal.js";
 
-export type UiPhase = "menu" | "heroes" | "playing" | "paused" | "won" | "lost" | "inventory" | "item" | "equipment" | "upgrade" | "hero" | "settings" | "checks" | "rankings" | "journal" | "news" | "changes" | "about" | "support" | "message";
+export type UiPhase = "menu" | "heroes" | "playing" | "paused" | "won" | "lost" | "inventory" | "item" | "equipment" | "upgrade" | "affix" | "seal_transfer" | "hero" | "settings" | "checks" | "rankings" | "journal" | "news" | "changes" | "about" | "support" | "message";
 export interface SpdUiState {
   phase: UiPhase;
   selectedClass: HeroClass;
@@ -196,7 +197,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     type Entry = { type: "supply"; key: Supply } | { type: "gear"; item: GearItem };
     const quantity = (key: Supply): number => key === "worn_key" ? state.wornKeys : key === "goo_blob" ? state.gooBlobs : state.inventory[key];
     const items: Supply[] = [...Object.keys(itemCatalog) as ItemKind[], "worn_key", "goo_blob"];
-    const carried: Entry[] = [...items.filter((key) => quantity(key) > 0 && !(key === "cloak_of_shadows" && cloakEquipped())).map((key): Entry => ({ type: "supply", key })),
+    const carried: Entry[] = [...items.filter((key) => quantity(key) > 0 && !(key === "cloak_of_shadows" && cloakEquipped()) && !(key === "broken_seal" && sealArmor() > 0)).map((key): Entry => ({ type: "supply", key })),
       ...state.equipment.filter((item) => !item.equipped).map((item): Entry => ({ type: "gear", item }))];
     for (let index = 0; index < 25; index++) {
       const x = index % 5 * (slotWidth + 1), y = 14 + Math.floor(index / 5) * (slotHeight + 1);
@@ -210,6 +211,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
         childrenSlot.push(image(`gear_icon_${gear.id}`, `sprites/dungeon/${gear.kind}.png`, rect((slotWidth - 16) / 2, (slotHeight - 16) / 2, 16, 16)));
         if (gear.level) childrenSlot.push(label(`gear_level_${gear.id}`, `+${gear.level}`, 1, 1, slotWidth - 2, 6, titleColor));
         if (gear.kind === "mages_staff") childrenSlot.push(label(`gear_charge_${gear.id}`, `${staffCharges(gear.id)}/${staffCapacity(gear.level)}`, 1, slotHeight - 8, slotWidth - 2, 5));
+        if (gear.id === sealArmor()) childrenSlot.push(image(`gear_seal_${gear.id}`, "sprites/dungeon/broken_seal.png", rect(slotWidth - 9, slotHeight - 9, 8, 8)));
       } else if (equipped && !key) {
         childrenSlot.push(art(`equipment_${index}`, ["empty_weapon", "empty_armor", "empty_artifact", "empty_ring", "empty_ring"][index]!, (slotWidth - 16) / 2, (slotHeight - 16) / 2));
       } else if (key) {
@@ -219,6 +221,8 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
         } else if (key === "cloak_of_shadows") {
           if (cloakValue("lifetime")) childrenSlot.push(label("item_level_cloak", `+${cloakValue("lifetime")}`, 1, 1, slotWidth - 2, 6));
           childrenSlot.push(label("item_charge_cloak", `${cloakValue("health")}/${cloakCapacity(cloakValue("lifetime"))}`, 1, slotHeight - 8, slotWidth - 2, 5));
+        } else if (key === "broken_seal") {
+          if (sealValue("lifetime")) childrenSlot.push(label("item_level_seal", `+${sealValue("lifetime")}`, 1, 1, slotWidth - 2, 6));
         } else childrenSlot.push(label(`item_count_${key}`, `${quantity(key)}`, 1, 1, slotWidth - 2, 6));
       }
       children.push({ kind: "button", id: gear ? `gear_slot_${gear.id}` : key ? `slot_${key}` : `bag_slot_${index}`, onClick: gear ? () => on(`gear:${gear.id}`) : key ? () => on(key === "worn_key" || key === "goo_blob" ? key : "item", key) : undefined,
@@ -268,6 +272,9 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     if (state.lockedFloor !== null) elements.push(label("hud_locked_floor", state.lockedFloor >= 1
       ? t("hud.lockedFloor", { amount: Math.ceil(state.lockedFloor) }) : t("hud.lockedFloorOff"),
       large ? 162 : 86, 29, large ? 82 : 40, 6, titleColor, 9));
+    if (shieldValue("health") > 0 || shieldValue("power") > 0) elements.push(label("hud_shield", shieldValue("health") > 0
+      ? t("hud.shield", { amount: shieldValue("health") }) : t("hud.shieldCooldown", { amount: shieldValue("power") }),
+      large ? 162 : 86, 38, large ? 82 : 40, 6, titleColor, 6));
     const toolbarX = !m.large && m.landscape ? w - 64 : w - 24, toolbarY = h - 26;
     const waitX = m.large ? w - 44 : m.landscape ? w - 20 : 0;
     const searchX = m.large ? w - 64 : m.landscape ? w - 40 : 20;
@@ -340,7 +347,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
     control("settings", t("menu.settings"), 0, 0, 120, 20, "red", "settings"),
     control("home", t("menu.home"), 0, 22, 120, 20, "red", "display"),
   ]);
-  else if (state.phase === "inventory" || state.phase === "item" || state.phase === "equipment" || state.phase === "upgrade") {
+  else if (state.phase === "inventory" || state.phase === "item" || state.phase === "equipment" || state.phase === "upgrade" || state.phase === "affix" || state.phase === "seal_transfer") {
     const bag = inventoryContent(); window("bag_window", bag.width, bag.height, bag.children);
     if (state.phase === "item") {
       const def = itemCatalog[state.item];
@@ -357,7 +364,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
         ...(state.item === "cloak_of_shadows" ? [
           control("toggle_cloak_equipment", t(cloakEquipped() ? "gear.remove" : "gear.equip"), 0, buttonY, 58, 16, "red", undefined, "toggle_cloak_equipment", true, 8),
           control("use_cloak_of_shadows", t(cloakActive() ? "cloak.stop" : "cloak.stealth"), 62, buttonY, 58, 16, "red", undefined, "use_cloak_of_shadows", cloakEquipped() && (cloakValue("health") > 0 || cloakActive()), 8),
-        ] : [control(`use_${state.item}`, state.item === "spirit_bow" ? t("item.shoot") : state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", undefined, `use_${state.item}`, true, 8)]),
+        ] : [control(`use_${state.item}`, state.item === "broken_seal" ? t("seal.affix") : state.item === "spirit_bow" ? t("item.shoot") : state.item === "potion_liquid_flame" ? t("item.throw") : def.category === "food" ? t("item.eat") : def.category === "scroll" ? t("item.read") : t("item.drink"), 0, buttonY, 120, 16, "red", undefined, `use_${state.item}`, true, 8)]),
       ]);
     } else if (state.phase === "equipment") {
       const gear = state.equipment.find((item) => item.id === state.selectedGear);
@@ -367,25 +374,39 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
           min: range[0], max: range[1], strength: strengthRequired(gear), delay: attackDelay(gear, state.strength).toFixed(2),
         }) + (state.strength < strengthRequired(gear) ? `\n${t("gear.tooHeavy")}` : "")
           + (gear.kind === "mages_staff" ? `\n${t("gear.staffMagic", { min: staffDamageRange(gear.level)[0], max: staffDamageRange(gear.level)[1],
-            charges: staffCharges(gear.id), capacity: staffCapacity(gear.level) })}` : "");
+            charges: staffCharges(gear.id), capacity: staffCapacity(gear.level) })}` : "")
+          + (gear.id === sealArmor() ? `\n${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifetime") })}` : "");
         const lines = wrappedText(description, 132, 6), buttonY = 26 + Math.ceil(lines.length * 7.2);
         const cost = !gear.equipped && equippedGear(state.equipment, spec.slot) ? 2 : 1;
-        window("equipment_window", 132, buttonY + 30, [
+        const sealAttached = gear.id === sealArmor(), extra = sealAttached ? 18 : 0;
+        window("equipment_window", 132, buttonY + 30 + extra, [
           image("gear_detail_icon", `sprites/dungeon/${gear.kind}.png`, rect(0, 0, 16, 16)),
           label("gear_detail_title", `${t(`item.${gear.kind}.name`)}${gear.level ? ` +${gear.level}` : ""}`, 20, 1, 112, 8, titleColor, 24),
           label("gear_detail_stats", lines.join("\n"), 0, 24, 132, 6, white, buttonY - 24),
           control("toggle_equipment", t(gear.equipped ? "gear.remove" : "gear.equip"), 0, buttonY, gear.kind === "mages_staff" ? 64 : 132, 16),
           ...(gear.kind === "mages_staff" ? [control("zap_staff", t("item.zap"), 68, buttonY, 64, 16, "red", undefined, `zap:${gear.id}`, staffCharges(gear.id) > 0)] : []),
-          label("gear_action_cost", t("gear.cost", { cost }), 0, buttonY + 19, 132, 6, grey, 10),
+          ...(sealAttached ? [control("detach_seal", t("seal.detach"), 0, buttonY + 18, 132, 16)] : []),
+          label("gear_action_cost", t("gear.cost", { cost }), 0, buttonY + extra + 19, 132, 6, grey, 10),
         ]);
       }
-    } else if (state.phase === "upgrade") {
+    } else if (state.phase === "seal_transfer") {
+      const lines = wrappedText(t("seal.transferPrompt"), 132, 7), buttonY = 18 + lines.length * 9;
+      window("seal_transfer_window", 132, buttonY + 18, [
+        label("seal_transfer_title", t("item.broken_seal.name"), 0, 0, 132, 8, titleColor),
+        label("seal_transfer_prompt", lines.join("\n"), 0, 14, 132, 7, white, lines.length * 9),
+        control("seal_transfer_yes", t("common.yes"), 0, buttonY, 64, 16),
+        control("seal_transfer_no", t("common.no"), 68, buttonY, 64, 16),
+      ]);
+    } else if (state.phase === "upgrade" || state.phase === "affix") {
+      const affixing = state.phase === "affix";
+      const items = affixing ? state.equipment.filter((item) => gearDefinitions[item.kind].slot === "armor" && item.id !== sealArmor())
+        : [...state.equipment, ...(state.inventory.broken_seal > 0 && sealArmor() === 0 && sealValue("lifetime") === 0 ? [{ id: 0, kind: "broken_seal" as const, level: 0 }] : [])];
       const perPage = Math.max(1, Math.min(5, Math.floor((h - 60) / 18)));
-      const pages = Math.max(1, Math.ceil(state.equipment.length / perPage));
-      const page = state.upgradePage % pages, choices = state.equipment.slice(page * perPage, (page + 1) * perPage);
+      const pages = Math.max(1, Math.ceil(items.length / perPage));
+      const page = state.upgradePage % pages, choices = items.slice(page * perPage, (page + 1) * perPage);
       window("upgrade_window", 132, 34 + choices.length * 18, [
-        label("upgrade_title", t("gear.chooseUpgrade"), 0, 0, 132, 8, titleColor),
-        ...choices.map((item, index) => control(`upgrade_${item.id}`, `${t(`item.${item.kind}.name`)} +${item.level}`, 0, 14 + index * 18, 132, 16, "red", undefined, `upgrade:${item.id}`, true, 7)),
+        label("upgrade_title", t(affixing ? "seal.chooseArmor" : "gear.chooseUpgrade"), 0, 0, 132, 8, titleColor),
+        ...choices.map((item, index) => control(`${affixing ? "affix" : "upgrade"}_${item.id}`, `${t(`item.${item.kind}.name`)} +${item.level}`, 0, 14 + index * 18, 132, 16, "red", undefined, `${affixing ? "affix" : "upgrade"}:${item.id}`, true, 7)),
         control("upgrade_cancel", t("common.close"), 0, 16 + choices.length * 18, pages > 1 ? 64 : 132, 16, "toast", undefined, "modal_close"),
         ...(pages > 1 ? [control("upgrade_page", t("common.next"), 68, 16 + choices.length * 18, 64, 16, "toast")] : []),
       ]);

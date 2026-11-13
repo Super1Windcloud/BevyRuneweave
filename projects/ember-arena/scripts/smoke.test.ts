@@ -13,6 +13,7 @@ import {
   seededRandom,
   lootKinds,
   type Point,
+  type HeroClass,
 } from "../modules/ember-arena/game/src/rules.js";
 import { canStep, cellKey, findPath, generateFloor, lineOfSight, passable, reveal, sameCell, searchFloor, terrainAt, type DungeonFloor, type Terrain } from "../modules/ember-arena/game/src/dungeon.js";
 import { defaultProfile, parseProfile } from "../modules/ember-arena/game/src/profile.js";
@@ -22,6 +23,7 @@ import { fontAdvances } from "./font-metrics.js";
 import { buffId, type BuffKind } from "../modules/ember-arena/game/src/effects.js";
 import { staffChargeId } from "../modules/ember-arena/game/src/staff.js";
 import { cloakBuffId, cloakId } from "../modules/ember-arena/game/src/cloak.js";
+import { sealId, shieldId } from "../modules/ember-arena/game/src/seal.js";
 
 const assets = resolve(import.meta.dirname, "../modules/ember-arena/game/assets");
 type RecordValue = { [key: string]: unknown };
@@ -156,7 +158,7 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
     for (let frame = 0; frame < count; frame++) { buttonPolls = 0; context.on_update(0.05); pressed.clear(); clicks.clear(); pointer.justPressed = false; }
   };
   return { entities, ui, keys, pressed, tick, context, saves, windowSizeRequests,
-    start: () => { clicks.add("start"); tick(); clicks.add("begin_run"); tick(); },
+    start: (hero?: HeroClass) => { clicks.add("start"); tick(); if (hero) { clicks.add(`hero_${hero}`); tick(); } clicks.add("begin_run"); tick(); },
     item: (item: string) => { clicks.add(`slot_${item}`); tick(); clicks.add(`use_${item}`); tick(); },
     setting: (id: string) => {
       const tab = id === "sensitivity" ? 2 : ["hints", "motion"].includes(id) ? 1 : 3;
@@ -711,7 +713,7 @@ test("survival actors keep independent fractional deadlines and freeze while idl
 });
 
 test("natural regeneration counts eligible wounded ticks and runs before lethal damage", () => {
-  const game = harness(); game.start(); removeMonsters(game);
+  const game = harness(); game.start("huntress"); removeMonsters(game);
   const regen = game.entities.get(buffId("regeneration", "player"))!.body!;
   for (let tick = 0; tick < 9; tick++) game.click("wait");
   assert.equal(regen.power, 0, "full health must not build up healing credit");
@@ -844,7 +846,7 @@ test("generated native sprites retain upstream frame sizes and manifest checksum
   for (const entry of manifest.spriteRecords) {
     assert.equal(createHash("sha256").update(readFileSync(resolve(assets, entry.file))).digest("hex"), entry.sha256);
   }
-  for (const [name, width, height] of [["warrior", 12, 15], ["gnoll", 12, 15], ["goo", 20, 14], ["exit", 16, 16]] as const) {
+  for (const [name, width, height] of [["warrior", 12, 15], ["gnoll", 12, 15], ["goo", 20, 14], ["exit", 16, 16], ["broken_seal", 13, 13]] as const) {
     const png = readFileSync(resolve(assets, `sprites/dungeon/${name}.png`));
     assert.equal(png.readUInt32BE(16), width); assert.equal(png.readUInt32BE(20), height);
     assert.equal(png[25], 6, "indexed upstream assets must become real RGBA sprites");
@@ -940,7 +942,7 @@ function putBuff(game: Game, type: BuffKind, target: string, left: number, acted
 }
 
 test("healing acts before lethal ooze and healing potions do not cure that ooze", () => {
-  const game = harness(); game.start(); removeMonsters(game);
+  const game = harness(); game.start("huntress"); removeMonsters(game);
   game.entities.get("player")!.body!.health = 1;
   const ooze = putBuff(game, "ooze", "player", 20);
   game.key("Digit1");
@@ -994,6 +996,170 @@ test("player buffs survive descending while environmental fire stays on the old 
   assert.ok(Number(game.entities.get("player")!.body!.health) >= 15);
   removeMonsters(game); const before = JSON.stringify([...game.entities]); game.tick(100);
   assert.equal(JSON.stringify([...game.entities]), before);
+});
+
+test("only the Warrior starts with a real seal affixed to cloth armor and an empty shield buff", () => {
+  for (const hero of heroClassList) {
+    const game = harness(); game.start(hero); removeMonsters(game);
+    assert.equal(game.entities.has(sealId), hero === "warrior");
+    assert.equal(game.entities.has(shieldId), hero === "warrior");
+    game.key("KeyI"); assert.ok(!game.ui.has("slot_broken_seal"));
+    assert.equal(game.ui.has("gear_seal_2"), hero === "warrior");
+    if (hero === "warrior") {
+      assert.equal(game.entities.get(sealId)!.body!.power, 2);
+      const shield = game.entities.get(shieldId)!.body!;
+      assert.deepEqual([shield.health, shield.power, shield.speed, shield.lifetime, shield.cooldown], [0, 0, 0, 0, 0]);
+      game.click("gear_slot_2"); assert.match(game.ui.get("gear_detail_stats")!.text!, /Shield capacity: 5/);
+      assert.ok(game.ui.has("detach_seal"));
+    }
+  }
+});
+
+test("a low-health burn activates a shield before damage and idle frames freeze its clock", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  game.entities.get("player")!.body!.health = 10;
+  const burn = putBuff(game, "burning", "player", 1); game.entities.get(burn)!.body!.power = 1;
+  game.click("wait"); const shield = game.entities.get(shieldId)!.body!;
+  assert.equal(game.state().lives, 10);
+  assert.deepEqual([shield.health, shield.power, shield.speed, shield.lifetime, shield.cooldown], [4, 149, 1, 5, 1]);
+  assert.equal(game.ui.get("hud_shield")!.text, "Shield 4");
+  const before = JSON.stringify([...game.entities]); game.tick(100); assert.equal(JSON.stringify([...game.entities]), before);
+  for (let tick = 0; tick < 4; tick++) game.click("wait");
+  assert.deepEqual([shield.health, shield.power, shield.speed], [0, 85, 5]);
+  assert.equal(game.ui.get("hud_shield")!.text, "Shield CD 85");
+});
+
+test("visible enemies retain shielding and the next activation waits for its cooldown", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  putActor(game, "visible", "chaser", { x: 13, z: 12 }); game.entities.get("visible")!.body!.cooldown = 1000;
+  game.entities.get("player")!.body!.health = 10;
+  let burn = putBuff(game, "burning", "player", 1); game.entities.get(burn)!.body!.power = 1;
+  game.click("wait"); const shield = game.entities.get(shieldId)!.body!;
+  for (let tick = 0; tick < 6; tick++) game.click("wait");
+  assert.equal(shield.health, 4); assert.equal(shield.speed, 0);
+  burn = putBuff(game, "burning", "player", 1); game.entities.get(burn)!.body!.power = 6;
+  game.click("wait"); assert.equal(game.state().lives, 8); assert.equal(shield.health, 0); assert.equal(shield.power, 142);
+  for (let tick = 0; tick < 142; tick++) game.click("wait");
+  assert.equal(shield.power, 0); game.entities.get("player")!.body!.health = 10;
+  burn = putBuff(game, "burning", "player", 1); game.entities.get(burn)!.body!.power = 1;
+  game.click("wait"); assert.equal(shield.health, 4); assert.equal(shield.power, 149);
+});
+
+test("hunger bypasses shielding and starvation does not pause the seal cooldown", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const shield = game.entities.get(shieldId)!.body!, hunger = game.entities.get(buffId("hunger", "player"))!.body!;
+  game.entities.get("player")!.body!.health = 10; hunger.health = 449;
+  game.click("wait"); assert.equal(game.state().lives, 9); assert.equal(shield.power, 0); assert.equal(shield.health, 0);
+  shield.health = 5; shield.power = 100; shield.lifetime = 5; hunger.power = Math.fround(0.99);
+  game.click("wait"); assert.equal(game.state().lives, 8); assert.equal(shield.health, 5); assert.equal(shield.power, 99);
+});
+
+test("an exhausted LockedFloor pauses shield cooldown and damaging Goo resumes it", () => {
+  const game = harness(); game.start(); exhaustBossWindow(game);
+  const shield = game.entities.get(shieldId)!.body!; shield.power = 10; shield.health = 0;
+  for (let tick = 0; tick < 3; tick++) game.click("wait");
+  assert.equal(shield.power, 10);
+  putActor(game, "warden", "boss", { x: 13, z: 12 }, 100); game.entities.get("warden")!.body!.cooldown = 1000;
+  game.step(1, 0); assert.equal(shield.power, 9);
+});
+
+test("a seal keeps one armor upgrade when detached and reaffixed without spending an action", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  game.key("Digit5"); assert.ok(!game.ui.has("upgrade_0")); game.click("upgrade_2");
+  assert.equal(game.entities.get(sealId)!.body!.lifetime, 1);
+  putActor(game, "scroll", "loot", { x: 13, z: 12 }, 1, 0);
+  game.entities.get("scroll")!.body!.power = lootKinds.indexOf("scroll_upgrade") + 1; game.step(1, 0);
+  game.key("Digit5"); game.click("upgrade_2");
+  assert.equal(game.entities.get(sealId)!.body!.lifetime, 1, "further armor upgrades stay on the armor");
+  const before = turnCount(game); game.key("KeyI"); game.click("gear_slot_2"); game.click("detach_seal");
+  assert.equal(turnCount(game), before); assert.equal(game.entities.get(sealId)!.body!.power, 0);
+  assert.match(game.ui.get("gear_detail_title")!.text!, /\+1/, "detaching takes exactly one level from +2 armor");
+  game.key("Escape"); assert.ok(game.ui.has("slot_broken_seal")); assert.equal(game.ui.get("item_level_seal")!.text, "+1");
+  game.click("slot_broken_seal"); game.click("use_broken_seal"); assert.ok(game.ui.has("affix_2")); assert.ok(!game.ui.has("affix_1"));
+  game.click("upgrade_cancel"); assert.equal(turnCount(game), before);
+  game.click("slot_broken_seal"); game.click("use_broken_seal"); game.click("affix_2");
+  assert.equal(turnCount(game), before); assert.equal(game.entities.get(sealId)!.body!.power, 2);
+  assert.match(game.ui.get("gear_detail_title")!.text!, /\+2/);
+  assert.match(game.ui.get("gear_detail_stats")!.text!, /Shield capacity: 5/);
+});
+
+test("a loose seal accepts one scroll upgrade and cannot consume a second scroll", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  game.key("KeyI"); game.click("gear_slot_2"); game.click("detach_seal"); game.key("Escape"); game.key("Escape");
+  game.key("Digit5"); assert.ok(game.ui.has("upgrade_0")); game.click("upgrade_0");
+  assert.equal(turnCount(game), 1); assert.equal(game.entities.get(sealId)!.body!.lifetime, 1);
+  putActor(game, "scroll", "loot", { x: 13, z: 12 }, 1, 0);
+  game.entities.get("scroll")!.body!.power = lootKinds.indexOf("scroll_upgrade") + 1; game.step(1, 0);
+  game.key("Digit5"); assert.ok(!game.ui.has("upgrade_0")); game.click("upgrade_cancel");
+  game.click("slot_broken_seal"); game.click("use_broken_seal"); game.click("affix_2");
+  assert.match(game.ui.get("gear_detail_title")!.text!, /\+1/);
+});
+
+test("unequipping sealed armor keeps a spent shield until cooldown expiry and reequipping restores it", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const shield = game.entities.get(shieldId)!.body!; shield.power = 2;
+  game.key("KeyI"); game.click("gear_slot_2"); game.click("toggle_equipment");
+  assert.equal(shield.power, 1); assert.equal(game.entities.get(sealId)!.body!.power, 2);
+  game.click("wait"); assert.ok(!game.entities.has(shieldId));
+  game.key("KeyI"); game.click("gear_slot_2"); game.click("toggle_equipment");
+  assert.ok(game.entities.has(shieldId)); assert.equal(game.entities.get(shieldId)!.body!.power, 0);
+});
+
+test("armor replacement waits for a seal-transfer choice and moves its upgrade only when accepted", () => {
+  for (const transfer of [false, true]) {
+    const game = harness(); game.start(); removeMonsters(game); game.key("Digit5"); game.click("upgrade_2");
+    putActor(game, "armor_drop", "loot", { x: 13, z: 12 }, 1, 0);
+    game.entities.get("armor_drop")!.body!.power = lootKinds.indexOf("leather_armor") + 1; game.step(1, 0);
+    game.key("KeyI"); game.click("gear_slot_3");
+    const before = turnCount(game), shield = game.entities.get(shieldId)!.body!, deadline = shield.cooldown;
+    game.click("toggle_equipment"); assert.ok(game.ui.has("seal_transfer_window"));
+    game.tick(100); game.key("Escape"); assert.ok(game.ui.has("seal_transfer_window"));
+    assert.equal(turnCount(game), before); assert.equal(shield.cooldown, deadline);
+    game.click(transfer ? "seal_transfer_yes" : "seal_transfer_no"); assert.equal(turnCount(game), before + 2);
+    assert.equal(game.entities.get(sealId)!.body!.power, transfer ? 3 : 2);
+    game.key("KeyI"); game.click("gear_slot_3");
+    assert.equal(game.ui.get("gear_detail_title")!.text!.includes("+1"), transfer);
+    assert.equal(game.ui.has("detach_seal"), transfer);
+    if (transfer) assert.match(game.ui.get("gear_detail_stats")!.text!, /Shield capacity: 7/);
+  }
+});
+
+test("descent retains the real seal and shield and death removes them before a fresh restart", () => {
+  const game = harness(); game.start(); removeMonsters(game);
+  const map = generateFloor(1337, 1); walk(game, map, map.exit);
+  const item = game.entities.get(sealId)!.body!, shield = game.entities.get(shieldId)!.body!;
+  shield.power = 100; const before = turnCount(game); game.click("descend");
+  assert.equal(game.entities.get(sealId)!.body, item); assert.equal(game.entities.get(shieldId)!.body, shield);
+  assert.equal(turnCount(game), before + 1); assert.equal(shield.power, 99);
+  removeMonsters(game); game.entities.get("player")!.body!.health = 1;
+  game.entities.get(buffId("hunger", "player"))!.body!.health = 449;
+  game.click("wait"); assert.equal(game.state().message, "LOST");
+  assert.ok(!game.entities.has(sealId)); assert.ok(!game.entities.has(shieldId));
+  game.click("restart"); game.click("begin_run");
+  assert.deepEqual([game.entities.get(sealId)!.body!.power, game.entities.get(sealId)!.body!.lifetime, game.entities.get(shieldId)!.body!.power], [2, 0, 0]);
+});
+
+test("Chinese seal windows fit portrait and short landscape and held detach or affix costs no turn", () => {
+  for (const [width, height, mobile] of [[450, 800, true], [800, 320, false]] as const) {
+    const game = harness(width, height, mobile, new Map(), false, "zh-CN"); game.start(); removeMonsters(game);
+    game.key("KeyI"); game.click("gear_slot_2"); assert.match(game.ui.get("gear_detail_stats")!.text!, /护盾上限：5/);
+    const style = game.ui.get("equipment_window")!.style!;
+    assert.ok(Number(style.top) >= 0); assert.ok(Number(style.top) + Number(style.height) <= Number(game.ui.get("safe_root")!.style!.height));
+    game.holdButton("detach_seal"); game.tick(30); game.releaseButton(); assert.equal(turnCount(game), 0);
+    game.key("Escape"); game.click("slot_broken_seal"); game.click("use_broken_seal");
+    assert.equal(game.ui.get("upgrade_title")!.text, "选择附加纹章的护甲");
+    game.holdButton("affix_2"); game.tick(30); game.releaseButton();
+    assert.equal(turnCount(game), 0); assert.equal(game.entities.get(sealId)!.body!.power, 2);
+    game.key("Escape"); game.key("Escape");
+    putActor(game, "armor_drop", "loot", { x: 13, z: 12 }, 1, 0);
+    game.entities.get("armor_drop")!.body!.power = lootKinds.indexOf("leather_armor") + 1; game.step(1, 0);
+    game.key("KeyI"); game.click("gear_slot_3"); game.click("toggle_equipment");
+    assert.match(game.ui.get("seal_transfer_prompt")!.text!, /纹章/);
+    const transfer = game.ui.get("seal_transfer_window")!.style!;
+    assert.ok(Number(transfer.top) >= 0); assert.ok(Number(transfer.top) + Number(transfer.height) <= Number(game.ui.get("safe_root")!.style!.height));
+    const before = turnCount(game); game.holdButton("seal_transfer_yes"); game.tick(30); game.releaseButton();
+    assert.equal(turnCount(game), before + 2); assert.equal(game.entities.get(sealId)!.body!.power, 3);
+  }
 });
 
 function rogue(game = harness()): Game {
@@ -1513,7 +1679,7 @@ test("Goo applies the original twenty-tick ooze through the normal attack proc",
 });
 
 test("burning death removes pending buffs and restart cannot inherit the previous effects", () => {
-  const game = harness(); game.start(); removeMonsters(game);
+  const game = harness(); game.start("huntress"); removeMonsters(game);
   game.entities.get("player")!.body!.health = 1;
   const id = putBuff(game, "burning", "player", 8);
   game.entities.get(id)!.body!.power = 3;
@@ -1601,6 +1767,7 @@ test("heavy armor found on the floor changes movement time and upgrades remove p
   const id = Number(icon[0].slice("gear_icon_".length));
   game.click(`gear_slot_${id}`); assert.match(game.ui.get("gear_detail_stats")!.text!, /Too heavy/);
   const before = turnCount(game); game.click("toggle_equipment");
+  assert.ok(game.ui.has("seal_transfer_window")); game.click("seal_transfer_no");
   assert.equal(turnCount(game), before + 2, "swapping also spends the previous armor's removal tick");
   const next = findPath(map, cell(game), map.entrance)[0]!, current = cell(game), start = turnCount(game);
   game.step(next.x - current.x, next.z - current.z);

@@ -54,10 +54,10 @@ export const heroClasses: Record<HeroClass, HeroClassSpec> = {
     splash: "sprites/spd/avatar_warrior.png",
     sprite: "sprites/spd/warrior.png",
     icon: "sprites/spd/hero_icons.png",
-    description: "A sturdy melee fighter. Starts with a stronger blade and an extra healing potion.",
+    description: "A melee fighter with a broken seal on his armor. Its shield triggers when a hit would leave him at half health or below.",
     baseHealth: 20,
     baseSpeed: 1,
-    perks: "Worn shortsword / cloth armor / extra healing potion",
+    perks: "Broken seal / worn shortsword / cloth armor",
   },
   mage: {
     id: "mage",
@@ -150,18 +150,19 @@ export type ItemKind =
   | "scroll_magic_mapping"
   | "food_ration"
   | "spirit_bow"
-  | "cloak_of_shadows";
+  | "cloak_of_shadows"
+  | "broken_seal";
 
 export type LootKind = ItemKind | "worn_key" | "goo_blob" | GearKind;
 // Stable indices stored in reflected ScriptActor.power, shared by spawning and pickup.
 export const lootKinds: readonly LootKind[] = ["potion_healing", "potion_liquid_flame", "potion_invisibility",
   "potion_strength", "scroll_upgrade", "scroll_magic_mapping", "food_ration", "worn_key", "goo_blob",
-  "worn_shortsword", "mages_staff", "dagger", "gloves", "shortsword", "cloth_armor", "leather_armor", "spirit_bow", "cloak_of_shadows"];
+  "worn_shortsword", "mages_staff", "dagger", "gloves", "shortsword", "cloth_armor", "leather_armor", "spirit_bow", "cloak_of_shadows", "broken_seal"];
 
 export interface ItemDef {
   id: ItemKind;
   name: string;
-  category: "potion" | "scroll" | "food" | "weapon" | "artifact";
+  category: "potion" | "scroll" | "food" | "weapon" | "artifact" | "seal";
   description: string;
   effectText: string;
   sprite: string;
@@ -204,7 +205,7 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     id: "scroll_upgrade",
     name: "Scroll of Upgrade",
     category: "scroll",
-    description: "Choose a carried weapon or armor to upgrade by 1. Costs 1 turn after selection.",
+    description: "Upgrade a carried weapon, armor or unupgraded loose seal by 1. Costs 1 turn after selection.",
     effectText: "Ancient runes infuse the selected equipment (+1 upgrade)!",
     sprite: "sprites/spd/items.png",
   },
@@ -238,6 +239,14 @@ export const itemCatalog: Record<ItemKind, ItemDef> = {
     category: "artifact",
     description: "Activate for 1 turn; stop for free. Each charge grants 4 turns of stealth. Recharges while equipped and inactive; grows through use.",
     effectText: "You blend into the shadows.",
+    sprite: "sprites/spd/items.png",
+  },
+  broken_seal: {
+    id: "broken_seal",
+    name: "Broken Seal",
+    category: "seal",
+    description: "Affix to armor to gain a shield when damage would leave you at half health or below. Recharges in 150 turns. Can carry one upgrade between armors; affixing and detaching are free.",
+    effectText: "You affix the seal to your armor.",
     sprite: "sprites/spd/items.png",
   },
 };
