@@ -41,6 +41,29 @@ The application icon is the original Shattered Pixel Dungeon desktop icon, bundl
 `assets/branding/shattered-pixel-dungeon.png`. Its pinned revision and checksum are recorded in
 `assets/licenses/icon-source.json`; both Cargo launches and the desktop launcher use it offline.
 
+## Mobile adaptation and host localization — 2026-11-12
+
+Fresh unified Android arm64 and iOS device runtimes were built and installed with the current
+bundle. Pixel 8 / Android 17 and iPhone 14 Pro / iOS 27.0.1 passed real game launch, touch input,
+portrait/landscape rendering and background/resume inspection. Android System Back returns to
+the native launcher without replacing the runtime process. BMS dispatches the optional
+`on_suspend()` callback identically to Lua and QuickJS; Ember Arena pauses and clears queued
+movement/targeting. A backgrounded run remains in memory; saving after process death is pending.
+
+All three example launchers now use a shared English/Simplified Chinese catalog (205 messages),
+follow the system language by default and fall back to English for other languages. Mobile
+Chinese/English/French-fallback UI was exercised; desktop localization has headless test coverage.
+The host READMEs document commands and evidence under `dist/mobile-adaptation/`.
+
+Completed automated checks: 164 script tests with Biome, independent TypeScript checks,
+42 unified runtime tests (one ignored), 34 desktop tests, 15 tooling tests, Android Kotlin/Lint,
+and two iOS device UI tests. The final repeated iOS suite had already completed when the user
+requested no further testing; no additional tests were started. Full-screen iOS rotation captures
+avoid stale app-relative accessibility crop coordinates. Windows/Linux native execution, desktop
+GPU localization, other mobile devices/ABIs, simulator, minimum OS, Release, audio/performance,
+download-failure recovery and upstream pixel parity remain unverified for this batch. This does
+not change the incomplete full-game parity status.
+
 ## Current gameplay
 
 - Native top-down 2D sprites use the original hero, monster, item and sewer tile atlases.

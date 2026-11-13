@@ -58,6 +58,16 @@ gaps. UI and scene images use nearest sampling. Source icons preserve their own 
 
 ## Visual inspection and acceptance
 
+Mobile adaptation batch, 2026-11-12: fresh unified runtimes and the current bundle were exercised
+on Pixel 8 / Android 17 and iPhone 14 Pro / iOS 27.0.1. Native GPU captures cover title, hero
+selection, dungeon HUD in portrait/landscape and the pause modal after Home/resume. Real touch
+movement and Android Back-to-launcher were exercised. iOS uses full-screen XCTest captures after
+stable foreground geometry; app-relative captures can crop against stale AX coordinates after
+rotation. Artifacts are under `dist/mobile-adaptation/`. This is narrow mobile acceptance, not
+coverage of every item window or matched upstream pixels. Earlier batch-specific NOT_RUN entries
+below retain their original scope. The final repeated iOS run passed both native UI tests before
+the user's stop request was processed; no further tests were started.
+
 The seal batch passes 162 script tests, Biome and independent TypeScript checks.
 Chinese seal armor/affix windows fit portrait and short-landscape doubles; held controls remain
 free and cannot repeat actions. Both transfer choices are exercised by gameplay doubles.

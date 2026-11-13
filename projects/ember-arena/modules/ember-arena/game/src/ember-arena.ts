@@ -1096,6 +1096,12 @@ callbacks.on_script_reloaded = (): void => {
   loadMenu();
 };
 
+callbacks.on_suspend = (): void => {
+  queuedPath = []; targeting = null; examining = false;
+  actionCooldown = 0; cameraShake = 0;
+  if (phase === "playing") setPhase("paused");
+};
+
 callbacks.on_update = (delta: number): void => {
   const dt = clamp(Number.isFinite(delta) ? delta : 0, 0, 0.05);
   const pointer = input_primary_pointer();

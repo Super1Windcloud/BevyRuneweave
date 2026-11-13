@@ -95,10 +95,10 @@ final class ReleaseClient {
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
               http.url?.scheme?.lowercased() == "https" else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            return .failure(HostFailure("Remote asset request failed with HTTP \(status)"))
+            return .failure(HostFailure(hostText("Remote asset request failed with HTTP {status}", String(status))))
         }
         guard let data, !data.isEmpty, data.count <= maximumBytes else {
-            return .failure(HostFailure("Remote asset response has an invalid size"))
+            return .failure(HostFailure(hostText("Remote asset response has an invalid size")))
         }
         return .success(data)
     }

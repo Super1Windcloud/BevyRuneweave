@@ -24,8 +24,10 @@
     "release:assets": "tsx --env-file=.env scripts/publish-release.ts",
     "update:bevy": "tsx scripts/update-bevy-runtime.ts",
     "typecheck:scripts": "tsc --project scripts/tsconfig.json",
+    "prepare:host-locales": "tsx scripts/prepare-host-locales.ts",
+    "test:host-locales": "tsx --test scripts/host-localization.test.ts scripts/ios-device-selection.test.ts",
     "test:release-assets": "tsx --test scripts/release-assets.test.ts",
-    "test": "npm run typecheck:scripts && npm run test:release-assets"
+    "test": "npm run typecheck:scripts && npm run test:release-assets && npm run test:host-locales"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",

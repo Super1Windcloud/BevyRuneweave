@@ -27,7 +27,7 @@ use bevy::{
     asset::AssetPlugin,
     prelude::*,
     render::{Render, RenderApp, RenderSystems, view::window::ExtractedWindows},
-    window::{MonitorSelection, PresentMode, WindowResolution},
+    window::{AppLifecycle, MonitorSelection, PresentMode, WindowFocused, WindowResolution},
 };
 use bevy_mod_scripting::core::event::ScriptAttachedEvent;
 use bevy_mod_scripting::prelude::{
@@ -111,7 +111,60 @@ fn initial_window(
     })
 }
 
-callback_labels!(OnUpdate => "on_update");
+callback_labels!(OnUpdate => "on_update", OnSuspend => "on_suspend");
+
+#[derive(Resource)]
+struct ScriptLifecycle {
+    focused: bool,
+    active: bool,
+    notified: bool,
+}
+
+impl Default for ScriptLifecycle {
+    fn default() -> Self {
+        Self {
+            focused: true,
+            active: true,
+            notified: false,
+        }
+    }
+}
+
+// BMS dispatches the same optional callback through both language adapters.
+// Keep focus and application state separate: their native events can arrive in
+// different frames, and regaining focus alone does not mean the app has resumed.
+fn emit_suspend(
+    mut state: ResMut<ScriptLifecycle>,
+    mut focus: MessageReader<WindowFocused>,
+    mut lifecycle: MessageReader<AppLifecycle>,
+    windows: Query<Entity, With<bevy::window::PrimaryWindow>>,
+    mut callbacks: MessageWriter<ScriptCallbackEvent>,
+) {
+    let mut interrupted = false;
+    for event in focus.read() {
+        if windows.contains(event.window) {
+            state.focused = event.focused;
+            interrupted |= !event.focused;
+        }
+    }
+    for event in lifecycle.read() {
+        match event {
+            AppLifecycle::WillSuspend | AppLifecycle::Suspended => {
+                state.active = false;
+                interrupted = true;
+            }
+            AppLifecycle::Running | AppLifecycle::WillResume => state.active = true,
+            AppLifecycle::Idle => {}
+        }
+    }
+    if interrupted && !state.notified {
+        callbacks.write(ScriptCallbackEvent::new_for_all_scripts(OnSuspend, vec![]));
+        state.notified = true;
+    }
+    if state.focused && state.active {
+        state.notified = false;
+    }
+}
 
 fn runtime_scripting_plugins() -> bevy::app::PluginGroupBuilder {
     let plugins = BMSPlugin.build();
@@ -599,6 +652,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         asset_path,
     })
     .insert_resource(RuntimeAssetRoot(asset_root.clone()))
+    .init_resource::<ScriptLifecycle>()
     .insert_resource(crate::script_api::storage::ScriptStorage::for_assets(
         &asset_root,
     ))
@@ -619,6 +673,11 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             log_script_attached,
             #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
             poll_asset_reload,
+            emit_suspend,
+            #[cfg(any(feature = "js", feature = "typescript"))]
+            event_handler::<OnSuspend, QuickJsScriptingPlugin>,
+            #[cfg(feature = "lua")]
+            event_handler::<OnSuspend, LuaScriptingPlugin>,
             emit_update,
             #[cfg(any(feature = "js", feature = "typescript"))]
             event_handler::<OnUpdate, QuickJsScriptingPlugin>,
@@ -796,6 +855,72 @@ mod tests {
 
     extern "C" fn record_exit_callback() {
         EXIT_CALLBACK_CALLED.store(true, Ordering::Release);
+    }
+
+    #[test]
+    fn suspension_is_primary_window_scoped_deduplicated_and_rearmed_after_resume() {
+        let mut app = App::new();
+        app.add_message::<WindowFocused>()
+            .add_message::<AppLifecycle>()
+            .add_message::<ScriptCallbackEvent>()
+            .init_resource::<ScriptLifecycle>()
+            .add_systems(Update, emit_suspend);
+        let primary = app.world_mut().spawn(bevy::window::PrimaryWindow).id();
+        let secondary = app.world_mut().spawn_empty().id();
+        let count = |app: &mut App| {
+            let messages = app
+                .world()
+                .resource::<bevy::ecs::message::Messages<ScriptCallbackEvent>>();
+            let mut cursor = messages.get_cursor();
+            cursor
+                .read(messages)
+                .filter(|event| event.label == OnSuspend.into())
+                .count()
+        };
+        app.world_mut().write_message(WindowFocused {
+            window: secondary,
+            focused: false,
+        });
+        app.update();
+        assert_eq!(count(&mut app), 0);
+        app.world_mut().write_message(WindowFocused {
+            window: primary,
+            focused: false,
+        });
+        app.update();
+        assert_eq!(count(&mut app), 1);
+        app.world_mut().write_message(AppLifecycle::WillSuspend);
+        app.world_mut().write_message(AppLifecycle::Suspended);
+        app.update();
+        app.update();
+        assert_eq!(
+            count(&mut app),
+            0,
+            "duplicate focus/lifecycle notifications must not repeat callbacks"
+        );
+        app.world_mut().write_message(WindowFocused {
+            window: primary,
+            focused: true,
+        });
+        app.update();
+        assert!(app.world().resource::<ScriptLifecycle>().notified);
+        app.world_mut().write_message(AppLifecycle::Running);
+        app.update();
+        assert!(!app.world().resource::<ScriptLifecycle>().notified);
+        app.world_mut().write_message(WindowFocused {
+            window: primary,
+            focused: false,
+        });
+        app.world_mut().write_message(WindowFocused {
+            window: primary,
+            focused: true,
+        });
+        app.update();
+        assert_eq!(
+            count(&mut app),
+            1,
+            "even a focus cycle completed in one frame must notify scripts"
+        );
     }
 
     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]

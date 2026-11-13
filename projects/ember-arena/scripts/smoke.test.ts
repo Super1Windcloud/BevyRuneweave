@@ -226,6 +226,28 @@ test("portrait touch, native safe area and reload reset", () => {
   assert.equal(game.state().message, "MENU");
   assert.equal([...game.entities.values()].filter((value) => value.body).length, 1);
 });
+test("suspension pauses a run, cancels queued walking and preserves actor state until explicit resume", () => {
+  const game = harness(393, 852, true); game.start(); removeMonsters(game);
+  const map = generateFloor(1337, 1);
+  const path = findPath(map, cell(game), { x: 14, z: 12 }); assert.ok(path.length >= 2);
+  game.tapCell(path.at(-1)!);
+  const stopped = cell(game), before = JSON.stringify([...game.entities]), turns = turnCount(game);
+  game.context.on_suspend(); assert.equal(game.state().message, "PAUSED");
+  game.tick(100); assert.equal(JSON.stringify([...game.entities]), before); assert.equal(turnCount(game), turns);
+  game.click("pause_window_outside"); game.tick(100);
+  assert.equal(game.state().message, "PLAYING"); assert.deepEqual(cell(game), stopped);
+  assert.equal(turnCount(game), turns, "foregrounding cannot resume the old queued route");
+  game.context.on_suspend(); game.context.on_suspend(); assert.equal(game.state().message, "PAUSED");
+});
+test("suspension cancels aiming without closing inventory or advancing timers", () => {
+  const game = harness(852, 393, true); game.start("mage"); removeMonsters(game);
+  game.click("quick_staff_1"); assert.ok(game.ui.has("target_prompt"));
+  const before = turnCount(game); game.context.on_suspend(); game.click("pause_window_outside");
+  assert.ok(!game.ui.has("target_prompt")); assert.equal(turnCount(game), before);
+  game.key("KeyI"); const actors = JSON.stringify([...game.entities]);
+  game.context.on_suspend(); game.tick(20);
+  assert.equal(game.state().message, "INVENTORY"); assert.equal(JSON.stringify([...game.entities]), actors);
+});
 test("contact damage ends a run and restart removes hostile actors", () => {
   const game = harness(); game.start();
   game.entities.get("player")!.body!.health = 1;

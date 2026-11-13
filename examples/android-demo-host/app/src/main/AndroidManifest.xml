@@ -21,10 +21,11 @@
 
         <activity
             android:name=".RuntimeActivity"
-            android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|uiMode"
+            android:configChanges="orientation|keyboard|keyboardHidden|screenSize|smallestScreenSize|screenLayout|density|fontScale|layoutDirection|locale|uiMode"
+            android:enableOnBackInvokedCallback="true"
             android:exported="false"
             android:launchMode="singleTask"
-            android:screenOrientation="portrait"
+            android:screenOrientation="fullUser"
             android:theme="@style/RuntimeTheme">
             <meta-data
                 android:name="android.app.lib_name"

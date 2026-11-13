@@ -110,9 +110,9 @@ final class HostCoordinator {
             guard let store = self.store else { return }
 
             let launcher = HostLauncherViewController(store: store)
-            launcher.tabBarItem = UITabBarItem(title: "Home", image: UIImage(systemName: "house"), tag: 0)
+            launcher.tabBarItem = UITabBarItem(title: hostText("Home"), image: UIImage(systemName: "house"), tag: 0)
             let settings = HostSettingsViewController(style: .insetGrouped)
-            settings.tabBarItem = UITabBarItem(title: "Settings", image: UIImage(systemName: "gearshape"), tag: 1)
+            settings.tabBarItem = UITabBarItem(title: hostText("Settings"), image: UIImage(systemName: "gearshape"), tag: 1)
             let tabs = UITabBarController()
             tabs.viewControllers = [launcher, settings]
             tabs.tabBar.tintColor = HostStyle.accent
@@ -164,7 +164,7 @@ final class HostCoordinator {
 
     func activate(config: EngineConfig) throws {
         let result = config.script.entry.withCString { game_runtime_switch_script($0) }
-        guard result == 0 else { throw HostFailure("The runtime could not activate the selected script") }
+        guard result == 0 else { throw HostFailure(hostText("The runtime could not activate the selected script")) }
         let runtime = runtimeWindow()
         launcherWindow?.isHidden = true
         launcherWindow?.rootViewController = nil
@@ -194,17 +194,17 @@ final class HostCoordinator {
 final class HostSettingsViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Settings"
+        title = hostText("Settings")
         tableView.backgroundColor = HostStyle.background
         tableView.separatorStyle = .none
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 88
         let heading = HostStyle.stack(spacing: 10)
-        heading.addArrangedSubview(HostStyle.label("MAKE IT YOURS", size: 12, color: HostStyle.accent,
+        heading.addArrangedSubview(HostStyle.label(hostText("MAKE IT YOURS"), size: 12, color: HostStyle.accent,
                                                  weight: .semibold))
-        heading.addArrangedSubview(HostStyle.label("Settings", size: 32, color: HostStyle.primary,
+        heading.addArrangedSubview(HostStyle.label(hostText("Settings"), size: 32, color: HostStyle.primary,
                                                  weight: .semibold, heading: true))
-        heading.addArrangedSubview(HostStyle.label("A comfortable space to play."))
+        heading.addArrangedSubview(HostStyle.label(hostText("A comfortable space to play.")))
         tableView.tableHeaderView = HostStyle.card(heading, color: HostStyle.background, inset: 24)
     }
 
@@ -224,11 +224,11 @@ final class HostSettingsViewController: UITableViewController {
     override func numberOfSections(in tableView: UITableView) -> Int { 1 }
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 1 }
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        "Appearance"
+        hostText("Appearance")
     }
 
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        "Bevy RuneWeave\nA home for small worlds and big ideas."
+        hostText("Bevy RuneWeave\nA home for small worlds and big ideas.")
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -240,15 +240,15 @@ final class HostSettingsViewController: UITableViewController {
         toggle.addTarget(self, action: #selector(darkModeChanged(_:)), for: .valueChanged)
         toggle.isOn = UserDefaults.standard.bool(forKey: hostDarkModeDefaultsKey)
         toggle.onTintColor = HostStyle.accent
-        toggle.accessibilityLabel = "Dark mode"
+        toggle.accessibilityLabel = hostText("Dark mode")
         cell.accessoryView = toggle
         cell.backgroundColor = HostStyle.surface
-        cell.textLabel?.text = "Dark mode"
+        cell.textLabel?.text = hostText("Dark mode")
         cell.textLabel?.textColor = HostStyle.primary
         cell.textLabel?.font = .preferredFont(forTextStyle: .headline)
         cell.textLabel?.adjustsFontForContentSizeCategory = true
         cell.textLabel?.numberOfLines = 0
-        cell.detailTextLabel?.text = "A softer glow after hours."
+        cell.detailTextLabel?.text = hostText("A softer glow after hours.")
         cell.detailTextLabel?.textColor = HostStyle.secondary
         cell.detailTextLabel?.font = .preferredFont(forTextStyle: .subheadline)
         cell.detailTextLabel?.adjustsFontForContentSizeCategory = true
@@ -274,9 +274,9 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     private let launchButton = HostActionButton(type: .custom)
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let statusLabel = UILabel()
-    private let installedTitle = HostStyle.label("Your next adventure awaits", size: 19,
+    private let installedTitle = HostStyle.label(hostText("Your next adventure awaits"), size: 19,
                                                 color: HostStyle.primary, weight: .semibold)
-    private let installedDetail = HostStyle.label("Choose a release below to get started.", size: 14)
+    private let installedDetail = HostStyle.label(hostText("Choose a release below to get started."), size: 14)
     private let statusRow = UIStackView()
     private let scroll = UIScrollView()
     private var busy = false
@@ -306,12 +306,12 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         let brand = HostStyle.label("RUNEWEAVE  /  iOS", size: 12, color: HostStyle.accent, weight: .semibold)
         add(brand, to: content, spacing: 12)
         let hero = HostStyle.stack(spacing: 12)
-        hero.addArrangedSubview(HostStyle.label("PLAY. CREATE. EXPLORE.", size: 11,
+        hero.addArrangedSubview(HostStyle.label(hostText("PLAY. CREATE. EXPLORE."), size: 11,
                                               color: UIColor(red: 0.66, green: 0.87, blue: 0.78, alpha: 1),
                                               weight: .semibold))
-        hero.addArrangedSubview(HostStyle.label("A little world.\nEndless possibilities.", size: 30,
+        hero.addArrangedSubview(HostStyle.label(hostText("A little world.\nEndless possibilities."), size: 30,
                                               color: .white, weight: .semibold, heading: true))
-        hero.addArrangedSubview(HostStyle.label("Discover a game and make it your own.",
+        hero.addArrangedSubview(HostStyle.label(hostText("Discover a game and make it your own."),
                                               color: UIColor(red: 0.76, green: 0.86, blue: 0.82, alpha: 1)))
         add(HostStyle.card(hero, color: UIColor(red: 0.07, green: 0.24, blue: 0.20, alpha: 1), inset: 24),
             to: content, spacing: 24)
@@ -331,17 +331,17 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         statusRow.isHidden = true
         add(statusRow, to: content, spacing: 16)
 
-        add(section("Your space"), to: content, spacing: 12)
+        add(section(hostText("Your space")), to: content, spacing: 12)
         let installed = HostStyle.stack(spacing: 6)
         installed.addArrangedSubview(installedTitle)
         installed.addArrangedSubview(installedDetail)
         installed.setCustomSpacing(18, after: installedDetail)
-        configureButton(launchButton, title: "Start installed game", symbol: "play",
+        configureButton(launchButton, title: hostText("Start installed game"), symbol: "play",
                         action: #selector(launchInstalled))
         installed.addArrangedSubview(launchButton)
         add(HostStyle.card(installed), to: content, spacing: 28)
 
-        add(section("Discover"), to: content, spacing: 6)
+        add(section(hostText("Discover")), to: content, spacing: 6)
         remoteAssetsStatus.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 13))
         remoteAssetsStatus.adjustsFontForContentSizeCategory = true
         remoteAssetsStatus.textColor = HostStyle.secondary
@@ -352,11 +352,11 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         add(remoteAssetsStack, to: content, spacing: 28)
 
         let custom = HostStyle.stack(spacing: 12)
-        custom.addArrangedSubview(HostStyle.label("Have a package link?", size: 19,
+        custom.addArrangedSubview(HostStyle.label(hostText("Have a package link?"), size: 19,
                                                 color: HostStyle.primary, weight: .semibold))
-        custom.addArrangedSubview(HostStyle.label("Bring your own game with an HTTPS ZIP link.", size: 14))
+        custom.addArrangedSubview(HostStyle.label(hostText("Bring your own game with an HTTPS ZIP link."), size: 14))
         urlField.placeholder = "https://…/game.zip"
-        urlField.accessibilityLabel = "HTTPS asset package URL"
+        urlField.accessibilityLabel = hostText("HTTPS asset package URL")
         urlField.keyboardType = .URL
         urlField.autocapitalizationType = .none
         urlField.autocorrectionType = .no
@@ -372,11 +372,11 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         urlField.leftViewMode = .always
         urlField.heightAnchor.constraint(greaterThanOrEqualToConstant: 56).isActive = true
         custom.addArrangedSubview(urlField)
-        configureButton(downloadButton, title: "Download and start", symbol: "arrow.down.to.line",
+        configureButton(downloadButton, title: hostText("Download and start"), symbol: "arrow.down.to.line",
                         primary: true, action: #selector(downloadCustom))
         custom.addArrangedSubview(downloadButton)
         add(HostStyle.card(custom), to: content, spacing: 24)
-        let footer = HostStyle.label("Powered by Bevy RuneWeave", size: 12)
+        let footer = HostStyle.label(hostText("Powered by Bevy RuneWeave"), size: 12)
         footer.textAlignment = .center
         content.addArrangedSubview(footer)
 
@@ -436,7 +436,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     }
 
     @objc private func reloadRemoteAssets() {
-        remoteAssetsStatus.text = "Finding the latest release…"
+        remoteAssetsStatus.text = hostText("Finding the latest release…")
         remoteAssetsStack.arrangedSubviews.forEach {
             remoteAssetsStack.removeArrangedSubview($0)
             $0.removeFromSuperview()
@@ -451,11 +451,12 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         switch result {
         case let .success(release):
             remoteAssets = release.assets
+            let tag = release.tag == "direct downloads" ? hostText("direct downloads") : release.tag
             remoteAssetsStatus.text = release.assets.isEmpty
-                ? "No assets in this release. You can use a package link below." : "Latest release · \(release.tag)"
+                ? hostText("No assets in this release. You can use a package link below.") : hostText("Latest release · {tag}", tag)
             for (index, asset) in release.assets.enumerated() {
                 let button = HostActionButton(type: .custom)
-                let detail = asset.size > 0 ? "\(formattedByteCount(asset.size)) · Download" : "Download release asset"
+                let detail = asset.size > 0 ? hostText("{size} · Download", formattedByteCount(asset.size)) : hostText("Download release asset")
                 configureButton(button, title: "\(asset.name)\n\(detail)",
                                 action: #selector(downloadPreset(_:)))
                 button.isEnabled = !busy
@@ -466,7 +467,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         case let .failure(error):
             remoteAssetsStatus.text = error.localizedDescription
             let retry = HostActionButton(type: .custom)
-            configureButton(retry, title: "Try again", action: #selector(reloadRemoteAssets))
+            configureButton(retry, title: hostText("Try again"), action: #selector(reloadRemoteAssets))
             retry.isEnabled = !busy
             remoteButtons.append(retry)
             remoteAssetsStack.addArrangedSubview(retry)
@@ -493,25 +494,25 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     private func updateInstalledState() {
         guard let config = try? store.installedConfig() else {
             launchButton.isEnabled = false
-            installedTitle.text = "Your next adventure awaits"
-            installedDetail.text = "Choose a release below to get started."
+            installedTitle.text = hostText("Your next adventure awaits")
+            installedDetail.text = hostText("Choose a release below to get started.")
             return
         }
         launchButton.isEnabled = !busy
         installedTitle.text = config.name
-        installedDetail.text = "Ready to play · v\(config.version) · \(config.script.language)"
+        installedDetail.text = hostText("Ready to play · v{version} · {language}", config.version, config.script.language)
     }
 
     private func showError(_ error: Error) {
-        let alert = UIAlertController(title: "Could not start game", message: error.localizedDescription,
+        let alert = UIAlertController(title: hostText("Could not start game"), message: error.localizedDescription,
                                       preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        alert.addAction(UIAlertAction(title: hostText("OK"), style: .default))
         present(alert, animated: true)
     }
 
     @objc private func downloadPreset(_ sender: UIButton) {
         guard remoteAssets.indices.contains(sender.tag) else {
-            showError(HostFailure("The selected release asset is no longer available"))
+            showError(HostFailure(hostText("The selected release asset is no longer available")))
             return
         }
         let asset = remoteAssets[sender.tag]
@@ -522,7 +523,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     @objc private func downloadCustom() {
         let raw = urlField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard let url = URL(string: raw), url.scheme?.lowercased() == "https" else {
-            showError(HostFailure("Enter a valid HTTPS URL"))
+            showError(HostFailure(hostText("Enter a valid HTTPS URL")))
             return
         }
         download(url: url)
@@ -531,7 +532,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     private func download(url: URL) {
         guard !busy else { return }
         view.endEditing(true)
-        setBusy(true, status: "Downloading package...")
+        setBusy(true, status: hostText("Downloading package..."))
         ReleaseClient.shared.download(url) { [weak self] result in
             guard let self else { return }
             let installed = result.flatMap { archive in Result { try self.store.install(archive: archive) } }
@@ -550,7 +551,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
 
     @objc private func launchInstalled() {
         do {
-            setBusy(true, status: "Starting installed game...")
+            setBusy(true, status: hostText("Starting installed game..."))
             activate(try store.installedConfig())
         } catch {
             setBusy(false, status: "")

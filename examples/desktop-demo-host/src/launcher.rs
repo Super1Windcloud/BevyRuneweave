@@ -1,5 +1,7 @@
 //! Native launcher presentation. Package installation and runtime hosting stay in `main`.
 
+use crate::i18n::text;
+
 use super::{
     InstalledGame, Language, LauncherApp, ReleaseAsset, format_size, open_resource_directory,
 };
@@ -116,11 +118,11 @@ impl Launcher {
             let view = view.clone();
             dialog
                 .confirm()
-                .title("Clear local game resources?")
-                .description("Close running games first. This removes downloaded game assets and the current game selection. Logs, bundled demo resources, and other files outside asset folders are kept. You can download games again from Discover.")
-                .ok_text("Clear resources")
+                .title(text("Clear local game resources?"))
+                .description(text("Close running games first. This removes downloaded game assets and the current game selection. Logs, bundled demo resources, and other files outside asset folders are kept. You can download games again from Discover."))
+                .ok_text(text("Clear resources"))
                 .ok_variant(ButtonVariant::Danger)
-                .cancel_text("Cancel")
+                .cancel_text(text("Cancel"))
                 .on_ok(move |_, _, cx| {
                     view.update(cx, |this, cx| {
                         if this.state.resources_busy() {
@@ -177,7 +179,7 @@ impl Launcher {
                                     div()
                                         .text_size(px(10.))
                                         .text_color(rgb(0xACB5A8))
-                                        .child("DESKTOP LAUNCHER"),
+                                        .child(text("DESKTOP LAUNCHER")),
                                 ),
                         )
                     }),
@@ -196,9 +198,9 @@ impl Launcher {
                 Button::new("open-resources")
                     .custom(sidebar_button_style(false, cx))
                     .icon(IconName::FolderOpen)
-                    .when(!compact, |button| button.label("Resource folder"))
+                    .when(!compact, |button| button.label(text("Resource folder")))
                     .text_color(rgb(0xCFD6C9))
-                    .tooltip("Open installed resources")
+                    .tooltip(text("Open installed resources"))
                     .on_click(cx.listener(|this, _, _, cx| {
                         if let Err(error) = open_resource_directory() {
                             this.state.error = Some(error);
@@ -213,8 +215,8 @@ impl Launcher {
                             .foreground(tone(0xE6AA96, 0xE8A993, cx).into()),
                     )
                     .icon(IconName::Trash)
-                    .when(!compact, |button| button.label("Clear resources"))
-                    .tooltip("Clear downloaded game resources")
+                    .when(!compact, |button| button.label(text("Clear resources")))
+                    .tooltip(text("Clear downloaded game resources"))
                     .disabled(self.state.resources_busy())
                     .on_click(cx.listener(|this, _, window, cx| this.confirm_cleanup(window, cx))),
             )
@@ -227,7 +229,7 @@ impl Launcher {
                         .border_color(rgb(0x3A433B))
                         .text_size(px(11.))
                         .text_color(rgb(0x9EA996))
-                        .child("A little world, ready to play."),
+                        .child(text("A little world, ready to play.")),
                 )
             })
     }
@@ -246,9 +248,9 @@ impl Launcher {
             .icon(icon)
             .h(px(42.))
             .w_full()
-            .when(!compact, |button| button.label(label))
+            .when(!compact, |button| button.label(text(label)))
             .toggled(selected)
-            .tooltip(label)
+            .tooltip(text(label))
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.page = page;
                 cx.notify();
@@ -280,26 +282,26 @@ impl Launcher {
                     .flex_col()
                     .gap_2()
                     .min_w_0()
-                    .child(kicker(eyebrow, cx))
+                    .child(kicker(text(eyebrow), cx))
                     .child(
                         div()
                             .text_size(px(30.))
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child(title),
+                            .child(text(title)),
                     )
-                    .when(!compact, |view| view.child(secondary(subtitle, cx))),
+                    .when(!compact, |view| view.child(secondary(text(subtitle), cx))),
             )
             .child(
                 Button::new("refresh")
                     .outline()
                     .icon(IconName::RefreshCw)
-                    .when(!compact, |button| button.label("Refresh"))
+                    .when(!compact, |button| button.label(text("Refresh")))
                     .disabled(
                         self.state.resources_busy()
                             || (self.page == Page::Downloads
                                 && self.state.remote_assets_result.is_some()),
                     )
-                    .tooltip("Refresh this page")
+                    .tooltip(text("Refresh this page"))
                     .on_click(cx.listener(|this, _, _, cx| {
                         match this.page {
                             Page::Library => {
@@ -335,7 +337,7 @@ impl Launcher {
                     .bg(tone(0xE9EEDD, 0x2B382B, cx))
                     .border_1()
                     .border_color(tone(0xDDE5D0, 0x43513B, cx))
-                    .child(kicker("PICK UP & PLAY", cx))
+                    .child(kicker(text("PICK UP & PLAY"), cx))
                     .child(
                         div()
                             .flex()
@@ -359,7 +361,7 @@ impl Launcher {
                                             .child(game.name.clone()),
                                     )
                                     .child(secondary(
-                                        format!(
+                                        host_format!(
                                             "{}  /  Version {}",
                                             game.language.label(),
                                             game.version
@@ -374,12 +376,15 @@ impl Launcher {
                             .items_center()
                             .justify_between()
                             .gap_3()
-                            .child(secondary("Your next adventure is one click away.", cx))
+                            .child(secondary(
+                                text("Your next adventure is one click away."),
+                                cx,
+                            ))
                             .child(
                                 Button::new("play-featured")
                                     .primary()
                                     .icon(IconName::Play)
-                                    .label("Play now")
+                                    .label(text("Play now"))
                                     .h(px(42.))
                                     .disabled(self.state.resources_busy())
                                     .on_click(cx.listener(move |this, _, _, cx| {
@@ -399,10 +404,11 @@ impl Launcher {
                 .child(
                     div()
                         .font_weight(FontWeight::SEMIBOLD)
-                        .child("Installed games"),
+                        .child(text("Installed games")),
                 )
                 .child(secondary(
-                    format!("{} in your library", self.state.installed_games.len()),
+                    text("{count} in your library")
+                        .replace("{count}", &self.state.installed_games.len().to_string()),
                     cx,
                 )),
         );
@@ -422,16 +428,16 @@ impl Launcher {
                         div()
                             .text_size(px(20.))
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child("Make room for a little adventure"),
+                            .child(text("Make room for a little adventure")),
                     )
                     .child(secondary(
-                        "Install a game from Discover to get started.",
+                        text("Install a game from Discover to get started."),
                         cx,
                     ))
                     .child(
                         Button::new("browse-games")
                             .primary()
-                            .label("Explore games")
+                            .label(text("Explore games"))
                             .icon(IconName::ArrowRight)
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.page = Page::Downloads;
@@ -488,14 +494,14 @@ impl Launcher {
                     )),
             )
             .when(active && !compact, |view| {
-                view.child(pill("Last played", cx))
+                view.child(pill(text("Last played"), cx))
             })
             .child(
                 Button::new(SharedString::from(format!("play-{}", game.project)))
                     .outline()
                     .icon(IconName::Play)
-                    .tooltip("Start this game")
-                    .when(!compact, |button| button.label("Play"))
+                    .tooltip(text("Start this game"))
+                    .when(!compact, |button| button.label(text("Play")))
                     .disabled(self.state.resources_busy())
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.state.start_installed_game(&project);
@@ -514,13 +520,20 @@ impl Launcher {
                 .child(
                     div()
                         .font_weight(FontWeight::SEMIBOLD)
-                        .child("Release packages"),
+                        .child(text("Release packages")),
                 )
                 .child(pill(
                     self.state
                         .remote_release_tag
-                        .clone()
-                        .unwrap_or_else(|| "Checking release".into()),
+                        .as_deref()
+                        .map(|tag| {
+                            if tag == "direct downloads" {
+                                text(tag).to_owned()
+                            } else {
+                                tag.to_owned()
+                            }
+                        })
+                        .unwrap_or_else(|| text("Checking release").into()),
                     cx,
                 )),
         );
@@ -531,15 +544,15 @@ impl Launcher {
                     .py_8()
                     .gap_3()
                     .child(Spinner::new())
-                    .child(secondary("Finding available packages...", cx)),
+                    .child(secondary(text("Finding available packages..."), cx)),
             );
         } else if self.state.remote_assets.is_empty() {
             body = body.child(
                 card(cx)
                     .gap_3()
-                    .child("No release packages available")
+                    .child(text("No release packages available"))
                     .child(secondary(
-                        "Refresh to try again, or install from a URL below.",
+                        text("Refresh to try again, or install from a URL below."),
                         cx,
                     )),
             );
@@ -560,10 +573,10 @@ impl Launcher {
                 .child(
                     div()
                         .font_weight(FontWeight::SEMIBOLD)
-                        .child("Bring your own world"),
+                        .child(text("Bring your own world")),
                 )
                 .child(secondary(
-                    "Paste a resource package URL. We'll install it and start the game.",
+                    text("Paste a resource package URL. We'll install it and start the game."),
                     cx,
                 ))
                 .child(
@@ -582,7 +595,7 @@ impl Launcher {
                             Button::new("install-url")
                                 .primary()
                                 .icon(IconName::Download)
-                                .label("Install & play")
+                                .label(text("Install & play"))
                                 .disabled(self.state.resources_busy())
                                 .on_click(cx.listener(|this, _, _, cx| this.install_url(cx))),
                         ),
@@ -598,7 +611,7 @@ impl Launcher {
     ) -> gpui_kit::Div {
         let download = asset.clone();
         let size = if asset.size == 0 {
-            "Release asset".to_owned()
+            text("Release asset").to_owned()
         } else {
             format_size(asset.size)
         };
@@ -639,7 +652,7 @@ impl Launcher {
                 Button::new(SharedString::from(format!("download-{}", asset.name)))
                     .outline()
                     .icon(IconName::Download)
-                    .when(!compact, |button| button.label("Install & play"))
+                    .when(!compact, |button| button.label(text("Install & play")))
                     .tooltip(super::release_asset_label(asset))
                     .disabled(self.state.resources_busy())
                     .on_click(cx.listener(move |this, _, _, cx| this.install_asset(&download, cx))),
@@ -660,11 +673,13 @@ impl Launcher {
             .text_color(cx.theme().muted_foreground)
             .when(self.state.downloading, |view| {
                 view.child(Spinner::new().small().color(cx.theme().primary))
-                    .child("Downloading & installing. Your game will start when ready.")
+                    .child(text(
+                        "Downloading & installing. Your game will start when ready.",
+                    ))
             })
             .when(self.state.clearing, |view| {
                 view.child(Spinner::new().small().color(cx.theme().primary))
-                    .child("Clearing local game resources...")
+                    .child(text("Clearing local game resources..."))
             })
             .when(!self.state.resources_busy(), |view| {
                 view.child(div().size(px(6.)).rounded_full().bg(rgb(0x839571)))
@@ -672,7 +687,7 @@ impl Launcher {
                         self.state
                             .status_message
                             .clone()
-                            .unwrap_or_else(|| "Ready to play".to_owned()),
+                            .unwrap_or_else(|| text("Ready to play").to_owned()),
                     )
                     .child(div().flex_1())
                     .child("Bevy RuneWeave")
@@ -727,7 +742,9 @@ impl Render for Launcher {
                                                     div()
                                                         .font_weight(FontWeight::SEMIBOLD)
                                                         .text_color(tone(0x9C3D24, 0xF5B8A0, cx))
-                                                        .child("Something needs your attention"),
+                                                        .child(text(
+                                                            "Something needs your attention",
+                                                        )),
                                                 )
                                                 .child(
                                                     div()
@@ -740,7 +757,7 @@ impl Render for Launcher {
                                             Button::new("dismiss-error")
                                                 .ghost()
                                                 .icon(IconName::X)
-                                                .tooltip("Dismiss error")
+                                                .tooltip(text("Dismiss error"))
                                                 .on_click(cx.listener(|this, _, _, cx| {
                                                     this.state.error = None;
                                                     cx.notify();
@@ -959,7 +976,7 @@ mod tests {
             window.render_frame(cx);
             assert_eq!(
                 content.read(cx).state.error.as_deref(),
-                Some("Enter an asset package URL")
+                Some(text("Enter an asset package URL"))
             );
             assert!(!content.read(cx).state.downloading);
             window.scroll(
@@ -1109,7 +1126,7 @@ mod tests {
         assert!(state.result.is_none());
         assert_eq!(
             state.error.as_deref(),
-            Some("Download worker stopped unexpectedly")
+            Some(text("Download worker stopped unexpectedly"))
         );
     }
 
@@ -1180,7 +1197,7 @@ mod tests {
                 .error
                 .as_deref()
                 .unwrap()
-                .contains("worker stopped unexpectedly")
+                .contains(text("Release worker stopped unexpectedly"))
         );
     }
 }

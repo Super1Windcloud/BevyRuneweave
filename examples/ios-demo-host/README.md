@@ -11,8 +11,8 @@ Build the unified Lua/QuickJS XCFramework, then open or build the project:
 just build-runtime-ios
 xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj \
   -scheme BevyRuneweaveHost \
-  -sdk iphonesimulator \
-  -destination 'generic/platform=iOS Simulator' \
+  -sdk iphoneos \
+  -destination 'generic/platform=iOS' \
   -configuration Debug \
   ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build
 ```
@@ -24,6 +24,13 @@ attached to the app so Swift, Rust, Bevy, and script stdout/stderr are visible i
 terminal; close the app or press `Ctrl+C` to stop streaming. Native crash reports remain available
 under `$HOME/Library/Logs/DiagnosticReports/BevyRuneweave-*.ips`. Run `just build-runtime-ios`
 separately when the runtime changes.
+
+The default runtime build currently produces a device-only arm64 XCFramework. Simulator builds,
+including the host script's fallback and Release simulator path, require a separately prepared
+matching simulator slice; the device library cannot be linked into a simulator app. This batch
+validated the signed Debug app on a physical iPhone, not those simulator paths. A paired iPhone
+whose CoreDevice tunnel has not opened yet is eligible for selection; DDI availability alone is
+not a reliable pre-launch filter.
 
 Physical-device installation requires an Apple Development signing identity and a 10-character team
 ID. Store the team ID in the root `.env`; the generated signing configuration remains untracked:
@@ -71,3 +78,37 @@ release downloads, and custom package links into rounded sections. Settings pers
 appearance choice. The centered content column adapts to iPad widths, text supports Dynamic Type,
 and release names wrap without fixed row heights. Keyboard avoidance and download busy states keep
 the package import flow accessible.
+
+The launcher follows the first preferred system language: Chinese locales use Simplified Chinese,
+and other languages use English. Native `.lproj` resources include navigation, accessibility,
+status and validation messages. They are generated from `examples/host-localization.json` with
+`npm run prepare:host-locales`; `npm run test:host-locales` verifies consistency across all hosts.
+
+The game supports portrait and both landscape orientations. The portable BMS `on_suspend()`
+callback lets games pause on focus loss or backgrounding. Ember Arena clears queued input and
+requires manual resume while preserving the current in-process world; process-death saving is
+outside this change.
+
+The shared `BevyRuneweaveHostUITests` scheme runs against the real signed app and embedded runtime:
+
+```bash
+xcodebuild -project examples/ios-demo-host/BevyRuneweaveHost.xcodeproj \
+  -scheme BevyRuneweaveHostUITests -sdk iphoneos \
+  -destination 'id=<iPhone UDID>' -configuration Debug \
+  -derivedDataPath dist/ios-demo-derived-data -allowProvisioningUpdates \
+  ARCHS=arm64 ONLY_ACTIVE_ARCH=YES test
+```
+
+The gameplay test requires current Ember Arena assets in the host's private package store.
+Build/install/signature checks and actual device trust/launch are separate gates. Rotation captures
+use `XCUIScreen.main.screenshot()` after stable foreground geometry because app-relative captures
+can crop against stale accessibility window coordinates.
+
+Device acceptance on 2026-11-12: iPhone 14 Pro / iOS 27.0.1, fresh unified runtime, signed Debug
+build and actual launch passed. Two native UI tests verified English, Chinese and French fallback,
+launcher navigation and actual game launch/taps/rotation/background activation. Full-screen GPU
+captures were visually inspected for title, hero selection, portrait/landscape dungeon and the
+pause modal after resume. The UI tests assert labels and app state; visual inspection supplies
+the canvas-layout evidence. Logs, `.xcresult` bundles and captures are under
+`dist/mobile-adaptation/`. Simulator, iPad, minimum OS, Release, download-failure recovery,
+audio/performance and complete game acceptance remain untested in this batch.

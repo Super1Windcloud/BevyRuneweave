@@ -95,6 +95,8 @@ interface RuneweaveCallbacks {
   on_script_loaded: () => void;
   on_script_reloaded: () => void;
   on_update: (dt: number) => void;
+  /** Optional; called before update when the primary window loses focus or the app suspends. */
+  on_suspend?: () => void;
 }
 
 /** ScriptActor is a real reflected Bevy component owned by this attachment. */

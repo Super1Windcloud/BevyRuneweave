@@ -603,6 +603,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sevenz-rust",
+ "sys-locale",
  "tar",
  "tempfile",
  "unrar",

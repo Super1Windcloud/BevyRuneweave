@@ -66,3 +66,23 @@ release downloads, and custom package links into rounded sections. Settings pers
 appearance choice. Content stays centered on wide screens, release names wrap without fixed row
 heights, and navigation grows with the system font scale. Download controls expose disabled and
 busy states; keyboard insets keep the URL field accessible.
+
+The launcher follows the system language by default: Chinese locales use Simplified Chinese,
+and other languages use English. Android 13+ per-app language preferences take priority; an
+unsupported preference falls back to English even on a Chinese system. Navigation, accessibility,
+status and validation messages come from `examples/host-localization.json`. Run
+`npm run prepare:host-locales` after changing that shared catalog and `npm run test:host-locales`
+to check the generated native resources and desktop catalog.
+
+The game supports portrait and landscape without recreating its NativeActivity. System Back
+returns to the launcher while keeping the runtime alive. The portable BMS `on_suspend()` callback
+lets games pause on focus loss or backgrounding; Ember Arena clears queued input and requires
+manual resume. This preserves an in-process run, not a save across process death.
+
+Device acceptance on 2026-11-12: Pixel 8 / Android 17, arm64 Debug runtime and APK rebuilt,
+Kotlin compilation and Android Lint passed. Chinese system default, English and French-to-English
+fallback, native launcher navigation, actual dungeon touch movement, portrait/landscape rendering,
+Home/recents pause/resume and Back-to-launcher passed. The runtime PID stayed unchanged through
+Home/recents and Back. Captures and logs are under `dist/mobile-adaptation/`; locale overrides were
+cleared and portrait restored. Other ABIs, minimum supported OS versions, Release, download-failure
+recovery, audio/performance and complete game acceptance were not tested in this batch.

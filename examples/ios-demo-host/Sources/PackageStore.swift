@@ -14,7 +14,7 @@ final class PackageStore {
 
     func installedConfig() throws -> EngineConfig {
         let marker = installedAssets.appendingPathComponent(installedMarkerName)
-        guard files.fileExists(atPath: marker.path) else { throw HostFailure("No game package is installed") }
+        guard files.fileExists(atPath: marker.path) else { throw HostFailure(hostText("No game package is installed")) }
         return try validateAssets(at: installedAssets)
     }
 
@@ -24,7 +24,7 @@ final class PackageStore {
             return
         }
         guard let bundled = Bundle.main.resourceURL?.appendingPathComponent("assets", isDirectory: true) else {
-            throw HostFailure("The bundled assets directory is missing")
+            throw HostFailure(hostText("The bundled assets directory is missing"))
         }
         _ = try validateAssets(at: bundled)
         let staging = installedAssets.deletingLastPathComponent()
@@ -82,7 +82,7 @@ final class PackageStore {
         guard let source = Bundle.main.resourceURL?
             .appendingPathComponent("assets", isDirectory: true)
             .appendingPathComponent(bootstrapScriptName), files.fileExists(atPath: source.path) else {
-            throw HostFailure("The bundled host bootstrap script is missing")
+            throw HostFailure(hostText("The bundled host bootstrap script is missing"))
         }
         let target = installedAssets.appendingPathComponent(bootstrapScriptName)
         try? files.removeItem(at: target)

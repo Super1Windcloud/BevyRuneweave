@@ -1,5 +1,20 @@
 import Foundation
 
+// Honor the system/app language; all Chinese variants use the Simplified Chinese
+// catalog and other languages fall back to English. Keep strings in native resources.
+private let hostLanguageBundle: Bundle = {
+    let language = Locale.preferredLanguages.first?.lowercased().hasPrefix("zh") == true ? "zh-Hans" : "en"
+    guard let path = Bundle.main.path(forResource: language, ofType: "lproj"),
+          let bundle = Bundle(path: path) else { return .main }
+    return bundle
+}()
+
+func hostText(_ key: String, _ arguments: String...) -> String {
+    let format = hostLanguageBundle.localizedString(forKey: key, value: key, table: nil)
+    guard !arguments.isEmpty else { return format }
+    return String(format: format, locale: Locale.current, arguments: arguments.map { $0 as NSString })
+}
+
 let bootstrapScriptName = "host-bootstrap.js"
 let installedMarkerName = ".installed-package"
 let hostDarkModeDefaultsKey = "host.darkMode"
@@ -42,26 +57,26 @@ func safeRelativePath(_ path: String, allowTrailingSlash: Bool = false) -> Bool 
 func validateAssets(at assets: URL) throws -> EngineConfig {
     let configURL = assets.appendingPathComponent("engineConfig.json")
     let config = try JSONDecoder().decode(EngineConfig.self, from: Data(contentsOf: configURL))
-    guard config.schemaVersion == 1 else { throw HostFailure("Unsupported engineConfig schemaVersion") }
+    guard config.schemaVersion == 1 else { throw HostFailure(hostText("Unsupported engineConfig schemaVersion")) }
     guard !config.name.isEmpty, !config.version.isEmpty else {
-        throw HostFailure("engineConfig name and version must not be empty")
+        throw HostFailure(hostText("engineConfig name and version must not be empty"))
     }
     guard ["js", "typescript", "lua"].contains(config.script.language) else {
-        throw HostFailure("Unsupported script language")
+        throw HostFailure(hostText("Unsupported script language"))
     }
     let entry = config.script.entry
     guard safeRelativePath(entry), !entry.hasSuffix("/") else {
-        throw HostFailure("script.entry must stay inside assets")
+        throw HostFailure(hostText("script.entry must stay inside assets"))
     }
     let fileExtension = (entry as NSString).pathExtension.lowercased()
     let isLua = config.script.language == "lua" && fileExtension == "lua"
     let isQuickJS = ["js", "typescript"].contains(config.script.language) &&
         ["js", "mjs"].contains(fileExtension)
     guard isLua || isQuickJS else {
-        throw HostFailure("script language does not match the entry extension")
+        throw HostFailure(hostText("script language does not match the entry extension"))
     }
     guard FileManager.default.fileExists(atPath: assets.appendingPathComponent(entry).path) else {
-        throw HostFailure("Script entry does not exist: \(entry)")
+        throw HostFailure(hostText("Script entry does not exist: {entry}", entry))
     }
     return config
 }

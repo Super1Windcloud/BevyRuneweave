@@ -6,11 +6,11 @@ enum ZipInstaller {
     private static let endSignature: UInt32 = 0x0605_4b50
 
     static func extract(_ archive: Data, to destination: URL) throws {
-        guard archive.count >= 22 else { throw HostFailure("Asset ZIP is truncated") }
+        guard archive.count >= 22 else { throw HostFailure(hostText("Asset ZIP is truncated")) }
         let minimum = max(0, archive.count - 65_557)
         guard let endOffset = stride(from: archive.count - 22, through: minimum, by: -1)
             .first(where: { archive.uint32LE(at: $0) == endSignature }) else {
-            throw HostFailure("Asset ZIP has no central directory")
+            throw HostFailure(hostText("Asset ZIP has no central directory"))
         }
 
         let disk = archive.uint16LE(at: endOffset + 4)
@@ -20,7 +20,7 @@ enum ZipInstaller {
         let centralOffset = Int(archive.uint32LE(at: endOffset + 16))
         guard disk == 0, centralDisk == 0, entryCount > 0, entryCount <= maxArchiveEntries,
               centralOffset <= archive.count, centralSize <= archive.count - centralOffset else {
-            throw HostFailure("Asset ZIP directory is invalid")
+            throw HostFailure(hostText("Asset ZIP directory is invalid"))
         }
 
         let files = FileManager.default
@@ -29,7 +29,7 @@ enum ZipInstaller {
         var totalUnpacked = 0
         for _ in 0..<entryCount {
             guard cursor <= archive.count - 46, archive.uint32LE(at: cursor) == centralSignature else {
-                throw HostFailure("Asset ZIP entry header is invalid")
+                throw HostFailure(hostText("Asset ZIP entry header is invalid"))
             }
             let flags = archive.uint16LE(at: cursor + 8)
             let method = archive.uint16LE(at: cursor + 10)
@@ -44,20 +44,20 @@ enum ZipInstaller {
             let next = cursor + 46 + nameLength + extraLength + commentLength
             guard next <= archive.count, nameLength > 0, flags & 1 == 0,
                   method == 0 || method == 8 else {
-                throw HostFailure("Asset ZIP contains an unsupported entry")
+                throw HostFailure(hostText("Asset ZIP contains an unsupported entry"))
             }
 
             let nameRange = (cursor + 46)..<(cursor + 46 + nameLength)
             guard let name = String(data: archive.subdata(in: nameRange), encoding: .utf8),
                   safeRelativePath(name, allowTrailingSlash: true),
                   UInt16(externalAttributes >> 16) & 0o170000 != 0o120000 else {
-                throw HostFailure("Asset ZIP contains an unsafe entry path")
+                throw HostFailure(hostText("Asset ZIP contains an unsafe entry path"))
             }
             let (updatedTotal, overflow) = totalUnpacked.addingReportingOverflow(unpackedSize)
             guard !overflow, updatedTotal <= maxUnpackedBytes,
                   localOffset <= archive.count - 30,
                   archive.uint32LE(at: localOffset) == localSignature else {
-                throw HostFailure("Asset ZIP exceeds its extraction limits")
+                throw HostFailure(hostText("Asset ZIP exceeds its extraction limits"))
             }
             totalUnpacked = updatedTotal
 
@@ -69,14 +69,14 @@ enum ZipInstaller {
                 let localExtraLength = Int(archive.uint16LE(at: localOffset + 28))
                 let dataOffset = localOffset + 30 + localNameLength + localExtraLength
                 guard dataOffset <= archive.count, compressedSize <= archive.count - dataOffset else {
-                    throw HostFailure("Asset ZIP entry data is truncated")
+                    throw HostFailure(hostText("Asset ZIP entry data is truncated"))
                 }
                 let compressed = archive.subdata(in: dataOffset..<(dataOffset + compressedSize))
                 let data = method == 0
                     ? try stored(compressed, expectedSize: unpackedSize)
                     : try inflated(compressed, expectedSize: unpackedSize)
                 guard data.crc32 == expectedCRC else {
-                    throw HostFailure("Asset ZIP entry checksum failed")
+                    throw HostFailure(hostText("Asset ZIP entry checksum failed"))
                 }
                 try files.createDirectory(at: target.deletingLastPathComponent(),
                                           withIntermediateDirectories: true)
@@ -87,7 +87,7 @@ enum ZipInstaller {
     }
 
     private static func stored(_ data: Data, expectedSize: Int) throws -> Data {
-        guard data.count == expectedSize else { throw HostFailure("Stored ZIP entry size is invalid") }
+        guard data.count == expectedSize else { throw HostFailure(hostText("Stored ZIP entry size is invalid")) }
         return data
     }
 
@@ -97,7 +97,7 @@ enum ZipInstaller {
         var stream = z_stream()
         let initialization = inflateInit2_(&stream, -MAX_WBITS, ZLIB_VERSION,
                                            Int32(MemoryLayout<z_stream>.size))
-        guard initialization == Z_OK else { throw HostFailure("Could not initialize ZIP decompression") }
+        guard initialization == Z_OK else { throw HostFailure(hostText("Could not initialize ZIP decompression")) }
         defer { inflateEnd(&stream) }
 
         let status = data.withUnsafeBytes { input in
@@ -112,7 +112,7 @@ enum ZipInstaller {
             }
         }
         guard status == Z_STREAM_END, Int(stream.total_out) == expectedSize else {
-            throw HostFailure("ZIP entry decompression failed")
+            throw HostFailure(hostText("ZIP entry decompression failed"))
         }
         output.count = expectedSize
         return output

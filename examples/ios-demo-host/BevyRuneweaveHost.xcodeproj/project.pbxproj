@@ -4,6 +4,26 @@
 	classes = {};
 	objectVersion = 56;
 	objects = {
+		900000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/HostLocalizationUITests.swift; sourceTree = "<group>"; };
+		900000000000000000000002 = {isa = PBXBuildFile; fileRef = 900000000000000000000001; };
+		900000000000000000000003 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (900000000000000000000002,); runOnlyForDeploymentPostprocessing = 0; };
+		900000000000000000000004 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		900000000000000000000005 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		900000000000000000000006 = {
+			isa = PBXNativeTarget; name = BevyRuneweaveHostUITests; productName = BevyRuneweaveHostUITests;
+			buildConfigurationList = 900000000000000000000009;
+			buildPhases = (900000000000000000000003, 900000000000000000000004, 900000000000000000000005,);
+			buildRules = (); dependencies = (90000000000000000000000B,);
+			productReference = 900000000000000000000007; productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		900000000000000000000007 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = BevyRuneweaveHostUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		900000000000000000000008 = {
+			isa = XCBuildConfiguration; name = Debug; baseConfigurationReference = 200000000000000000000006;
+			buildSettings = {CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = io.github.super1windcloud.runeweave.demo.uitests; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = BevyRuneweaveHost; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";};
+		};
+		900000000000000000000009 = {isa = XCConfigurationList; buildConfigurations = (900000000000000000000008,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+		90000000000000000000000A = {isa = PBXContainerItemProxy; containerPortal = 600000000000000000000001; proxyType = 1; remoteGlobalIDString = 500000000000000000000001; remoteInfo = BevyRuneweaveHost; };
+		90000000000000000000000B = {isa = PBXTargetDependency; target = 500000000000000000000001; targetProxy = 90000000000000000000000A; };
 
 			100000000000000000000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000001 /* main.swift */; };
 			100000000000000000000002 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000002 /* assets */; };
@@ -14,6 +34,10 @@
 			100000000000000000000007 /* PackageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20000000000000000000000A /* PackageStore.swift */; };
 			100000000000000000000008 /* ReleaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20000000000000000000000B /* ReleaseClient.swift */; };
 			100000000000000000000009 /* HostUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20000000000000000000000C /* HostUI.swift */; };
+			10000000000000000000000A /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 400000000000000000000005 /* Localizable.strings */; };
+			20000000000000000000000E /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = Resources/en.lproj/Localizable.strings; sourceTree = "<group>"; };
+			20000000000000000000000F /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "Resources/zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+			400000000000000000000005 /* Localizable.strings */ = {isa = PBXVariantGroup; children = (20000000000000000000000E, 20000000000000000000000F,); name = Localizable.strings; sourceTree = "<group>"; };
 
 			200000000000000000000001 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		200000000000000000000002 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = "<group>"; };
@@ -38,7 +62,7 @@
 		300000000000000000000002 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-				files = (100000000000000000000002 /* assets in Resources */, 100000000000000000000004 /* Assets.xcassets in Resources */,);
+				files = (100000000000000000000002 /* assets in Resources */, 100000000000000000000004 /* Assets.xcassets in Resources */, 10000000000000000000000A /* Localizable.strings in Resources */,);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		300000000000000000000003 /* Sources */ = {
@@ -61,6 +85,8 @@
 					400000000000000000000002 /* Sources */,
 					200000000000000000000007 /* Assets.xcassets */,
 					200000000000000000000002 /* assets */,
+					400000000000000000000005 /* Localizable.strings */,
+					900000000000000000000001 /* HostLocalizationUITests.swift */,
 				200000000000000000000003 /* BevyRuneweave.xcframework */,
 				400000000000000000000003 /* Config */,
 				400000000000000000000004 /* Products */,
@@ -89,7 +115,7 @@
 		};
 		400000000000000000000004 /* Products */ = {
 			isa = PBXGroup;
-			children = (200000000000000000000004 /* BevyRuneweave.app */,);
+			children = (200000000000000000000004 /* BevyRuneweave.app */, 900000000000000000000007,);
 			name = Products;
 			sourceTree = "<group>";
 		};
@@ -121,12 +147,12 @@
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
-			knownRegions = (en, Base,);
+			knownRegions = (en, "zh-Hans", Base,);
 			mainGroup = 400000000000000000000001;
 			productRefGroup = 400000000000000000000004 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (500000000000000000000001 /* BevyRuneweaveHost */,);
+			targets = (500000000000000000000001 /* BevyRuneweaveHost */, 900000000000000000000006,);
 		};
 
 		700000000000000000000001 = {

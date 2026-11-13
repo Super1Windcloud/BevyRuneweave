@@ -2,22 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-
-interface CoreDevice {
-  connectionProperties?: { tunnelState?: string };
-  deviceProperties?: {
-    ddiServicesAvailable?: boolean;
-    developerModeStatus?: string;
-    name?: string;
-  };
-  hardwareProperties?: {
-    marketingName?: string;
-    platform?: string;
-    reality?: string;
-    udid?: string;
-  };
-  identifier: string;
-}
+import { selectPhysicalDevice, type CoreDevice } from "./ios-device-selection.js";
 
 interface CoreDeviceList {
   result?: { devices?: CoreDevice[] };
@@ -44,21 +29,8 @@ function connectedPhysicalDevice() {
   try {
     run("xcrun", ["devicectl", "list", "devices", "--json-output", jsonPath, "--quiet"]);
     const devices = (JSON.parse(readFileSync(jsonPath, "utf8")) as CoreDeviceList).result?.devices ?? [];
-    const available = devices.filter((device) =>
-      device.hardwareProperties?.platform === "iOS"
-      && device.hardwareProperties.reality === "physical"
-      && device.connectionProperties?.tunnelState === "connected"
-      && device.deviceProperties?.ddiServicesAvailable === true
-      && device.deviceProperties.developerModeStatus === "enabled"
-    );
     const requested = process.env.RUNEWEAVE_IOS_DEVICE?.trim();
-    return requested
-      ? available.find((device) => [
-          device.identifier,
-          device.hardwareProperties?.udid,
-          device.deviceProperties?.name,
-        ].includes(requested))
-      : available[0];
+    return selectPhysicalDevice(devices, requested);
   } catch (error) {
     console.warn(`Could not enumerate physical iOS devices: ${String(error)}`);
     return undefined;

@@ -8,6 +8,14 @@ immutable revision; source and crop checksums are recorded in the asset manifest
 
 ## Current sewer milestone
 
+Mobile adaptation update (2026-11-12): Android arm64 and iOS device Debug builds and actual
+launch/touch/rotation/background-pause paths were exercised with rebuilt runtimes. Optional BMS
+`on_suspend()` cancels queued game input and pauses the in-process run; process-death save/load
+remains absent. Script tests now pass 164 cases and unified runtime tests pass 42 (one ignored).
+These checks and the three launchers' Chinese/English localization do not satisfy full-game,
+all-platform or original-client pixel acceptance. See the current mobile evidence in README.md
+and UI_PARITY.md; older batch-specific validation below is historical.
+
 | Area | Implemented | Remaining difference |
 | --- | --- | --- |
 | Time | Fractional action times in reflected f32 components; independent healing/regeneration/fire/mob/buff deadlines with source priorities 0/-1/-10/-20/-30; hunger and LockedFloor have their own actors; idle frames do not advance actors | Exact same-priority actor ordering and the rest of the Actor framework remain pending |

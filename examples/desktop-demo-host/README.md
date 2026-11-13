@@ -78,6 +78,17 @@ Linux builds also require the X11/Wayland development libraries described in the
 hosts do not depend on GPUI Kit. UI interaction tests use Kit's headless test windows; they do not
 replace native rendering checks on each desktop platform.
 
+The launcher follows the system locale at startup: all Chinese variants use Simplified Chinese,
+and other locales fall back to English. Navigation, accessibility/tooltips, status and recovery
+messages share `examples/host-localization.json` with Android and iOS. Package metadata, URLs and
+script-language identifiers remain unchanged. Run `npm run prepare:host-locales` after editing
+the catalog; `npm run test:host-locales` checks generated resources and placeholder parity.
+
+Localization acceptance on 2026-11-12: 34 macOS-hosted tests passed, including GPUI interaction,
+Chinese locale variants, unsupported-language fallback and formatted error data. These headless
+checks do not establish native GPU rendering or Windows/Linux execution; those remain unverified
+for this localization batch.
+
 Release builds redirect stdout and stderr to process-specific files under the application-data
 directory. Every process start truncates its own file, so `logs/launcher.log` contains only the
 latest launcher session and `logs/runtime.log` contains only the latest game-runtime session. Debug

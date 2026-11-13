@@ -4,6 +4,16 @@ Runeweave registers script-facing operations once in `AppScriptFunctionRegistry`
 and TypeScript receive the same functions through their BMS language adapters. Scene data is stored
 as real reflected Bevy components and resources; there is no script-side ECS snapshot in Rust.
 
+## Lifecycle callbacks
+
+`on_suspend()` is optional in Lua, JavaScript and TypeScript. The runtime dispatches it through
+BMS before `on_update` when the primary window loses focus or Bevy reports application suspension.
+Focus and lifecycle notifications for one interruption are coalesced; secondary windows do not
+pause the game. Foregrounding rearms the callback and does not automatically restart gameplay.
+Use it to cancel queued input/targeting and show a pause screen. Existing scripts without the
+callback continue to work. This contract is shared by Windows, macOS, Linux, Android and iOS;
+it does not serialize in-progress runs or provide recovery after process termination.
+
 ## Scene Functions
 
 | Function | Behavior |

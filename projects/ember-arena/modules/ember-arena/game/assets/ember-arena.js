@@ -3172,6 +3172,14 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
     loadProfile();
     loadMenu();
   };
+  callbacks.on_suspend = () => {
+    queuedPath = [];
+    targeting = null;
+    examining = false;
+    actionCooldown = 0;
+    cameraShake = 0;
+    if (phase === "playing") setPhase("paused");
+  };
   callbacks.on_update = (delta) => {
     const dt = clamp(Number.isFinite(delta) ? delta : 0, 0, 0.05);
     const pointer = input_primary_pointer();

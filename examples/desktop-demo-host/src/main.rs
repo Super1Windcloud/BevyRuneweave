@@ -2,8 +2,12 @@
 
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+#[macro_use]
+mod localized_messages;
+mod i18n;
 mod launcher;
 use flate2::read::GzDecoder;
+use i18n::text;
 use libloading::{Library, Symbol};
 use lzma_rust2::XzReader;
 use serde::Deserialize;
@@ -180,7 +184,7 @@ impl LauncherApp {
         self.status_message = None;
         let url = self.url.trim().to_owned();
         if url.is_empty() {
-            self.error = Some("Enter an asset package URL".to_owned());
+            self.error = Some(text("Enter an asset package URL").to_owned());
             return;
         }
 
@@ -201,7 +205,7 @@ impl LauncherApp {
             Ok(result) => result,
             Err(mpsc::TryRecvError::Empty) => return false,
             Err(mpsc::TryRecvError::Disconnected) => {
-                Err("Download worker stopped unexpectedly".to_owned())
+                Err(text("Download worker stopped unexpectedly").to_owned())
             }
         };
 
@@ -252,7 +256,7 @@ impl LauncherApp {
             Ok(result) => result,
             Err(mpsc::TryRecvError::Empty) => return false,
             Err(mpsc::TryRecvError::Disconnected) => {
-                Err("Cleanup worker stopped unexpectedly".to_owned())
+                Err(text("Cleanup worker stopped unexpectedly").to_owned())
             }
         };
         self.cleanup_result = None;
@@ -261,7 +265,7 @@ impl LauncherApp {
         let refreshed = self.refresh_installed_games();
         self.error = result.and(refreshed).err();
         if self.error.is_none() {
-            self.status_message = Some("Local game resources cleared".to_owned());
+            self.status_message = Some(text("Local game resources cleared").to_owned());
         }
         true
     }
@@ -274,7 +278,7 @@ impl LauncherApp {
             Ok(result) => result,
             Err(mpsc::TryRecvError::Empty) => return false,
             Err(mpsc::TryRecvError::Disconnected) => {
-                Err("Release worker stopped unexpectedly".to_owned())
+                Err(text("Release worker stopped unexpectedly").to_owned())
             }
         };
 
@@ -284,7 +288,12 @@ impl LauncherApp {
                 self.remote_release_tag = Some(tag);
                 self.remote_assets = assets;
             }
-            Err(error) => self.error = Some(format!("Could not load release assets: {error}")),
+            Err(error) => {
+                self.error = Some(host_format!(
+                    "Could not load release assets: {error}",
+                    error = error
+                ))
+            }
         }
         true
     }
@@ -294,21 +303,29 @@ fn clear_local_game_resources_at(root: &Path) -> Result<(), String> {
     let metadata = match fs::symlink_metadata(root) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
-        Err(error) => return Err(format!("Could not inspect resource directory: {error}")),
+        Err(error) => {
+            return Err(host_format!(
+                "Could not inspect resource directory: {error}",
+                error = error
+            ));
+        }
     };
     if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        return Err("Resource directory must be a regular directory, not a link".to_owned());
+        return Err(text("Resource directory must be a regular directory, not a link").to_owned());
     }
 
     let marker = root.join(ACTIVE_PROJECT_FILE);
     match fs::symlink_metadata(&marker) {
         Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {
             return Err(
-                "Active project marker is a directory; resources were not cleared".to_owned(),
+                text("Active project marker is a directory; resources were not cleared").to_owned(),
             );
         }
         Err(error) if error.kind() != io::ErrorKind::NotFound => {
-            return Err(format!("Could not inspect active project marker: {error}"));
+            return Err(host_format!(
+                "Could not inspect active project marker: {error}",
+                error = error
+            ));
         }
         _ => {}
     }
@@ -324,8 +341,9 @@ fn clear_local_game_resources_at(root: &Path) -> Result<(), String> {
         if file_type.is_symlink()
             && (name == "assets" || entry.path().join("assets").join(CONFIG_FILE).is_file())
         {
-            return Err(format!(
-                "Resources at {name} are linked; resources were not cleared"
+            return Err(host_format!(
+                "Resources at {name} are linked; resources were not cleared",
+                name = name
             ));
         }
         if name == "assets" && entry.path().join(CONFIG_FILE).is_file() {
@@ -340,41 +358,61 @@ fn clear_local_game_resources_at(root: &Path) -> Result<(), String> {
         let assets = entry.path().join("assets");
         match fs::symlink_metadata(&assets) {
             Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err(format!(
-                    "Assets for {name} are linked; resources were not cleared"
+                return Err(host_format!(
+                    "Assets for {name} are linked; resources were not cleared",
+                    name = name
                 ));
             }
             Ok(metadata) if metadata.is_dir() && assets.join(CONFIG_FILE).is_file() => {
                 targets.push(assets);
             }
             Err(error) if error.kind() != io::ErrorKind::NotFound => {
-                return Err(format!("Could not inspect assets for {name}: {error}"));
+                return Err(host_format!(
+                    "Could not inspect assets for {name}: {error}",
+                    name = name,
+                    error = error
+                ));
             }
             _ => {}
         }
     }
     for assets in targets {
-        fs::remove_dir_all(&assets)
-            .map_err(|error| format!("Could not clear {}: {error}", assets.display()))?;
+        fs::remove_dir_all(&assets).map_err(|error| {
+            host_format!(
+                "Could not clear {}: {error}",
+                assets.display(),
+                error = error
+            )
+        })?;
     }
     match fs::remove_file(&marker) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(format!("Could not clear active project marker: {error}")),
+        Err(error) => Err(host_format!(
+            "Could not clear active project marker: {error}",
+            error = error
+        )),
     }
 }
 
 fn open_resource_directory() -> Result<(), String> {
     let resources = platform_data_root()?;
     fs::create_dir_all(&resources).map_err(|error| {
-        format!(
+        host_format!(
             "Could not create resource directory {}: {error}",
-            resources.display()
+            resources.display(),
+            error = error
         )
     })?;
     directory_open_command(&resources)
         .spawn()
-        .map_err(|error| format!("Could not open {}: {error}", resources.display()))?;
+        .map_err(|error| {
+            host_format!(
+                "Could not open {}: {error}",
+                resources.display(),
+                error = error
+            )
+        })?;
     Ok(())
 }
 
@@ -405,7 +443,7 @@ fn repo_root() -> Result<PathBuf, String> {
     if current.join("include/game_runtime.h").is_file() {
         Ok(current)
     } else {
-        Err("Could not find the Bevy RuneWeave runtime directory".to_owned())
+        Err(text("Could not find the Bevy RuneWeave runtime directory").to_owned())
     }
 }
 
@@ -414,7 +452,7 @@ fn executable_directory() -> Result<PathBuf, String> {
         .map_err(|error| error.to_string())?
         .parent()
         .map(Path::to_path_buf)
-        .ok_or_else(|| "Could not determine the launcher directory".to_owned())
+        .ok_or_else(|| text("Could not determine the launcher directory").to_owned())
 }
 
 fn bundled_assets_root() -> Result<PathBuf, String> {
@@ -431,7 +469,7 @@ fn bundled_assets_root() -> Result<PathBuf, String> {
     {
         return Ok(resources);
     }
-    Err("The installed application does not contain default assets".to_owned())
+    Err(text("The installed application does not contain default assets").to_owned())
 }
 
 fn platform_data_root() -> Result<PathBuf, String> {
@@ -453,7 +491,7 @@ fn platform_data_root() -> Result<PathBuf, String> {
                 .map(|home| home.join(".local/share"))
         });
     base.map(|path| path.join("Bevy RuneWeave"))
-        .ok_or_else(|| "Could not determine the user data directory".to_owned())
+        .ok_or_else(|| text("Could not determine the user data directory").to_owned())
 }
 
 #[cfg(any(not(debug_assertions), test))]
@@ -466,17 +504,29 @@ fn initialize_release_logging(mode: ProcessMode) -> Result<PathBuf, String> {
     let path = release_log_path_at(&platform_data_root()?, mode);
     let parent = path
         .parent()
-        .ok_or_else(|| "Could not determine the release log directory".to_owned())?;
-    fs::create_dir_all(parent)
-        .map_err(|error| format!("Could not create {}: {error}", parent.display()))?;
+        .ok_or_else(|| text("Could not determine the release log directory").to_owned())?;
+    fs::create_dir_all(parent).map_err(|error| {
+        host_format!(
+            "Could not create {}: {error}",
+            parent.display(),
+            error = error
+        )
+    })?;
     let file = fs::OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
         .open(&path)
-        .map_err(|error| format!("Could not reset {}: {error}", path.display()))?;
-    redirect_standard_streams(file)
-        .map_err(|error| format!("Could not redirect output to {}: {error}", path.display()))?;
+        .map_err(|error| {
+            host_format!("Could not reset {}: {error}", path.display(), error = error)
+        })?;
+    redirect_standard_streams(file).map_err(|error| {
+        host_format!(
+            "Could not redirect output to {}: {error}",
+            path.display(),
+            error = error
+        )
+    })?;
     println!(
         "Bevy RuneWeave {mode:?} started (pid {})",
         std::process::id()
@@ -633,22 +683,32 @@ fn active_assets_root_at(installed_root: &Path) -> Result<PathBuf, String> {
         }
         return Ok(path);
     }
-    Err("No installed game assets are available".to_owned())
+    Err(text("No installed game assets are available").to_owned())
 }
 
 fn load_config(assets: &Path) -> Result<EngineConfig, String> {
-    let bytes = fs::read(assets.join(CONFIG_FILE))
-        .map_err(|error| format!("Could not read {CONFIG_FILE}: {error}"))?;
-    let config: EngineConfig = serde_json::from_slice(&bytes)
-        .map_err(|error| format!("Could not parse {CONFIG_FILE}: {error}"))?;
+    let bytes = fs::read(assets.join(CONFIG_FILE)).map_err(|error| {
+        host_format!(
+            "Could not read {CONFIG_FILE}: {error}",
+            CONFIG_FILE = CONFIG_FILE,
+            error = error
+        )
+    })?;
+    let config: EngineConfig = serde_json::from_slice(&bytes).map_err(|error| {
+        host_format!(
+            "Could not parse {CONFIG_FILE}: {error}",
+            CONFIG_FILE = CONFIG_FILE,
+            error = error
+        )
+    })?;
     if config.schema_version != 1 {
-        return Err(format!(
+        return Err(host_format!(
             "Unsupported engineConfig schemaVersion: {}",
             config.schema_version
         ));
     }
     if config.name.trim().is_empty() || config.version.trim().is_empty() {
-        return Err("engineConfig name and version must not be empty".to_owned());
+        return Err(text("engineConfig name and version must not be empty").to_owned());
     }
     if config.script.entry.is_absolute()
         || config
@@ -657,10 +717,10 @@ fn load_config(assets: &Path) -> Result<EngineConfig, String> {
             .components()
             .any(|part| matches!(part, Component::ParentDir))
     {
-        return Err("script.entry must be a relative path inside assets".to_owned());
+        return Err(text("script.entry must be a relative path inside assets").to_owned());
     }
     if !assets.join(&config.script.entry).is_file() {
-        return Err(format!(
+        return Err(host_format!(
             "Script entry does not exist: {}",
             config.script.entry.display()
         ));
@@ -720,7 +780,7 @@ fn safe_relative(path: &Path) -> Result<PathBuf, String> {
             Component::Normal(part) => safe.push(part),
             Component::CurDir => {}
             Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
-                return Err(format!(
+                return Err(host_format!(
                     "Archive entry escapes its destination: {}",
                     path.display()
                 ));
@@ -728,20 +788,23 @@ fn safe_relative(path: &Path) -> Result<PathBuf, String> {
         }
     }
     if safe.as_os_str().is_empty() {
-        Err("Archive contains an empty entry path".to_owned())
+        Err(text("Archive contains an empty entry path").to_owned())
     } else {
         Ok(safe)
     }
 }
 
 fn extract_package(bytes: &[u8], source_name: &str, destination: &Path) -> Result<(), String> {
-    match detect_archive_format(bytes).ok_or_else(|| "Unsupported archive format".to_owned())? {
+    match detect_archive_format(bytes)
+        .ok_or_else(|| text("Unsupported archive format").to_owned())?
+    {
         ArchiveFormat::Zip => extract_zip(bytes, destination),
         ArchiveFormat::Tar => extract_tar(Cursor::new(bytes), destination),
         ArchiveFormat::Gzip => extract_compressed(GzDecoder::new(bytes), source_name, destination),
         ArchiveFormat::Zstd => {
-            let decoder = zstd::stream::read::Decoder::new(bytes)
-                .map_err(|error| format!("Could not open zstd stream: {error}"))?;
+            let decoder = zstd::stream::read::Decoder::new(bytes).map_err(|error| {
+                host_format!("Could not open zstd stream: {error}", error = error)
+            })?;
             extract_compressed(decoder, source_name, destination)
         }
         ArchiveFormat::Xz => {
@@ -754,19 +817,19 @@ fn extract_package(bytes: &[u8], source_name: &str, destination: &Path) -> Resul
 
 fn extract_zip(bytes: &[u8], destination: &Path) -> Result<(), String> {
     let mut archive = zip::ZipArchive::new(Cursor::new(bytes))
-        .map_err(|error| format!("Could not open ZIP archive: {error}"))?;
+        .map_err(|error| host_format!("Could not open ZIP archive: {error}", error = error))?;
     for index in 0..archive.len() {
         let mut entry = archive
             .by_index(index)
-            .map_err(|error| format!("Could not read ZIP entry: {error}"))?;
+            .map_err(|error| host_format!("Could not read ZIP entry: {error}", error = error))?;
         let relative = entry
             .enclosed_name()
-            .ok_or_else(|| format!("Unsafe ZIP entry path: {}", entry.name()))?;
+            .ok_or_else(|| host_format!("Unsafe ZIP entry path: {}", entry.name()))?;
         if entry
             .unix_mode()
             .is_some_and(|mode| mode & 0o170000 == 0o120000)
         {
-            return Err(format!(
+            return Err(host_format!(
                 "ZIP symbolic links are not supported: {}",
                 entry.name()
             ));
@@ -789,14 +852,15 @@ fn extract_tar<R: Read>(reader: R, destination: &Path) -> Result<(), String> {
     let mut archive = tar::Archive::new(reader);
     let entries = archive
         .entries()
-        .map_err(|error| format!("Could not read tar archive: {error}"))?;
+        .map_err(|error| host_format!("Could not read tar archive: {error}", error = error))?;
     for entry in entries {
-        let mut entry = entry.map_err(|error| format!("Could not read tar entry: {error}"))?;
+        let mut entry = entry
+            .map_err(|error| host_format!("Could not read tar entry: {error}", error = error))?;
         let unpacked = entry
             .unpack_in(destination)
-            .map_err(|error| format!("Could not extract tar entry: {error}"))?;
+            .map_err(|error| host_format!("Could not extract tar entry: {error}", error = error))?;
         if !unpacked {
-            return Err("Tar entry escapes its destination".to_owned());
+            return Err(text("Tar entry escapes its destination").to_owned());
         }
     }
     Ok(())
@@ -810,7 +874,7 @@ fn extract_compressed<R: Read>(
     let mut decoded = Vec::new();
     reader
         .read_to_end(&mut decoded)
-        .map_err(|error| format!("Could not decompress stream: {error}"))?;
+        .map_err(|error| host_format!("Could not decompress stream: {error}", error = error))?;
     if looks_like_tar(&decoded) {
         return extract_tar(Cursor::new(decoded), destination);
     }
@@ -823,7 +887,7 @@ fn compressed_output_name(source_name: &str) -> Result<&str, String> {
     let file_name = Path::new(source_name)
         .file_name()
         .and_then(OsStr::to_str)
-        .ok_or_else(|| "Compressed download has no valid file name".to_owned())?;
+        .ok_or_else(|| text("Compressed download has no valid file name").to_owned())?;
     for suffix in [".gzip", ".gz", ".zstd", ".zst", ".xz"] {
         if let Some(stem) = file_name.strip_suffix(suffix)
             && !stem.is_empty()
@@ -831,7 +895,10 @@ fn compressed_output_name(source_name: &str) -> Result<&str, String> {
             return Ok(stem);
         }
     }
-    Err(format!("Could not determine output name for {file_name}"))
+    Err(host_format!(
+        "Could not determine output name for {file_name}",
+        file_name = file_name
+    ))
 }
 
 fn extract_seven_zip(bytes: &[u8], destination: &Path) -> Result<(), String> {
@@ -854,35 +921,41 @@ fn extract_seven_zip(bytes: &[u8], destination: &Path) -> Result<(), String> {
             Ok(true)
         },
     )
-    .map_err(|error| format!("Could not extract 7z archive: {error}"))
+    .map_err(|error| host_format!("Could not extract 7z archive: {error}", error = error))
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
 fn extract_rar(bytes: &[u8], destination: &Path) -> Result<(), String> {
-    let mut source = tempfile::NamedTempFile::new()
-        .map_err(|error| format!("Could not create temporary RAR file: {error}"))?;
+    let mut source = tempfile::NamedTempFile::new().map_err(|error| {
+        host_format!(
+            "Could not create temporary RAR file: {error}",
+            error = error
+        )
+    })?;
     source
         .write_all(bytes)
         .and_then(|()| source.flush())
-        .map_err(|error| format!("Could not write temporary RAR file: {error}"))?;
+        .map_err(|error| {
+            host_format!("Could not write temporary RAR file: {error}", error = error)
+        })?;
     let mut archive = unrar::Archive::new(source.path())
         .open_for_processing()
-        .map_err(|error| format!("Could not open RAR archive: {error}"))?;
+        .map_err(|error| host_format!("Could not open RAR archive: {error}", error = error))?;
     while let Some(header) = archive
         .read_header()
-        .map_err(|error| format!("Could not read RAR entry: {error}"))?
+        .map_err(|error| host_format!("Could not read RAR entry: {error}", error = error))?
     {
         let relative = safe_relative(&header.entry().filename)?;
         let target = destination.join(relative);
         if header.entry().is_directory() {
             fs::create_dir_all(&target).map_err(|error| error.to_string())?;
-            archive = header
-                .skip()
-                .map_err(|error| format!("Could not skip RAR directory: {error}"))?;
+            archive = header.skip().map_err(|error| {
+                host_format!("Could not skip RAR directory: {error}", error = error)
+            })?;
         } else {
-            let (data, remaining) = header
-                .read()
-                .map_err(|error| format!("Could not extract RAR entry: {error}"))?;
+            let (data, remaining) = header.read().map_err(|error| {
+                host_format!("Could not extract RAR entry: {error}", error = error)
+            })?;
             if let Some(parent) = target.parent() {
                 fs::create_dir_all(parent).map_err(|error| error.to_string())?;
             }
@@ -895,7 +968,7 @@ fn extract_rar(bytes: &[u8], destination: &Path) -> Result<(), String> {
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 fn extract_rar(_bytes: &[u8], _destination: &Path) -> Result<(), String> {
-    Err("RAR extraction is not supported on this operating system".to_owned())
+    Err(text("RAR extraction is not supported on this operating system").to_owned())
 }
 
 fn fetch_remote_assets() -> Receiver<RemoteAssetsResult> {
@@ -962,9 +1035,9 @@ fn fallback_release_assets() -> Vec<ReleaseAsset> {
 
 fn release_asset_label(asset: &ReleaseAsset) -> String {
     if asset.size == 0 {
-        format!("Download {}", asset.name)
+        host_format!("Download {}", asset.name)
     } else {
-        format!("Download {} ({})", asset.name, format_size(asset.size))
+        host_format!("Download {} ({})", asset.name, format_size(asset.size))
     }
 }
 
@@ -996,10 +1069,10 @@ fn download_and_install(url: &str) -> Result<(), String> {
         .get(url)
         .send()
         .and_then(reqwest::blocking::Response::error_for_status)
-        .map_err(|error| format!("Download failed: {error}"))?;
+        .map_err(|error| host_format!("Download failed: {error}", error = error))?;
     let bytes = response
         .bytes()
-        .map_err(|error| format!("Could not read download: {error}"))?;
+        .map_err(|error| host_format!("Could not read download: {error}", error = error))?;
     install_downloaded_package(&root, &bytes, &source_name).map(|_| ())
 }
 
@@ -1013,7 +1086,10 @@ fn project_directory_name(name: &str) -> Result<String, String> {
             character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
         })
     {
-        return Err(format!("Invalid engineConfig project name: {name}"));
+        return Err(host_format!(
+            "Invalid engineConfig project name: {name}",
+            name = name
+        ));
     }
     Ok(name.to_ascii_lowercase())
 }
@@ -1021,18 +1097,30 @@ fn project_directory_name(name: &str) -> Result<String, String> {
 fn write_active_project(root: &Path, project: &str) -> Result<(), String> {
     let key = project_directory_name(project)?;
     if key != project {
-        return Err("Active project key is not normalized".to_owned());
+        return Err(text("Active project key is not normalized").to_owned());
     }
     let marker = root.join(ACTIVE_PROJECT_FILE);
     let temporary = root.join(format!(".{ACTIVE_PROJECT_FILE}.{}.tmp", std::process::id()));
-    fs::write(&temporary, format!("{key}\n"))
-        .map_err(|error| format!("Could not write active project marker: {error}"))?;
+    fs::write(&temporary, format!("{key}\n")).map_err(|error| {
+        host_format!(
+            "Could not write active project marker: {error}",
+            error = error
+        )
+    })?;
     if marker.exists() {
-        fs::remove_file(&marker)
-            .map_err(|error| format!("Could not replace active project marker: {error}"))?;
+        fs::remove_file(&marker).map_err(|error| {
+            host_format!(
+                "Could not replace active project marker: {error}",
+                error = error
+            )
+        })?;
     }
-    fs::rename(&temporary, &marker)
-        .map_err(|error| format!("Could not activate installed project: {error}"))
+    fs::rename(&temporary, &marker).map_err(|error| {
+        host_format!(
+            "Could not activate installed project: {error}",
+            error = error
+        )
+    })
 }
 
 fn install_downloaded_package(
@@ -1044,7 +1132,9 @@ fn install_downloaded_package(
     let staging = tempfile::Builder::new()
         .prefix(".installing-")
         .tempdir_in(root)
-        .map_err(|error| format!("Could not create staging directory: {error}"))?;
+        .map_err(|error| {
+            host_format!("Could not create staging directory: {error}", error = error)
+        })?;
     let staged_project = staging.path().join("project");
     let staged_assets = staged_project.join("assets");
     fs::create_dir_all(&staged_project).map_err(|error| error.to_string())?;
@@ -1055,18 +1145,29 @@ fn install_downloaded_package(
     let destination = root.join(&project);
     let backup = root.join(format!(".{project}.backup"));
     if backup.exists() {
-        fs::remove_dir_all(&backup)
-            .map_err(|error| format!("Could not remove stale project backup: {error}"))?;
+        fs::remove_dir_all(&backup).map_err(|error| {
+            host_format!(
+                "Could not remove stale project backup: {error}",
+                error = error
+            )
+        })?;
     }
     if destination.exists() {
-        fs::rename(&destination, &backup)
-            .map_err(|error| format!("Could not preserve installed project: {error}"))?;
+        fs::rename(&destination, &backup).map_err(|error| {
+            host_format!(
+                "Could not preserve installed project: {error}",
+                error = error
+            )
+        })?;
     }
     if let Err(error) = fs::rename(&staged_project, &destination) {
         if backup.exists() {
             let _ = fs::rename(&backup, &destination);
         }
-        return Err(format!("Could not install project: {error}"));
+        return Err(host_format!(
+            "Could not install project: {error}",
+            error = error
+        ));
     }
     if let Err(error) = write_active_project(root, &project) {
         let _ = fs::remove_dir_all(&destination);
@@ -1076,8 +1177,9 @@ fn install_downloaded_package(
         return Err(error);
     }
     if backup.exists() {
-        fs::remove_dir_all(&backup)
-            .map_err(|error| format!("Could not remove project backup: {error}"))?;
+        fs::remove_dir_all(&backup).map_err(|error| {
+            host_format!("Could not remove project backup: {error}", error = error)
+        })?;
     }
     Ok(destination.join("assets"))
 }
@@ -1090,18 +1192,23 @@ fn install_package(bytes: &[u8], source_name: &str, destination: &Path) -> Resul
         bytes.len()
     );
     if destination.exists() {
-        fs::remove_dir_all(destination)
-            .map_err(|error| format!("Could not replace installed assets: {error}"))?;
+        fs::remove_dir_all(destination).map_err(|error| {
+            host_format!("Could not replace installed assets: {error}", error = error)
+        })?;
     }
     fs::create_dir_all(destination).map_err(|error| error.to_string())?;
 
     let result = (|| {
         extract_package(bytes, source_name, destination)?;
-        let config_path =
-            find_config(destination)?.ok_or_else(|| format!("Package is missing {CONFIG_FILE}"))?;
+        let config_path = find_config(destination)?.ok_or_else(|| {
+            host_format!(
+                "Package is missing {CONFIG_FILE}",
+                CONFIG_FILE = CONFIG_FILE
+            )
+        })?;
         let package_root = config_path
             .parent()
-            .ok_or_else(|| "Invalid engineConfig.json path".to_owned())?;
+            .ok_or_else(|| text("Invalid engineConfig.json path").to_owned())?;
         load_config(package_root)?;
 
         // Packages may contain one or more wrapper directories. Copy their game root
@@ -1177,12 +1284,22 @@ fn prepare_runtime_icon(assets: &Path, icon: &str) -> Result<(), String> {
     if icon.starts_with("http://") || icon.starts_with("https://") {
         let response = reqwest::blocking::get(icon)
             .and_then(reqwest::blocking::Response::error_for_status)
-            .map_err(|error| format!("Could not download runtime icon: {error}"))?;
-        let bytes = response
-            .bytes()
-            .map_err(|error| format!("Could not read runtime icon response: {error}"))?;
-        return fs::write(&target, bytes)
-            .map_err(|error| format!("Could not write {}: {error}", target.display()));
+            .map_err(|error| {
+                host_format!("Could not download runtime icon: {error}", error = error)
+            })?;
+        let bytes = response.bytes().map_err(|error| {
+            host_format!(
+                "Could not read runtime icon response: {error}",
+                error = error
+            )
+        })?;
+        return fs::write(&target, bytes).map_err(|error| {
+            host_format!(
+                "Could not write {}: {error}",
+                target.display(),
+                error = error
+            )
+        });
     }
 
     let relative = Path::new(icon);
@@ -1191,15 +1308,22 @@ fn prepare_runtime_icon(assets: &Path, icon: &str) -> Result<(), String> {
             .components()
             .any(|component| component == Component::ParentDir)
     {
-        return Err("icon must be a relative path inside assets or an HTTP(S) URL".to_owned());
+        return Err(
+            text("icon must be a relative path inside assets or an HTTP(S) URL").to_owned(),
+        );
     }
 
     let source = assets.join(relative);
     if source == target {
-        let metadata = fs::metadata(&source)
-            .map_err(|error| format!("Could not read {}: {error}", source.display()))?;
+        let metadata = fs::metadata(&source).map_err(|error| {
+            host_format!(
+                "Could not read {}: {error}",
+                source.display(),
+                error = error
+            )
+        })?;
         if !metadata.is_file() || metadata.len() == 0 {
-            return Err(format!(
+            return Err(host_format!(
                 "Runtime icon is empty or not a file: {}",
                 source.display()
             ));
@@ -1208,10 +1332,11 @@ fn prepare_runtime_icon(assets: &Path, icon: &str) -> Result<(), String> {
     }
 
     fs::copy(&source, &target).map(|_| ()).map_err(|error| {
-        format!(
+        host_format!(
             "Could not copy runtime icon from {} to {}: {error}",
             source.display(),
-            target.display()
+            target.display(),
+            error = error
         )
     })
 }
@@ -1245,11 +1370,21 @@ fn run_game() -> Result<(), String> {
     } else {
         development
     };
-    let library = unsafe { Library::new(&library_path) }
-        .map_err(|error| format!("Could not load {}: {error}", library_path.display()))?;
+    let library = unsafe { Library::new(&library_path) }.map_err(|error| {
+        host_format!(
+            "Could not load {}: {error}",
+            library_path.display(),
+            error = error
+        )
+    })?;
     type Run = unsafe extern "C" fn(*const c_char, *const c_char) -> c_int;
-    let run: Symbol<'_, Run> = unsafe { library.get(b"game_runtime_run_with_assets\0") }
-        .map_err(|error| format!("Could not find game_runtime_run_with_assets: {error}"))?;
+    let run: Symbol<'_, Run> =
+        unsafe { library.get(b"game_runtime_run_with_assets\0") }.map_err(|error| {
+            host_format!(
+                "Could not find game_runtime_run_with_assets: {error}",
+                error = error
+            )
+        })?;
     let asset_root =
         CString::new(assets.to_string_lossy().as_bytes()).map_err(|error| error.to_string())?;
     let script = CString::new(config.script.entry.to_string_lossy().as_bytes())
@@ -1258,7 +1393,10 @@ fn run_game() -> Result<(), String> {
     if code == 0 {
         Ok(())
     } else {
-        Err(format!("Game runtime returned error code {code}"))
+        Err(host_format!(
+            "Game runtime returned error code {code}",
+            code = code
+        ))
     }
 }
 
@@ -1552,7 +1690,7 @@ mod tests {
         );
         assert_eq!(
             release_asset_label(&assets[0]),
-            format!("Download {}", FALLBACK_RELEASE_ASSETS[0])
+            host_format!("Download {}", FALLBACK_RELEASE_ASSETS[0])
         );
     }
 
@@ -1740,7 +1878,10 @@ mod tests {
         let bytes = zip_bytes("../escaped.txt", CONTENT);
         let destination = tempfile::tempdir().unwrap();
         let error = extract_package(&bytes, "unsafe.zip", destination.path()).unwrap_err();
-        assert!(error.contains("Unsafe ZIP entry path"));
+        assert_eq!(
+            error,
+            host_format!("Unsafe ZIP entry path: {}", "../escaped.txt")
+        );
         assert!(
             !destination
                 .path()

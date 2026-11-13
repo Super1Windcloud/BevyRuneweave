@@ -57,6 +57,35 @@ equivalent behavior or an explicit, portable error contract on every platform. C
 interfaces must assess all five targets and verify the available platform builds; any target that
 cannot be executed in the current environment must be called out explicitly as an unverified gap.
 
+## Mobile Runtime Delivery
+
+- A game bundle and its installed native runtime must be compatible. After changing BMS APIs,
+  callbacks or runtime behavior, rebuild the unified Android library and iOS XCFramework, then
+  rebuild and reinstall the hosts. Rebuilding TypeScript or Kotlin/Swift alone does not update
+  the prebuilt runtime. Match the target, profile and packaged library to the current source.
+- A running process or blank fullscreen surface does not prove that a game loaded. Launch the
+  current bundle on the device, check script/native logs for missing API errors, and exercise
+  gameplay input before reporting runtime acceptance.
+- An iOS build or install success does not prove launch acceptance. Verify signing/provisioning
+  validity and actual device launch separately. Report signing/trust failures as unresolved;
+  a UIKit-only preview or simulator stub is not runtime integration evidence.
+- For iOS rotation screenshots, wait for stable foreground geometry and capture the full screen
+  with `XCUIScreen.main.screenshot()`. App-relative accessibility window coordinates can retain
+  a stale portrait origin after rotation; distinguish capture cropping from actual rendering.
+- Preserve existing installed packages and user data when staging local validation assets.
+  Record build, installation, launch, touch, rotation, safe-area and background/resume results
+  separately for Android and iOS; results from one platform do not establish the other.
+
+## Example Host Localization
+
+- Every user-facing example host must support English and Simplified Chinese, including navigation,
+  accessibility labels, progress/status messages, validation errors and recovery actions.
+- Follow the system language by default, selecting Chinese for Chinese system locales and English
+  as the fallback. Use native localization resources on Android/iOS and a centralized catalog on
+  desktop. Keep package names, URLs, script language identifiers and protocol data unchanged.
+- Verify both languages and an unsupported-locale fallback. Localize presentation without changing
+  download, installation, runtime switching or persistence behavior.
+
 ## Build and Test Commands
 
 - `npm install` installs root tooling; `npm run typecheck:scripts` checks release/build scripts.

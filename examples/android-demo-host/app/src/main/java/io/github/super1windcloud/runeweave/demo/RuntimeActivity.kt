@@ -6,9 +6,12 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Process
 import android.view.View
+import android.view.KeyEvent
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 
 /**
  * The only NativeActivity in the application process. The downloader is brought above this
@@ -16,8 +19,19 @@ import android.view.WindowManager
  * of constructing a second winit event loop.
  */
 class RuntimeActivity : NativeActivity() {
+    private var unregisterBackCallback: (() -> Unit)? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val callback = OnBackInvokedCallback { returnToLauncher() }
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback,
+            )
+            unregisterBackCallback = {
+                onBackInvokedDispatcher.unregisterOnBackInvokedCallback(callback)
+            }
+        }
         enterImmersiveMode()
     }
 
@@ -37,8 +51,14 @@ class RuntimeActivity : NativeActivity() {
         switchFromIntent(intent)
     }
 
-    override fun onBackPressed() {
-        returnToLauncher()
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU &&
+            keyCode == KeyEvent.KEYCODE_BACK && !event.isCanceled
+        ) {
+            returnToLauncher()
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
     }
 
     @Suppress("unused")
@@ -54,6 +74,8 @@ class RuntimeActivity : NativeActivity() {
     }
 
     override fun onDestroy() {
+        unregisterBackCallback?.invoke()
+        unregisterBackCallback = null
         val finishing = isFinishing
         super.onDestroy()
         if (finishing) {
@@ -64,7 +86,7 @@ class RuntimeActivity : NativeActivity() {
 
     private fun switchFromIntent(intent: Intent?) {
         val script = intent?.getStringExtra(EXTRA_SCRIPT) ?: return
-        check(nativeSwitchScript(script) == 0) { "Could not switch runtime script" }
+        check(nativeSwitchScript(script) == 0) { getString(R.string.host_runtime_switch_failed) }
     }
 
     @Suppress("DEPRECATION")

@@ -1,6 +1,9 @@
 package io.github.super1windcloud.runeweave.demo
 
 import android.app.Activity
+import android.app.LocaleManager
+import android.content.Context
+import android.content.res.Configuration
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.res.ColorStateList
@@ -10,6 +13,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.RippleDrawable
 import android.os.Build
+import android.os.LocaleList
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -40,6 +44,22 @@ import javax.net.ssl.X509TrustManager
 import kotlin.math.max
 
 class MainActivity : Activity() {
+    override fun attachBaseContext(newBase: Context) {
+        val configuration = Configuration(newBase.resources.configuration)
+        val appLocales = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            newBase.getSystemService(LocaleManager::class.java).applicationLocales
+        } else LocaleList.getEmptyLocaleList()
+        val preferred = if (appLocales.isEmpty) configuration.locales.get(0) else appLocales.get(0)
+        val locale = if (preferred?.language.equals("zh", ignoreCase = true)) {
+            java.util.Locale.SIMPLIFIED_CHINESE
+        } else {
+            java.util.Locale.ENGLISH
+        }
+        configuration.setLocales(LocaleList(locale))
+        configuration.setLayoutDirection(locale)
+        super.attachBaseContext(newBase.createConfigurationContext(configuration))
+    }
+
     private val executor = Executors.newSingleThreadExecutor()
     private val primaryLabels = mutableListOf<TextView>()
     private val secondaryLabels = mutableListOf<TextView>()
@@ -118,9 +138,9 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        homeNavigation = navigationItem("Home", R.drawable.ic_home, Page.HOME)
+        homeNavigation = navigationItem(getString(R.string.host_home), R.drawable.ic_home, Page.HOME)
         settingsNavigation = navigationItem(
-            "Settings",
+            getString(R.string.host_settings),
             R.drawable.ic_settings,
             Page.SETTINGS,
         )
@@ -209,13 +229,13 @@ class MainActivity : Activity() {
                 cornerRadius = dp(28).toFloat()
             }
             addView(TextView(context).apply {
-                text = "PLAY. CREATE. EXPLORE."
+                text = getString(R.string.host_play_create_explore)
                 textSize = 11f
                 letterSpacing = 0.16f
                 setTextColor(Color.parseColor("#A8DDC8"))
             }, spaced(12))
             addView(TextView(context).apply {
-                text = "A little world.\nEndless possibilities."
+                text = getString(R.string.host_little_world)
                 textSize = 30f
                 setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL))
                 setTextColor(Color.WHITE)
@@ -223,7 +243,7 @@ class MainActivity : Activity() {
                 markAsHeading()
             }, spaced(12))
             addView(TextView(context).apply {
-                text = "Discover a game and make it your own."
+                text = getString(R.string.host_discover_intro)
                 textSize = 15f
                 setTextColor(Color.parseColor("#C1DCD1"))
             }, matchWrap())
@@ -245,20 +265,20 @@ class MainActivity : Activity() {
         statusRow.addView(status, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         addView(statusRow, matchWrap())
 
-        addView(sectionHeading("Your space"), spaced(12))
+        addView(sectionHeading(getString(R.string.host_your_space)), spaced(12))
         addView(card().apply {
-            installedTitle = label("Your next adventure awaits", 19f)
-            installedDetail = label("Choose a release below to get started.", 14f, secondary = true)
+            installedTitle = label(getString(R.string.host_next_adventure), 19f)
+            installedDetail = label(getString(R.string.host_choose_release), 14f, secondary = true)
             addView(installedTitle, spaced(6))
             addView(installedDetail, spaced(18))
-            launchButton = themedButton("Start installed game", R.drawable.ic_play).apply {
+            launchButton = themedButton(getString(R.string.host_start_installed), R.drawable.ic_play).apply {
                 setOnClickListener { launchGame() }
             }
             addView(launchButton, matchWrap())
         }, spaced(28))
 
-        addView(sectionHeading("Discover"), spaced(6))
-        remoteAssetsStatus = label("Finding the latest release…", 13f, secondary = true).apply {
+        addView(sectionHeading(getString(R.string.host_discover)), spaced(6))
+        remoteAssetsStatus = label(getString(R.string.host_finding_release), 13f, secondary = true).apply {
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         addView(remoteAssetsStatus, spaced(12))
@@ -266,8 +286,8 @@ class MainActivity : Activity() {
         addView(remoteAssetsContainer, spaced(18))
 
         addView(card().apply {
-            addView(label("Have a package link?", 19f), spaced(6))
-            addView(label("Bring your own game with an HTTPS ZIP link.", 14f, secondary = true), spaced(16))
+            addView(label(getString(R.string.host_package_link), 19f), spaced(6))
+            addView(label(getString(R.string.host_package_link_intro), 14f, secondary = true), spaced(16))
             urlField = EditText(context).apply {
                 hint = "https://…/game.zip"
                 textSize = 15f
@@ -277,7 +297,7 @@ class MainActivity : Activity() {
                 setSingleLine(true)
                 minHeight = dp(56)
                 setPadding(dp(14), dp(14), dp(14), dp(14))
-                contentDescription = "HTTPS asset package URL"
+                contentDescription = getString(R.string.host_package_url)
                 setOnEditorActionListener { _, action, _ ->
                     if (action == android.view.inputmethod.EditorInfo.IME_ACTION_GO) {
                         if (!busy) installFromUrl()
@@ -286,35 +306,35 @@ class MainActivity : Activity() {
                 }
             }
             addView(urlField, spaced(12))
-            downloadButton = themedButton("Download and start", R.drawable.ic_download).apply {
+            downloadButton = themedButton(getString(R.string.host_download_start), R.drawable.ic_download).apply {
                 setOnClickListener { installFromUrl() }
             }
             addView(downloadButton, matchWrap())
         }, spaced(24))
-        addView(label("Powered by Bevy RuneWeave", 12f, secondary = true).apply {
+        addView(label(getString(R.string.host_powered_by), 12f, secondary = true).apply {
             gravity = Gravity.CENTER
         }, matchWrap())
     }
 
     private fun createSettingsContent() = column().apply {
         setPadding(dp(20), dp(24), dp(20), dp(28))
-        addView(label("MAKE IT YOURS", 12f).apply {
+        addView(label(getString(R.string.host_make_it_yours), 12f).apply {
             letterSpacing = 0.14f
             accentLabels += this
         }, spaced(12))
-        addView(label("Settings", 32f).apply { markAsHeading() }, spaced(8))
-        addView(label("A comfortable space to play.", 15f, secondary = true), spaced(28))
-        addView(sectionHeading("Appearance"), spaced(12))
+        addView(label(getString(R.string.host_settings), 32f).apply { markAsHeading() }, spaced(8))
+        addView(label(getString(R.string.host_comfortable_space), 15f, secondary = true), spaced(28))
+        addView(sectionHeading(getString(R.string.host_appearance)), spaced(12))
         addView(card().apply {
             val row = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
             row.addView(column().apply {
-                addView(label("Dark mode", 17f), spaced(4))
-                addView(label("A softer glow after hours.", 14f, secondary = true), matchWrap())
+                addView(label(getString(R.string.host_dark_mode), 17f), spaced(4))
+                addView(label(getString(R.string.host_softer_glow), 14f, secondary = true), matchWrap())
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                 marginEnd = dp(12)
             })
             appearanceSwitch = Switch(context).apply {
-                contentDescription = "Dark mode"
+                contentDescription = getString(R.string.host_dark_mode)
                 minHeight = dp(48)
                 isChecked = darkMode
                 setOnCheckedChangeListener { _, enabled ->
@@ -328,7 +348,7 @@ class MainActivity : Activity() {
             addView(row, matchWrap())
         }, spaced(28))
         addView(label("Bevy RuneWeave", 16f), spaced(4))
-        addView(label("A home for small worlds and big ideas.", 14f, secondary = true), matchWrap())
+        addView(label(getString(R.string.host_big_ideas), 14f, secondary = true), matchWrap())
     }
 
     private fun TextView.markAsHeading() {
@@ -465,7 +485,7 @@ class MainActivity : Activity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     private fun loadRemoteAssets() {
-        remoteAssetsStatus.text = "Finding the latest release…"
+        remoteAssetsStatus.text = getString(R.string.host_finding_release)
         remoteAssetsContainer.removeAllViews()
         themedButtons.removeAll(remoteAssetButtons.toSet())
         remoteAssetButtons.clear()
@@ -474,8 +494,8 @@ class MainActivity : Activity() {
                 .recover { fallbackRemoteRelease() }
             runOnUiThread {
                 result.onSuccess(::showRemoteAssets).onFailure { error ->
-                    remoteAssetsStatus.text = error.message ?: "Could not load release assets"
-                    val retry = themedButton("Try again", R.drawable.ic_download).apply {
+                    remoteAssetsStatus.text = error.message ?: getString(R.string.host_release_failed)
+                    val retry = themedButton(getString(R.string.host_retry), R.drawable.ic_download).apply {
                         isEnabled = !busy
                         setOnClickListener { loadRemoteAssets() }
                     }
@@ -488,9 +508,10 @@ class MainActivity : Activity() {
     }
 
     private fun showRemoteAssets(release: RemoteRelease) {
-        remoteAssetsStatus.text = "Latest release · ${release.tag}"
+        val tag = if (release.tag == "direct downloads") getString(R.string.host_direct_downloads) else release.tag
+        remoteAssetsStatus.text = getString(R.string.host_latest_release, tag)
         release.assets.forEach { asset ->
-            val detail = if (asset.size > 0) "${formatSize(asset.size)} · Download" else "Download release asset"
+            val detail = if (asset.size > 0) getString(R.string.host_download_size, formatSize(asset.size)) else getString(R.string.host_download_asset)
             val button = themedButton("${asset.name}\n$detail", R.drawable.ic_download).apply {
                 isEnabled = !busy
                 textSize = 14f
@@ -502,7 +523,7 @@ class MainActivity : Activity() {
             remoteAssetButtons += button
             remoteAssetsContainer.addView(button, spaced(10))
         }
-        if (release.assets.isEmpty()) remoteAssetsStatus.text = "No assets in this release. You can use a package link below."
+        if (release.assets.isEmpty()) remoteAssetsStatus.text = getString(R.string.host_no_assets)
         refreshButtons()
     }
 
@@ -546,12 +567,12 @@ class MainActivity : Activity() {
         }
         try {
             check(connection.responseCode in 200..299) {
-                "Release lookup failed with HTTP ${connection.responseCode}"
+                getString(R.string.host_release_http, connection.responseCode.toString())
             }
             return connection.inputStream.bufferedReader().use { reader ->
                 val text = reader.readText()
                 check(text.toByteArray().size <= MAX_REMOTE_METADATA_BYTES) {
-                    "Release metadata is too large"
+                    getString(R.string.host_metadata_large)
                 }
                 text
             }
@@ -571,22 +592,22 @@ class MainActivity : Activity() {
         val rawUrl = urlField.text.toString().trim()
         val url = runCatching { URL(rawUrl) }.getOrNull()
         if (url == null || url.protocol != "https") {
-            showError("Enter a valid HTTPS URL")
+            showError(getString(R.string.host_valid_https))
             urlField.requestFocus()
-            urlField.error = "Enter a valid HTTPS URL"
+            urlField.error = getString(R.string.host_valid_https)
             return
         }
         urlField.error = null
         (getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
             .hideSoftInputFromWindow(urlField.windowToken, 0)
         urlField.clearFocus()
-        setBusy(true, "Downloading package...")
+        setBusy(true, getString(R.string.host_downloading))
         executor.execute {
             val result = runCatching { downloadAndInstall(url) }
             runOnUiThread {
                 setBusy(false, "")
                 result.onSuccess { launchGame() }
-                    .onFailure { showError(it.message ?: "Installation failed") }
+                    .onFailure { showError(it.message ?: getString(R.string.host_installation_failed)) }
                 updateInstalledState()
             }
         }
@@ -595,7 +616,7 @@ class MainActivity : Activity() {
     private fun downloadAndInstall(url: URL) {
         val staging = File(filesDir, "assets.staging")
         staging.deleteRecursively()
-        check(staging.mkdirs()) { "Could not create staging directory" }
+        check(staging.mkdirs()) { getString(R.string.host_staging_failed) }
 
         val connection = openDownloadConnection(url).apply {
             connectTimeout = 15_000
@@ -604,9 +625,9 @@ class MainActivity : Activity() {
         }
         try {
             check(connection.responseCode in 200..299) {
-                "Download failed with HTTP ${connection.responseCode}"
+                getString(R.string.host_download_http, connection.responseCode.toString())
             }
-            check(connection.url.protocol == "https") { "Download redirected to a non-HTTPS URL" }
+            check(connection.url.protocol == "https") { getString(R.string.host_https_redirect) }
             ZipInputStream(BufferedInputStream(connection.inputStream)).use { archive ->
                 extractZip(archive, staging)
             }
@@ -634,62 +655,62 @@ class MainActivity : Activity() {
         var bytesWritten = 0L
         while (true) {
             val entry = archive.nextEntry ?: break
-            check(++entries <= MAX_ENTRIES) { "Archive contains too many entries" }
+            check(++entries <= MAX_ENTRIES) { getString(R.string.host_many_entries) }
             val output = File(root, entry.name).canonicalFile
             check(output.path.startsWith(root.path + File.separator)) {
-                "Archive entry escapes the asset directory"
+                getString(R.string.host_unsafe_archive)
             }
             if (entry.isDirectory) {
-                check(output.mkdirs() || output.isDirectory) { "Could not create ${entry.name}" }
+                check(output.mkdirs() || output.isDirectory) { getString(R.string.host_create_entry, entry.name) }
             } else {
-                val parent = checkNotNull(output.parentFile) { "Archive entry has no parent directory" }
-                check(parent.isDirectory || parent.mkdirs()) { "Could not create ${entry.name}" }
+                val parent = checkNotNull(output.parentFile) { getString(R.string.host_entry_no_parent) }
+                check(parent.isDirectory || parent.mkdirs()) { getString(R.string.host_create_entry, entry.name) }
                 output.outputStream().buffered().use { stream ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                     while (true) {
                         val count = archive.read(buffer)
                         if (count < 0) break
                         bytesWritten += count
-                        check(bytesWritten <= MAX_UNPACKED_BYTES) { "Archive is too large" }
+                        check(bytesWritten <= MAX_UNPACKED_BYTES) { getString(R.string.host_archive_large) }
                         stream.write(buffer, 0, count)
                     }
                 }
             }
             archive.closeEntry()
         }
-        check(entries > 0) { "Asset ZIP is empty" }
+        check(entries > 0) { getString(R.string.host_zip_empty) }
     }
 
     private fun validatePackage(assets: File) {
         val configFile = File(assets, "engineConfig.json")
-        check(configFile.isFile) { "engineConfig.json is missing" }
+        check(configFile.isFile) { getString(R.string.host_config_missing) }
         val config = JSONObject(configFile.readText())
-        check(config.optInt("schemaVersion") == 1) { "Unsupported engineConfig schemaVersion" }
-        check(config.optString("name").isNotBlank()) { "engineConfig name is empty" }
-        check(config.optString("version").isNotBlank()) { "engineConfig version is empty" }
+        check(config.optInt("schemaVersion") == 1) { getString(R.string.host_schema_unsupported) }
+        check(config.optString("name").isNotBlank()) { getString(R.string.host_config_name_empty) }
+        check(config.optString("version").isNotBlank()) { getString(R.string.host_config_version_empty) }
         val script = config.getJSONObject("script")
         val language = script.getString("language")
-        check(language in setOf("js", "typescript", "lua")) { "Unsupported script language" }
+        check(language in setOf("js", "typescript", "lua")) { getString(R.string.host_script_unsupported) }
         val entry = script.getString("entry")
         check(entry.isNotBlank() && !entry.startsWith('/') && !entry.split('/').contains("..")) {
-            "script.entry must stay inside assets"
+            getString(R.string.host_script_inside)
         }
         val extension = File(entry).extension.lowercase()
         check((language == "lua" && extension == "lua") ||
             (language in setOf("js", "typescript") && extension in setOf("js", "mjs"))) {
-            "script.language does not match the entry extension"
+            getString(R.string.host_script_extension)
         }
-        check(File(assets, entry).isFile) { "Script entry does not exist: $entry" }
+        check(File(assets, entry).isFile) { getString(R.string.host_script_missing, entry) }
     }
 
     private fun replaceInstalledAssets(staging: File) {
         val installed = File(filesDir, "assets")
         val backup = File(filesDir, "assets.backup")
         backup.deleteRecursively()
-        if (installed.exists()) check(installed.renameTo(backup)) { "Could not preserve installed game" }
+        if (installed.exists()) check(installed.renameTo(backup)) { getString(R.string.host_preserve_failed) }
         if (!staging.renameTo(installed)) {
             backup.renameTo(installed)
-            error("Could not activate downloaded game")
+            error(getString(R.string.host_activate_download_failed))
         }
         backup.deleteRecursively()
     }
@@ -697,7 +718,7 @@ class MainActivity : Activity() {
     private fun launchGame() {
         runCatching { validatePackage(File(filesDir, "assets")) }
             .onFailure {
-                showError(it.message ?: "No valid game is installed")
+                showError(it.message ?: getString(R.string.host_no_valid_game))
                 return
             }
         startActivity(
@@ -714,10 +735,10 @@ class MainActivity : Activity() {
             JSONObject(File(assets, "engineConfig.json").readText())
         }.getOrNull()
         launchButton.isEnabled = !busy && config != null
-        installedTitle.text = config?.getString("name") ?: "Your next adventure awaits"
+        installedTitle.text = config?.getString("name") ?: getString(R.string.host_next_adventure)
         installedDetail.text = if (config != null) {
-            "Ready to play · v${config.getString("version")} · ${config.getJSONObject("script").getString("language")}"
-        } else "Choose a release below to get started."
+            getString(R.string.host_ready, config.getString("version"), config.getJSONObject("script").getString("language"))
+        } else getString(R.string.host_choose_release)
         refreshButtons()
     }
 

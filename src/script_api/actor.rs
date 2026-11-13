@@ -208,6 +208,10 @@ mod tests {
                     position.set("x", 6);
                     if (scene_actor_ids()[0] !== "actor") throw Error("actor query");
                 }
+                function on_suspend() {
+                    const actor = scene_actor("actor");
+                    actor.set("health", actor.get("health") - 3);
+                }
             "#,
                 world_id,
             )?;
@@ -217,6 +221,13 @@ mod tests {
                 &CallbackLabel::from("on_script_loaded"),
                 &mut context,
                 world_id,
+            )?;
+            quickjs_handler(
+                Vec::new(),
+                &attachment,
+                &CallbackLabel::from("on_suspend"),
+                &mut context,
+                world_id,
             )
         })?;
         let (actor, transform) = app
@@ -224,7 +235,7 @@ mod tests {
             .query::<(&ScriptActor, &Transform)>()
             .single(app.world())
             .unwrap();
-        assert_eq!(actor.health, 73.0);
+        assert_eq!(actor.health, 70.0);
         assert_eq!(transform.translation.x, 6.0);
         Ok(())
     }
@@ -693,6 +704,19 @@ mod tests {
                 let player = super::super::find_owned_entity(world, &attachment, "player").unwrap();
                 assert_eq!(world.get::<ScriptActor>(player).unwrap().cooldown, 1.0);
             })?;
+            click("equipment_window_outside")?;
+            call("on_update", &mut context)?;
+            click("close_bag")?;
+            call("on_update", &mut context)?;
+            call("on_suspend", &mut context)?;
+            call("on_update", &mut context)?;
+            guard.with_world_mut(|world| {
+                assert_eq!(world.resource::<ScriptGameState>().message, "PAUSED");
+                let player = super::super::find_owned_entity(world, &attachment, "player").unwrap();
+                assert_eq!(world.get::<ScriptActor>(player).unwrap().cooldown, 1.0);
+            })?;
+            click("pause_window_outside")?;
+            call("on_update", &mut context)?;
             Ok(())
         })
     }
@@ -723,6 +747,10 @@ mod tests {
                     transform.translation.x = 6
                     assert(scene_actor_ids()[1] == "actor")
                 end
+                function on_suspend()
+                    local actor = scene_actor("actor")
+                    actor.health = actor.health - 3
+                end
             "#,
                 world_id,
             )?;
@@ -732,6 +760,13 @@ mod tests {
                 &CallbackLabel::from("on_script_loaded"),
                 &mut context,
                 world_id,
+            )?;
+            lua_handler(
+                Vec::new(),
+                &attachment,
+                &CallbackLabel::from("on_suspend"),
+                &mut context,
+                world_id,
             )
         })?;
         let (actor, transform) = app
@@ -739,7 +774,7 @@ mod tests {
             .query::<(&ScriptActor, &Transform)>()
             .single(app.world())
             .unwrap();
-        assert_eq!(actor.health, 73.0);
+        assert_eq!(actor.health, 70.0);
         assert_eq!(transform.translation.x, 6.0);
         Ok(())
     }
