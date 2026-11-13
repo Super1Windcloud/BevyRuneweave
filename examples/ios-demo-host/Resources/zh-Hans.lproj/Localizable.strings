@@ -204,3 +204,4 @@
 "Release asset" = "版本资源";
 "Ready to play" = "可以开始";
 "ZIP symbolic links are not supported: {}" = "不支持 ZIP 符号链接：%1$@";
+"mobile.orientation must be auto, portrait or landscape" = "mobile.orientation 必须为 auto、portrait 或 landscape";

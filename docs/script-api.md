@@ -6,6 +6,14 @@ as real reflected Bevy components and resources; there is no script-side ECS sna
 
 ## Lifecycle callbacks
 
+Mobile example hosts accept an optional package setting in `assets/engineConfig.json`:
+`"mobile": { "orientation": "landscape" }`. Values are `auto` (the default), `portrait`,
+or `landscape`. Android/iOS apply the restriction when activating or switching the game and
+restore launcher behavior on exit. Both landscape directions are allowed. This is native host
+configuration, not a script callback; Windows/macOS/Linux ignore it and retain `window` sizing.
+Packages without `mobile` remain compatible. Updating it requires distributing the new config
+and rebuilding the native hosts, without changing the runtime C ABI or Lua/QuickJS bindings.
+
 `on_suspend()` is optional in Lua, JavaScript and TypeScript. The runtime dispatches it through
 BMS before `on_update` when the primary window loses focus or Bevy reports application suspension.
 Focus and lifecycle notifications for one interruption are coalesced; secondary windows do not

@@ -35,7 +35,9 @@ through `typecheck`; `test` runs Biome, rebuilds the bundle and runs all TypeScr
 The desktop window starts at **800×600 logical pixels**, centered on the primary monitor.
 `assets/engineConfig.json` declares that size before native window creation; script load/reload
 does not resize an already visible window. Manual resizing and the Display tab's landscape/
-portrait controls remain available. Android and iOS keep their native fullscreen geometry.
+portrait controls remain available on desktop. Android and iOS keep their native fullscreen geometry
+and run this game in landscape only (`mobile.orientation: "landscape"`), allowing both left and
+right landscape. The native launcher and games without this setting retain their default policy.
 This startup behavior requires a runtime rebuilt with support for `engineConfig.window`.
 The application icon is the original Shattered Pixel Dungeon desktop icon, bundled at
 `assets/branding/shattered-pixel-dungeon.png`. Its pinned revision and checksum are recorded in
@@ -49,6 +51,11 @@ portrait/landscape rendering and background/resume inspection. Android System Ba
 the native launcher without replacing the runtime process. BMS dispatches the optional
 `on_suspend()` callback identically to Lua and QuickJS; Ember Arena pauses and clears queued
 movement/targeting. A backgrounded run remains in memory; saving after process death is pending.
+
+The landscape-only package setting was added after the device acceptance below. Both hosts must
+be rebuilt and the updated `engineConfig.json` installed for it to take effect; the existing Rust
+runtime libraries remain compatible. Landscape locking and return-to-launcher restoration have
+not been revalidated on devices for this change.
 
 All three example launchers now use a shared English/Simplified Chinese catalog (205 messages),
 follow the system language by default and fall back to English for other languages. Mobile

@@ -688,6 +688,10 @@ class MainActivity : Activity() {
         check(config.optInt("schemaVersion") == 1) { getString(R.string.host_schema_unsupported) }
         check(config.optString("name").isNotBlank()) { getString(R.string.host_config_name_empty) }
         check(config.optString("version").isNotBlank()) { getString(R.string.host_config_version_empty) }
+        val mobile = if (config.has("mobile")) config.getJSONObject("mobile") else null
+        check((mobile?.optString("orientation", "auto") ?: "auto") in setOf("auto", "portrait", "landscape")) {
+            getString(R.string.host_mobile_orientation_invalid)
+        }
         val script = config.getJSONObject("script")
         val language = script.getString("language")
         check(language in setOf("js", "typescript", "lua")) { getString(R.string.host_script_unsupported) }
@@ -716,15 +720,19 @@ class MainActivity : Activity() {
     }
 
     private fun launchGame() {
-        runCatching { validatePackage(File(filesDir, "assets")) }
-            .onFailure {
-                showError(it.message ?: getString(R.string.host_no_valid_game))
-                return
-            }
+        val config = runCatching {
+            val assets = File(filesDir, "assets")
+            validatePackage(assets)
+            JSONObject(File(assets, "engineConfig.json").readText())
+        }.getOrElse {
+            showError(it.message ?: getString(R.string.host_no_valid_game))
+            return
+        }
         startActivity(
             Intent(this, RuntimeActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra(RuntimeActivity.EXTRA_SCRIPT, JSONObject(File(File(filesDir, "assets"), "engineConfig.json").readText()).getJSONObject("script").getString("entry")),
+                .putExtra(RuntimeActivity.EXTRA_SCRIPT, config.getJSONObject("script").getString("entry"))
+                .putExtra(RuntimeActivity.EXTRA_ORIENTATION, config.optJSONObject("mobile")?.optString("orientation", "auto") ?: "auto"),
         )
     }
 

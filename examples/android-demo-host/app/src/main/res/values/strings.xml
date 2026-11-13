@@ -206,4 +206,5 @@
     <string name="host_release_asset">Release asset</string>
     <string name="host_ready_idle">Ready to play</string>
     <string name="host_zip_symlink">ZIP symbolic links are not supported: %1$s</string>
+    <string name="host_mobile_orientation_invalid">mobile.orientation must be auto, portrait or landscape</string>
 </resources>

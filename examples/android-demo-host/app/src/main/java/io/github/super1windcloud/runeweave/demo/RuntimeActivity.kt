@@ -2,6 +2,7 @@ package io.github.super1windcloud.runeweave.demo
 
 import android.app.NativeActivity
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
@@ -22,6 +23,7 @@ class RuntimeActivity : NativeActivity() {
     private var unregisterBackCallback: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        applyOrientation(intent)
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val callback = OnBackInvokedCallback { returnToLauncher() }
@@ -48,6 +50,7 @@ class RuntimeActivity : NativeActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        applyOrientation(intent)
         switchFromIntent(intent)
     }
 
@@ -89,6 +92,14 @@ class RuntimeActivity : NativeActivity() {
         check(nativeSwitchScript(script) == 0) { getString(R.string.host_runtime_switch_failed) }
     }
 
+    private fun applyOrientation(intent: Intent?) {
+        requestedOrientation = when (intent?.getStringExtra(EXTRA_ORIENTATION)) {
+            "landscape" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            "portrait" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+            else -> ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+        }
+    }
+
     @Suppress("DEPRECATION")
     private fun enterImmersiveMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -118,6 +129,7 @@ class RuntimeActivity : NativeActivity() {
 
     companion object {
         const val EXTRA_SCRIPT = "io.github.super1windcloud.runeweave.demo.SCRIPT"
+        const val EXTRA_ORIENTATION = "io.github.super1windcloud.runeweave.demo.ORIENTATION"
 
         init {
             System.loadLibrary("bevy_runeweave")

@@ -496,6 +496,10 @@ pub(super) const MESSAGES: &[(&str, &str)] = &[
         "icon 必须是资源目录内的相对路径或 HTTP(S) 地址",
     ),
     (
+        "mobile.orientation must be auto, portrait or landscape",
+        "mobile.orientation 必须为 auto、portrait 或 landscape",
+    ),
+    (
         "script language does not match the entry extension",
         "脚本语言与入口文件扩展名不匹配",
     ),

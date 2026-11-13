@@ -203,5 +203,6 @@
   ["finding_packages","Finding available packages...","正在查找可用资源包…"],
   ["release_asset","Release asset","版本资源"],
   ["ready_idle","Ready to play","可以开始"],
-  ["zip_symlink","ZIP symbolic links are not supported: {}","不支持 ZIP 符号链接：{}"]
+  ["zip_symlink","ZIP symbolic links are not supported: {}","不支持 ZIP 符号链接：{}"],
+  ["mobile_orientation_invalid","mobile.orientation must be auto, portrait or landscape","mobile.orientation 必须为 auto、portrait 或 landscape"]
 ]

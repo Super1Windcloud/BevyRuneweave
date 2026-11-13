@@ -204,3 +204,4 @@
 "Release asset" = "Release asset";
 "Ready to play" = "Ready to play";
 "ZIP symbolic links are not supported: {}" = "ZIP symbolic links are not supported: %1$@";
+"mobile.orientation must be auto, portrait or landscape" = "mobile.orientation must be auto, portrait or landscape";

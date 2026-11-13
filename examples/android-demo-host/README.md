@@ -93,7 +93,13 @@ status and validation messages come from `examples/host-localization.json`. Run
 `npm run prepare:host-locales` after changing that shared catalog and `npm run test:host-locales`
 to check the generated native resources and desktop catalog.
 
-The game supports portrait and landscape without recreating its NativeActivity. System Back
+The host reads optional `mobile.orientation` from the package's `engineConfig.json`: `auto`
+(the default), `portrait`, or `landscape`. Ember Arena selects `landscape`, allowing both landscape
+directions even when the system rotation preference is locked to portrait. The setting is applied
+before native startup and again when switching packages; it does not restrict the launcher.
+Older packages without the setting retain the default system policy.
+
+The game changes orientation without recreating its NativeActivity. System Back
 returns to the launcher while keeping the runtime alive. The portable BMS `on_suspend()` callback
 lets games pause on focus loss or backgrounding; Ember Arena clears queued input and requires
 manual resume. This preserves an in-process run, not a save across process death.

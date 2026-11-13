@@ -89,6 +89,62 @@ private final class HostActionButton: UIButton {
     override var isHighlighted: Bool { didSet { alpha = isHighlighted ? 0.65 : (isEnabled ? 1 : 0.45) } }
 }
 
+// Keep winit's controller and rendering view intact as a child. Only this host
+// container chooses the game's allowed orientations; UIKit still owns geometry.
+private final class RuntimeOrientationViewController: UIViewController {
+    private let content: UIViewController
+    private var orientationMask: UIInterfaceOrientationMask = .allButUpsideDown
+
+    init(content: UIViewController) {
+        self.content = content
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+
+    override func loadView() {
+        view = UIView()
+        addChild(content)
+        content.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(content.view)
+        NSLayoutConstraint.activate([
+            content.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            content.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            content.view.topAnchor.constraint(equalTo: view.topAnchor),
+            content.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        content.didMove(toParent: self)
+    }
+
+    override var shouldAutorotate: Bool { true }
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { orientationMask }
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
+        orientationMask == .landscape ? .landscapeRight : .portrait
+    }
+    override var childForStatusBarHidden: UIViewController? { content }
+    override var childForHomeIndicatorAutoHidden: UIViewController? { content }
+    override var childForScreenEdgesDeferringSystemGestures: UIViewController? { content }
+
+    func applyOrientation(_ orientation: String) {
+        switch orientation {
+        case "landscape": orientationMask = .landscape
+        case "portrait": orientationMask = .portrait
+        default: orientationMask = .allButUpsideDown
+        }
+        if #available(iOS 16.0, *) {
+            setNeedsUpdateOfSupportedInterfaceOrientations()
+            if let scene = view.window?.windowScene {
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientationMask)) { error in
+                    NSLog("Could not update game orientation: %@", error.localizedDescription)
+                }
+                return
+            }
+        }
+        // Legacy application windows can have no UIWindowScene, including on iOS 16+.
+        UIViewController.attemptRotationToDeviceOrientation()
+    }
+}
+
 final class HostCoordinator {
     static let shared = HostCoordinator()
 
@@ -108,6 +164,7 @@ final class HostCoordinator {
                 return
             }
             guard let store = self.store else { return }
+            (runtimeWindow.rootViewController as? RuntimeOrientationViewController)?.applyOrientation("auto")
 
             let launcher = HostLauncherViewController(store: store)
             launcher.tabBarItem = UITabBarItem(title: hostText("Home"), image: UIImage(systemName: "house"), tag: 0)
@@ -153,6 +210,7 @@ final class HostCoordinator {
 
     func returnToLauncher() {
         DispatchQueue.main.async {
+            (self.runtimeWindow()?.rootViewController as? RuntimeOrientationViewController)?.applyOrientation("auto")
             if let window = self.launcherWindow {
                 window.isHidden = false
                 window.makeKeyAndVisible()
@@ -170,6 +228,16 @@ final class HostCoordinator {
         launcherWindow?.rootViewController = nil
         launcherWindow = nil
         runtime?.makeKeyAndVisible()
+        if let runtime = runtime, let content = runtime.rootViewController {
+            let controller: RuntimeOrientationViewController
+            if let existing = content as? RuntimeOrientationViewController {
+                controller = existing
+            } else {
+                controller = RuntimeOrientationViewController(content: content)
+                runtime.rootViewController = controller
+            }
+            controller.applyOrientation(config.mobile?.orientation ?? "auto")
+        }
     }
 
     func applyInterfaceStyle() {

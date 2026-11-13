@@ -33,6 +33,10 @@ struct HostFailure: LocalizedError {
 }
 
 struct EngineConfig: Decodable {
+    struct Mobile: Decodable {
+        let orientation: String?
+    }
+
     struct Script: Decodable {
         let language: String
         let entry: String
@@ -42,6 +46,7 @@ struct EngineConfig: Decodable {
     let name: String
     let version: String
     let script: Script
+    let mobile: Mobile?
 }
 
 func safeRelativePath(_ path: String, allowTrailingSlash: Bool = false) -> Bool {
@@ -60,6 +65,9 @@ func validateAssets(at assets: URL) throws -> EngineConfig {
     guard config.schemaVersion == 1 else { throw HostFailure(hostText("Unsupported engineConfig schemaVersion")) }
     guard !config.name.isEmpty, !config.version.isEmpty else {
         throw HostFailure(hostText("engineConfig name and version must not be empty"))
+    }
+    guard ["auto", "portrait", "landscape"].contains(config.mobile?.orientation ?? "auto") else {
+        throw HostFailure(hostText("mobile.orientation must be auto, portrait or landscape"))
     }
     guard ["js", "typescript", "lua"].contains(config.script.language) else {
         throw HostFailure(hostText("Unsupported script language"))

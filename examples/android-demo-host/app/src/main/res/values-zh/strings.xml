@@ -206,4 +206,5 @@
     <string name="host_release_asset">版本资源</string>
     <string name="host_ready_idle">可以开始</string>
     <string name="host_zip_symlink">不支持 ZIP 符号链接：%1$s</string>
+    <string name="host_mobile_orientation_invalid">mobile.orientation 必须为 auto、portrait 或 landscape</string>
 </resources>

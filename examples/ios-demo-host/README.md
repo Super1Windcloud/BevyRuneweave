@@ -84,7 +84,17 @@ and other languages use English. Native `.lproj` resources include navigation, a
 status and validation messages. They are generated from `examples/host-localization.json` with
 `npm run prepare:host-locales`; `npm run test:host-locales` verifies consistency across all hosts.
 
-The game supports portrait and both landscape orientations. The portable BMS `on_suspend()`
+The host reads optional `mobile.orientation` from `engineConfig.json`: `auto` (the default),
+`portrait`, or `landscape`. Ember Arena selects `landscape`, allowing both landscape directions.
+A native container retains winit's rendering controller as its child and supplies the supported
+orientation mask. iOS 16+ scene windows use geometry updates; older/legacy windows use UIKit's
+rotation update. Returning to the launcher resets the policy, and packages without the setting
+retain the default behavior. These host/configuration changes require no new runtime XCFramework.
+The landscape-only restriction has not been revalidated on devices after the earlier acceptance.
+The device-target build passes with existing XCFramework object deployment-version warnings
+(iOS 26.5 objects linked for a 13.0 host); this does not establish compatibility with older iOS.
+
+The portable BMS `on_suspend()`
 callback lets games pause on focus loss or backgrounding. Ember Arena clears queued input and
 requires manual resume while preserving the current in-process world; process-death saving is
 outside this change.
