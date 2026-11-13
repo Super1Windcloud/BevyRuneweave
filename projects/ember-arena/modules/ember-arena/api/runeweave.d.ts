@@ -48,12 +48,22 @@ declare function game_state_set(score: number, lives: number, message: string): 
 declare function app_request_exit(): boolean;
 /** Native preferred language tag, or en-US when unavailable. */
 declare function app_locale(): string;
+/** Native operating system; independent of language or input hardware. */
+declare function app_platform(): string;
 declare function window_set_size(width: number, height: number): boolean;
 declare function window_safe_area(): RuneweaveWindowSafeArea;
 declare function input_key_pressed(key: string): boolean;
 declare function input_key_just_pressed(key: string): boolean;
 declare function input_key_just_released(key: string): boolean;
 declare function input_primary_touch(): RuneweaveTouchState;
+/** Active contacts; stable string IDs, normalized top-left coordinates. Empty without touch input. */
+declare function input_touches(): RuneweaveTouchContact[];
+interface RuneweaveTouchContact {
+  id: string;
+  justPressed: boolean;
+  x: number;
+  y: number;
+}
 declare function input_primary_pointer(): RuneweavePointerState;
 
 interface RuneweaveTouchState {

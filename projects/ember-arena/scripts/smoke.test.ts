@@ -63,6 +63,8 @@ function harness(width = 1280, height = 800, mobile = false, saves = new Map<str
   const context = createContext({
     console,
     app_locale: () => locale,
+    app_platform: () => mobile ? "android" : "macos",
+    input_touches: () => [],
     storage_read: (key: string) => storageFailure ? { state: "error", error: storageFailure }
       : saves.has(key) ? { state: "ok", value: saves.get(key) } : { state: "missing" },
     storage_write: (key: string, value: string) => {

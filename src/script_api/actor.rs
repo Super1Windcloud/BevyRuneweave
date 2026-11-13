@@ -739,6 +739,7 @@ mod tests {
                 &attachment,
                 br#"
                 function on_script_loaded()
+                    assert(type(app_platform()) == "string" and #input_touches() == 0)
                     scene_spawn("actor", 1, 0, 2)
                     assert(scene_actor_set("actor", "player", 100, 4, 0.4))
                     local actor = scene_actor("actor")

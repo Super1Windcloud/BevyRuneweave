@@ -124,6 +124,16 @@ resource and returns `pressed`, `justPressed`, `x`, `y`, `deltaX`, and `deltaY`.
 are normalized against the primary window; X runs left-to-right and Y runs bottom-to-top. On systems
 without an active touch it returns the same object with `pressed: false` and zero coordinates.
 
+`input_touches()` reads all active contacts from the same live `Touches` resource through
+`WorldGuard`. Lua receives a sequence and QuickJS/TypeScript an array of
+`{ id, justPressed, x, y }` objects, sorted by native numeric ID. `id` is a string preserving
+the entire native u64 identifier. Coordinates are normalized against the primary window,
+with `(0, 0)` at the **top-left** and `(1, 1)` at the bottom-right. Unlike the older single-touch
+API, Y increases downward, matching retained UI. Releasing/cancelling a contact removes its ID;
+there is no mouse emulation, cached ECS mirror or separate per-language implementation. Without
+active touch input or a usable primary window the result is empty on all five supported platforms.
+Use stable IDs for joystick/button capture and clear capture on suspend, modal entry or resizing.
+
 `input_primary_pointer()` is the cross-platform click and drag API used by gameplay. It prioritizes
 the lowest-ID active touch, then falls back to the primary mouse cursor and left button. It returns
 `pressed`, `justPressed`, `x`, `y`, `viewportWidth`, and `viewportHeight`. Position and viewport
@@ -143,6 +153,12 @@ Android reads the system language, rather than an Android per-app language overr
 change system settings or subscribe to language changes; games decide when to read it and how to
 map unsupported languages. Existing runtime libraries must be rebuilt to expose the new function;
 the public C ABI is unchanged.
+
+`app_platform()` returns the native operating-system identifier (`windows`, `macos`, `linux`,
+`android` or `ios` on supported targets). It is independent of language and input hardware and
+has the same BMS registration for Lua and QuickJS/TypeScript. Ember Arena uses it to show its
+mobile controls only on Android/iOS. Both this function and `input_touches()` require a freshly
+built native runtime; the public C ABI and host ownership/lifecycle contracts are unchanged.
 
 `window_set_size(width, height)` lets scripts choose their desktop window dimensions on Windows,
 macOS, and Linux. It returns `true` when the primary window accepts a finite size between 1 and

@@ -15,9 +15,10 @@ import { applyBurning, applyHealing, applyInvisibility, applyLockedFloor, applyO
 import { projectileImpact, type TargetKind } from "./projectiles.js";
 import { spiritBowAccuracy, spiritBowDamage, spiritBowDelay, spiritBowStrength } from "./spirit-bow.js";
 import { createStaffCharger, rechargeStaff, staffCapacity, staffChargeId, staffChargerKind, staffCharges, staffDamageRange, staffGearId, upgradeStaffCharge } from "./staff.js";
-import { cloakActive, cloakEquipped, cloakId, cloakKind, cloakRechargeStep, cloakStealthStep, cloakValue, createCloak, startCloak, stopCloak } from "./cloak.js";
-import { affixSeal, createSeal, detachSeal, ensureWarriorShield, maximumShield, sealArmor, sealId, sealValue, shieldDamage, shieldId, shieldStep } from "./seal.js";
+import { cloakActive, cloakCapacity, cloakEquipped, cloakId, cloakKind, cloakRechargeStep, cloakStealthStep, cloakValue, createCloak, startCloak, stopCloak } from "./cloak.js";
+import { affixSeal, createSeal, detachSeal, ensureWarriorShield, maximumShield, sealArmor, sealId, sealValue, shieldDamage, shieldId, shieldStep, shieldValue } from "./seal.js";
 import { affectHunger, extendLockedFloor, hungerStep, lockedFloorStep, regenerationStep, starvingAt, type HungerStep } from "./survival.js";
+import { joystickThumbStyle, MobileControls, type MobileAction, type MobileFrame, type MobileHudState } from "./mobile-controls.js";
 
 type Phase = UiPhase;
 
@@ -35,6 +36,9 @@ let turns = 0;
 let actionCooldown = 0;
 let floor: DungeonFloor | null = null;
 let queuedPath: Point[] = [];
+const mobileEnabled = typeof app_platform === "function" && ["android", "ios"].includes(app_platform());
+const mobileControls = new MobileControls();
+let joystickVisual = "";
 const renderedTiles = new Map<number, Terrain>();
 const renderedFog = new Set<number>();
 let nextId = 0;
@@ -90,6 +94,64 @@ const hungerLevel = (): number => remainingBuff("hunger", "player");
 const isInvisible = (): boolean => hasBuff("invisibility", "player") || cloakActive();
 const targetExperience = (): number => 5 + level * 5;
 
+function mobileContacts(pointer = input_primary_pointer()): RuneweaveTouchContact[] {
+  const contacts = input_touches();
+  // Let a mouse operate the mobile overlay in device emulators as well.
+  return contacts.length || !pointer.pressed ? contacts : [{ id: "mouse", justPressed: pointer.justPressed,
+    x: pointer.x / pointer.viewportWidth + 0.5, y: 0.5 - pointer.y / pointer.viewportHeight }];
+}
+
+function adjacentEnemy(): string | undefined {
+  if (!floor || !scene_actor("player")) return undefined;
+  const hero = cellPosition("player");
+  return monsterIds().find((id) => {
+    const target = cellPosition(id);
+    return field(id, "health") > 0 && floor!.visible.has(cellKey(floor!, target)) && canStep(floor!, hero, target);
+  });
+}
+
+function mobileHudState(): MobileHudState {
+  const t = (key: MessageKey): string => renderMessage(profile.language, message(key));
+  let skill: MobileHudState["skill"] = { label: t("mobile.shield"), detail: t("mobile.passive"), enabled: false, active: shieldValue("health") > 0 };
+  if (selectedClass === "mage") {
+    const staff = equipment.find((gear) => gear.kind === "mages_staff");
+    const charges = staff ? staffCharges(staff.id) : 0;
+    skill = { label: t("mobile.staff"), detail: `${charges}/${staff ? staffCapacity(staff.level) : 0}`, enabled: charges > 0, active: false };
+  } else if (selectedClass === "huntress") {
+    skill = { label: t("mobile.bow"), detail: "", enabled: inventory.spirit_bow > 0, active: false };
+  } else if (selectedClass === "rogue") {
+    const active = cloakActive();
+    skill = { label: t(active ? "mobile.reveal" : "mobile.cloak"), detail: `${cloakValue("health")}/${cloakCapacity(cloakValue("lifetime"))}`,
+      enabled: inventory.cloak_of_shadows > 0 && cloakEquipped() && (active || cloakValue("health") > 0), active };
+  }
+  if (targeting) skill = { ...skill, label: t("mobile.cancel"), enabled: true, active: true };
+  return { stick: mobileControls.stick, attack: adjacentEnemy() !== undefined, healing: inventory.potion_healing, skill };
+}
+
+function mobileAction(action: MobileAction): void {
+  if (phase !== "playing") return;
+  if (action === "mobile_skill" && targeting) { targeting = null; drawUi(); return; }
+  if (actionCooldown > 0) return;
+  if (action === "mobile_skill" && !mobileHudState().skill.enabled) return;
+  if (action === "mobile_attack" && !adjacentEnemy()) return;
+  if (action === "mobile_heal" && inventory.potion_healing <= 0) return;
+  queuedPath = []; examining = false; targeting = null;
+  if (action === "mobile_attack") {
+    const enemy = adjacentEnemy();
+    if (!enemy) return;
+    const hero = cellPosition("player"), target = cellPosition(enemy);
+    movePlayer(target.x - hero.x, target.z - hero.z);
+  } else if (action === "mobile_heal") {
+    if (!useInventoryItem("potion_healing")) return;
+  } else if (action === "mobile_wait") spendTurns();
+  else if (selectedClass === "mage") {
+    const staff = equipment.find((gear) => gear.kind === "mages_staff");
+    if (staff) beginStaffZap(staff.id);
+  } else if (selectedClass === "huntress") useInventoryItem("spirit_bow");
+  else if (selectedClass === "rogue") toggleCloak();
+  actionCooldown = 0.16;
+}
+
 function pushLog(entry: Message): void {
   dungeonLogs.unshift(entry);
   if (dungeonLogs.length > 3) dungeonLogs.pop();
@@ -144,6 +206,7 @@ function drawUi(): void {
   if (metrics.width <= 0 || metrics.height <= 0) return;
   viewport = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
   const localized = (value: Message): string => renderMessage(profile.language, value);
+  joystickVisual = "";
   mountUi(renderSpdUi({
     phase: previewPhase ?? phase, selectedClass, item: selectedItem, health: previewPhase === "lost" ? 0 : health(), maxHealth, level, strength, experience,
     targetExperience: targetExperience(), depth, gold, score, turns, hunger: getHungerStatus(hungerLevel()),
@@ -155,6 +218,7 @@ function drawUi(): void {
     saveNotice: saveNotice ? localized(saveNotice) : "", resetPending, checks: checks.map(localized), checkPage,
     networkStatus: networkLines.length ? networkLines.map(localized).join("\n") : localized(networkStatus),
     notice: uiNotice ? localized(uiNotice) : "",
+    mobile: mobileEnabled ? mobileHudState() : undefined,
   }, uiAction));
 }
 
@@ -171,6 +235,7 @@ function closeModal(): void {
 
 function uiAction(id: string, value?: string | number): void {
   if (previewPhase) { previewPhase = null; drawUi(); return; }
+  if (id.startsWith("mobile_")) { mobileAction(id as MobileAction); return; }
   if (id.startsWith("select:")) {
     const hero = id.slice(7) as HeroClass;
     if (!heroClassList.includes(hero)) {
@@ -247,6 +312,7 @@ function publish(): void {
 }
 
 function setPhase(next: Phase): void {
+  if (mobileEnabled) mobileControls.reset(mobileContacts());
   previewPhase = null;
   examining = false;
   targeting = null;
@@ -935,7 +1001,7 @@ function examineCell(point: Point): void {
   overlayReturn = "playing"; setPhase("message");
 }
 
-function playerInput(dt: number, pointer: RuneweavePointerState): void {
+function playerInput(dt: number, pointer: RuneweavePointerState, mobile?: MobileFrame): void {
   actionCooldown = Math.max(0, actionCooldown - dt);
   if (input_key_just_pressed("KeyF")) { toggleExamine(); return; }
   if (input_key_just_pressed("KeyE") || input_key_just_pressed("Period")) { descend(); return; }
@@ -950,6 +1016,13 @@ function playerInput(dt: number, pointer: RuneweavePointerState): void {
     if (examining || targeting) { examining = false; targeting = null; drawUi(); }
     queuedPath = [];
     if (actionCooldown <= 0) { movePlayer(dx, dz); actionCooldown = 0.16; }
+    return;
+  }
+  if (mobile?.engaged && !targeting && !examining) {
+    queuedPath = [];
+    if ((mobile.direction.x || mobile.direction.y) && actionCooldown <= 0) {
+      movePlayer(mobile.direction.x, mobile.direction.y); actionCooldown = 0.16;
+    }
     return;
   }
   if (pointer.justPressed) {
@@ -1097,6 +1170,7 @@ callbacks.on_script_reloaded = (): void => {
 };
 
 callbacks.on_suspend = (): void => {
+  if (mobileEnabled) mobileControls.reset(mobileContacts());
   queuedPath = []; targeting = null; examining = false;
   actionCooldown = 0; cameraShake = 0;
   if (phase === "playing") setPhase("paused");
@@ -1110,6 +1184,7 @@ callbacks.on_update = (delta: number): void => {
   if (metrics.width <= 0 || metrics.height <= 0) return;
   const signature = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
   if (viewport !== signature) {
+    if (mobileEnabled) mobileControls.reset(mobileContacts(pointer));
     viewport = signature;
     refreshDungeon();
     drawUi();
@@ -1119,7 +1194,17 @@ callbacks.on_update = (delta: number): void => {
   }
   const previousPhase = phase;
   const previousTurns = turns;
-  const uiActivated = updateUi();
+  const mobile = mobileEnabled ? mobileControls.sample(mobileContacts(pointer), uiMetrics(), { x: metrics.width, y: metrics.height }, phase === "playing") : undefined;
+  if (mobile && phase === "playing") {
+    const visual = `${mobileControls.stick.x.toFixed(3)}:${mobileControls.stick.y.toFixed(3)}:${mobileControls.stick.active}`;
+    if (visual !== joystickVisual) {
+      joystickVisual = visual;
+      ui_set_style("mobile_joystick_thumb", JSON.stringify(joystickThumbStyle(uiMetrics(), mobileControls.stick)));
+    }
+    const action = mobile.actions[0];
+    if (action) { mobileAction(action); return; }
+  }
+  const uiActivated = mobile?.consumed ? false : updateUi();
   pollNetwork(dt);
   if (uiActivated || phase !== previousPhase || turns !== previousTurns) return;
   if (input_key_just_pressed("F12")) {
@@ -1166,6 +1251,10 @@ callbacks.on_update = (delta: number): void => {
   if (phase !== "playing") return;
 
   elapsed += dt;
-  playerInput(dt, pointer);
+  const contact = mobile?.worldTap;
+  const gamePointer = mobile ? { ...pointer, pressed: !!contact, justPressed: !!contact,
+    x: contact ? (contact.x - 0.5) * pointer.viewportWidth : 0,
+    y: contact ? (0.5 - contact.y) * pointer.viewportHeight : 0 } : pointer;
+  playerInput(dt, gamePointer, mobile);
 
 };

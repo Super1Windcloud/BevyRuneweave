@@ -165,6 +165,52 @@ pub(super) fn input_primary_touch(
     })
 }
 
+/// Active contacts in stable ID order, normalized from the top-left of the window.
+/// IDs are strings so Lua and JavaScript preserve the complete native u64 value.
+pub(super) fn input_touches(context: FunctionCallContext) -> Result<ScriptValue, InteropError> {
+    context.world()?.with_world(|world| {
+        let Some(window) = world.iter_entities().find_map(|entity| {
+            entity.get::<PrimaryWindow>()?;
+            entity.get::<Window>()
+        }) else {
+            return ScriptValue::List(Default::default());
+        };
+        let Some(touches) = world.get_resource::<Touches>() else {
+            return ScriptValue::List(Default::default());
+        };
+        if window.width() <= 0.0 || window.height() <= 0.0 {
+            return ScriptValue::List(Default::default());
+        }
+        let mut contacts: Vec<_> = touches.iter().collect();
+        contacts.sort_by_key(|touch| touch.id());
+        ScriptValue::List(
+            contacts
+                .into_iter()
+                .map(|touch| {
+                    let mut state = bevy::platform::collections::HashMap::default();
+                    state.insert(
+                        "id".into(),
+                        ScriptValue::String(touch.id().to_string().into()),
+                    );
+                    state.insert(
+                        "justPressed".into(),
+                        ScriptValue::Bool(touches.just_pressed(touch.id())),
+                    );
+                    state.insert(
+                        "x".into(),
+                        ScriptValue::Float(f64::from(touch.position().x / window.width())),
+                    );
+                    state.insert(
+                        "y".into(),
+                        ScriptValue::Float(f64::from(touch.position().y / window.height())),
+                    );
+                    ScriptValue::Map(state)
+                })
+                .collect(),
+        )
+    })
+}
+
 pub(super) fn input_primary_pointer(
     context: FunctionCallContext,
 ) -> Result<ScriptValue, InteropError> {
@@ -265,6 +311,13 @@ mod tests {
             force: None,
             id: 7,
         });
+        app.world_mut().write_message(TouchInput {
+            phase: TouchPhase::Started,
+            position: Vec2::new(150.0, 300.0),
+            window,
+            force: None,
+            id: u64::MAX,
+        });
         app.update();
         app.world_mut().init_resource::<AppScriptFunctionRegistry>();
         app.world_mut().init_resource::<AppTypeRegistry>();
@@ -281,6 +334,28 @@ mod tests {
             assert_eq!(state.get("y"), Some(&ScriptValue::Float(0.75)));
             assert_eq!(state.get("deltaX"), Some(&ScriptValue::Float(0.0)));
             assert_eq!(state.get("deltaY"), Some(&ScriptValue::Float(0.0)));
+
+            let ScriptValue::List(contacts) = input_touches(context.clone())? else {
+                return Err(InteropError::string(
+                    "touch contacts must be a list".to_owned(),
+                ));
+            };
+            assert_eq!(contacts.len(), 2);
+            let ScriptValue::Map(first) = &contacts[0] else {
+                panic!("first contact is not a map")
+            };
+            let ScriptValue::Map(second) = &contacts[1] else {
+                panic!("second contact is not a map")
+            };
+            assert_eq!(first.get("id"), Some(&ScriptValue::String("7".into())));
+            assert_eq!(first.get("x"), Some(&ScriptValue::Float(0.25)));
+            assert_eq!(first.get("y"), Some(&ScriptValue::Float(0.25)));
+            assert_eq!(
+                second.get("id"),
+                Some(&ScriptValue::String(u64::MAX.to_string().into()))
+            );
+            assert_eq!(second.get("x"), Some(&ScriptValue::Float(0.75)));
+            assert_eq!(second.get("y"), Some(&ScriptValue::Float(0.75)));
 
             let ScriptValue::Map(pointer) = input_primary_pointer(context)? else {
                 return Err(InteropError::string(

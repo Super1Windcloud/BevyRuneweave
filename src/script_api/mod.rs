@@ -24,7 +24,7 @@ use bevy_mod_scripting::{
 use actor::{ScriptActor, scene_actor, scene_actor_ids, scene_actor_set};
 use input::{
     input_key_just_pressed, input_key_just_released, input_key_pressed, input_primary_pointer,
-    input_primary_touch, window_metrics,
+    input_primary_touch, input_touches, window_metrics,
 };
 use network::ScriptNetwork;
 use storage::{
@@ -709,6 +709,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("game_state_set", game_state_set)
             .register("app_request_exit", app_request_exit)
             .register("app_locale", app_locale)
+            .register("app_platform", || std::env::consts::OS.to_owned())
             .register("window_set_size", window_set_size)
             .register("window_safe_area", window_safe_area)
             .register("window_metrics", window_metrics)
@@ -716,6 +717,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("input_key_just_pressed", input_key_just_pressed)
             .register("input_key_just_released", input_key_just_released)
             .register("input_primary_touch", input_primary_touch)
+            .register("input_touches", input_touches)
             .register("input_primary_pointer", input_primary_pointer)
             .register("http_get", {
                 let network = network.clone();

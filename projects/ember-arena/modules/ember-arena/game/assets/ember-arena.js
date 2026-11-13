@@ -438,6 +438,18 @@
     "common.no": ["No", "\u5426"],
     "common.on": ["On", "\u5F00"],
     "common.off": ["Off", "\u5173"],
+    "mobile.move": ["MOVE", "\u79FB\u52A8"],
+    "mobile.attack": ["Attack", "\u653B\u51FB"],
+    "mobile.heal": ["Heal", "\u6CBB\u7597"],
+    "mobile.wait": ["Wait", "\u7B49\u5F85"],
+    "mobile.staff": ["Zap", "\u65BD\u6CD5"],
+    "mobile.bow": ["Shoot", "\u5C04\u51FB"],
+    "mobile.cloak": ["Stealth", "\u9690\u8EAB"],
+    "mobile.reveal": ["Uncloak", "\u89E3\u9664"],
+    "mobile.shield": ["Shield", "\u62A4\u76FE"],
+    "mobile.passive": ["Passive", "\u88AB\u52A8"],
+    "mobile.cancel": ["Cancel", "\u53D6\u6D88"],
+    "mobile.hint": ["Drag the left stick to move. Tap Attack beside an enemy; aim skills by tapping a tile.", "\u62D6\u52A8\u5DE6\u4FA7\u6447\u6746\u79FB\u52A8\uFF0C\u9760\u8FD1\u654C\u4EBA\u540E\u70B9\u653B\u51FB\uFF1B\u65BD\u6CD5\u6216\u5C04\u51FB\u540E\u70B9\u9009\u76EE\u6807\u683C\u3002"],
     "hero.choose": ["Choose Your Hero", "\u9009\u62E9\u4F60\u7684\u82F1\u96C4"],
     "hero.warrior.name": ["Warrior", "\u6218\u58EB"],
     "hero.mage.name": ["Mage", "\u6CD5\u5E08"],
@@ -1259,6 +1271,98 @@
     return { shield, cooldown, absent, detach: shield <= 0 && capacity <= 0 && cooldown === 0 };
   }
 
+  // modules/ember-arena/game/src/mobile-controls.ts
+  function mobileLayout(m) {
+    const s = m.scale, gap = 8 / s, margin = 12 / s;
+    const bottom = m.height - 26 - gap;
+    const radius = Math.max(12 / s, Math.min(56 / s, (m.height - 26) * 0.28, (m.width - 144 / s) / 2));
+    const attack = { x: m.width - margin - 56 / s, y: bottom - 56 / s, width: 56 / s, height: 56 / s };
+    const skill = { x: attack.x - gap - 48 / s, y: bottom - 48 / s, width: 48 / s, height: 48 / s };
+    return {
+      joystick: { x: margin + radius, y: bottom - radius, radius },
+      buttons: {
+        mobile_attack: attack,
+        mobile_skill: skill,
+        mobile_heal: { x: attack.x + 12 / s, y: attack.y - gap - 44 / s, width: 44 / s, height: 44 / s },
+        mobile_wait: { x: skill.x + 4 / s, y: attack.y - gap - 44 / s, width: 44 / s, height: 44 / s }
+      },
+      actionLeft: skill.x
+    };
+  }
+  function joystickThumbStyle(m, stick) {
+    const radius = mobileLayout(m).joystick.radius, thumb = 36 / m.scale;
+    return {
+      position: "absolute",
+      left: (radius + stick.x * radius * 0.55 - thumb / 2) * m.scale,
+      top: (radius + stick.y * radius * 0.55 - thumb / 2) * m.scale,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      background: stick.active ? [0.91, 0.67, 0.26, 0.95] : [0.75, 0.75, 0.66, 0.75]
+    };
+  }
+  var MobileControls = class {
+    captures = /* @__PURE__ */ new Map();
+    blocked = /* @__PURE__ */ new Set();
+    stick = { x: 0, y: 0, active: false };
+    reset(contacts = []) {
+      this.captures.clear();
+      this.blocked = new Set(contacts.map((contact) => contact.id));
+      this.stick.x = 0;
+      this.stick.y = 0;
+      this.stick.active = false;
+    }
+    sample(contacts, m, size, active) {
+      const frame = { consumed: false, engaged: false, direction: { x: 0, y: 0 }, actions: [], worldTap: null };
+      const live = new Set(contacts.map((contact) => contact.id));
+      for (const id of this.captures.keys()) if (!live.has(id)) this.captures.delete(id);
+      for (const id of this.blocked) if (!live.has(id)) this.blocked.delete(id);
+      if (!active) {
+        for (const id of this.captures.keys()) this.blocked.add(id);
+        this.captures.clear();
+        this.stick.x = 0;
+        this.stick.y = 0;
+        this.stick.active = false;
+        frame.consumed = this.blocked.size > 0;
+        return frame;
+      }
+      const layout = mobileLayout(m);
+      this.stick.x = 0;
+      this.stick.y = 0;
+      this.stick.active = false;
+      for (const contact of contacts) {
+        if (this.blocked.has(contact.id)) continue;
+        const point = { x: (contact.x * size.x - m.left) / m.scale, y: (contact.y * size.y - m.top) / m.scale };
+        if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+        let capture = this.captures.get(contact.id);
+        if (!capture && contact.justPressed) {
+          if (Math.hypot(point.x - layout.joystick.x, point.y - layout.joystick.y) <= layout.joystick.radius) {
+            capture = [...this.captures.values()].includes("joystick") ? "ignore" : "joystick";
+          } else {
+            capture = Object.entries(layout.buttons).find(([, rect]) => point.x >= rect.x && point.y >= rect.y && point.x <= rect.x + rect.width && point.y <= rect.y + rect.height)?.[0];
+          }
+          if (capture) this.captures.set(contact.id, capture);
+          else frame.worldTap ??= contact;
+        }
+        if (capture === "joystick") {
+          frame.engaged = true;
+          this.stick.active = true;
+          const dx = (point.x - layout.joystick.x) / layout.joystick.radius;
+          const dy = (point.y - layout.joystick.y) / layout.joystick.radius;
+          const distance = Math.hypot(dx, dy), divisor = Math.max(1, distance);
+          this.stick.x = dx / divisor;
+          this.stick.y = dy / divisor;
+          if (distance >= 0.24) {
+            const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * Math.PI / 4;
+            frame.direction = { x: Math.round(Math.cos(angle)), y: Math.round(Math.sin(angle)) };
+          }
+        } else if (capture && capture !== "ignore" && contact.justPressed) frame.actions.push(capture);
+      }
+      frame.consumed = this.captures.size > 0 || this.blocked.size > 0;
+      return frame;
+    }
+  };
+
   // modules/ember-arena/game/src/spd-ui.ts
   function uiMetrics() {
     const size = window_metrics(), pointer = input_primary_pointer(), safe = window_safe_area();
@@ -1522,7 +1626,7 @@
         elements.push(label("examine_prompt", lines.join("\n"), 2, 44, promptWidth, 6, titleColor, lines.length * 8));
         elements.push(control("cancel_examine", t("common.close"), w - 28, 44, 26, 14, "toast", void 0, "cancel_examine", true, 6));
       } else if (state.profile.showHints) {
-        const lines = wrappedText(t("log.guide"), w - 4, 6);
+        const lines = wrappedText(t(state.mobile ? "mobile.hint" : "log.guide"), w - 4, 6);
         elements.push(label("hud_hint", lines.join("\n"), 2, 44, w - 4, 6, grey, lines.length * 8));
       }
       const staff = state.equipment.find((gear) => gear.kind === "mages_staff");
@@ -1548,12 +1652,14 @@
           ]
         });
       }
-      const logWidth = Math.max(90, w - 90);
+      const mobile = state.mobile && state.phase === "playing" ? mobileLayout(m) : null;
+      const logX = mobile ? mobile.joystick.x + mobile.joystick.radius + 8 / s : 2;
+      const logWidth = mobile ? Math.max(30, mobile.actionLeft - logX - 8 / s) : Math.max(90, w - 90);
       const logLines = state.logs.slice(0, 3).reverse().map((entry) => wrappedText(entry, logWidth, 6));
       const logHeights = logLines.map((lines) => Math.max(10, Math.ceil(lines.length * 7.2) + 2));
       let logY = h - 32 - logHeights.reduce((sum, height) => sum + height, 0);
       logLines.forEach((lines, index) => {
-        elements.push(label(`log_line_${index}`, lines.join("\n"), 2, logY, logWidth, 6, index === logLines.length - 1 ? white : grey, logHeights[index]));
+        elements.push(label(`log_line_${index}`, lines.join("\n"), logX, logY, logWidth, 6, index === logLines.length - 1 ? white : grey, logHeights[index]));
         logY += logHeights[index];
       });
       if (state.bossHealth !== null) elements.push(node("boss_panel", rect((w - 100) / 2, 2, 100, 10), [
@@ -1561,6 +1667,44 @@
         node("boss_fill", { ...rect(0, 5, Math.max(0, state.bossHealth), 3), background: [0.65, 0.05, 0.04, 1] }),
         label("boss_label", t("monster.boss"), 0, -2, 100, 6, titleColor)
       ]));
+      if (state.mobile && state.phase === "playing") {
+        const controls = state.mobile, layout = mobileLayout(m), stick = layout.joystick;
+        elements.push(node("mobile_joystick", {
+          ...rect(stick.x - stick.radius, stick.y - stick.radius, stick.radius * 2, stick.radius * 2),
+          borderRadius: stick.radius * s,
+          background: [0.04, 0.045, 0.03, 0.65]
+        }, [
+          node("mobile_joystick_axis_x", { ...rect(8 / s, stick.radius - 1 / s, stick.radius * 2 - 16 / s, 2 / s), background: [0.8, 0.8, 0.7, 0.25] }),
+          node("mobile_joystick_axis_y", { ...rect(stick.radius - 1 / s, 8 / s, 2 / s, stick.radius * 2 - 16 / s), background: [0.8, 0.8, 0.7, 0.25] }),
+          node("mobile_joystick_thumb", joystickThumbStyle(m, controls.stick))
+        ]));
+        elements.push(label("mobile_move_label", t("mobile.move"), stick.x - stick.radius, stick.y + stick.radius - 12 / s, stick.radius * 2, 10 / s, grey));
+        const buttons = [
+          ["mobile_attack", t("mobile.attack"), "", controls.attack, false],
+          ["mobile_skill", controls.skill.label, controls.skill.detail, controls.skill.enabled, controls.skill.active],
+          ["mobile_heal", t("mobile.heal"), `${controls.healing}`, controls.healing > 0, false],
+          ["mobile_wait", t("mobile.wait"), "", true, false]
+        ];
+        for (const [id, caption, detail, enabled, active] of buttons) {
+          const bounds = layout.buttons[id], width = bounds.width, height = bounds.height;
+          const size = Math.min(12 / s, (width - 4 / s) / Math.max(1, textWidth(caption, 1)));
+          const textY = detail ? height / 2 - 12 / s : (height - size * 1.2) / 2;
+          elements.push({
+            kind: "button",
+            id,
+            onClick: enabled ? () => on(id) : void 0,
+            style: {
+              ...rect(bounds.x, bounds.y, width, height),
+              borderRadius: width * s / 2,
+              background: !enabled ? [0.1, 0.1, 0.08, 0.65] : active ? [0.17, 0.34, 0.23, 0.9] : id === "mobile_attack" ? [0.48, 0.13, 0.09, 0.88] : [0.27, 0.24, 0.16, 0.88]
+            },
+            children: [
+              label(`${id}_label`, caption, (width - textWidth(caption, size)) / 2, textY, width, size, enabled ? white : grey),
+              ...detail ? [label(`${id}_detail`, detail, (width - textWidth(detail, 10 / s)) / 2, height / 2 + 2 / s, width, 10 / s, active ? titleColor : grey)] : []
+            ]
+          });
+        }
+      }
     }
     const menuPhases = ["menu", "rankings", "journal", "news", "changes", "about", "support"];
     if (state.phase === "heroes") heroScreen();
@@ -1776,6 +1920,9 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
   var actionCooldown = 0;
   var floor = null;
   var queuedPath = [];
+  var mobileEnabled = typeof app_platform === "function" && ["android", "ios"].includes(app_platform());
+  var mobileControls = new MobileControls();
+  var joystickVisual = "";
   var renderedTiles = /* @__PURE__ */ new Map();
   var renderedFog = /* @__PURE__ */ new Set();
   var nextId = 0;
@@ -1827,6 +1974,73 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
   var hungerLevel = () => remainingBuff("hunger", "player");
   var isInvisible = () => hasBuff("invisibility", "player") || cloakActive();
   var targetExperience = () => 5 + level * 5;
+  function mobileContacts(pointer = input_primary_pointer()) {
+    const contacts = input_touches();
+    return contacts.length || !pointer.pressed ? contacts : [{
+      id: "mouse",
+      justPressed: pointer.justPressed,
+      x: pointer.x / pointer.viewportWidth + 0.5,
+      y: 0.5 - pointer.y / pointer.viewportHeight
+    }];
+  }
+  function adjacentEnemy() {
+    if (!floor || !scene_actor("player")) return void 0;
+    const hero = cellPosition("player");
+    return monsterIds().find((id) => {
+      const target = cellPosition(id);
+      return field(id, "health") > 0 && floor.visible.has(cellKey(floor, target)) && canStep(floor, hero, target);
+    });
+  }
+  function mobileHudState() {
+    const t = (key) => renderMessage(profile.language, message(key));
+    let skill = { label: t("mobile.shield"), detail: t("mobile.passive"), enabled: false, active: shieldValue("health") > 0 };
+    if (selectedClass === "mage") {
+      const staff = equipment.find((gear) => gear.kind === "mages_staff");
+      const charges = staff ? staffCharges(staff.id) : 0;
+      skill = { label: t("mobile.staff"), detail: `${charges}/${staff ? staffCapacity(staff.level) : 0}`, enabled: charges > 0, active: false };
+    } else if (selectedClass === "huntress") {
+      skill = { label: t("mobile.bow"), detail: "", enabled: inventory.spirit_bow > 0, active: false };
+    } else if (selectedClass === "rogue") {
+      const active = cloakActive();
+      skill = {
+        label: t(active ? "mobile.reveal" : "mobile.cloak"),
+        detail: `${cloakValue("health")}/${cloakCapacity(cloakValue("lifetime"))}`,
+        enabled: inventory.cloak_of_shadows > 0 && cloakEquipped() && (active || cloakValue("health") > 0),
+        active
+      };
+    }
+    if (targeting) skill = { ...skill, label: t("mobile.cancel"), enabled: true, active: true };
+    return { stick: mobileControls.stick, attack: adjacentEnemy() !== void 0, healing: inventory.potion_healing, skill };
+  }
+  function mobileAction(action) {
+    if (phase !== "playing") return;
+    if (action === "mobile_skill" && targeting) {
+      targeting = null;
+      drawUi();
+      return;
+    }
+    if (actionCooldown > 0) return;
+    if (action === "mobile_skill" && !mobileHudState().skill.enabled) return;
+    if (action === "mobile_attack" && !adjacentEnemy()) return;
+    if (action === "mobile_heal" && inventory.potion_healing <= 0) return;
+    queuedPath = [];
+    examining = false;
+    targeting = null;
+    if (action === "mobile_attack") {
+      const enemy = adjacentEnemy();
+      if (!enemy) return;
+      const hero = cellPosition("player"), target = cellPosition(enemy);
+      movePlayer(target.x - hero.x, target.z - hero.z);
+    } else if (action === "mobile_heal") {
+      if (!useInventoryItem("potion_healing")) return;
+    } else if (action === "mobile_wait") spendTurns();
+    else if (selectedClass === "mage") {
+      const staff = equipment.find((gear) => gear.kind === "mages_staff");
+      if (staff) beginStaffZap(staff.id);
+    } else if (selectedClass === "huntress") useInventoryItem("spirit_bow");
+    else if (selectedClass === "rogue") toggleCloak();
+    actionCooldown = 0.16;
+  }
   function pushLog(entry) {
     dungeonLogs.unshift(entry);
     if (dungeonLogs.length > 3) dungeonLogs.pop();
@@ -1876,6 +2090,7 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
     if (metrics.width <= 0 || metrics.height <= 0) return;
     viewport = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
     const localized = (value) => renderMessage(profile.language, value);
+    joystickVisual = "";
     mountUi(renderSpdUi({
       phase: previewPhase ?? phase,
       selectedClass,
@@ -1914,7 +2129,8 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
       checks: checks.map(localized),
       checkPage,
       networkStatus: networkLines.length ? networkLines.map(localized).join("\n") : localized(networkStatus),
-      notice: uiNotice ? localized(uiNotice) : ""
+      notice: uiNotice ? localized(uiNotice) : "",
+      mobile: mobileEnabled ? mobileHudState() : void 0
     }, uiAction));
   }
   function closeModal() {
@@ -1935,6 +2151,10 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
     if (previewPhase) {
       previewPhase = null;
       drawUi();
+      return;
+    }
+    if (id.startsWith("mobile_")) {
+      mobileAction(id);
       return;
     }
     if (id.startsWith("select:")) {
@@ -2144,6 +2364,7 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
     game_state_set(score, Math.ceil(health()), phase.toUpperCase());
   }
   function setPhase(next) {
+    if (mobileEnabled) mobileControls.reset(mobileContacts());
     previewPhase = null;
     examining = false;
     targeting = null;
@@ -2981,7 +3202,7 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
     overlayReturn = "playing";
     setPhase("message");
   }
-  function playerInput(dt, pointer) {
+  function playerInput(dt, pointer, mobile) {
     actionCooldown = Math.max(0, actionCooldown - dt);
     if (input_key_just_pressed("KeyF")) {
       toggleExamine();
@@ -3022,6 +3243,14 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
       queuedPath = [];
       if (actionCooldown <= 0) {
         movePlayer(dx, dz);
+        actionCooldown = 0.16;
+      }
+      return;
+    }
+    if (mobile?.engaged && !targeting && !examining) {
+      queuedPath = [];
+      if ((mobile.direction.x || mobile.direction.y) && actionCooldown <= 0) {
+        movePlayer(mobile.direction.x, mobile.direction.y);
         actionCooldown = 0.16;
       }
       return;
@@ -3173,6 +3402,7 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
     loadMenu();
   };
   callbacks.on_suspend = () => {
+    if (mobileEnabled) mobileControls.reset(mobileContacts());
     queuedPath = [];
     targeting = null;
     examining = false;
@@ -3188,6 +3418,7 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
     if (metrics.width <= 0 || metrics.height <= 0) return;
     const signature = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
     if (viewport !== signature) {
+      if (mobileEnabled) mobileControls.reset(mobileContacts(pointer));
       viewport = signature;
       refreshDungeon();
       drawUi();
@@ -3198,7 +3429,20 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
     }
     const previousPhase = phase;
     const previousTurns = turns;
-    const uiActivated = updateUi();
+    const mobile = mobileEnabled ? mobileControls.sample(mobileContacts(pointer), uiMetrics(), { x: metrics.width, y: metrics.height }, phase === "playing") : void 0;
+    if (mobile && phase === "playing") {
+      const visual = `${mobileControls.stick.x.toFixed(3)}:${mobileControls.stick.y.toFixed(3)}:${mobileControls.stick.active}`;
+      if (visual !== joystickVisual) {
+        joystickVisual = visual;
+        ui_set_style("mobile_joystick_thumb", JSON.stringify(joystickThumbStyle(uiMetrics(), mobileControls.stick)));
+      }
+      const action = mobile.actions[0];
+      if (action) {
+        mobileAction(action);
+        return;
+      }
+    }
+    const uiActivated = mobile?.consumed ? false : updateUi();
     pollNetwork(dt);
     if (uiActivated || phase !== previousPhase || turns !== previousTurns) return;
     if (input_key_just_pressed("F12")) {
@@ -3256,6 +3500,14 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
     }
     if (phase !== "playing") return;
     elapsed += dt;
-    playerInput(dt, pointer);
+    const contact = mobile?.worldTap;
+    const gamePointer = mobile ? {
+      ...pointer,
+      pressed: !!contact,
+      justPressed: !!contact,
+      x: contact ? (contact.x - 0.5) * pointer.viewportWidth : 0,
+      y: contact ? (0.5 - contact.y) * pointer.viewportHeight : 0
+    } : pointer;
+    playerInput(dt, gamePointer, mobile);
   };
 })();

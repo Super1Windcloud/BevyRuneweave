@@ -10,6 +10,7 @@ import type { TargetKind } from "./projectiles.js";
 import { staffCapacity, staffCharges, staffDamageRange } from "./staff.js";
 import { cloakActive, cloakCapacity, cloakEquipped, cloakValue } from "./cloak.js";
 import { sealArmor, sealMaximum, sealValue, shieldValue } from "./seal.js";
+import { joystickThumbStyle, mobileLayout, type MobileAction, type MobileHudState } from "./mobile-controls.js";
 
 export type UiPhase = "menu" | "heroes" | "playing" | "paused" | "won" | "lost" | "inventory" | "item" | "equipment" | "upgrade" | "affix" | "seal_transfer" | "hero" | "settings" | "checks" | "rankings" | "journal" | "news" | "changes" | "about" | "support" | "message";
 export interface SpdUiState {
@@ -51,6 +52,7 @@ export interface SpdUiState {
   checkPage: number;
   networkStatus: string;
   notice: string;
+  mobile?: MobileHudState;
 }
 export interface UiMetrics { scale: number; width: number; height: number; left: number; top: number; landscape: boolean; large: boolean }
 export function uiMetrics(): UiMetrics {
@@ -290,7 +292,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       elements.push(label("examine_prompt", lines.join("\n"), 2, 44, promptWidth, 6, titleColor, lines.length * 8));
       elements.push(control("cancel_examine", t("common.close"), w - 28, 44, 26, 14, "toast", undefined, "cancel_examine", true, 6));
     } else if (state.profile.showHints) {
-      const lines = wrappedText(t("log.guide"), w - 4, 6);
+      const lines = wrappedText(t(state.mobile ? "mobile.hint" : "log.guide"), w - 4, 6);
       elements.push(label("hud_hint", lines.join("\n"), 2, 44, w - 4, 6, grey, lines.length * 8));
     }
     const staff = state.equipment.find((gear) => gear.kind === "mages_staff");
@@ -318,18 +320,49 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
         art(`quick_frame_${index}`, `quick_${side}`, 0, 0), ...(name ? [image(`quick_icon_${index}`, `sprites/dungeon/${name}.png`, rect((width - 16) / 2, 3, 16, 16)), label(`quick_count_${index}`, quantity, 2, 2, 14, 5)] : []),
       ] });
     }
-    const logWidth = Math.max(90, w - 90);
+    const mobile = state.mobile && state.phase === "playing" ? mobileLayout(m) : null;
+    const logX = mobile ? mobile.joystick.x + mobile.joystick.radius + 8 / s : 2;
+    const logWidth = mobile ? Math.max(30, mobile.actionLeft - logX - 8 / s) : Math.max(90, w - 90);
     const logLines = state.logs.slice(0, 3).reverse().map((entry) => wrappedText(entry, logWidth, 6));
     const logHeights = logLines.map((lines) => Math.max(10, Math.ceil(lines.length * 7.2) + 2));
     let logY = h - 32 - logHeights.reduce((sum, height) => sum + height, 0);
     logLines.forEach((lines, index) => {
-      elements.push(label(`log_line_${index}`, lines.join("\n"), 2, logY, logWidth, 6, index === logLines.length - 1 ? white : grey, logHeights[index]!));
+      elements.push(label(`log_line_${index}`, lines.join("\n"), logX, logY, logWidth, 6, index === logLines.length - 1 ? white : grey, logHeights[index]!));
       logY += logHeights[index]!;
     });
     if (state.bossHealth !== null) elements.push(node("boss_panel", rect((w - 100) / 2, 2, 100, 10), [
       node("boss_track", { ...rect(0, 5, 100, 3), background: [0.1, 0.03, 0.03, 1] }),
       node("boss_fill", { ...rect(0, 5, Math.max(0, state.bossHealth), 3), background: [0.65, 0.05, 0.04, 1] }), label("boss_label", t("monster.boss"), 0, -2, 100, 6, titleColor),
     ]));
+    if (state.mobile && state.phase === "playing") {
+      const controls = state.mobile, layout = mobileLayout(m), stick = layout.joystick;
+      elements.push(node("mobile_joystick", {
+        ...rect(stick.x - stick.radius, stick.y - stick.radius, stick.radius * 2, stick.radius * 2),
+        borderRadius: stick.radius * s, background: [0.04, 0.045, 0.03, 0.65],
+      }, [
+        node("mobile_joystick_axis_x", { ...rect(8 / s, stick.radius - 1 / s, stick.radius * 2 - 16 / s, 2 / s), background: [0.8, 0.8, 0.7, 0.25] }),
+        node("mobile_joystick_axis_y", { ...rect(stick.radius - 1 / s, 8 / s, 2 / s, stick.radius * 2 - 16 / s), background: [0.8, 0.8, 0.7, 0.25] }),
+        node("mobile_joystick_thumb", joystickThumbStyle(m, controls.stick)),
+      ]));
+      elements.push(label("mobile_move_label", t("mobile.move"), stick.x - stick.radius, stick.y + stick.radius - 12 / s, stick.radius * 2, 10 / s, grey));
+      const buttons: [MobileAction, string, string, boolean, boolean][] = [
+        ["mobile_attack", t("mobile.attack"), "", controls.attack, false],
+        ["mobile_skill", controls.skill.label, controls.skill.detail, controls.skill.enabled, controls.skill.active],
+        ["mobile_heal", t("mobile.heal"), `${controls.healing}`, controls.healing > 0, false],
+        ["mobile_wait", t("mobile.wait"), "", true, false],
+      ];
+      for (const [id, caption, detail, enabled, active] of buttons) {
+        const bounds = layout.buttons[id], width = bounds.width, height = bounds.height;
+        const size = Math.min(12 / s, (width - 4 / s) / Math.max(1, textWidth(caption, 1)));
+        const textY = detail ? height / 2 - 12 / s : (height - size * 1.2) / 2;
+        elements.push({ kind: "button", id, onClick: enabled ? () => on(id) : undefined,
+          style: { ...rect(bounds.x, bounds.y, width, height), borderRadius: width * s / 2,
+            background: !enabled ? [0.1, 0.1, 0.08, 0.65] : active ? [0.17, 0.34, 0.23, 0.9] : id === "mobile_attack" ? [0.48, 0.13, 0.09, 0.88] : [0.27, 0.24, 0.16, 0.88] },
+          children: [label(`${id}_label`, caption, (width - textWidth(caption, size)) / 2, textY, width, size, enabled ? white : grey),
+            ...(detail ? [label(`${id}_detail`, detail, (width - textWidth(detail, 10 / s)) / 2, height / 2 + 2 / s, width, 10 / s, active ? titleColor : grey)] : [])],
+        });
+      }
+    }
   }
 
   const menuPhases: UiPhase[] = ["menu", "rankings", "journal", "news", "changes", "about", "support"];

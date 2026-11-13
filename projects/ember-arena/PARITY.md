@@ -8,6 +8,12 @@ immutable revision; source and crop checksums are recorded in the asset manifest
 
 ## Current sewer milestone
 
+The Android/iOS virtual joystick and class-action overlay are a port-specific extension.
+They reuse turn-based movement/combat/item functions and live BMS touch contacts; they do not
+implement upstream camera dragging/pinch zoom or close the remaining original movement/UI gaps.
+Native runtime builds pass, while the new controller/gameplay tests and device acceptance are
+NOT_RUN at the user's request.
+
 Mobile adaptation update (2026-11-12): Android arm64 and iOS device Debug builds and actual
 launch/touch/rotation/background-pause paths were exercised with rebuilt runtimes. Optional BMS
 `on_suspend()` cancels queued game input and pauses the in-process run; process-death save/load

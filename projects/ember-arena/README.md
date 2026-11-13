@@ -199,6 +199,28 @@ not change the incomplete full-game parity status.
 | C | Activate/stop the equipped cloak |
 | Escape | Pause/resume or close the current menu |
 
+Android/iOS also show a fixed virtual joystick at the lower left and Attack, class skill,
+Heal and Wait controls at the lower right, inside the safe area and above the original toolbar.
+Drag the stick beyond its dead zone to walk in eight directions; holding it repeats the existing
+tile action every 0.16 seconds, and releasing it stops. It remains turn based. Attack selects an
+adjacent visible enemy and uses the existing melee action, without automatically chasing enemies.
+The Mage's skill opens staff aiming with a charge count; Huntress opens bow aiming; Rogue toggles
+the equipped cloak with its energy count. Warrior's shield is automatic and shown as a passive,
+disabled skill control. Heal consumes a carried healing potion. Unavailable actions are disabled.
+While aiming, joystick movement pauses until a tile is selected or the skill is cancelled.
+
+Separate touch IDs allow the left thumb to keep holding the stick while the right thumb uses
+skills or selects a target. Buttons trigger once per press, including after a UI redraw. Modal
+entry, viewport changes and suspension clear capture and block still-held contacts until release.
+Tapping explored terrain remains available; desktop keyboard/mouse input retains its existing
+behavior. This overlay is a port extension, not an upstream Pixel Dungeon UI replica.
+
+Rebuild Android/iOS runtimes to expose the BMS `input_touches` and `app_platform` functions, then
+rebuild the native hosts and distribute the regenerated game bundle. An older desktop runtime can
+still run the bundle without the mobile overlay. Current Android arm64, iOS device and macOS
+unified Rust compilation passed; gameplay/controller test sources compile, but test suites and
+device/visual/performance acceptance were not run for this change at the user's request.
+
 The title opens a separate six-icon hero selection screen; the four implemented classes are
 playable, while Duelist/Cleric show their upstream unlock-message presentation. Selecting a
 backpack slot opens an item-detail window before Drink/Throw/Shoot/Zap/Read/Eat is confirmed.
