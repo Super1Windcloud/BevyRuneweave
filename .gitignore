@@ -10,3 +10,4 @@ node_modules
 index.html
 temp
 .DS_Store
+/examples/app-debug
