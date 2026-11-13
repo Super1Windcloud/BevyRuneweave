@@ -47,6 +47,11 @@ struct Launcher {
 
 impl Launcher {
     fn new(state: LauncherApp, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        gpui_kit::component::set_locale(if crate::i18n::is_chinese() {
+            "zh-CN"
+        } else {
+            "en"
+        });
         configure_theme(window.appearance().into(), cx);
         let appearance_subscription = cx.observe_window_appearance(window, |_, window, cx| {
             configure_theme(window.appearance().into(), cx);

@@ -83,6 +83,10 @@ and other locales fall back to English. Navigation, accessibility/tooltips, stat
 messages share `examples/host-localization.json` with Android and iOS. Package metadata, URLs and
 script-language identifiers remain unchanged. Run `npm run prepare:host-locales` after editing
 the catalog; `npm run test:host-locales` checks generated resources and placeholder parity.
+GPUI's built-in component locale uses the same selection, including the input field's Cut,
+Copy, Paste and Select All menus and its Clear accessibility label. Chinese variants map to
+the component library's `zh-CN` catalog; unsupported locales use `en` for both host and components.
+Restart the launcher after changing the system language.
 
 Localization acceptance on 2026-11-12: 34 macOS-hosted tests passed, including GPUI interaction,
 Chinese locale variants, unsupported-language fallback and formatted error data. These headless
