@@ -7,10 +7,17 @@ import { trackData } from "../modules/stk-car/game/src/track-data.ts";
 
 const project = resolve(import.meta.dirname, "..");
 const assets = join(project, "modules/stk-car/game/assets");
+const manifest = JSON.parse(readFileSync(join(assets, "asset-manifest.json"), "utf8")) as { files: string[] };
+if (!Array.isArray(manifest.files) || manifest.files.some((path) => typeof path !== "string" || path.startsWith("/") || /^[A-Za-z]:/.test(path) || path.includes("\\") || path.split("/").some((part) => !part || part === "." || part === ".."))) throw new Error("Invalid asset manifest");
+const allowed = new Set([...manifest.files, "engineConfig.json", "stk-car.js", "asset-manifest.json"]);
 const required = [trackData.trackModel, trackData.kartModel, ...trackData.wheels.map((wheel) => wheel.path),
-  ...trackData.scenery.map((object) => object.path), ...Object.values(trackData.pickupModels),
+  ...Object.values(trackData.pickupModels),
+  trackData.skyModel, trackData.menuSkyModel, ...trackData.karts.flatMap((kart) => [kart.model, kart.icon, ...kart.wheels.map((wheel) => wheel.path)]),
+  "ui/background.jpg", "ui/logo.png", "ui/minimap.png",
   "fonts/wqy-microhei.ttf", "branding/tux.png", "licenses/source-manifest.json"];
 for (const file of required) if (!existsSync(join(assets, file))) throw new Error(`Missing ${file}; run prepare:assets before packaging`);
+for (const file of required) if (!allowed.has(file)) throw new Error(`Unlisted asset ${file}; run prepare:assets`);
+for (const file of allowed) if (file !== "stk-car.js" && !existsSync(join(assets, file))) throw new Error(`Missing manifest asset ${file}`);
 await build({ absWorkingDir: project, entryPoints: ["modules/stk-car/game/src/stk-car.ts"], outfile: join(assets, "stk-car.js"), bundle: true, format: "iife", target: "es2023" });
 
 const localParts: Buffer[] = [];
@@ -23,6 +30,7 @@ function visit(directory: string): void {
     if (entry.isSymbolicLink()) throw new Error(`Refusing symlink in asset bundle: ${path}`);
     if (entry.isDirectory()) { visit(path); continue; }
     if (!entry.isFile() || entry.name.startsWith(".")) continue;
+    if (!allowed.has(relative(assets, path).replaceAll("\\", "/"))) continue;
     const name = Buffer.from(`assets/${relative(assets, path).replaceAll("\\", "/")}`);
     const data = readFileSync(path);
     const compressed = deflateRawSync(data, { level: 9 });

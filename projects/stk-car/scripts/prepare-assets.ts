@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { readSpm, writeGlb } from "./spm.ts";
+import { prepareScene } from "./prepare-scene.ts";
+import { minimap } from "./minimap.ts";
+import { skyMesh } from "./scene-source.ts";
 
 const project = resolve(import.meta.dirname, "..");
 const sourceArgument = process.argv.find((value) => value.startsWith("--source="))?.slice(9);
@@ -13,6 +16,7 @@ const track = join(source, "tracks/lighthouse");
 const kart = join(source, "karts/tux");
 const sourceFiles = new Map<string, string>();
 const textures = new Map<string, string>();
+const generatedFiles = new Set<string>();
 
 function indexTextures(directory: string) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -22,14 +26,19 @@ function indexTextures(directory: string) {
   }
 }
 function record(path: string): Buffer {
+  const sourcePath = relative(source, path), codePath = relative(code, path);
+  const inside = (value: string) => value !== ".." && !value.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) && !isAbsolute(value);
+  const sourceKey = inside(sourcePath) ? `stk-assets/${sourcePath}` : inside(codePath) ? `stk-code/${codePath}` : null;
+  if (!sourceKey) throw new Error(`Resource is outside the configured STK directories: ${path}`);
   const data = readFileSync(path);
-  const relative = path.startsWith(`${source}/`) ? `stk-assets/${path.slice(source.length + 1)}` : `stk-code/${path.slice(code.length + 1)}`;
-  sourceFiles.set(relative, createHash("sha256").update(data).digest("hex"));
+  sourceFiles.set(sourceKey.replaceAll("\\", "/"), createHash("sha256").update(data).digest("hex"));
   return data;
 }
 function write(path: string, data: string | Buffer) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, data);
+  const assetPath = relative(assets, path);
+  if (assetPath && !assetPath.startsWith("..") && !isAbsolute(assetPath)) generatedFiles.add(assetPath.replaceAll("\\", "/"));
 }
 function copy(path: string, target: string) { write(join(assets, target), record(path)); }
 function xml(path: string): string { return record(path).toString("utf8"); }
@@ -47,7 +56,8 @@ function vector(value: string): number[] {
 }
 function convert(path: string, target: string): string {
   const mesh = readSpm(record(path));
-  const shaders = new Map(tags(xml(join(dirname(path), "materials.xml")), "material").map((m) => [m.name, m.shader]));
+  const materialPath = join(dirname(path), "materials.xml");
+  const shaders = new Map((existsSync(materialPath) ? tags(xml(materialPath), "material") : []).map((m) => [m.name, m.shader]));
   const output = writeGlb(mesh, (name) => {
     const local = join(dirname(path), basename(name));
     const resolved = existsSync(local) ? local : textures.get(basename(name));
@@ -65,20 +75,27 @@ for (const path of [track, kart, join(source, "textures"), join(code, "data/ttf/
 }
 indexTextures(join(source, "textures"));
 const scene = xml(join(track, "scene.xml"));
-const model = tags(scene, "track")[0].model;
-const trackModel = convert(join(track, model), "models/lighthouse.glb");
-const objects = tags(scene, "static-object").filter((object) => object.model && object.interaction !== "physics-only" && !["dynamicSky.spm"].includes(object.model));
-const scenery = objects.map((object, index) => ({
-  path: convert(join(track, object.model), `models/scenery-${index}.glb`),
-  position: vector(object.xyz ?? "0 0 0"),
-  rotation: (object.hpr ?? "0 0 0").split(/\s+/).map(Number),
-  scale: (object.scale ?? "1 1 1").split(/\s+/).map(Number),
-}));
+const fullScene = prepareScene(source, track, record, textures, (path, data) => write(join(assets, path), data));
+const trackModel = fullScene.trackModel;
+const scenery: { path: string; position: number[]; rotation: number[]; scale: number[] }[] = [];
 const kartConfig = xml(join(kart, "kart.xml"));
 const kartModel = convert(join(kart, tags(kartConfig, "kart")[0]["model-file"]), "models/tux.glb");
 const wheels = ["front-left", "front-right", "rear-left", "rear-right"].map((tag) => {
   const wheel = tags(kartConfig, tag)[0];
   return { path: convert(join(kart, wheel.model), `models/${tag}.glb`), position: vector(wheel.position), front: tag.startsWith("front") };
+});
+const karts = ["tux", "pidgin", "wilber", "suzanne"].map((id) => {
+  const directory = join(source, "karts", id);
+  const config = xml(join(directory, "kart.xml"));
+  const info = tags(config, "kart")[0];
+  const model = id === "tux" ? kartModel : convert(join(directory, info["model-file"]), `models/karts/${id}/kart.glb`);
+  const kartWheels = id === "tux" ? wheels : ["front-left", "front-right", "rear-left", "rear-right"].map((tag) => {
+    const wheel = tags(config, tag)[0];
+    return { path: convert(join(directory, wheel.model), `models/karts/${id}/${tag}.glb`), position: vector(wheel.position), front: tag.startsWith("front") };
+  });
+  copy(join(directory, info["icon-file"]), `branding/${id}.png`);
+  copy(join(directory, "licenses.txt"), `licenses/${id}.txt`);
+  return { id, name: info.name, type: info.type, model, icon: `branding/${id}.png`, wheels: kartWheels };
 });
 const pickupModels = Object.fromEntries([
   ["item", "gift-box.spm"], ["banana", "banana.spm"],
@@ -102,22 +119,45 @@ const route = quads.slice(Number(edge.from), Number(edge.to) + 1).map((quad) => 
 const pickups = ["small-nitro", "big-nitro", "banana", "item"].flatMap((tag) => tags(scene, tag).map((item) => ({
   kind: tag, position: vector(`${item.x} ${item.y} ${item.z}`),
 })));
-const manifest = { trackModel, kartModel, wheels, scenery, route, pickups, pickupModels };
+const trackInfo = tags(xml(join(track, "track.xml")), "track")[0];
+const map = minimap(route);
+write(join(assets, "ui/minimap.png"), map.image);
+const manifest = { trackModel, kartModel, wheels, scenery, route, pickups, pickupModels, karts,
+  menuSkyModel: "models/menu-background.glb",
+  skyModel: fullScene.skyModel, sceneMetadata: fullScene.metadata, environment: fullScene.environment,
+  minimap: map.bounds, defaultLaps: Number(trackInfo["default-number-of-laps"]), startGrid: tags(scene, "default-start")[0] };
 write(join(project, "modules/stk-car/game/src/track-data.ts"), `// Generated by npm run prepare:assets from STK's Lighthouse assets.\nexport const trackData = ${JSON.stringify(manifest)} as const;\n`);
 copy(join(kart, "tux_icon.png"), "branding/tux.png");
 copy(join(track, "screenshot.jpg"), "branding/lighthouse.jpg");
 copy(join(code, "data/ttf/wqy-microhei.ttf"), "fonts/wqy-microhei.ttf");
+copy(join(code, "data/ttf/Cantarell-Regular.otf"), "fonts/Cantarell-Regular.otf");
+copy(join(code, "data/ttf/SigmarOne.otf"), "fonts/SigmarOne.otf");
+for (const name of ["logo", "menu_race", "main_options", "main_help", "main_quit", "back", "green_check", "restart", "mode_normal", "mode_tt", "difficulty_easy", "difficulty_medium", "difficulty_hard", "difficulty_best", "speedback", "nitro", "lap_flag", "power", "zipper_collect", "banana"]) {
+  copy(join(code, `data/gui/icons/${name}.png`), `ui/${name}.png`);
+}
+copy(join(code, "data/skins/cartoon/background.jpg"), "ui/background.jpg");
+const menuBackground = join(code, "data/skins/cartoon/background.jpg");
+write(join(assets, "models/menu-background.glb"), writeGlb(skyMesh(new Array(6).fill(menuBackground)), (name) => name, new Map([[menuBackground, "unlit"]])));
+copy(join(code, "data/gui/icons/licenses.txt"), "licenses/gui-icons.txt");
+copy(join(code, "data/skins/cartoon/licenses.txt"), "licenses/skin.txt");
+for (const name of fullScene.metadata.libraries) {
+  const path = join(source, "library", name, "licenses.txt");
+  if (existsSync(path)) copy(path, `licenses/library-${name}.txt`);
+}
+write(join(assets, "licenses/scene-instances.json"), `${JSON.stringify(fullScene.instances)}\n`);
 for (const [path, target] of [
   [join(source, "licenses.txt"), "licenses/stk-assets.txt"],
   [join(track, "licenses.txt"), "licenses/lighthouse.txt"],
   [join(kart, "licenses.txt"), "licenses/tux.txt"],
   [join(source, "models/licenses.txt"), "licenses/models.txt"],
   [join(code, "data/ttf/LICENSE"), "licenses/fonts.txt"],
+  [join(code, "data/ttf/SIL Open Font License.txt"), "licenses/OFL.txt"],
   [join(code, "COPYING"), "licenses/STK-COPYING.txt"],
 ] as const) copy(path, target);
 write(join(assets, "licenses/source-manifest.json"), `${JSON.stringify({
   source: "https://github.com/supertuxkart/stk-assets-mobile/releases/tag/git",
-  conversion: "SPM v1 to GLB; Z reflection with reversed winding; baked straight pose; base color only; secondary textures and skeletons omitted.",
+  conversion: "SPM v1 to GLB; Z reflection; composed scene/library/LOD transforms baked including nonuniform scale; original skybox; straight kart poses; base color only; secondary textures and skeletons omitted.",
   files: Object.fromEntries([...sourceFiles].sort(([a], [b]) => a.localeCompare(b))),
 }, null, 2)}\n`);
-console.log(`Prepared Lighthouse (${route.length} route nodes), Tux and ${pickups.length} pickups.`);
+console.log(`Prepared Lighthouse (${fullScene.metadata.modelInstances} model instances, ${fullScene.metadata.libraryInstances} library instances, ${route.length} route nodes), ${karts.length} karts and ${pickups.length} pickups.`);
+write(join(assets, "asset-manifest.json"), `${JSON.stringify({ files: [...generatedFiles].sort() }, null, 2)}\n`);

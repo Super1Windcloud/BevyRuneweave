@@ -48,11 +48,11 @@ test("nitro consumes a bounded reserve and pickup cooldown prevents repeated col
   race.player.nitro = 0;
   race.pickups[0].position = [race.player.x, race.player.y, race.player.z];
   race.step(fixedStep, { ...emptyControls(), throttle: 1 });
-  assert.equal(race.player.nitro, 28);
+  assert.equal(race.player.nitro, 3);
   assert.ok(race.pickups[0].cooldown > 6);
   race.step(fixedStep, { ...emptyControls(), throttle: 1, nitro: true });
-  assert.ok(race.player.nitro < 28 && race.player.nitro > 27);
-  race.player.nitro = 0.01;
+  assert.ok(race.player.nitro < 3 && race.player.nitro > 2.9);
+  race.player.nitro = 0.001;
   race.step(fixedStep, { ...emptyControls(), throttle: 1, nitro: true });
   assert.equal(race.player.nitro, 0);
 });

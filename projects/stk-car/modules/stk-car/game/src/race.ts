@@ -1,10 +1,13 @@
 export interface Vec3 { x: number; y: number; z: number; }
 export interface RouteNode { center: readonly number[]; width: number; }
-export interface Controls { throttle: number; steer: number; brake: boolean; drift: boolean; nitro: boolean; rescue: boolean; useItem: boolean; }
+export interface Controls { throttle: number; steer: number; brake: boolean; drift: boolean; nitro: boolean; rescue: boolean; useItem: boolean; lookBack?: boolean; }
+export interface RaceOptions { difficulty: number; aiCount: number; mode: "normal" | "time-trial"; kartId: string; }
+export const nitroCapacity = 20;
 export interface Pose extends Vec3 { heading: number; pitch: number; }
 export interface Racer extends Pose {
   previous: Pose;
   id: string;
+  kartId: string;
   speed: number;
   progress: number;
   routeDistance: number;
@@ -16,7 +19,10 @@ export interface Racer extends Pose {
   steering: number;
   offRoad: number;
   stun: number;
+  falseStart: boolean;
+  startBoostApplied: boolean;
   item: boolean;
+  zipperCount: number;
   finishedAt: number | null;
 }
 export interface Pickup { kind: string; position: readonly number[]; cooldown: number; }
@@ -107,14 +113,17 @@ export class Race {
   elapsed = 0;
   lapTime = 0;
   readonly lapTimes: number[] = [];
-  constructor(readonly circuit: Circuit, pickups: readonly { kind: string; position: readonly number[] }[], readonly laps = 3) {
-    this.pickups = pickups.map((pickup) => ({ ...pickup, cooldown: 0 }));
-    this.racers = ["tux", "comet", "pepper", "ocean"].map((id, index) => {
-      const progress = 5 - Math.floor(index / 2) * 3;
-      const lane = index % 2 ? 1.4 : -1.4;
+  constructor(readonly circuit: Circuit, pickups: readonly { kind: string; position: readonly number[] }[], readonly laps = 3,
+    readonly options: RaceOptions = { difficulty: 1, aiCount: 3, mode: "normal", kartId: "tux" }) {
+    this.pickups = pickups.filter((pickup) => options.mode !== "time-trial" || pickup.kind !== "item").map((pickup) => ({ ...pickup, cooldown: 0 }));
+    const kartIds = [options.kartId, ...["tux", "pidgin", "wilber", "suzanne"].filter((id) => id !== options.kartId)];
+    const count = options.mode === "time-trial" ? 1 : clamp(Math.floor(options.aiCount), 0, 3) + 1;
+    this.racers = ["tux", "comet", "pepper", "ocean"].slice(0, count).map((id, index) => {
+      const progress = -1.5 - Math.floor(index / 2) * 1.5;
+      const lane = index % 2 ? 1.5 : -1.5;
       const pose = circuit.sample(progress, lane);
-      return { ...pose, previous: { ...pose }, id, progress: progress - 5, routeDistance: circuit.wrap(progress), lane,
-        speed: 0, nitro: 35, boost: 0, driftCharge: 0, steering: 0, offRoad: 0, stun: 0, item: false, finishedAt: null };
+      return { ...pose, previous: { ...pose }, id, kartId: kartIds[index], progress, routeDistance: circuit.wrap(progress), lane,
+        speed: 0, nitro: 0, boost: 0, driftCharge: 0, steering: 0, offRoad: 0, stun: 0, falseStart: false, startBoostApplied: false, item: false, zipperCount: options.mode === "time-trial" ? laps : 0, finishedAt: null };
     });
   }
   get player(): Racer { return this.racers[0]; }
@@ -132,8 +141,9 @@ export class Race {
     if (!Number.isFinite(dt) || dt <= 0 || dt > 0.05) return;
     for (const racer of this.racers) racer.previous = { x: racer.x, y: racer.y, z: racer.z, heading: racer.heading, pitch: racer.pitch };
     if (this.phase === "countdown") {
+      if (controls.throttle > 0 && this.countdown > 0.2) this.player.falseStart = true;
       this.countdown -= dt;
-      if (this.countdown <= 0) this.phase = "racing";
+      if (this.countdown <= 0) { this.phase = "racing"; if (this.player.falseStart) this.player.stun = 1; }
       return;
     }
     if (this.phase !== "racing") return;
@@ -150,7 +160,7 @@ export class Race {
       if (racer.progress >= this.circuit.length * this.laps) racer.finishedAt = this.elapsed;
       for (const pickup of this.pickups) {
         if (pickup.cooldown > 0 || Math.abs(racer.y - pickup.position[1]) > 4 || Math.hypot(racer.x - pickup.position[0], racer.z - pickup.position[2]) > 1.7) continue;
-        if (pickup.kind.includes("nitro")) racer.nitro = Math.min(100, racer.nitro + (pickup.kind === "big-nitro" ? 28 : 14));
+        if (pickup.kind.includes("nitro")) racer.nitro = Math.min(nitroCapacity, racer.nitro + (pickup.kind === "big-nitro" ? 3 : 1));
         else if (pickup.kind === "banana") { racer.stun = 1; racer.speed *= 0.35; }
         else racer.item = true;
         pickup.cooldown = 7;
@@ -173,7 +183,7 @@ export class Race {
       }
     }
     const lap = Math.floor(player.progress / this.circuit.length);
-    if (lap > previousLap && this.lapTimes.length < lap) {
+    if (lap > Math.max(0, previousLap) && this.lapTimes.length < lap) {
       this.lapTimes.push(this.elapsed - this.lapTime);
       this.lapTime = this.elapsed;
     }
@@ -181,25 +191,32 @@ export class Race {
   }
   private drive(racer: Racer, dt: number, controls: Controls): void {
     if (controls.rescue) this.rescue(racer);
+    if (controls.useItem && racer.zipperCount > 0) { racer.zipperCount--; racer.boost = 3.5; racer.speed += 4.5; }
     if (controls.useItem && racer.item) {
       this.traps.push({ x: racer.x - Math.sin(racer.heading) * 2.5, z: racer.z + Math.cos(racer.heading) * 2.5, y: racer.y, lifetime: 18, owner: racer.id });
       racer.item = false;
+    }
+    if (!racer.startBoostApplied && controls.throttle > 0) {
+      racer.startBoostApplied = true;
+      if (!racer.falseStart && this.elapsed <= 0.5) { racer.speed += this.elapsed <= 0.3 ? 8 : 4; racer.boost = 0.4; }
     }
     const steering = clamp(controls.steer, -1, 1);
     racer.steering += (steering - racer.steering) * (1 - Math.exp(-dt * 12));
     const drifting = controls.drift && Math.abs(racer.steering) > 0.25 && racer.speed > 10;
     if (drifting) racer.driftCharge = Math.min(3, racer.driftCharge + dt);
     else {
-      if (racer.driftCharge >= 0.8) racer.boost = Math.min(1.5, racer.driftCharge * 0.65);
+      if (racer.driftCharge >= 1) racer.boost = racer.driftCharge >= 3 ? 4 : 3;
       racer.driftCharge = 0;
     }
     const nitro = controls.nitro && racer.nitro > 0 && racer.speed > 3 && controls.throttle > 0;
-    if (nitro) racer.nitro = Math.max(0, racer.nitro - 23 * dt);
+    const light = racer.kartId === "wilber", heavy = racer.kartId === "pidgin";
+    if (nitro) racer.nitro = Math.max(0, racer.nitro - dt * (light ? 1 : heavy ? 1.67 : 1.25));
     const boosting = nitro || racer.boost > 0;
-    const maxSpeed = racer.stun > 0 ? 9 : boosting ? 42 : 30;
+    const baseSpeed = 25 * [0.6, 0.8, 0.92, 1][clamp(Math.floor(this.options.difficulty), 0, 3)] * (light ? 0.95 : heavy ? 1.05 : 1);
+    const maxSpeed = racer.stun > 0 ? (racer.falseStart && this.elapsed < 1 ? 0 : 9) : baseSpeed + (boosting ? 5 : 0);
     const acceleration = clamp(controls.throttle, -1, 1) * (boosting ? 17 : 11) - 0.07 * racer.speed;
     racer.speed = clamp(racer.speed + acceleration * dt, -8, Math.max(maxSpeed, racer.speed - 20 * dt));
-    if (controls.brake) racer.speed = Math.max(0, racer.speed - 24 * dt);
+    if (controls.brake) racer.speed = Math.max(-baseSpeed * 0.65 * (light ? 0.8 : heavy ? 0.7 : 0.75), racer.speed - 15 * dt);
     if (controls.throttle === 0) racer.speed *= Math.exp(-dt * 0.5);
     racer.heading += racer.steering * clamp(racer.speed / 11, -0.6, 1.9) * (drifting ? 1.2 : 0.92) * dt;
     racer.x += Math.sin(racer.heading) * racer.speed * dt;
@@ -224,7 +241,8 @@ export class Race {
   private driveAi(racer: Racer, index: number, dt: number): void {
     const ahead = this.circuit.sample(racer.routeDistance + 12);
     const turn = Math.abs(angleDelta(ahead.heading - racer.heading));
-    const targetSpeed = racer.stun > 0 ? 8 : 23 + index * 0.8 - Math.min(9, turn * 8);
+    const baseSpeed = 25 * [0.6, 0.8, 0.92, 1][clamp(Math.floor(this.options.difficulty), 0, 3)];
+    const targetSpeed = racer.stun > 0 ? 8 : baseSpeed * (0.78 + index * 0.025) - Math.min(6, turn * 5);
     racer.speed += clamp(targetSpeed - racer.speed, -16 * dt, 9 * dt);
     const distance = racer.speed * dt;
     racer.progress += distance;

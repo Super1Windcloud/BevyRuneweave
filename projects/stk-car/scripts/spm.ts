@@ -163,11 +163,12 @@ export function writeGlb(mesh: SpmMesh, resolveTexture: (name: string) => string
     }
     const shader = shaders.get(spec.texture) ?? "solid";
     return {
-      name: spec.texture || "untextured",
+      name: spec.texture.split(/[\\/]/).at(-1) || "untextured",
       doubleSided: true,
       pbrMetallicRoughness: { metallicFactor: 0, roughnessFactor: 0.85, ...(texture === undefined ? {} : { baseColorTexture: { index: texture } }) },
       alphaMode: ["alphablend", "additive"].includes(shader) ? "BLEND" : ["alphatest", "grass"].includes(shader) ? "MASK" : "OPAQUE",
       ...(shader === "additive" ? { emissiveFactor: [0.8, 0.8, 0.8], ...(texture === undefined ? {} : { emissiveTexture: { index: texture } }) } : {}),
+      ...(shader === "unlit" ? { extensions: { KHR_materials_unlit: {} } } : {}),
     };
   });
   const primitives = mesh.primitives.map((primitive) => ({
@@ -182,6 +183,7 @@ export function writeGlb(mesh: SpmMesh, resolveTexture: (name: string) => string
   }));
   const json = Buffer.from(JSON.stringify({
     asset: { version: "2.0", generator: "RuneWeave stk-car SPM converter" },
+    ...(materials.some((material) => "extensions" in material) ? { extensionsUsed: ["KHR_materials_unlit"] } : {}),
     scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0 }], meshes: [{ primitives }],
     materials, images, textures,
     samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 10497 }],

@@ -17,7 +17,7 @@ test("SPM decoding rejects unsupported headers and truncated buffers", () => {
 
 test("all converted GLBs are self-contained with valid bounds, triangle indices and image signatures", () => {
   const paths = [trackData.trackModel, trackData.kartModel, ...trackData.wheels.map((wheel) => wheel.path),
-    ...trackData.scenery.map((object) => object.path), ...Object.values(trackData.pickupModels)];
+    trackData.skyModel, trackData.menuSkyModel, ...Object.values(trackData.pickupModels), ...trackData.karts.flatMap((kart) => [kart.model, ...kart.wheels.map((wheel) => wheel.path)])];
   for (const path of paths) {
     const data = readFileSync(join(assets, path));
     assert.equal(data.readUInt32LE(), 0x46546c67);

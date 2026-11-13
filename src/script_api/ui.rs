@@ -429,6 +429,22 @@ pub(super) fn ui_set_font(
     })
 }
 
+pub(super) fn ui_button_hovered(
+    context: FunctionCallContext,
+    id: String,
+) -> Result<bool, InteropError> {
+    let (world, owner) = current_script(&context)?;
+    world.with_world_mut(|world| {
+        let Some(entity) = find_ui_entity(world, &owner, &id) else {
+            return false;
+        };
+        world.get::<Button>(entity).is_some()
+            && world.get::<Interaction>(entity).is_some_and(|interaction| {
+                matches!(interaction, Interaction::Hovered | Interaction::Pressed)
+            })
+    })
+}
+
 pub(super) fn ui_button_just_pressed(
     context: FunctionCallContext,
     id: String,
@@ -525,6 +541,7 @@ mod tests {
             let mut js = quickjs_context_load(&attachment, br#"
                 function on_script_loaded() {
                     if (!ui_spawn("font_label", "", "text")) throw Error("spawn");
+                    if (!ui_spawn("hover_test", "", "button") || ui_button_hovered("hover_test") || ui_button_hovered("missing")) throw Error("hover");
                     if (!ui_set_text("font_label", "Pixel", 24, 1, 1, 1, 1)) throw Error("text");
                     if (!ui_set_font("font_label", "fonts/spd-pixel.ttf")) throw Error("font");
                     if (!scene_set_camera_2d(12, 24, 240) || scene_set_camera_2d(99, 99, 0)) throw Error("camera");
@@ -579,6 +596,8 @@ mod tests {
                 br#"
                 function on_script_loaded()
                     assert(ui_spawn("font_label", "", "text"))
+                    assert(ui_spawn("hover_test", "", "button"))
+                    assert(not ui_button_hovered("hover_test") and not ui_button_hovered("missing"))
                     assert(ui_set_text("font_label", "Pixel", 24, 1, 1, 1, 1))
                     assert(ui_set_font("font_label", "fonts/spd-pixel.ttf"))
                     assert(scene_set_camera_2d(12, 24, 240))
@@ -664,6 +683,9 @@ mod tests {
             })?;
 
             assert!(ui_button_just_pressed(context.clone(), "start".to_owned())?);
+            assert!(ui_button_hovered(context.clone(), "start".to_owned())?);
+            assert!(!ui_button_hovered(context.clone(), "root".to_owned())?);
+            assert!(!ui_button_hovered(context.clone(), "missing".to_owned())?);
             guard.with_world_mut(World::clear_trackers)?;
             assert!(!ui_button_just_pressed(
                 context.clone(),

@@ -194,6 +194,8 @@ mod tests {
                 function on_script_loaded() {
                     if (!scene_set_camera_3d(1, 8, 12, 1, 0, 0, 65)) throw Error("camera");
                     if (scene_set_camera_3d(99, 99, 99, 0, 0, 0, 180)) throw Error("invalid FOV");
+                    if (!scene_set_environment('{"ambient":[0.2,0.3,0.4],"brightness":350,"sun":[0.2,0.2,0.3],"illuminance":6000,"direction":[-1,2,1],"background":[0.3,0.4,1],"fog":{"color":[0.1,0.2,0.3,0.5],"start":20,"end":160}}')) throw Error("environment");
+                    if (scene_set_environment('{}')) throw Error("invalid environment");
                 }
             "#,
                 world_id,
@@ -217,6 +219,8 @@ mod tests {
                         panic!("perspective camera");
                     };
                     assert!((perspective.fov - 65.0_f32.to_radians()).abs() < 1e-6);
+                    assert_eq!(world.resource::<GlobalAmbientLight>().brightness, 350.0);
+                    assert!(world.get::<bevy::pbr::DistanceFog>(camera).is_some());
                 })
             };
             check()?;
@@ -226,6 +230,8 @@ mod tests {
                 function on_script_loaded()
                     assert(scene_set_camera_3d(1, 8, 12, 1, 0, 0, 65))
                     assert(not scene_set_camera_3d(99, 99, 99, 0, 0, 0, 180))
+                    assert(scene_set_environment('{"ambient":[0.2,0.3,0.4],"brightness":350,"sun":[0.2,0.2,0.3],"illuminance":6000,"direction":[-1,2,1],"background":[0.3,0.4,1],"fog":{"color":[0.1,0.2,0.3,0.5],"start":20,"end":160}}'))
+                    assert(not scene_set_environment('{}'))
                 end
             "#,
                 world_id,

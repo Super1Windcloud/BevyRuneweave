@@ -37,15 +37,20 @@ export class TouchControls {
   }
 }
 
-export function readControls(touch: TouchControls, layout: Layout): Controls {
-  const held = (key: string) => input_key_pressed(key);
+export function keyboardControls(held: (key: string) => boolean, pressed: (key: string) => boolean, wasd = false): Controls {
   const input = emptyControls();
-  input.throttle = held("KeyW") || held("ArrowUp") ? 1 : held("KeyS") || held("ArrowDown") ? -1 : 0;
-  input.steer = (held("KeyD") || held("ArrowRight") ? 1 : 0) - (held("KeyA") || held("ArrowLeft") ? 1 : 0);
-  input.drift = held("Space");
-  input.nitro = held("ShiftLeft") || held("ShiftRight");
-  input.rescue = input_key_just_pressed("KeyR") || ui_button_just_pressed("rescue");
-  input.useItem = input_key_just_pressed("KeyE") || ui_button_just_pressed("item");
+  input.throttle = held("ArrowUp") || wasd && held("KeyW") ? 1 : 0;
+  input.brake = held("ArrowDown") || wasd && held("KeyS");
+  input.steer = (held("ArrowRight") || wasd && held("KeyD") ? 1 : 0) - (held("ArrowLeft") || wasd && held("KeyA") ? 1 : 0);
+  input.drift = held("KeyV"); input.nitro = held("KeyN"); input.lookBack = held("KeyB");
+  input.rescue = pressed("Backspace"); input.useItem = pressed("Space");
+  return input;
+}
+export function readControls(touch: TouchControls, layout: Layout, mobile = false, wasd = false): Controls {
+  const input = keyboardControls(input_key_pressed, input_key_just_pressed, wasd);
+  if (!mobile) return input;
+  input.rescue ||= ui_button_just_pressed("rescue");
+  input.useItem ||= ui_button_just_pressed("item");
   const contacts = input_touches().map((contact) => ({ id: contact.id, justPressed: contact.justPressed, x: contact.x * layout.width, y: contact.y * layout.height }));
   const pointer = input_primary_pointer();
   if (!contacts.length && pointer.pressed) contacts.push({ id: "mouse", justPressed: pointer.justPressed,

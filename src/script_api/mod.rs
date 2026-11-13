@@ -2,6 +2,7 @@
 
 mod actor;
 mod camera;
+mod environment;
 mod input;
 mod network;
 #[cfg(test)]
@@ -24,6 +25,7 @@ use bevy_mod_scripting::{
 
 use actor::{ScriptActor, scene_actor, scene_actor_ids, scene_actor_set};
 use camera::scene_set_camera_3d;
+use environment::scene_set_environment;
 use input::{
     input_key_just_pressed, input_key_just_released, input_key_pressed, input_primary_pointer,
     input_primary_touch, input_touches, window_metrics,
@@ -33,8 +35,8 @@ use storage::{
     ScriptStorage, clear_detached_storage_bindings, storage_read, storage_remove, storage_write,
 };
 use ui::{
-    ScriptUiNode, ui_button_just_pressed, ui_clear, ui_despawn, ui_set_font, ui_set_image,
-    ui_set_style, ui_set_text, ui_spawn,
+    ScriptUiNode, ui_button_hovered, ui_button_just_pressed, ui_clear, ui_despawn, ui_set_font,
+    ui_set_image, ui_set_style, ui_set_text, ui_spawn,
 };
 
 const MAX_ENTITY_ID_LENGTH: usize = 128;
@@ -731,6 +733,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("scene_set_3d_enabled", scene_set_3d_enabled)
             .register("scene_set_camera_2d", scene_set_camera_2d)
             .register("scene_set_camera_3d", scene_set_camera_3d)
+            .register("scene_set_environment", scene_set_environment)
             .register("scene_set_transform", scene_set_transform)
             .register("scene_set_text", scene_set_text)
             .register("scene_despawn", scene_despawn)
@@ -742,6 +745,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("ui_set_image", ui_set_image)
             .register("ui_set_font", ui_set_font)
             .register("ui_button_just_pressed", ui_button_just_pressed)
+            .register("ui_button_hovered", ui_button_hovered)
             .register("ui_despawn", ui_despawn)
             .register("ui_clear", ui_clear)
             .register("game_state_set", game_state_set)

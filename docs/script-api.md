@@ -24,6 +24,10 @@ it does not serialize in-progress runs or provide recovery after process termina
 
 ## Scene Functions
 
+`ui_button_hovered(id)` reports whether an owned UI button has Bevy `Interaction::Hovered` or
+`Interaction::Pressed`. Missing entities, non-buttons and another attachment's nodes return false.
+Use it for mouse focus feedback; `ui_button_just_pressed` remains the activation event.
+
 | Function | Behavior |
 | --- | --- |
 | `scene_spawn(id, x, y, z)` | Creates or updates an owned entity with Bevy `Transform`. |
@@ -33,6 +37,7 @@ it does not serialize in-progress runs or provide recovery after process termina
 | `scene_set_transform_3d(id, x, y, z, rx, ry, rz, scale)` | Applies a 3D translation, Euler rotation in radians, and uniform scale. |
 | `scene_play_animation(id, path, repeat)` | Loads animation 0 from a standard glTF 2.0 GLB and binds it after the model hierarchy is ready. |
 | `scene_set_3d_enabled(enabled)` | Enables or disables the runtime's 3D camera; it starts with an orthographic projection. |
+| `scene_set_environment(configJson)` | Configures the real `GlobalAmbientLight`, `DirectionalLight`, `ClearColor` and 3D-camera `DistanceFog` through BMS. JSON has `ambient`, `sun`, `background` RGB arrays (0–1), `brightness` (0–10000), `illuminance` (0–200000), a finite nonzero `direction` XYZ and optional `fog: { color: [r,g,b,a], start, end }`. Linear fog requires `0 <= start < end`; null/omitted fog removes it. Rejects unknown fields, invalid values, payloads above 4096 bytes or a missing 3D camera with false before mutation. Works identically on Lua and QuickJS; no C ABI changes or platform-specific types. Native hosts need a rebuilt runtime. |
 | `scene_set_camera_3d(x, y, z, targetX, targetY, targetZ, fovDegrees)` | Moves the existing 3D camera and aims it at a target using perspective projection. FOV is 10–140 degrees; coordinates must be finite and the target distinct. Returns false without mutation for invalid arguments or a missing camera. Vertical views use a stable alternative up axis. Does not enable the camera; call `scene_set_3d_enabled(true)` separately. |
 | `scene_set_transform(id, x, y, z)` | Updates the entity's Bevy `Transform`. |
 | `scene_set_text(id, value, size, r, g, b, a, anchor)` | Inserts Bevy `Text2d`, `TextFont`, `TextColor`, and `Anchor` components. |

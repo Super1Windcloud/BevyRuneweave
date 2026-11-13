@@ -21,6 +21,8 @@ declare function scene_set_transform_3d(
 ): boolean;
 declare function scene_play_animation(id: string, path: string, repeat: boolean): boolean;
 declare function scene_set_3d_enabled(enabled: boolean): boolean;
+/** Validated portable ambient, sunlight, background and optional linear fog settings. */
+declare function scene_set_environment(configJson: string): boolean;
 /** Perspective look-at camera; finite coordinates, distinct target, FOV 10-140 degrees. */
 declare function scene_set_camera_3d(x: number, y: number, z: number, targetX: number, targetY: number, targetZ: number, fovDegrees: number): boolean;
 /** Moves the real 2D orthographic camera; viewportHeight is in world units. */
@@ -46,6 +48,8 @@ declare function ui_set_image(id: string, path: string): boolean;
 /** Sets a project-relative TTF/OTF font with crisp pixel rasterization. */
 declare function ui_set_font(id: string, path: string): boolean;
 declare function ui_button_just_pressed(id: string): boolean;
+/** True while the owned button is hovered or pressed. */
+declare function ui_button_hovered(id: string): boolean;
 declare function ui_despawn(id: string): boolean;
 declare function ui_clear(): void;
 declare function game_state_set(score: number, lives: number, message: string): void;
