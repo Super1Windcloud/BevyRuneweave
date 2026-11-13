@@ -32,7 +32,8 @@ it does not serialize in-progress runs or provide recovery after process termina
 | `scene_set_model(id, path)` | Loads scene 0 from a standard glTF 2.0 GLB into the owned entity. Proprietary containers that only use a `.glb` suffix are not supported. |
 | `scene_set_transform_3d(id, x, y, z, rx, ry, rz, scale)` | Applies a 3D translation, Euler rotation in radians, and uniform scale. |
 | `scene_play_animation(id, path, repeat)` | Loads animation 0 from a standard glTF 2.0 GLB and binds it after the model hierarchy is ready. |
-| `scene_set_3d_enabled(enabled)` | Enables or disables the runtime's fixed orthographic 3D camera. |
+| `scene_set_3d_enabled(enabled)` | Enables or disables the runtime's 3D camera; it starts with an orthographic projection. |
+| `scene_set_camera_3d(x, y, z, targetX, targetY, targetZ, fovDegrees)` | Moves the existing 3D camera and aims it at a target using perspective projection. FOV is 10–140 degrees; coordinates must be finite and the target distinct. Returns false without mutation for invalid arguments or a missing camera. Vertical views use a stable alternative up axis. Does not enable the camera; call `scene_set_3d_enabled(true)` separately. |
 | `scene_set_transform(id, x, y, z)` | Updates the entity's Bevy `Transform`. |
 | `scene_set_text(id, value, size, r, g, b, a, anchor)` | Inserts Bevy `Text2d`, `TextFont`, `TextColor`, and `Anchor` components. |
 | `scene_transform(id)` | Returns a BMS `ReflectReference` to Bevy `Transform`. |

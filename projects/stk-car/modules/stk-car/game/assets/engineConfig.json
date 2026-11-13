@@ -1,0 +1,17 @@
+{
+    "schemaVersion": 1,
+    "name": "stk-car",
+    "version": "0.1.0",
+    "appName": "STK Car",
+    "icon": "branding/tux.png",
+    "window": { "width": 1280, "height": 720 },
+    "mobile": { "orientation": "landscape" },
+    "script": {
+        "language": "typescript",
+        "entry": "stk-car.js"
+    },
+    "metadata": {
+        "sourceLanguage": "typescript",
+        "runtime": "quickjs"
+    }
+}

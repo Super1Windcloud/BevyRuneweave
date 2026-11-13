@@ -1,0 +1,8 @@
+{
+    "schemaVersion": 1,
+    "name": "stk-car",
+    "language": "ts",
+    "sourceDirectory": "game/src",
+    "assetDirectory": "game/assets",
+    "scriptEntry": "stk-car.js"
+}

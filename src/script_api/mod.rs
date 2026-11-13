@@ -1,6 +1,7 @@
 //! Script-facing Runeweave APIs registered through BMS.
 
 mod actor;
+mod camera;
 mod input;
 mod network;
 #[cfg(test)]
@@ -22,6 +23,7 @@ use bevy_mod_scripting::{
 };
 
 use actor::{ScriptActor, scene_actor, scene_actor_ids, scene_actor_set};
+use camera::scene_set_camera_3d;
 use input::{
     input_key_just_pressed, input_key_just_released, input_key_pressed, input_primary_pointer,
     input_primary_touch, input_touches, window_metrics,
@@ -728,6 +730,7 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("scene_play_animation", scene_play_animation)
             .register("scene_set_3d_enabled", scene_set_3d_enabled)
             .register("scene_set_camera_2d", scene_set_camera_2d)
+            .register("scene_set_camera_3d", scene_set_camera_3d)
             .register("scene_set_transform", scene_set_transform)
             .register("scene_set_text", scene_set_text)
             .register("scene_despawn", scene_despawn)

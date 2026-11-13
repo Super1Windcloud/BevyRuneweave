@@ -1,0 +1,20 @@
+{
+  "name": "@runeweave/stk-car",
+  "version": "0.1.0",
+  "author": "superwindcloud",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "esbuild modules/stk-car/game/src/stk-car.ts --bundle --format=iife --target=es2023 --outfile=modules/stk-car/game/assets/stk-car.js",
+    "watch": "esbuild modules/stk-car/game/src/stk-car.ts --bundle --format=iife --target=es2023 --outfile=modules/stk-car/game/assets/stk-car.js --watch=forever",
+    "check": "biome check . --error-on-warnings",
+    "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.scripts.json --noEmit",
+    "prepare:assets": "tsx scripts/prepare-assets.ts",
+    "test": "tsx --test scripts/*.test.ts",
+    "package": "tsx scripts/package.ts"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "typescript": "7.0.2"
+  }
+}

@@ -21,6 +21,8 @@ declare function scene_set_transform_3d(
 ): boolean;
 declare function scene_play_animation(id: string, path: string, repeat: boolean): boolean;
 declare function scene_set_3d_enabled(enabled: boolean): boolean;
+/** Perspective look-at camera; finite coordinates, distinct target, FOV 10-140 degrees. */
+declare function scene_set_camera_3d(x: number, y: number, z: number, targetX: number, targetY: number, targetZ: number, fovDegrees: number): boolean;
 /** Moves the real 2D orthographic camera; viewportHeight is in world units. */
 declare function scene_set_camera_2d(x: number, y: number, viewportHeight: number): boolean;
 declare function scene_set_transform(id: string, x: number, y: number, z: number): boolean;

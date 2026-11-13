@@ -43,6 +43,14 @@ run-desktop-demo profile="":
 run-ember-arena profile="":
     cargo run {{profile}} -p ember-arena-ts
 
+# Build and run the TypeScript STK racing project.
+run-stk-car profile="":
+    cargo run {{profile}} -p stk-car-ts
+
+# Convert a local SuperTuxKart asset checkout into portable GLB game resources.
+prepare-stk-car source code:
+    npm --prefix projects/stk-car run prepare:assets -- --source="{{source}}" --code="{{code}}"
+
 # Type-check, bundle, and simulate Ember Arena gameplay contracts.
 test-ember-arena:
     npm --prefix projects/ember-arena test

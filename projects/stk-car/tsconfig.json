@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "preserve",
+    "rootDir": "modules/stk-car",
+    "outDir": "modules/stk-car/game/assets",
+    "strict": true,
+    "noEmit": true,
+    "noEmitOnError": true,
+    "removeComments": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "modules/stk-car/game/src/**/*.ts",
+    "modules/stk-car/api/**/*.ts",
+    "modules/stk-car/api/**/*.d.ts"
+  ]
+}

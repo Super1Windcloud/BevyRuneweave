@@ -1,0 +1,16 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.7/schema.json",
+  "files": {
+    "includes": ["modules/stk-car/game/src/**/*.ts", "modules/stk-car/api/**/*.ts", "scripts/**/*.ts", "*.json", "!package-lock.json", "!modules/stk-car/game/src/track-data.ts"]
+  },
+  "formatter": { "enabled": false },
+  "assist": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "none",
+      "correctness": { "preset": "recommended" },
+      "suspicious": { "preset": "recommended" }
+    }
+  }
+}
