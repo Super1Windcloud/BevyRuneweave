@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { readSpm, writeGlb } from "./spm.ts";
+import { readSpm, writeGlb, wheelRadius, type SpmMesh } from "./spm.ts";
 import { prepareScene } from "./prepare-scene.ts";
 import { minimap } from "./minimap.ts";
 import { skyMesh } from "./scene-source.ts";
@@ -55,8 +55,7 @@ function vector(value: string): number[] {
   if (numbers.length !== 3 || !numbers.every(Number.isFinite)) throw new Error(`Invalid XYZ: ${value}`);
   return [numbers[0], numbers[1], -numbers[2]];
 }
-function convert(path: string, target: string): string {
-  const mesh = readSpm(record(path));
+function convert(path: string, target: string, mesh: SpmMesh = readSpm(record(path))): string {
   const materialPath = join(dirname(path), "materials.xml");
   const shaders = new Map((existsSync(materialPath) ? tags(xml(materialPath), "material") : []).map((m) => [m.name, m.shader]));
   const output = writeGlb(mesh, (name) => {
@@ -83,7 +82,8 @@ const kartConfig = xml(join(kart, "kart.xml"));
 const kartModel = convert(join(kart, tags(kartConfig, "kart")[0]["model-file"]), "models/tux.glb");
 const wheels = ["front-left", "front-right", "rear-left", "rear-right"].map((tag) => {
   const wheel = tags(kartConfig, tag)[0];
-  return { path: convert(join(kart, wheel.model), `models/${tag}.glb`), position: vector(wheel.position), front: tag.startsWith("front") };
+  const path = join(kart, wheel.model), mesh = readSpm(record(path));
+  return { path: convert(path, `models/${tag}.glb`, mesh), position: vector(wheel.position), front: tag.startsWith("front"), radius: wheelRadius(mesh) };
 });
 const karts = ["tux", "pidgin", "wilber", "suzanne"].map((id) => {
   const directory = join(source, "karts", id);
@@ -92,7 +92,8 @@ const karts = ["tux", "pidgin", "wilber", "suzanne"].map((id) => {
   const model = id === "tux" ? kartModel : convert(join(directory, info["model-file"]), `models/karts/${id}/kart.glb`);
   const kartWheels = id === "tux" ? wheels : ["front-left", "front-right", "rear-left", "rear-right"].map((tag) => {
     const wheel = tags(config, tag)[0];
-    return { path: convert(join(directory, wheel.model), `models/karts/${id}/${tag}.glb`), position: vector(wheel.position), front: tag.startsWith("front") };
+    const path = join(directory, wheel.model), mesh = readSpm(record(path));
+    return { path: convert(path, `models/karts/${id}/${tag}.glb`, mesh), position: vector(wheel.position), front: tag.startsWith("front"), radius: wheelRadius(mesh) };
   });
   copy(join(directory, info["icon-file"]), `branding/${id}.png`);
   copy(join(directory, "licenses.txt"), `licenses/${id}.txt`);

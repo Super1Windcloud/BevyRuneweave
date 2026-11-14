@@ -5,6 +5,7 @@ import { angleDelta, fixedStep, interpolate, type Pose } from "./race.js";
 import { PcSession, parseSettings } from "./session.js";
 import { trackData } from "./track-data.js";
 import { GameAudio } from "./sound.js";
+import { advanceWheelSpin, kartFrame, wheelTransform } from "./kart-transform.js";
 
 const callbacks = globalThis as unknown as RuneweaveCallbacks;
 const session = new PcSession();
@@ -62,11 +63,12 @@ function preparePreview(): void {
 }
 function renderPreview(dt: number): void {
   previewAngle = (previewAngle + dt * 0.55) % (Math.PI * 2);
-  scene_set_transform_3d("preview-body", 0, 0, 0, 0, previewAngle, 0, 1);
+  const frame = kartFrame({ ...zeroPose(), heading: -previewAngle }, 0, 0);
+  scene_set_transform_3d("preview-body", 0, 0, 0, ...frame.rotation, 1);
   const kart = trackData.karts.find((kart) => kart.id === session.settings.kartId)!;
   for (let i = 0; i < kart.wheels.length; i++) {
-    const [x, y, z] = kart.wheels[i].position;
-    scene_set_transform_3d(`preview-wheel-${i}`, x * Math.cos(previewAngle) + z * Math.sin(previewAngle), y, -x * Math.sin(previewAngle) + z * Math.cos(previewAngle), 0, previewAngle, 0, 1);
+    const wheel = wheelTransform(frame, kart.wheels[i].position, 0, 0);
+    scene_set_transform_3d(`preview-wheel-${i}`, wheel.position.x, wheel.position.y, wheel.position.z, ...wheel.rotation, 1);
   }
   scene_set_camera_3d(2.5, 1.5, 3.6, 0, 0.5, 0, 32);
 }
@@ -97,17 +99,15 @@ function render(alpha: number, dt: number): void {
   for (const racer of race.racers) {
     const pose = interpolate(racer, alpha);
     const kart = trackData.karts.find((kart) => kart.id === racer.kartId)!;
-    const roll = ((wheelAngles.get(racer.id) ?? 0) + racer.speed * dt / 0.18) % (Math.PI * 2);
-    wheelAngles.set(racer.id, roll);
     const lean = racer.stun > 0 && !racer.falseStart ? Math.sin(race.elapsed * 20) * 0.2 : -racer.steering * Math.min(0.09, Math.abs(racer.speed) * 0.003);
-    const yaw = -pose.heading;
-    scene_set_transform_3d(racer.id, pose.x, pose.y + 0.1, pose.z, pose.pitch, yaw, lean, 1);
+    const frame = kartFrame(pose, lean);
+    scene_set_transform_3d(racer.id, frame.position.x, frame.position.y, frame.position.z, ...frame.rotation, 1);
     for (let i = 0; i < kart.wheels.length; i++) {
-      const wheel = kart.wheels[i], [wx, wy, wz] = wheel.position;
-      const tiltedY = wy * Math.cos(pose.pitch) - wz * Math.sin(pose.pitch);
-      const tiltedZ = wy * Math.sin(pose.pitch) + wz * Math.cos(pose.pitch);
-      scene_set_transform_3d(`${racer.id}-wheel-${i}`, pose.x + wx * Math.cos(yaw) + tiltedZ * Math.sin(yaw), pose.y + tiltedY + 0.1,
-        pose.z - wx * Math.sin(yaw) + tiltedZ * Math.cos(yaw), pose.pitch + roll, yaw - (wheel.front ? racer.steering * 0.35 : 0), lean, 1);
+      const wheel = kart.wheels[i], id = `${racer.id}-wheel-${i}`;
+      const spin = advanceWheelSpin(wheelAngles.get(id) ?? 0, racer.speed, dt, wheel.radius);
+      wheelAngles.set(id, spin);
+      const transform = wheelTransform(frame, wheel.position, spin, wheel.front ? -racer.steering * 0.35 : 0);
+      scene_set_transform_3d(id, transform.position.x, transform.position.y, transform.position.z, ...transform.rotation, 1);
     }
   }
   const target = interpolate(race.player, alpha), response = 1 - Math.exp(-Math.min(dt, 0.1) * 9);

@@ -12,6 +12,17 @@ export interface SpmPrimitive {
 }
 export interface SpmMesh { materials: SpmMaterial[]; primitives: SpmPrimitive[]; }
 
+/** Match KartModel's wheel graphics radius without moving its author-defined axle pivot. */
+export function wheelRadius(mesh: SpmMesh): number {
+  let min = Infinity, max = -Infinity;
+  for (const primitive of mesh.primitives) for (let index = 1; index < primitive.positions.length; index += 3) {
+    min = Math.min(min, primitive.positions[index]); max = Math.max(max, primitive.positions[index]);
+  }
+  const radius = (max - min) / 2;
+  if (!Number.isFinite(radius) || radius <= 1e-6) throw new Error("Invalid wheel graphics radius");
+  return radius;
+}
+
 export function halfFloat(bits: number): number {
   const sign = bits & 0x8000 ? -1 : 1;
   const exponent = (bits >> 10) & 31;

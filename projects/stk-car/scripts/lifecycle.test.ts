@@ -108,3 +108,22 @@ test("bundled PC callbacks drive, look back and stop on suspend until resumed", 
   game.press("Enter"); for (let i = 0; i < 10; i++) game.frame();
   assert.equal(game.texts.has("title"), false); assert.notDeepEqual(game.transforms.get("tux"), paused);
 });
+test("bundled racing wheels keep their axle aligned with the body while driving through a turn", () => {
+  const game = load("en-US"); game.start();
+  const axle = (transform: number[]) => {
+    const [x, y, z] = transform.slice(3, 6);
+    return [Math.cos(y) * Math.cos(z), Math.cos(x) * Math.sin(z) + Math.sin(x) * Math.sin(y) * Math.cos(z),
+      Math.sin(x) * Math.sin(z) - Math.cos(x) * Math.sin(y) * Math.cos(z)];
+  };
+  const initialWheel = [...game.transforms.get("tux-wheel-2")!];
+  game.held.add("ArrowUp"); game.held.add("ArrowRight");
+  for (let frame = 0; frame < 120; frame++) {
+    game.frame();
+    const body = axle(game.transforms.get("tux")!);
+    for (const index of [2, 3]) {
+      const wheel = axle(game.transforms.get(`tux-wheel-${index}`)!);
+      assert.ok(body.every((value, axis) => Math.abs(value - wheel[axis]) < 1e-8), "rolling must not wobble the rear axle");
+    }
+  }
+  assert.notDeepEqual(game.transforms.get("tux-wheel-2")!.slice(3, 6), initialWheel.slice(3, 6));
+});
