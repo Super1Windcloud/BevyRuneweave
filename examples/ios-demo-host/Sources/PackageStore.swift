@@ -4,12 +4,29 @@ final class PackageStore {
     let installedAssets: URL
     private let files = FileManager.default
 
-    init() throws {
+    convenience init() throws {
+        let files = FileManager.default
         let support = try files.url(for: .applicationSupportDirectory, in: .userDomainMask,
                                     appropriateFor: nil, create: true)
-        let root = support.appendingPathComponent("BevyRuneweave", isDirectory: true)
+        try self.init(root: support.appendingPathComponent("BevyRuneweave", isDirectory: true))
+    }
+
+    init(root: URL) throws {
         try files.createDirectory(at: root, withIntermediateDirectories: true)
         installedAssets = root.appendingPathComponent("runtime-assets", isDirectory: true)
+    }
+
+    func clearLocalResources() throws {
+        let root = installedAssets.deletingLastPathComponent()
+        for directory in [installedAssets,
+                          root.appendingPathComponent("assets.staging", isDirectory: true),
+                          root.appendingPathComponent("assets.backup", isDirectory: true)] {
+            if files.fileExists(atPath: directory.path) {
+                try files.removeItem(at: directory)
+            }
+        }
+        // The live runtime still uses this directory for the launcher's bootstrap script.
+        try installBundledAssetsIfNeeded()
     }
 
     func installedConfig() throws -> EngineConfig {

@@ -1,6 +1,7 @@
 package io.github.super1windcloud.runeweave.demo
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.LocaleManager
 import android.content.Context
 import android.content.res.Configuration
@@ -71,6 +72,7 @@ class MainActivity : Activity() {
     private lateinit var urlField: EditText
     private lateinit var downloadButton: Button
     private lateinit var launchButton: Button
+    private lateinit var clearResourcesButton: Button
     private val remoteAssetButtons = mutableListOf<Button>()
     private lateinit var remoteAssetsContainer: LinearLayout
     private lateinit var remoteAssetsStatus: TextView
@@ -283,7 +285,11 @@ class MainActivity : Activity() {
             launchButton = themedButton(getString(R.string.host_start_installed), R.drawable.ic_play).apply {
                 setOnClickListener { launchGame() }
             }
-            addView(launchButton, matchWrap())
+            addView(launchButton, spaced(10))
+            clearResourcesButton = themedButton(getString(R.string.host_clear_downloaded)).apply {
+                setOnClickListener { confirmClearResources() }
+            }
+            addView(clearResourcesButton, matchWrap())
         }, spaced(28))
 
         addView(sectionHeading(getString(R.string.host_discover)), spaced(6))
@@ -764,7 +770,40 @@ class MainActivity : Activity() {
         backup.deleteRecursively()
     }
 
+    private fun confirmClearResources() {
+        if (busy) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.host_clear_title)
+            .setMessage(R.string.host_mobile_clear_description)
+            .setNegativeButton(R.string.host_cancel, null)
+            .setPositiveButton(R.string.host_clear_resources) { _, _ -> clearLocalResources() }
+            .show()
+    }
+
+    private fun clearLocalResources() {
+        if (busy) return
+        setBusy(true, getString(R.string.host_clearing))
+        executor.execute {
+            val result = runCatching {
+                for (name in listOf("assets", "assets.staging", "assets.backup")) {
+                    val directory = File(filesDir, name)
+                    check(!directory.exists() || directory.deleteRecursively()) {
+                        getString(R.string.host_mobile_clear_failed, name)
+                    }
+                }
+            }
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                setBusy(false, if (result.isSuccess) getString(R.string.host_cleared) else "")
+                result.onFailure {
+                    showError(it.message ?: getString(R.string.host_attention))
+                }
+            }
+        }
+    }
+
     private fun launchGame() {
+        if (busy) return
         val config = runCatching {
             val assets = File(filesDir, "assets")
             validatePackage(assets)
@@ -800,6 +839,7 @@ class MainActivity : Activity() {
         remoteAssetButtons.forEach { it.isEnabled = !busy }
         urlField.isEnabled = !busy
         downloadButton.isEnabled = !busy
+        clearResourcesButton.isEnabled = !busy
         updateInstalledState()
         progress.visibility = if (busy) ProgressBar.VISIBLE else ProgressBar.GONE
         if (!busy) downloadBar.visibility = View.GONE

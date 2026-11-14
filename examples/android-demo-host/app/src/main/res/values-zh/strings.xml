@@ -86,6 +86,8 @@
     <string name="host_clear_title">清除本地游戏资源？</string>
     <string name="host_clear_description">请先关闭正在运行的游戏。此操作会删除已下载的游戏资源及当前游戏选择，保留日志、内置示例和资源目录以外的文件。之后可从“发现”重新下载游戏。</string>
     <string name="host_clear_resources">清除资源</string>
+    <string name="host_mobile_clear_description">此操作会删除已下载的游戏资源和未完成的安装文件，保留应用设置和日志。之后可从“发现”重新下载游戏。</string>
+    <string name="host_mobile_clear_failed">无法清除本地游戏资源：%1$s</string>
     <string name="host_cancel">取消</string>
     <string name="host_desktop_launcher">桌面启动器</string>
     <string name="host_library">游戏库</string>

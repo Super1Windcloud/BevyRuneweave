@@ -86,6 +86,8 @@
     <string name="host_clear_title">Clear local game resources?</string>
     <string name="host_clear_description">Close running games first. This removes downloaded game assets and the current game selection. Logs, bundled demo resources, and other files outside asset folders are kept. You can download games again from Discover.</string>
     <string name="host_clear_resources">Clear resources</string>
+    <string name="host_mobile_clear_description">This removes downloaded game resources and unfinished installations. App settings and logs are kept. You can download games again from Discover.</string>
+    <string name="host_mobile_clear_failed">Could not clear local game resources: %1$s</string>
     <string name="host_cancel">Cancel</string>
     <string name="host_desktop_launcher">DESKTOP LAUNCHER</string>
     <string name="host_library">My library</string>

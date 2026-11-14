@@ -569,9 +569,16 @@ fn request_asset_reload(
         for entity in &scripts {
             commands.entity(entity).despawn();
         }
-        commands.spawn(ScriptComponent::new(vec![
-            asset_server.load::<ScriptAsset>(asset_path.clone()),
-        ]));
+        let script =
+            if let Some(script) = asset_server.get_handle::<ScriptAsset>(asset_path.clone()) {
+                // Hosts replace packages at the same path. load() alone reuses the
+                // previous ScriptAsset, so explicitly refresh it through BMS asset events.
+                asset_server.reload(asset_path.clone());
+                script
+            } else {
+                asset_server.load::<ScriptAsset>(asset_path.clone())
+            };
+        commands.spawn(ScriptComponent::new(vec![script]));
         path.source_path = asset_root.0.join(&asset_path);
         path.modified = fs::metadata(&path.source_path)
             .and_then(|metadata| metadata.modified())
@@ -1274,6 +1281,115 @@ mod tests {
             app.world()
                 .contains_resource::<Messages<ScriptDetachedEvent>>()
         );
+    }
+
+    #[cfg(feature = "unified")]
+    #[test]
+    fn script_switch_reloads_replaced_content_at_the_same_path() {
+        for (name, before, after) in [
+            (
+                "game.js",
+                "function on_script_loaded() { game_state_set(1, 0, 'before'); } globalThis.on_script_reloaded = on_script_loaded;",
+                "function on_script_loaded() { game_state_set(2, 0, 'after'); } globalThis.on_script_reloaded = on_script_loaded;",
+            ),
+            (
+                "game.lua",
+                "function on_script_loaded() game_state_set(1, 0, 'before') end on_script_reloaded = on_script_loaded",
+                "function on_script_loaded() game_state_set(2, 0, 'after') end on_script_reloaded = on_script_loaded",
+            ),
+        ] {
+            let directory = tempfile::tempdir().unwrap();
+            let source = directory.path().join(name);
+            fs::write(&source, before).unwrap();
+            let mut app = App::new();
+            app.add_plugins((
+                MinimalPlugins,
+                AssetPlugin {
+                    file_path: directory.path().to_string_lossy().into_owned(),
+                    watch_for_changes_override: Some(false),
+                    ..default()
+                },
+            ))
+            .add_plugins(runtime_scripting_plugins())
+            .add_plugins(RuneweaveScriptApiPlugin)
+            .insert_resource(RuntimeAssetRoot(directory.path().to_path_buf()))
+            .insert_resource(LoadedScriptPath {
+                asset_path: PathBuf::from(name),
+                source_path: source.clone(),
+                modified: None,
+            })
+            .insert_resource(crate::script_api::storage::ScriptStorage::for_assets(
+                directory.path(),
+            ));
+            app.finish();
+            app.cleanup();
+            let handle = app
+                .world()
+                .resource::<AssetServer>()
+                .load::<ScriptAsset>(name);
+            app.world_mut()
+                .spawn(ScriptComponent::new(vec![handle.clone()]));
+            let wait_for_content = |app: &mut App, expected: &str| {
+                let deadline = Instant::now() + std::time::Duration::from_secs(5);
+                loop {
+                    app.update();
+                    if app
+                        .world()
+                        .resource::<Assets<ScriptAsset>>()
+                        .get(&handle)
+                        .is_some_and(|asset| asset.content.as_ref() == expected.as_bytes())
+                    {
+                        break;
+                    }
+                    assert!(Instant::now() < deadline, "{name} did not load {expected}");
+                    std::thread::sleep(std::time::Duration::from_millis(1));
+                }
+            };
+            let wait_for_version = |app: &mut App, version| {
+                let deadline = Instant::now() + std::time::Duration::from_secs(5);
+                loop {
+                    app.update();
+                    if app
+                        .world()
+                        .resource::<crate::script_api::ScriptGameState>()
+                        .score
+                        == version
+                    {
+                        break;
+                    }
+                    assert!(
+                        Instant::now() < deadline,
+                        "{name} did not execute version {version}"
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(1));
+                }
+            };
+            wait_for_content(&mut app, before);
+            wait_for_version(&mut app, 1);
+            fs::write(&source, after).unwrap();
+            let cached = app
+                .world()
+                .resource::<AssetServer>()
+                .load::<ScriptAsset>(name);
+            assert_eq!(cached.id(), handle.id());
+            assert_eq!(
+                app.world()
+                    .resource::<Assets<ScriptAsset>>()
+                    .get(&cached)
+                    .unwrap()
+                    .content
+                    .as_ref(),
+                before.as_bytes(),
+                "load() alone still returns the previous package contents"
+            );
+            let requested = std::ffi::CString::new(name).unwrap();
+            assert_eq!(unsafe { game_runtime_switch_script(requested.as_ptr()) }, 0);
+            app.world_mut()
+                .run_system_cached(request_asset_reload)
+                .unwrap();
+            wait_for_content(&mut app, after);
+            wait_for_version(&mut app, 2);
+        }
     }
 
     #[cfg(all(feature = "lua", any(feature = "js", feature = "typescript")))]

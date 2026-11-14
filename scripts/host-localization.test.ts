@@ -11,7 +11,7 @@ test("native and desktop resources match the complete shared catalog", () => {
 });
 test("navigation, recovery and formatted status messages have both host translations", () => {
   const catalog = new Map(rows.map((row) => [row[0], row]));
-  for (const id of ["home", "settings", "library", "ready", "latest_release", "valid_https", "runtime_switch_failed", "zip_unsafe", "clear_description"]) {
+  for (const id of ["home", "settings", "library", "ready", "latest_release", "valid_https", "runtime_switch_failed", "zip_unsafe", "clear_description", "mobile_clear_description", "mobile_clear_failed", "clear_downloaded", "clearing", "cleared", "cancel"]) {
     const row = catalog.get(id); assert.ok(row, id); assert.match(row[2], /[\u3400-\u9fff]/);
   }
   const android = readFileSync(resolve(root, "examples/android-demo-host/app/src/main/res/values/strings.xml"), "utf8");

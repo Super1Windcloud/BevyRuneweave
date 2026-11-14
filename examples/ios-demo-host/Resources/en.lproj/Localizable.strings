@@ -84,6 +84,8 @@
 "Clear local game resources?" = "Clear local game resources?";
 "Close running games first. This removes downloaded game assets and the current game selection. Logs, bundled demo resources, and other files outside asset folders are kept. You can download games again from Discover." = "Close running games first. This removes downloaded game assets and the current game selection. Logs, bundled demo resources, and other files outside asset folders are kept. You can download games again from Discover.";
 "Clear resources" = "Clear resources";
+"This removes downloaded game resources and unfinished installations. App settings and logs are kept. You can download games again from Discover." = "This removes downloaded game resources and unfinished installations. App settings and logs are kept. You can download games again from Discover.";
+"Could not clear local game resources: {name}" = "Could not clear local game resources: %1$@";
 "Cancel" = "Cancel";
 "DESKTOP LAUNCHER" = "DESKTOP LAUNCHER";
 "My library" = "My library";

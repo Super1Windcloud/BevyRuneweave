@@ -101,6 +101,10 @@ pub(super) const MESSAGES: &[(&str, &str)] = &[
         "Could not clear active project marker: {error}",
         "无法清除当前项目标记：{error}",
     ),
+    (
+        "Could not clear local game resources: {name}",
+        "无法清除本地游戏资源：{name}",
+    ),
     ("Could not clear {}: {error}", "无法清除 {}：{error}"),
     (
         "Could not copy runtime icon from {} to {}: {error}",
@@ -470,6 +474,10 @@ pub(super) const MESSAGES: &[(&str, &str)] = &[
         "The selected release asset is no longer available",
         "所选资源包已不可用",
     ),
+    (
+        "This removes downloaded game resources and unfinished installations. App settings and logs are kept. You can download games again from Discover.",
+        "此操作会删除已下载的游戏资源和未完成的安装文件，保留应用设置和日志。之后可从“发现”重新下载游戏。",
+    ),
     ("Try again", "重试"),
     ("Unsafe ZIP entry path: {}", "不安全的 ZIP 文件路径：{}"),
     ("Unsupported archive format", "不支持的压缩格式"),
@@ -558,6 +566,9 @@ macro_rules! host_format {
     };
     ("Remote asset is too large ({size}); maximum is {limit}", $($args:tt)*) => {
         if crate::i18n::is_chinese() { format!("资源包过大（{size}），最大允许 {limit}", $($args)*) } else { format!("Remote asset is too large ({size}); maximum is {limit}", $($args)*) }
+    };
+    ("Could not clear local game resources: {name}", $($args:tt)*) => {
+        if crate::i18n::is_chinese() { format!("无法清除本地游戏资源：{name}", $($args)*) } else { format!("Could not clear local game resources: {name}", $($args)*) }
     };
     ("{count} in your library", $($args:tt)*) => {
         if crate::i18n::is_chinese() { format!("游戏库中有 {count} 个游戏", $($args)*) } else { format!("{count} in your library", $($args)*) }

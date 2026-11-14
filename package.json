@@ -28,6 +28,7 @@
     "prepare:host-locales": "tsx scripts/prepare-host-locales.ts",
     "test:host-locales": "tsx --test scripts/host-localization.test.ts scripts/ios-device-selection.test.ts",
     "test:ios-download": "tsx --test scripts/ios-download.test.ts",
+    "test:mobile-resources": "tsx --test scripts/mobile-resource-cleanup.test.ts",
     "test:release-assets": "tsx --test scripts/release-assets.test.ts",
     "test": "npm run typecheck:scripts && npm run test:release-assets && npm run test:host-locales"
   },

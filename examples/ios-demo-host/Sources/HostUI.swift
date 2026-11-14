@@ -340,6 +340,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     private let urlField = UITextField()
     private let downloadButton = HostActionButton(type: .custom)
     private let launchButton = HostActionButton(type: .custom)
+    private let clearResourcesButton = HostActionButton(type: .custom)
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let statusLabel = UILabel()
     private let downloadProgress = UIProgressView(progressViewStyle: .default)
@@ -412,6 +413,9 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         configureButton(launchButton, title: hostText("Start installed game"), symbol: "play",
                         action: #selector(launchInstalled))
         installed.addArrangedSubview(launchButton)
+        configureButton(clearResourcesButton, title: hostText("Clear downloaded game resources"), symbol: "trash",
+                        action: #selector(confirmClearResources))
+        installed.addArrangedSubview(clearResourcesButton)
         add(HostStyle.card(installed), to: content, spacing: 28)
 
         add(section(hostText("Discover")), to: content, spacing: 6)
@@ -551,6 +555,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         self.busy = busy
         urlField.isEnabled = !busy
         downloadButton.isEnabled = !busy
+        clearResourcesButton.isEnabled = !busy
         launchButton.isEnabled = !busy && (try? store.installedConfig()) != nil
         remoteButtons.forEach { $0.isEnabled = !busy }
         busy ? spinner.startAnimating() : spinner.stopAnimating()
@@ -648,7 +653,42 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         }
     }
 
+    @objc private func confirmClearResources() {
+        guard !busy else { return }
+        let alert = UIAlertController(title: hostText("Clear local game resources?"),
+                                      message: hostText("This removes downloaded game resources and unfinished installations. App settings and logs are kept. You can download games again from Discover."),
+                                      preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: hostText("Cancel"), style: .cancel))
+        alert.addAction(UIAlertAction(title: hostText("Clear resources"), style: .destructive) { [weak self] _ in
+            self?.clearLocalResources()
+        })
+        present(alert, animated: true)
+    }
+
+    private func clearLocalResources() {
+        guard !busy else { return }
+        view.endEditing(true)
+        setBusy(true, status: hostText("Clearing local game resources..."))
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result { try self.store.clearLocalResources() }
+            DispatchQueue.main.async {
+                if case let .failure(error) = result {
+                    self.setBusy(false, status: "")
+                    let alert = UIAlertController(title: hostText("Something needs your attention"),
+                                                  message: error.localizedDescription, preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: hostText("OK"), style: .default))
+                    self.present(alert, animated: true)
+                } else {
+                    self.setBusy(false, status: hostText("Local game resources cleared"))
+                    UIAccessibility.post(notification: .announcement, argument: hostText("Local game resources cleared"))
+                }
+                self.updateInstalledState()
+            }
+        }
+    }
+
     @objc private func launchInstalled() {
+        guard !busy else { return }
         do {
             setBusy(true, status: hostText("Starting installed game..."))
             activate(try store.installedConfig())
