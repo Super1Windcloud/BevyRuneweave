@@ -4,7 +4,7 @@ export interface XmlNode { tag: string; attributes: Record<string, string>; chil
 export function parseXml(text: string): XmlNode {
   const root: XmlNode = { tag: "document", attributes: {}, children: [] };
   const stack = [root];
-  for (const match of text.replace(/<!--[\s\S]*?-->/g, "").matchAll(/<([^>]+)>/g)) {
+  for (const match of text.replace(/<!--[\s\S]*?-->/g, "").matchAll(/<((?:"[^"]*"|'[^']*'|[^'">])+)>/g)) {
     const token = match[1].trim();
     if (token.startsWith("?") || token.startsWith("!")) continue;
     if (token.startsWith("/")) {

@@ -1,9 +1,11 @@
 import { Circuit, Race, clamp } from "./race.js";
 import { trackData } from "./track-data.js";
+import { MenuState } from "./menu-state.js";
+import type { UiLanguage } from "./localization.js";
 
-export type Screen = "main" | "kart" | "setup" | "tracks" | "track-info" | "options" | "help" | "notice" | "race" | "paused" | "finished";
-export interface Settings { kartId: string; difficulty: number; mode: "normal" | "time-trial"; laps: number; aiCount: number; reverse: boolean; wasd: boolean; musicVolume: number; sfxVolume: number; }
-export const defaultSettings = (): Settings => ({ kartId: "tux", difficulty: 1, mode: "normal", laps: trackData.defaultLaps, aiCount: 3, reverse: false, wasd: false, musicVolume: 0.6, sfxVolume: 0.7 });
+export type Screen = "main" | "kart" | "setup" | "tracks" | "track-info" | "options" | "help" | "notice" | "menu" | "race" | "paused" | "finished";
+export interface Settings { kartId: string; difficulty: number; mode: "normal" | "time-trial"; laps: number; aiCount: number; reverse: boolean; wasd: boolean; musicVolume: number; sfxVolume: number; language: UiLanguage; }
+export const defaultSettings = (): Settings => ({ kartId: "tux", difficulty: 1, mode: "normal", laps: trackData.defaultLaps, aiCount: 3, reverse: false, wasd: false, musicVolume: 0.6, sfxVolume: 0.7, language: "system" });
 export function parseSettings(value: string): Settings {
   const defaults = defaultSettings();
   try {
@@ -16,6 +18,7 @@ export function parseSettings(value: string): Settings {
     if (typeof data.reverse === "boolean") defaults.reverse = data.reverse;
     if (typeof data.wasd === "boolean") defaults.wasd = data.wasd;
     for (const key of ["musicVolume", "sfxVolume"] as const) if (typeof data[key] === "number" && Number.isFinite(data[key])) defaults[key] = clamp(data[key], 0, 1);
+    if (["system", "zh-CN", "en-US"].includes(data.language as string)) defaults.language = data.language as UiLanguage;
   } catch { /* Preserve defaults for invalid or old saved values. */ }
   return defaults;
 }
@@ -27,6 +30,8 @@ export class PcSession {
   best = 0;
   noticeTitle = "";
   noticeText = "";
+  menu = new MenuState();
+  menuHistory: { screen: Screen; page: string }[] = [];
   get bestKey(): string { return `pc-lighthouse-${this.settings.mode}-${this.settings.laps}-${this.settings.reverse ? "reverse" : "forward"}-${this.settings.difficulty}`; }
   start(): void {
     const route = this.settings.reverse ? [...trackData.route].reverse() : trackData.route;
@@ -34,9 +39,14 @@ export class PcSession {
     this.race.start(); this.screen = "race";
   }
   back(): void {
+    if (this.menu.dialog) { this.menu.close(); return; }
+    if (this.menuHistory.length && ["menu", "options", "help", "kart", "setup", "tracks", "track-info"].includes(this.screen)) {
+      const previous = this.menuHistory.pop()!; this.screen = previous.screen; this.menu.show(previous.page); return;
+    }
     const previous: Partial<Record<Screen, Screen>> = { kart: "main", setup: "kart", tracks: "setup", "track-info": "tracks", paused: "race", finished: "track-info", race: "paused" };
     this.screen = this.screen === "options" || this.screen === "help" || this.screen === "notice" ? this.returnScreen : previous[this.screen] ?? "main";
   }
-  open(screen: "options" | "help"): void { this.returnScreen = this.screen; this.screen = screen; }
+  open(screen: "options" | "help"): void { this.returnScreen = this.screen; this.openMenu(screen === "options" ? "options_audio" : "help1", screen); }
+  openMenu(page: string, screen: Screen = "menu"): void { this.menuHistory.push({ screen: this.screen, page: this.menu.page }); this.screen = screen; this.menu.show(page); }
   notice(title: string, text: string): void { this.returnScreen = this.screen; this.noticeTitle = title; this.noticeText = text; this.screen = "notice"; }
 }

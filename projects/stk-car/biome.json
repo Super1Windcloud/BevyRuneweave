@@ -1,7 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.7/schema.json",
   "files": {
-    "includes": ["modules/stk-car/game/src/**/*.ts", "modules/stk-car/api/**/*.ts", "scripts/**/*.ts", "*.json", "!package-lock.json", "!modules/stk-car/game/src/track-data.ts"]
+    "includes": ["modules/stk-car/game/src/**/*.ts", "modules/stk-car/api/**/*.ts", "scripts/**/*.ts", "*.json", "!package-lock.json", "!modules/stk-car/game/src/track-data.ts", "!modules/stk-car/game/src/menu-data.ts"]
   },
   "formatter": { "enabled": false },
   "assist": { "enabled": false },
