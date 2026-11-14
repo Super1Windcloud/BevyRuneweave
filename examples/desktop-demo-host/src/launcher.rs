@@ -13,6 +13,7 @@ use gpui_kit::{
         ActiveTheme, Disableable, Icon, Sizable, WindowExt,
         button::{Button, ButtonCustomVariant, ButtonVariant, ButtonVariants},
         input::{Input, InputEvent, InputState},
+        progress::Progress,
         scroll::ScrollableElement,
         spinner::Spinner,
         theme::{Theme, ThemeMode},
@@ -86,7 +87,12 @@ impl Launcher {
                     let download_changed = this.state.poll_download();
                     let release_changed = this.state.poll_remote_assets();
                     let cleanup_changed = this.state.poll_cleanup();
-                    if download_changed || release_changed || cleanup_changed {
+                    // Byte counters advance on the worker thread; repaint them while downloading.
+                    if download_changed
+                        || release_changed
+                        || cleanup_changed
+                        || this.state.downloading
+                    {
                         cx.notify();
                     }
                     this.state.result.is_some()
@@ -677,10 +683,24 @@ impl Launcher {
             .text_size(px(12.))
             .text_color(cx.theme().muted_foreground)
             .when(self.state.downloading, |view| {
-                view.child(Spinner::new().small().color(cx.theme().primary))
-                    .child(text(
-                        "Downloading & installing. Your game will start when ready.",
-                    ))
+                let progress = &self.state.download_progress;
+                let percent = progress.percent();
+                let installing = progress
+                    .installing
+                    .load(std::sync::atomic::Ordering::Relaxed);
+                view.child(
+                    Progress::new("download-progress")
+                        .w(px(160.))
+                        .value(percent.unwrap_or_default())
+                        .loading(percent.is_none() || installing)
+                        .color(cx.theme().primary)
+                        .accessibility_label(text("Download progress")),
+                )
+                .child(progress.status())
+                .child(div().flex_1())
+                .child(text(
+                    "Downloading & installing. Your game will start when ready.",
+                ))
             })
             .when(self.state.clearing, |view| {
                 view.child(Spinner::new().small().color(cx.theme().primary))
@@ -924,6 +944,7 @@ mod tests {
         LauncherApp {
             url: String::new(),
             downloading: false,
+            download_progress: std::sync::Arc::default(),
             clearing: false,
             status_message: None,
             installed_games: Vec::new(),

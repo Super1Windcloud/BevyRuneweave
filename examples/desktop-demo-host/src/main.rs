@@ -17,7 +17,11 @@ use std::{
     io::{self, Cursor, Read, Write},
     path::{Component, Path, PathBuf},
     process::Command,
-    sync::mpsc::{self, Receiver},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        mpsc::{self, Receiver},
+    },
     thread,
 };
 
@@ -32,6 +36,41 @@ const FALLBACK_RELEASE_ASSETS: [&str; 3] = [
     "script-squadron-js.zip",
     "script-squadron-lua.zip",
 ];
+/// Byte counters shared by the download worker and the launcher UI.
+#[derive(Default)]
+struct DownloadProgress {
+    received: AtomicU64,
+    /// Zero when the server does not report a content length.
+    total: AtomicU64,
+    installing: AtomicBool,
+}
+
+impl DownloadProgress {
+    /// Completion percentage, or `None` while the total size is unknown.
+    fn percent(&self) -> Option<f32> {
+        let total = self.total.load(Ordering::Relaxed);
+        (total > 0).then(|| {
+            (self.received.load(Ordering::Relaxed) as f64 / total as f64 * 100.0).min(100.0) as f32
+        })
+    }
+
+    fn status(&self) -> String {
+        if self.installing.load(Ordering::Relaxed) {
+            return text("Installing package...").to_owned();
+        }
+        let received = format_size(self.received.load(Ordering::Relaxed));
+        match self.percent() {
+            Some(percent) => host_format!(
+                "Downloading {received} / {total} · {percent}",
+                received = received,
+                total = format_size(self.total.load(Ordering::Relaxed)),
+                percent = format!("{}%", percent.floor() as u32)
+            ),
+            None => host_format!("Downloading {received}…", received = received),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ProcessMode {
     Launcher,
@@ -119,6 +158,7 @@ struct InstalledGame {
 struct LauncherApp {
     url: String,
     downloading: bool,
+    download_progress: Arc<DownloadProgress>,
     clearing: bool,
     status_message: Option<String>,
     installed_games: Vec<InstalledGame>,
@@ -136,6 +176,7 @@ impl LauncherApp {
         let mut app = Self {
             url: String::new(),
             downloading: false,
+            download_progress: Arc::default(),
             clearing: false,
             status_message: None,
             installed_games: Vec::new(),
@@ -189,11 +230,13 @@ impl LauncherApp {
         }
 
         let (sender, receiver) = mpsc::channel();
+        let progress = Arc::new(DownloadProgress::default());
+        self.download_progress = Arc::clone(&progress);
         self.downloading = true;
         self.error = None;
         self.result = Some(receiver);
         thread::spawn(move || {
-            let _ = sender.send(download_and_install(&url));
+            let _ = sender.send(download_and_install(&url, &progress));
         });
     }
 
@@ -1051,7 +1094,7 @@ fn format_size(bytes: u64) -> String {
     }
 }
 
-fn download_and_install(url: &str) -> Result<(), String> {
+fn download_and_install(url: &str, progress: &DownloadProgress) -> Result<(), String> {
     let root = platform_data_root()?;
     fs::create_dir_all(&root).map_err(|error| error.to_string())?;
     let source_name = reqwest::Url::parse(url)
@@ -1070,10 +1113,33 @@ fn download_and_install(url: &str) -> Result<(), String> {
         .send()
         .and_then(reqwest::blocking::Response::error_for_status)
         .map_err(|error| host_format!("Download failed: {error}", error = error))?;
-    let bytes = response
-        .bytes()
+    let bytes = read_with_progress(response, progress)
         .map_err(|error| host_format!("Could not read download: {error}", error = error))?;
+    progress.installing.store(true, Ordering::Relaxed);
     install_downloaded_package(&root, &bytes, &source_name).map(|_| ())
+}
+
+fn read_with_progress(
+    mut response: reqwest::blocking::Response,
+    progress: &DownloadProgress,
+) -> io::Result<Vec<u8>> {
+    let total = response.content_length().unwrap_or(0);
+    progress.total.store(total, Ordering::Relaxed);
+    // The reported length only sizes the initial allocation; never trust it beyond that.
+    let mut bytes = Vec::with_capacity(total.min(64 * 1024 * 1024) as usize);
+    let mut buffer = [0; 64 * 1024];
+    loop {
+        let count = match response.read(&mut buffer) {
+            Ok(0) => return Ok(bytes),
+            Ok(count) => count,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        };
+        bytes.extend_from_slice(&buffer[..count]);
+        progress
+            .received
+            .store(bytes.len() as u64, Ordering::Relaxed);
+    }
 }
 
 fn project_directory_name(name: &str) -> Result<String, String> {
@@ -1433,6 +1499,25 @@ mod tests {
     use flate2::{Compression, write::GzEncoder};
     use lzma_rust2::{XzOptions, XzWriter};
     use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
+
+    #[test]
+    fn download_progress_reports_known_unknown_and_installing_stages() {
+        let progress = DownloadProgress::default();
+        progress.received.store(512 * 1024, Ordering::Relaxed);
+        assert_eq!(progress.percent(), None);
+        assert!(progress.status().contains("512.0 KB"));
+
+        progress.total.store(2 * 1024 * 1024, Ordering::Relaxed);
+        assert_eq!(progress.percent(), Some(25.0));
+        assert!(progress.status().contains("512.0 KB / 2.0 MB · 25%"));
+
+        // A server may send more than its declared length; the bar stays full.
+        progress.received.store(3 * 1024 * 1024, Ordering::Relaxed);
+        assert_eq!(progress.percent(), Some(100.0));
+
+        progress.installing.store(true, Ordering::Relaxed);
+        assert_eq!(progress.status(), text("Installing package..."));
+    }
 
     #[test]
     fn clears_only_installed_assets_and_selection_while_preserving_other_files() {

@@ -30,6 +30,8 @@ import android.widget.TextView
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.File
+import java.io.FilterInputStream
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.SecureRandom
@@ -73,6 +75,7 @@ class MainActivity : Activity() {
     private lateinit var remoteAssetsContainer: LinearLayout
     private lateinit var remoteAssetsStatus: TextView
     private lateinit var progress: ProgressBar
+    private lateinit var downloadBar: ProgressBar
     private lateinit var status: TextView
     private lateinit var statusRow: LinearLayout
     private lateinit var installedTitle: TextView
@@ -264,6 +267,12 @@ class MainActivity : Activity() {
         }
         statusRow.addView(status, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         addView(statusRow, matchWrap())
+        downloadBar = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = DOWNLOAD_PROGRESS_STEPS
+            visibility = View.GONE
+            contentDescription = getString(R.string.host_download_progress_label)
+        }
+        addView(downloadBar, matchWrap().apply { bottomMargin = dp(16) })
 
         addView(sectionHeading(getString(R.string.host_your_space)), spaced(12))
         addView(card().apply {
@@ -444,6 +453,9 @@ class MainActivity : Activity() {
         urlField.backgroundTintList = null
         status.setTextColor(if (statusIsError) errorColor() else secondaryColor)
         progress.indeterminateTintList = ColorStateList.valueOf(accentColor)
+        downloadBar.progressTintList = ColorStateList.valueOf(accentColor)
+        downloadBar.indeterminateTintList = ColorStateList.valueOf(accentColor)
+        downloadBar.progressBackgroundTintList = ColorStateList.valueOf(softAccentColor)
         appearanceSwitch.thumbTintList = ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
             intArrayOf(accentColor, secondaryColor),
@@ -602,8 +614,15 @@ class MainActivity : Activity() {
             .hideSoftInputFromWindow(urlField.windowToken, 0)
         urlField.clearFocus()
         setBusy(true, getString(R.string.host_downloading))
+        showDownloadProgress(0, 0)
         executor.execute {
-            val result = runCatching { downloadAndInstall(url) }
+            val result = runCatching {
+                downloadAndInstall(url, { received, total ->
+                    runOnUiThread { if (busy) showDownloadProgress(received, total) }
+                }, {
+                    runOnUiThread { if (busy) showInstalling() }
+                })
+            }
             runOnUiThread {
                 setBusy(false, "")
                 result.onSuccess { launchGame() }
@@ -613,7 +632,29 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun downloadAndInstall(url: URL) {
+    private fun showDownloadProgress(received: Long, total: Long) {
+        downloadBar.visibility = View.VISIBLE
+        downloadBar.isIndeterminate = total <= 0
+        if (total > 0) {
+            val fraction = (received.toDouble() / total).coerceIn(0.0, 1.0)
+            downloadBar.progress = (fraction * DOWNLOAD_PROGRESS_STEPS).toInt()
+            status.text = getString(
+                R.string.host_download_progress,
+                formatSize(received),
+                formatSize(total),
+                "${(fraction * 100).toInt()}%",
+            )
+        } else {
+            status.text = getString(R.string.host_download_progress_unknown, formatSize(received))
+        }
+    }
+
+    private fun showInstalling() {
+        downloadBar.isIndeterminate = true
+        status.text = getString(R.string.host_installing_package)
+    }
+
+    private fun downloadAndInstall(url: URL, onProgress: (Long, Long) -> Unit, onInstalling: () -> Unit) {
         val staging = File(filesDir, "assets.staging")
         staging.deleteRecursively()
         check(staging.mkdirs()) { getString(R.string.host_staging_failed) }
@@ -628,9 +669,13 @@ class MainActivity : Activity() {
                 getString(R.string.host_download_http, connection.responseCode.toString())
             }
             check(connection.url.protocol == "https") { getString(R.string.host_https_redirect) }
-            ZipInputStream(BufferedInputStream(connection.inputStream)).use { archive ->
+            val total = connection.contentLengthLong
+            onProgress(0, total)
+            val counted = ProgressInputStream(connection.inputStream) { received -> onProgress(received, total) }
+            ZipInputStream(BufferedInputStream(counted)).use { archive ->
                 extractZip(archive, staging)
             }
+            onInstalling()
             validatePackage(staging)
             replaceInstalledAssets(staging)
         } finally {
@@ -757,6 +802,7 @@ class MainActivity : Activity() {
         downloadButton.isEnabled = !busy
         updateInstalledState()
         progress.visibility = if (busy) ProgressBar.VISIBLE else ProgressBar.GONE
+        if (!busy) downloadBar.visibility = View.GONE
         statusRow.visibility = if (message.isEmpty()) View.GONE else View.VISIBLE
         statusIsError = false
         status.setTextColor(secondaryColor)
@@ -798,10 +844,42 @@ class MainActivity : Activity() {
         )
         private const val MAX_REMOTE_METADATA_BYTES = 2 * 1024 * 1024
         private const val MAX_ENTRIES = 10_000
+        private const val DOWNLOAD_PROGRESS_STEPS = 1_000
+        private const val PROGRESS_INTERVAL_NANOS = 100_000_000L
         private const val MAX_UNPACKED_BYTES = 256L * 1024L * 1024L
         private const val PREFERENCES = "host_settings"
         private const val DARK_MODE = "dark_mode"
         private const val BOTTOM_NAVIGATION_HEIGHT_DP = 72
+    }
+
+    /** Counts compressed bytes read from the network, reporting at most every 100 ms. */
+    private class ProgressInputStream(
+        input: InputStream,
+        private val report: (Long) -> Unit,
+    ) : FilterInputStream(input) {
+        private var received = 0L
+        private var lastReport = 0L
+
+        override fun read(): Int = super.read().also { if (it >= 0) advance(1) }
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+            super.read(buffer, offset, length).also { if (it > 0) advance(it.toLong()) }
+
+        override fun skip(count: Long): Long = super.skip(count).also { if (it > 0) advance(it) }
+
+        private fun advance(count: Long) {
+            received += count
+            val now = System.nanoTime()
+            if (now - lastReport >= PROGRESS_INTERVAL_NANOS) {
+                lastReport = now
+                report(received)
+            }
+        }
+
+        override fun close() {
+            report(received)
+            super.close()
+        }
     }
 
     private data class RemoteAsset(val name: String, val url: String, val size: Long)

@@ -106,6 +106,10 @@
     <string name="host_bring_world">Bring your own world</string>
     <string name="host_install_play">Install &amp; play</string>
     <string name="host_downloading_installing">Downloading &amp; installing. Your game will start when ready.</string>
+    <string name="host_download_progress">Downloading %1$s / %2$s · %3$s</string>
+    <string name="host_download_progress_unknown">Downloading %1$s…</string>
+    <string name="host_installing_package">Installing package...</string>
+    <string name="host_download_progress_label">Download progress</string>
     <string name="host_clearing">Clearing local game resources...</string>
     <string name="host_attention">Something needs your attention</string>
     <string name="host_dismiss_error">Dismiss error</string>

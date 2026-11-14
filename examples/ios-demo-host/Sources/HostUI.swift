@@ -342,6 +342,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     private let launchButton = HostActionButton(type: .custom)
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let statusLabel = UILabel()
+    private let downloadProgress = UIProgressView(progressViewStyle: .default)
     private let installedTitle = HostStyle.label(hostText("Your next adventure awaits"), size: 19,
                                                 color: HostStyle.primary, weight: .semibold)
     private let installedDetail = HostStyle.label(hostText("Choose a release below to get started."), size: 14)
@@ -397,7 +398,11 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         statusRow.addArrangedSubview(spinner)
         statusRow.addArrangedSubview(statusLabel)
         statusRow.isHidden = true
-        add(statusRow, to: content, spacing: 16)
+        add(statusRow, to: content, spacing: 10)
+        downloadProgress.progressTintColor = HostStyle.accent
+        downloadProgress.accessibilityLabel = hostText("Download progress")
+        downloadProgress.isHidden = true
+        add(downloadProgress, to: content, spacing: 16)
 
         add(section(hostText("Your space")), to: content, spacing: 12)
         let installed = HostStyle.stack(spacing: 6)
@@ -551,6 +556,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         busy ? spinner.startAnimating() : spinner.stopAnimating()
         statusLabel.text = status
         statusRow.isHidden = status.isEmpty
+        if !busy { downloadProgress.isHidden = true }
         if busy {
             view.layoutIfNeeded()
             scroll.scrollRectToVisible(statusRow.convert(statusRow.bounds, to: scroll),
@@ -601,8 +607,19 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         guard !busy else { return }
         view.endEditing(true)
         setBusy(true, status: hostText("Downloading package..."))
-        ReleaseClient.shared.download(url) { [weak self] result in
+        downloadProgress.setProgress(0, animated: false)
+        downloadProgress.isHidden = false
+        ReleaseClient.shared.download(url, progress: { [weak self] received, expected in
+            self?.showDownloadProgress(received: received, expected: expected)
+        }) { [weak self] result in
             guard let self else { return }
+            if case .success = result {
+                DispatchQueue.main.async {
+                    guard self.busy else { return }
+                    self.downloadProgress.setProgress(1, animated: false)
+                    self.statusLabel.text = hostText("Installing package...")
+                }
+            }
             let installed = result.flatMap { archive in Result { try self.store.install(archive: archive) } }
             DispatchQueue.main.async {
                 switch installed {
@@ -614,6 +631,20 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
                     self.updateInstalledState()
                 }
             }
+        }
+    }
+
+    private func showDownloadProgress(received: Int64, expected: Int64) {
+        guard busy else { return }
+        if expected > 0 {
+            let fraction = min(1, Double(received) / Double(expected))
+            downloadProgress.setProgress(Float(fraction), animated: !UIAccessibility.isReduceMotionEnabled)
+            statusLabel.text = hostText("Downloading {received} / {total} · {percent}",
+                                        formattedByteCount(received), formattedByteCount(expected),
+                                        "\(Int(fraction * 100))%")
+            downloadProgress.accessibilityValue = "\(Int(fraction * 100))%"
+        } else {
+            statusLabel.text = hostText("Downloading {received}…", formattedByteCount(received))
         }
     }
 

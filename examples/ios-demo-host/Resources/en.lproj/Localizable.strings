@@ -104,6 +104,10 @@
 "Bring your own world" = "Bring your own world";
 "Install & play" = "Install & play";
 "Downloading & installing. Your game will start when ready." = "Downloading & installing. Your game will start when ready.";
+"Downloading {received} / {total} · {percent}" = "Downloading %1$@ / %2$@ · %3$@";
+"Downloading {received}…" = "Downloading %1$@…";
+"Installing package..." = "Installing package...";
+"Download progress" = "Download progress";
 "Clearing local game resources..." = "Clearing local game resources...";
 "Something needs your attention" = "Something needs your attention";
 "Dismiss error" = "Dismiss error";

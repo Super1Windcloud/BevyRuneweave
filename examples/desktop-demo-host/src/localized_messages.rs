@@ -292,6 +292,7 @@ pub(super) const MESSAGES: &[(&str, &str)] = &[
         "下载失败，HTTP 状态码：{status}",
     ),
     ("Download failed: {error}", "下载失败：{error}"),
+    ("Download progress", "下载进度"),
     (
         "Download redirected to a non-HTTPS URL",
         "下载被重定向至非 HTTPS 地址",
@@ -305,6 +306,11 @@ pub(super) const MESSAGES: &[(&str, &str)] = &[
         "正在下载并安装，准备完成后将启动游戏。",
     ),
     ("Downloading package...", "正在下载资源包…"),
+    (
+        "Downloading {received} / {total} · {percent}",
+        "正在下载 {received} / {total} · {percent}",
+    ),
+    ("Downloading {received}…", "正在下载 {received}…"),
     ("Enter a valid HTTPS URL", "请输入有效的 HTTPS 地址"),
     ("Enter an asset package URL", "请输入资源包地址"),
     ("Explore games", "探索游戏"),
@@ -328,6 +334,7 @@ pub(super) const MESSAGES: &[(&str, &str)] = &[
     ),
     ("Installation failed", "安装失败"),
     ("Installed games", "已安装游戏"),
+    ("Installing package...", "正在安装资源包…"),
     (
         "Invalid engineConfig project name: {name}",
         "engineConfig 项目名称无效：{name}",
@@ -547,6 +554,12 @@ macro_rules! host_format {
     };
     ("{count} in your library", $($args:tt)*) => {
         if crate::i18n::is_chinese() { format!("游戏库中有 {count} 个游戏", $($args)*) } else { format!("{count} in your library", $($args)*) }
+    };
+    ("Downloading {received} / {total} · {percent}", $($args:tt)*) => {
+        if crate::i18n::is_chinese() { format!("正在下载 {received} / {total} · {percent}", $($args)*) } else { format!("Downloading {received} / {total} · {percent}", $($args)*) }
+    };
+    ("Downloading {received}…", $($args:tt)*) => {
+        if crate::i18n::is_chinese() { format!("正在下载 {received}…", $($args)*) } else { format!("Downloading {received}…", $($args)*) }
     };
     ("Could not load release assets: {error}", $($args:tt)*) => {
         if crate::i18n::is_chinese() { format!("无法加载版本资源：{error}", $($args)*) } else { format!("Could not load release assets: {error}", $($args)*) }

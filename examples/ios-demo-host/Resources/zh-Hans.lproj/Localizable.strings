@@ -104,6 +104,10 @@
 "Bring your own world" = "导入你的世界";
 "Install & play" = "安装并游玩";
 "Downloading & installing. Your game will start when ready." = "正在下载并安装，准备完成后将启动游戏。";
+"Downloading {received} / {total} · {percent}" = "正在下载 %1$@ / %2$@ · %3$@";
+"Downloading {received}…" = "正在下载 %1$@…";
+"Installing package..." = "正在安装资源包…";
+"Download progress" = "下载进度";
 "Clearing local game resources..." = "正在清除本地游戏资源…";
 "Something needs your attention" = "有一项问题需要处理";
 "Dismiss error" = "关闭错误提示";

@@ -59,13 +59,27 @@ final class ReleaseClient {
         #endif
     }
 
-    func download(_ url: URL, completion: @escaping (Result<Data, Error>) -> Void) {
+    /// Reports received and expected bytes on the main queue; expected is zero when unknown.
+    func download(_ url: URL, progress: @escaping (Int64, Int64) -> Void,
+                  completion: @escaping (Result<Data, Error>) -> Void) {
         var request = URLRequest(url: url)
         request.setValue("BevyRuneweave-iOS-Demo/0.1", forHTTPHeaderField: "User-Agent")
-        session.dataTask(with: request) { data, response, error in
+        var observation: NSKeyValueObservation?
+        let task = session.dataTask(with: request) { data, response, error in
+            observation?.invalidate()
             completion(self.validatedData(data: data, response: response, error: error,
                                           maximumBytes: maxArchiveBytes))
-        }.resume()
+        }
+        var lastReport = Date.distantPast
+        observation = task.observe(\.countOfBytesReceived) { task, _ in
+            let now = Date()
+            guard now.timeIntervalSince(lastReport) >= 0.1 else { return }
+            lastReport = now
+            let received = task.countOfBytesReceived
+            let expected = max(0, task.countOfBytesExpectedToReceive)
+            DispatchQueue.main.async { progress(received, expected) }
+        }
+        task.resume()
     }
 
     private func request<Value: Decodable & Sendable>(_ url: URL, as type: Value.Type,

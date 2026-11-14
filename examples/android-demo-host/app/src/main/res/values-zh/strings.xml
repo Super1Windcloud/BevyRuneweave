@@ -106,6 +106,10 @@
     <string name="host_bring_world">导入你的世界</string>
     <string name="host_install_play">安装并游玩</string>
     <string name="host_downloading_installing">正在下载并安装，准备完成后将启动游戏。</string>
+    <string name="host_download_progress">正在下载 %1$s / %2$s · %3$s</string>
+    <string name="host_download_progress_unknown">正在下载 %1$s…</string>
+    <string name="host_installing_package">正在安装资源包…</string>
+    <string name="host_download_progress_label">下载进度</string>
     <string name="host_clearing">正在清除本地游戏资源…</string>
     <string name="host_attention">有一项问题需要处理</string>
     <string name="host_dismiss_error">关闭错误提示</string>
