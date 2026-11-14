@@ -45,7 +45,7 @@ function refreshUi(): void {
   }
   storage_write("pc-race-settings-v1", JSON.stringify(session.settings));
   mountHud(session, layout, refreshUi, startRace, mobile, (id) => {
-    if (session.screen === "kart" && id.startsWith("gui:karts:choose-")) {
+    if (!mobile && session.screen === "kart" && id.startsWith("gui:karts:choose-")) {
       const kart = trackData.karts.find((kart) => `gui:karts:choose-${kart.id}` === id);
       if (kart && session.settings.kartId !== kart.id) { session.settings.kartId = kart.id; refreshUi(); }
     }
@@ -78,10 +78,10 @@ function startRace(): void {
   wheelAngles.clear(); pickupVisible.clear(); trapIds.clear();
   camera = { ...session.race.player };
   scene_clear();
-  if (!scene_set_environment(JSON.stringify(trackData.environment))) throw new Error("STK scene environment requires the current native runtime");
+  if (!scene_set_environment(JSON.stringify(session.course.environment))) throw new Error("STK scene environment requires the current native runtime");
   scene_set_3d_enabled(true);
-  spawn("lighthouse", trackData.trackModel, zeroPose());
-  spawn("sky", trackData.skyModel, zeroPose());
+  spawn("track", session.course.trackModel, zeroPose());
+  spawn("sky", session.course.skyModel, zeroPose());
   for (const racer of session.race.racers) {
     const kart = trackData.karts.find((kart) => kart.id === racer.kartId)!;
     spawn(racer.id, kart.model, racer);
@@ -137,6 +137,7 @@ function load(): void {
   sound.reset();
   const stored = storage_read("pc-race-settings-v1");
   session.settings = parseSettings(stored.state === "ok" ? stored.value : "{}"); session.screen = "main";
+  session.menu.track = session.settings.trackId;
   setUiLanguage(session.settings.language); session.menu.close(); session.menuHistory = [];
   scene_clear(); scene_set_3d_enabled(false); worldReady = false;
   previewId = "";

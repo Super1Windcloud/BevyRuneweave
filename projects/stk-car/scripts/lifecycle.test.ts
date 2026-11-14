@@ -24,7 +24,7 @@ test("keyboard navigation traverses source menus and preserves the race configur
   assert.notDeepEqual(game.transforms.get("preview-body"), preview);
   game.press("ArrowRight"); game.press("Enter"); assert.ok(game.nodes.has("gui:race_setup:mode-normal"));
   game.press("Enter"); assert.ok(game.nodes.has("gui:tracks_and_gp:track:lighthouse"));
-  game.press("Enter"); assert.equal(game.texts.get("gui:track_info:name:text"), "Around the lighthouse");
+  game.click("gui:tracks_and_gp:track:lighthouse"); assert.equal(game.texts.get("gui:track_info:name:text"), "Around the Lighthouse");
   assert.equal(game.texts.get("gui:track_info:target-value-spinner:value:text"), "4");
   assert.ok([...game.texts.values()].some((text) => text.includes("2:00.400")));
   game.press("Escape"); assert.ok(game.nodes.has("gui:tracks_and_gp:track:lighthouse"));

@@ -75,6 +75,31 @@ cannot be executed in the current environment must be called out explicitly as a
 - Preserve existing installed packages and user data when staging local validation assets.
   Record build, installation, launch, touch, rotation, safe-area and background/resume results
   separately for Android and iOS; results from one platform do not establish the other.
+- Diagnose the device the user actually reported. For an iPhone failure, first identify the
+  connected iPhone, installed app/game bundle and its script/native errors. A macOS reproduction
+  can investigate shared code, but cannot establish the cause or acceptance of the iOS failure.
+- Check the installed runtime's interface availability, not just current declarations or source.
+  An old host can render the home screen yet throw on the first input or a periodic diagnostic
+  because APIs such as `ui_button_hovered` or `audio_state` are missing. Updating the game ZIP
+  alone does not add these APIs to the installed host.
+- A shared `android`/`ios` script branch establishes code coverage only. Do not describe iOS as
+  validated until the current signed host and game bundle actually load and accept gameplay
+  input on iOS. Keep code checks, signing, installation, launch and interaction evidence separate.
+- Honor the user's current device-use constraints. If device interaction is postponed, continue
+  source/build work and read-only diagnostics without launching, switching or driving phone apps.
+
+## Script UI Contract Validation
+
+- Use the runtime's actual style schema and enum values, not browser CSS assumptions. For example,
+  BMS retained UI accepts `start`/`end`, not `flex-start`/`flex-end`; rejected styles can abort menu
+  construction. Check UI API return values so failures identify the widget and operation.
+- UI test doubles must reject the invalid parameters relevant to their regression cases. Do not
+  make every spawn/style/image call return success and then claim native UI compatibility.
+  Exercise real BMS bindings when changing their contract; Node/VM tests remain script evidence.
+- Test missing optional APIs explicitly. Touch menus must not depend on desktop mouse-hover
+  queries, and optional audio/telemetry diagnostics must not block input, interrupt gameplay or
+  mask the primary failure from a callback. Required capability failures need a clear recovery
+  path rather than an empty or partially constructed screen.
 
 ## Example Host Localization
 

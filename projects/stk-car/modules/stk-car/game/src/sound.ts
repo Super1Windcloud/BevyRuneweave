@@ -31,7 +31,7 @@ export class GameAudio {
     const inRace = screen === "race" || screen === "paused" || ["options", "help"].includes(screen) && session.returnScreen === "paused";
     const paused = inRace && screen !== "race";
     const pauseChanged = this.paused !== paused;
-    const music = screen === "finished" ? race.ranking[0] === player ? trackData.audio.result : trackData.audio.lose : inRace ? trackData.audio.race : trackData.audio.menu;
+    const music = screen === "finished" ? race.ranking[0] === player ? trackData.audio.result : trackData.audio.lose : inRace ? session.course.music : trackData.audio.menu;
     if (music !== this.music) {
       this.music = music; this.musicVolume = settings.musicVolume; this.paused = paused;
       audio_play("music", music, true, settings.musicVolume); audio_update("music", settings.musicVolume, 1, paused);
@@ -64,7 +64,7 @@ export class GameAudio {
       loop("skid", inRace && player.driftCharge > 0.2, "skid", 0.3, 1);
     }
     this.stateClock += dt;
-    if (this.stateClock >= 2) {
+    if (this.stateClock >= 2 && typeof audio_state === "function") {
       this.stateClock = 0;
       const state = audio_state("music"), failure = `${music}:${state}`;
       if (["playing", "error", "unavailable"].includes(state) && this.reported !== failure) { console.log(`[stk-audio] ${failure}`); this.reported = failure; }

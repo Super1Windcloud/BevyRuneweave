@@ -13,6 +13,8 @@ export function prepareScene(source: string, track: string, record: (path: strin
   const instances: { model: string; category: string; matrix: number[] }[] = [];
   const document = (path: string) => parseXml(record(path).toString());
   const scene = document(join(track, "scene.xml"));
+  const trackInfo = document(join(track, "track.xml")).attributes;
+  const trackId = basename(track), daytime = trackInfo["is-during-day"] === "Y";
   function texture(directory: string, name: string): string {
     const local = join(directory, basename(name));
     const path = existsSync(local) ? local : textureIndex.get(basename(name));
@@ -68,19 +70,20 @@ export function prepareScene(source: string, track: string, record: (path: strin
   }
   walk(scene, track, identity(), new Map(), [], "track");
   const batched = batchScene(merged, shaders);
-  console.log(`Lighthouse static primitives: ${merged.primitives.length} -> ${batched.primitives.length}`);
-  write("models/lighthouse-scene.glb", writeGlb(batched, (name) => name.slice(name.indexOf(":") + 1), shaders));
+  console.log(`${trackId} static primitives: ${merged.primitives.length} -> ${batched.primitives.length}`);
+  write(`models/${trackId}-scene.glb`, writeGlb(batched, (name) => name.slice(name.indexOf(":") + 1), shaders));
   const skyTextures = scene.children.find((child) => child.tag === "sky-box")!.attributes.texture.split(/\s+/).map((name) => texture(track, name));
-  write("models/lighthouse-sky.glb", writeGlb(skyMesh(skyTextures), (name) => name, new Map(skyTextures.map((name) => [name, "unlit"]))));
+  write(`models/${trackId}-sky.glb`, writeGlb(skyMesh(skyTextures), (name) => name, new Map(skyTextures.map((name) => [name, "unlit"]))));
   const sun = scene.children.find((child) => child.tag === "sun")!.attributes;
   const color = (value: string) => value.trim().split(/\s+/).map((channel) => Number(channel) / 255);
   const metadata = { modelInstances: instances.length, libraryInstances: scene.children.filter((child) => child.tag === "library").length,
     lodInstances: instances.filter((instance) => instance.category.endsWith("-lod")).length, libraries: [...libraries].sort(),
     sourceModels: meshCache.size, triangles: merged.primitives.reduce((sum, primitive) => sum + primitive.indices.length / 3, 0) };
-  return { trackModel: "models/lighthouse-scene.glb", skyModel: "models/lighthouse-sky.glb", metadata, instances,
-    environment: { ambient: color(sun.ambient), brightness: 350, sun: color(sun["sun-diffuse"]), illuminance: 6000,
+  const skyColor = scene.children.find((child) => child.tag === "sky-color")?.attributes.rgb;
+  return { trackModel: `models/${trackId}-scene.glb`, skyModel: `models/${trackId}-sky.glb`, metadata, instances,
+    environment: { ambient: color(sun.ambient), brightness: daytime ? 1500 : 350, sun: color(sun["sun-diffuse"]), illuminance: daytime ? 50000 : 6000,
       direction: sun.xyz.split(/\s+/).map((value, axis) => Number(value) * (axis === 2 ? -1 : 1)),
-      background: color(scene.children.find((child) => child.tag === "sky-color")!.attributes.rgb),
-      fog: { color: [...color(sun["fog-color"]), Number(sun["fog-max"])], start: Number(sun["fog-start"]), end: Number(sun["fog-end"]) } },
+      background: skyColor ? color(skyColor) : daytime ? [0.5, 0.7, 1] : [0.05, 0.08, 0.12],
+      fog: sun.fog === "true" ? { color: [...color(sun["fog-color"]), Number(sun["fog-max"])], start: Number(sun["fog-start"]), end: Number(sun["fog-end"]) } : null },
   };
 }

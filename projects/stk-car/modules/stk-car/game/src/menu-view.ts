@@ -8,6 +8,7 @@ import { isChinese, sourceText, tr } from "./localization.js";
 import { formatTime } from "./race.js";
 import type { PcSession } from "./session.js";
 import { trackData } from "./track-data.js";
+import { courses, defaultCourse } from "./courses.js";
 
 export interface MenuButton {
   id: string; action: () => void; base: number[]; hint?: string;
@@ -36,7 +37,7 @@ function picture(id: string, path: string, rect: Rect, stretch = false, parent =
   if (!ui_set_image(id, sourceImage(path))) throw new Error(`Missing menu image ${path}`);
 }
 function text(id: string, value: string, rect: Rect, size: number, color = ink, align = "center", parent = "root"): void {
-  spawn(id, "node", parent, { ...position(rect), flexDirection: "column", alignItems: align === "left" ? "flex-start" : "center", justifyContent: "center" });
+  spawn(id, "node", parent, { ...position(rect), flexDirection: "column", alignItems: align === "left" ? "start" : "center", justifyContent: "center" });
   spawn(`${id}:text`, "text", id, { maxWidth: "100%", flexShrink: 1 });
   ui_set_text(`${id}:text`, value, size, color[0], color[1], color[2], color[3]);
   ui_set_font(`${id}:text`, isChinese() ? "fonts/wqy-microhei.ttf" : "fonts/Cantarell-Regular.otf");
@@ -80,7 +81,8 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     if (id === "tracks" && currentPage !== "edit_gp") {
       const gp = currentPage === "grand_prix_editor" || currentPage === "gp_info" ? menuData.grandPrix.find((gp) => gp.id === m.grandPrix) : undefined;
       const query = m.fields[`${currentPage}:search`]?.toLocaleLowerCase() ?? "";
-      return menuData.tracks.filter((track) => track.id !== "overworld" && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => Number(b.id === "lighthouse") - Number(a.id === "lighthouse")).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name), image: track.image, selected: track.id === m.track }));
+      const priority = (id: string) => { const index = courses.findIndex((course) => course.id === id); return index < 0 ? courses.length : index; };
+      return menuData.tracks.filter((track) => track.id !== "overworld" && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => priority(a.id) - priority(b.id)).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name), image: track.image, selected: track.id === m.track }));
     }
     if (id === "players") return m.profiles.map((name, index) => ({ id: `profile:${index}`, text: name === "Player" ? tr("Player", "玩家") : name, image: trackData.karts[index % trackData.karts.length].icon, selected: m.player === index }));
     if (id === "resolutions") return ["1280 × 720", "1600 × 900", "1920 × 1080"].map((label) => ({ id: `resolution:${label}`, text: label, selected: label === (m.values["resolution"] ?? "1280 × 720") }));
@@ -88,18 +90,20 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   }
   function rows(id: string, currentPage: string): Item[] {
     if (id === "language") return [{ id: "language:system", text: tr("System Language (default)", "系统语言（默认）"), selected: session.settings.language === "system" }, { id: "language:en-US", text: "English", selected: session.settings.language === "en-US" }, { id: "language:zh-CN", text: "简体中文", selected: session.settings.language === "zh-CN" }];
-    if (id === "devices") return [{ id: "device:keyboard", text: tr("Keyboard 0", "键盘 0"), image: "gui/icons/options_input.png" }];
+    if (id === "devices") return [...(mobile ? [{ id: "device:touch", text: tr("Touchscreen · Virtual joystick", "触摸屏 · 虚拟摇杆"), image: "gui/icons/options_input.png" }] : []), { id: "device:keyboard", text: tr("Keyboard 0", "键盘 0"), image: "gui/icons/options_input.png" }];
     if (id === "actions") return [["Accelerate", "↑"], ["Brake", "↓"], ["Steer Left", "←"], ["Steer Right", "→"], ["Fire", "Space"], ["Nitro", "N"], ["Drift", "V"], ["Rescue", "Backspace"], ["Look Back", "B"]].map(([name, key]) => ({ id: `binding:${name}`, text: `${sourceText(name)}                         ${key}` }));
     if (id === "achievements_list") return menuData.achievements.map((item, index) => ({ id: `achievement:${index}`, text: `${sourceText(item.name)}                           0%` }));
     if (id === "tracks" && currentPage === "edit_gp") return m.draftTracks.map((id, index) => ({ id: `draft-row:${index}`, text: `${index + 1}.  ${sourceText(menuData.tracks.find((track) => track.id === id)?.name ?? id)}`, selected: m.selectedRow === index }));
     if (["high_scores_list", "highscore_entries", "high_score_list"].includes(id)) {
       const stored = storage_read(session.bestKey), best = stored.state === "ok" ? Number(stored.value) : 0;
-      return Number.isFinite(best) && best > 0 ? [{ id: "score:lighthouse", text: `${tr("Around the Lighthouse", "环绕灯塔")}     ${sourceText(session.settings.mode === "normal" ? "Normal Race" : "Time Trial")}     ${formatTime(best)}` }] : [];
+      return Number.isFinite(best) && best > 0 ? [{ id: `score:${session.course.id}`, text: `${sourceText(session.course.name)}     ${sourceText(session.settings.mode === "normal" ? "Normal Race" : "Time Trial")}     ${formatTime(best)}` }] : [];
     }
     if (id === "player-list" || id === "players-list") return [{ id: "local-player", text: tr("Local interface preview — not connected", "本地界面预览——尚未连接") }];
     return [];
   }
   function labelValue(id: string, fallback: string, currentPage: string): string {
+    if (mobile && currentPage === "options_input" && id === "help1") return tr("Tap a device to view its controls.", "点击设备查看操作方式。");
+    if (mobile && currentPage === "options_input" && id === "help2") return tr("Drag the virtual joystick to drive. Combine it with the action buttons using another finger.", "拖动虚拟摇杆驾驶，另一根手指可同时操作技能按钮。");
     if (m.dialog && id === "title") return m.dialog.title;
     if (id === "name" && currentPage === "track_info" || id === "selected_track") return sourceText(m.selectedTrack.name);
     if (id === "author") return m.selectedTrack.designer;
@@ -239,13 +243,18 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   }
 
   function drawMobilePage(r: Rect): boolean {
-    if (!["karts", "race_setup", "tracks_and_gp", "track_info"].includes(page)) return false;
+    if (!["karts", "race_setup", "tracks_and_gp", "track_info", "gp_info", "touch_controls"].includes(page)) return false;
     const rect = (x: number, y: number, width: number, height: number): Rect => ({ x: r.x + x, y: r.y + y, width, height });
-    const title = page === "karts" ? tr("Choose a Kart", "选择赛车") : page === "race_setup" ? sourceText("Race Setup") : page === "tracks_and_gp" ? tr("Choose a Track", "选择赛道") : sourceText(m.selectedTrack.name);
+    const gp = menuData.grandPrix.find((entry) => entry.id === m.grandPrix);
+    const title = page === "gp_info" ? sourceText(gp?.name ?? "Grand Prix") : page === "touch_controls" ? tr("Touch Controls", "触控操作") : page === "karts" ? tr("Choose a Kart", "选择赛车") : page === "race_setup" ? sourceText("Race Setup") : page === "tracks_and_gp" ? tr("Choose a Track", "选择赛道") : sourceText(m.selectedTrack.name);
     text("mobile-page-title", title, rect(56, 0, r.width - 112, 42), 24, blue);
     button(menuWidgetId(page, "back"), rect(0, 0, 48, 44), "", action("back"), { image: "gui/icons/back.png", normal: "" });
     const card = (item: Item, bounds: Rect) => button(menuWidgetId(page, item.id), bounds, item.text, action(item.id), { image: item.image, selected: item.selected, normal: "" });
-    if (page === "karts") {
+    if (page === "touch_controls") {
+      picture("touch-controls-panel", skin("generic"), rect(0, 52, r.width, r.height - 52), true);
+      const rules = [tr("Drag left/right on the joystick to steer and accelerate.", "左右拖动摇杆转向并自动加速。"), tr("Pull down or hold Brake to slow down, then reverse.", "下拉摇杆或按住刹车减速，停车后继续按住可倒车。"), tr("Hold Nitro or Drift while steering with another finger.", "转向时，另一根手指可按住氮气或漂移。"), tr("Tap Fire or Rescue once; hold Rear to look behind.", "点击道具或救援触发一次；按住回看查看后方。"), tr("Pause stops the race. Release your fingers before resuming.", "暂停会停止比赛，恢复前请先松开手指。")];
+      rules.forEach((rule, index) => { text(`touch-control-rule-${index}`, rule, rect(18, 60 + index * (r.height - 68) / rules.length, r.width - 36, (r.height - 68) / rules.length), 18, ink, "left"); });
+    } else if (page === "karts") {
       const height = Math.min(112, r.height * 0.33), width = Math.min(150, r.width / 5);
       items("karts", page).forEach((item, index) => { card(item, rect((r.width - width * 4) / 2 + index * width, r.height - height, width - 8, height)); });
       button(menuWidgetId(page, "continue"), rect(r.width - 110, 0, 110, 44), tr("Continue", "继续"), action("continue"));
@@ -259,13 +268,24 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       host.focus(menuWidgetId(page, `mode-${session.settings.mode}`));
     } else if (page === "tracks_and_gp") {
       const gpHeight = Math.min(84, r.height * 0.24);
-      items("gps", page).forEach((item, index) => { card(item, rect(index * r.width / 4 + 4, 46, r.width / 4 - 8, gpHeight)); });
+      text("mobile-gp-heading", tr("Grand Prix · Preview", "大奖赛 · 预览"), rect(4, 44, r.width - 8, 20), 15, ink, "left");
+      items("gps", page).forEach((item, index) => { card(item, rect(index * r.width / 4 + 4, 66, r.width / 4 - 8, gpHeight)); });
       const list = items("tracks", page), columns = Math.max(3, Math.min(5, Math.floor(r.width / 160))), capacity = columns * 2, key = "mobile-tracks";
       const total = Math.max(1, Math.ceil(list.length / capacity)), number = Math.min(m.listPages[key] ?? 0, total - 1);
       m.listPages[key] = number;
-      const y = gpHeight + 54, height = Math.max(44, (r.height - y - 30) / 2);
+      text("mobile-track-heading", tr("Playable: Hacienda and Lighthouse", "可玩赛道：庄园、灯塔"), rect(4, gpHeight + 68, r.width - 8, 20), 15, ink, "left");
+      const y = gpHeight + 90, height = Math.max(44, (r.height - y - 30) / 2);
       list.slice(number * capacity, (number + 1) * capacity).forEach((item, index) => { card(item, rect(index % columns * r.width / columns + 4, y + Math.floor(index / columns) * height, r.width / columns - 8, height - 4)); });
       pagination(key, r, total);
+      host.focus(menuWidgetId(page, `track:${m.track}`));
+    } else if (page === "gp_info") {
+      const tracks = (gp?.tracks ?? []).map((id) => menuData.tracks.find((track) => track.id === id)).filter((track) => !!track);
+      const left = r.width * 0.5, right = left + 20, column = r.width - right;
+      if (tracks[0]) picture("mobile-gp-preview", tracks[0].image, rect(0, 56, left, Math.max(80, r.height - 130)));
+      text("mobile-gp-tracks", tracks.map((track) => sourceText(track.name)).join(" · "), rect(0, r.height - 68, left, 60), 15);
+      text("mobile-gp-note", tr("Grand Prix menu preview. Hacienda and Lighthouse single races are playable.", "大奖赛菜单预览。当前可玩庄园和灯塔单场比赛。"), rect(right, 60, column, Math.max(70, r.height - 180)), 18, ink, "left");
+      button(menuWidgetId(page, "start"), rect(right, r.height - 112, column, 44), tr("Grand Prix Preview", "大奖赛预览"), action("start"));
+      button(menuWidgetId(page, "single-race"), rect(right, r.height - 56, column, 48), tr(`Play ${defaultCourse.name} Single Race`, "玩庄园单场比赛"), action("single-race"));
     } else {
       const left = r.width * 0.43, right = left + 20, column = r.width - right;
       picture("mobile-track-preview", m.selectedTrack.image, rect(0, 56, left, Math.max(70, r.height - 110)));
@@ -283,6 +303,26 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     return true;
   }
 
+  function drawTouchKeyboard(r: Rect): void {
+    host.modal();
+    const field = m.editing, rows = ["1234567890", "qwertyuiop", "asdfghjkl", "zxcvbnm@._-"], height = 248;
+    const top = Math.max(r.y, r.y + r.height - height);
+    spawn("touch-keyboard", "node", "root", { position: "absolute", left: r.x, top, width: r.width, height, background: [0.08, 0.1, 0.13, 0.98] });
+    const value = m.text(field), masked = field.includes("password") ? "●".repeat(value.length) : value;
+    text("touch-keyboard-value", `${masked}|`, { x: r.x + 8, y: top, width: r.width - 16, height: 28 }, 17, [1, 1, 1, 1]);
+    rows.forEach((row, index) => {
+      const width = r.width / row.length;
+      [...row].forEach((key, column) => { button(`touch-key:${key}`, { x: r.x + column * width + 2, y: top + 28 + index * 44, width: width - 4, height: 42 }, key, () => { m.setText(field, m.text(field) + key); changed(); }); });
+    });
+    const tools = [tr("Delete", "删除"), tr("Space", "空格"), tr("Done", "完成")];
+    tools.forEach((name, index) => { button(`touch-key-tool:${index}`, { x: r.x + index * r.width / 3 + 2, y: top + 204, width: r.width / 3 - 4, height: 44 }, name, () => {
+      if (index === 0) m.setText(field, m.text(field).slice(0, -1));
+      else if (index === 1) m.setText(field, `${m.text(field)} `);
+      else m.editing = "";
+      changed();
+    }); });
+  }
+
   if (session.screen !== "main" && !(mobile && drawMobilePage(safeRect))) drawPage(page, safeRect);
   if (page === "track_info") host.focus(menuWidgetId(page, "start"));
   if (m.dialog) {
@@ -295,5 +335,6 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     drawPage(m.dialog.page, { x: r.x + 18 * scale, y: r.y + 15 * scale, width: r.width - 36 * scale, height: r.height - 30 * scale });
   }
   if (m.status) text("menu-status", m.status, { x: layout.width * 0.22, y: layout.height * 0.94, width: layout.width * 0.75, height: layout.height * 0.05 }, 15 * scale, [0.55, 0.05, 0, 1]);
+  if (mobile && m.editing) drawTouchKeyboard(safeRect);
   return true;
 }

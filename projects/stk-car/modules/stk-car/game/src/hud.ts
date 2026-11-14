@@ -21,6 +21,7 @@ let focused: (id: string) => void = () => {};
 let dimensions: Layout;
 let menuSession: PcSession;
 let menuChanged = () => {};
+let stickState = "";
 export const style = (id: string, value: Record<string, unknown>): void => { ui_set_style(id, JSON.stringify(value)); };
 function node(id: string, parent: string, spec: Record<string, unknown>, kind: "node" | "button" = "node"): void {
   if (!ui_spawn(id, parent, kind)) throw new Error(`Cannot create UI ${id}`);
@@ -47,7 +48,7 @@ function button(id: string, parent: string, value: string, action: () => void, s
 function mainIcon(id: string, parent: string, value: string, icon: string, action: () => void, size: number, small = false): void {
   node(id, parent, { width: small ? size : "18%", height: "100%", flexDirection: "column", alignItems: "center", gap: 2, background: [0, 0, 0, 0] }, "button");
   image(`${id}-icon`, id, `ui/${icon}.png`, { width: size, height: size, flexShrink: 0 });
-  if (!small) label(`${id}-label`, id, value, dimensions.mobile ? 16 : 21, { height: dimensions.mobile ? 42 : 50 }, [0, 0, 0, 1]);
+  if (!small) label(`${id}-label`, id, value, dimensions.mobile ? 16 : 21, { height: dimensions.mobile ? 36 : 50 }, [0, 0, 0, 1]);
   buttons.push({ id, action, base: [0, 0, 0, 0], icon: `ui/${icon}.png`, focusIcon: small ? undefined : `ui/${icon}_focus.png`, hint: small ? value : undefined });
 }
 function mountMainMenu(session: PcSession, act: (action: () => void) => () => void, layout: Layout): void {
@@ -58,17 +59,17 @@ function mountMainMenu(session: PcSession, act: (action: () => void) => () => vo
   const chooseKarts = (players: number) => act(() => { session.menu.players = players; session.menu.raceMode = "normal"; session.settings.mode = "normal"; session.openMenu("karts", "kart"); if (players > 1) session.menu.popup("splitscreen_player_dialog", tr("Splitscreen Multiplayer", "分屏多人游戏"), "splitscreen"); });
   image("logo", parent, "ui/logo.png", { position: "absolute", left: "33%", top: "0%", width: "34%", height: "44%" });
   node("main-cards", parent, { position: "absolute", top: "51%", left: "5%", width: "90%", height: "31%", justifyContent: "space-between", flexDirection: "row" });
-  const size = Math.min(layout.width * 0.127, 166 * unit);
+  const size = layout.mobile ? Math.min(layout.width * 0.127, layout.height * 0.22) : Math.min(layout.width * 0.127, 166 * unit);
   mainIcon("story", "main-cards", tr("Story Mode", "故事模式"), "menu_story", open("story"), size);
   mainIcon("singleplayer", "main-cards", tr("Singleplayer", "单人游戏"), "menu_race", chooseKarts(1), size);
   mainIcon("multiplayer", "main-cards", tr("Splitscreen Multiplayer", "分屏多人游戏"), "menu_multi", chooseKarts(2), size);
   mainIcon("online", "main-cards", tr("Online", "在线"), "menu_online", open("online"), size);
   mainIcon("addons", "main-cards", tr("Addons", "附加组件"), "menu_addons", open("addons_screen"), size);
   focus = 1;
-  node("profile", parent, { position: "absolute", top: 2, right: 2, width: "27%", height: 30 * unit, alignItems: "center", justifyContent: "center" }, "button");
+  node("profile", parent, { position: "absolute", top: 2, right: 2, width: "27%", height: layout.mobile ? 32 : 30 * unit, alignItems: "center", justifyContent: "center" }, "button");
   buttons.push({ id: "profile", action: open("user_screen"), base: [0, 0, 0, 0] });
   image("profile-background", "profile", "ui/profile.png", { position: "absolute", width: "100%", height: "100%", imageMode: "stretch" });
-  label("profile-name", "profile", session.menu.profiles[session.menu.player] === "Player" ? tr("Player", "玩家") : session.menu.profiles[session.menu.player], 21, {}, [0, 0, 0, 1]);
+  label("profile-name", "profile", session.menu.profiles[session.menu.player] === "Player" ? tr("Player", "玩家") : session.menu.profiles[session.menu.player], layout.mobile ? 18 : 21, {}, [0, 0, 0, 1]);
   image("bottom-bar", parent, "ui/bottom_bar.png", { position: "absolute", bottom: 0, width: "100%", height: "8.5%", imageMode: "stretch" });
   label("news", parent, layout.mobile ? "SuperTuxKart" : tr("SuperTuxKart · PC Singleplayer", "SuperTuxKart · PC 单人竞速"), 18, { position: "absolute", bottom: "2%", left: layout.mobile ? "1%" : "20%" }, [0, 0, 0, 1]);
   node("main-bottom", parent, { position: "absolute", bottom: 0, right: "1%", width: layout.mobile ? "60%" : "42%", height: layout.mobile ? 48 : "8%", flexDirection: "row", justifyContent: "space-between" });
@@ -111,7 +112,7 @@ function highlight(): void {
 export function pollButtons(): void {
   if (!buttons.length) return;
   const pointer = input_primary_pointer(), position = `${pointer.x}:${pointer.y}`;
-  if (position !== pointerPosition) {
+  if (position !== pointerPosition && !dimensions.mobile && typeof ui_button_hovered === "function") {
     pointerPosition = position;
     const hovered = buttons.findIndex((button) => ui_button_hovered(button.id));
     if (hovered >= 0 && hovered !== focus) { focus = hovered; highlight(); menuSound("plopp"); focused(buttons[focus].id); }
@@ -131,7 +132,7 @@ export function readLayout(mobile = false): Layout {
 export function mountHud(session: PcSession, layout: Layout, changed: () => void, start: () => void, mobile = false, focusChanged: (id: string) => void = () => {}): void {
   const screenKey = `${session.screen}:${session.menu.page}:${session.menu.dialog?.page ?? ""}`;
   const focusedId = previousScreen === screenKey ? buttons[focus]?.id : undefined;
-  ui_clear(); labels.clear(); buttons.length = 0; focus = 0; dimensions = layout;
+  ui_clear(); labels.clear(); buttons.length = 0; focus = 0; dimensions = layout; stickState = "";
   focused = focusChanged;
   menuSession = session; menuChanged = changed;
   const screen = session.screen;
@@ -205,7 +206,7 @@ function mountRaceHud(session: PcSession, layout: Layout, mobile: boolean, chang
     image(`position-icon-${i}`, `position-${i}`, trackData.karts[0].icon, { width: mobile ? 26 : 36, height: mobile ? 26 : 36 });
     if (!mobile) label(`position-name-${i}`, `position-${i}`, "", 17);
   }
-  image("map", "root", "ui/minimap.png", { position: "absolute", left: layout.left, bottom: mapBottom, width: mapSize, height: mapSize });
+  image("map", "root", session.course.minimap.image, { position: "absolute", left: layout.left, bottom: mapBottom, width: mapSize, height: mapSize });
   for (const racer of session.race.racers) image(`map-${racer.id}`, "root", trackData.karts.find((kart) => kart.id === racer.kartId)!.icon, { position: "absolute", width: racer === session.race.player ? 22 : 16, height: racer === session.race.player ? 22 : 16 });
   image("speed-meter", "root", "ui/speedback.png", { position: "absolute", right: layout.right + 28, bottom: speedBottom, width: 145 * unit, height: 145 * unit });
   label("speed", "root", "", 29, { position: "absolute", right: layout.right + 57 * unit, bottom: speedBottom + 52 * unit });
@@ -223,9 +224,13 @@ function mountRaceHud(session: PcSession, layout: Layout, mobile: boolean, chang
       label(`${id}-label`, id, name, 15);
     }
     button("pause", "root", "Ⅱ", () => { session.screen = "paused"; changed(); }, { position: "absolute", left: layout.left, top: layout.top + 52, width: 50, height: 44 });
+    label("touch-hint", "root", tr("Drag to drive · Pull down to brake", "拖动摇杆驾驶 · 下拉刹车"), 13, { position: "absolute", left: "28%", bottom: layout.bottom, maxWidth: "34%" });
   }
 }
 export function updateStick(touch: TouchControls, layout: Layout): void {
+  const state = `${touch.dx.toFixed(3)}:${touch.dy.toFixed(3)}:${[...touch.active].sort().join(",")}`;
+  if (state === stickState) return;
+  stickState = state;
   const radius = layout.radius * 0.32;
   style("stick-thumb", { left: layout.stickX + touch.dx * layout.radius * 0.7 - radius, top: layout.stickY + touch.dy * layout.radius * 0.7 - radius });
   for (const id of Object.keys(touchControlRects(layout))) style(id, { background: touch.active.has(id as Parameters<typeof touch.active.has>[0]) ? [0.1, 0.65, 0.75, 0.85] : panel });
@@ -252,8 +257,8 @@ export function updateHud(session: PcSession): void {
   const { mapSize: size, mapBottom } = raceHudLayout(dimensions);
   for (const racer of race.racers) {
     const iconSize = racer === player ? 22 : 16;
-    const left = dimensions.left + (racer.x - trackData.minimap.minX) / trackData.minimap.size * size - iconSize / 2;
-    const bottom = mapBottom + (1 - (racer.z - trackData.minimap.minZ) / trackData.minimap.size) * size - iconSize / 2;
+    const left = dimensions.left + (racer.x - session.course.minimap.minX) / session.course.minimap.size * size - iconSize / 2;
+    const bottom = mapBottom + (1 - (racer.z - session.course.minimap.minZ) / session.course.minimap.size) * size - iconSize / 2;
     style(`map-${racer.id}`, { left, bottom });
   }
 }

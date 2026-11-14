@@ -1,6 +1,7 @@
 import { menuData } from "./menu-data.js";
 import { sourceText, tr } from "./localization.js";
 import type { PcSession } from "./session.js";
+import { defaultCourse } from "./courses.js";
 
 export interface MenuDialog { page: string; title: string; purpose?: string; }
 export interface MenuChoice { value: string | number; label: string; }
@@ -18,7 +19,7 @@ export class MenuState {
   fields: Record<string, string> = {};
   editing = "";
   status = "";
-  track = "lighthouse";
+  track = defaultCourse.id;
   grandPrix = menuData.grandPrix[0]?.id ?? "";
   raceMode = "normal";
   scoreMode = "normal";

@@ -2,6 +2,7 @@ import { menuData } from "./menu-data.js";
 import { setUiLanguage, sourceText, tr } from "./localization.js";
 import { optionPages, optionTabs } from "./menu-state.js";
 import type { PcSession, Screen } from "./session.js";
+import { courseFor, defaultCourse } from "./courses.js";
 
 export function menuPageFor(session: PcSession): string {
   const pages: Partial<Record<Screen, string>> = { kart: "karts", setup: "race_setup", tracks: "tracks_and_gp", "track-info": "track_info" };
@@ -28,13 +29,22 @@ export function menuAction(session: PcSession, id: string, changed: () => void, 
     m.raceMode = id.slice(5);
     if (m.raceMode === "normal" || m.raceMode === "time-trial") session.settings.mode = m.raceMode;
     go("tracks_and_gp", "tracks");
-  } else if (id.startsWith("track:")) { m.track = id.slice(6); if (page !== "edit_track") go("track_info", "track-info"); }
+  } else if (id.startsWith("track:")) {
+    const trackId = id.slice(6), course = courseFor(trackId); m.track = trackId;
+    if (course && session.settings.trackId !== trackId) { session.settings.trackId = trackId; session.settings.laps = course.defaultLaps; }
+    if (page !== "edit_track") go("track_info", "track-info");
+  }
   else if (id.startsWith("gp:")) {
     m.grandPrix = id.slice(3);
     if (page !== "grand_prix_editor") go("gp_info");
+  } else if (page === "gp_info" && id === "single-race") {
+    m.track = defaultCourse.id; session.settings.trackId = defaultCourse.id; session.settings.laps = defaultCourse.defaultLaps;
+    m.raceMode = "normal"; m.players = 1; session.settings.mode = "normal"; go("track_info", "track-info");
+  } else if (page === "gp_info" && ["start", "continue"].includes(id)) {
+    popup("confirm_dialog", tr("Grand Prix is currently a menu preview. Choose a single race to play.", "大奖赛当前为菜单预览，请选择单场比赛进入游戏。"), "preview");
   } else if (id === "start" && page === "track_info") {
-    if (m.track === "lighthouse" && ["normal", "time-trial"].includes(m.raceMode) && m.number("ai-spinner", session) <= 3 && m.players === 1) start();
-    else { popup("confirm_dialog", tr("This race configuration is available as a menu preview. The playable build currently supports Lighthouse, singleplayer and up to three AI karts.", "此配置目前仅供菜单预览；可运行版本支持灯塔赛道、单人及最多三名 AI。"), "preview"); }
+    if (courseFor(m.track) && m.players === 1 && (m.raceMode === "time-trial" || m.raceMode === "normal" && m.number("ai-spinner", session) <= 3)) { session.settings.trackId = m.track; start(); }
+    else { popup("confirm_dialog", tr("This configuration is a menu preview. Playable tracks: Hacienda and Lighthouse; singleplayer with up to three AI karts.", "此配置目前仅供菜单预览；可玩庄园和灯塔赛道，支持单人及最多三名 AI。"), "preview"); }
   } else if (id === "random_track") { m.track = menuData.tracks.find((track) => !track.arena)?.id ?? "lighthouse"; go("track_info", "track-info"); }
   else if (id === "rand-gp") { m.grandPrix = menuData.grandPrix[0].id; go("gp_info"); }
   else if (id.startsWith("group:") || id.startsWith("filter:")) { m.values[m.key("group")] = id.split(":")[1]; m.listPages = {}; }
@@ -74,6 +84,7 @@ export function menuAction(session: PcSession, id: string, changed: () => void, 
   else if (id === "custom" && page === "options_video") popup("custom_video_settings", sourceText("Graphics Settings"));
   else if (id === "custom_camera") popup("custom_camera_settings", sourceText("Camera Settings"));
   else if (id === "device:keyboard") m.show("options_device");
+  else if (id === "device:touch") go("touch_controls");
   else if (id === "add_device" || id.startsWith("binding:")) popup("press_a_key_dialog", sourceText("Press fully and release..."), id);
   else if (id === "startTutorial") { go("help1", "help"); m.status = tr("Tutorial interface preview. Driving instructions are shown below.", "教程界面预览，驾驶说明见下方。"); }
   else if (page === "splitscreen_player_dialog" && id === "add") { m.players = Math.min(4, m.players + 1); m.status = tr(`${m.players} local players (preview)`, `${m.players} 名本地玩家（预览）`); }

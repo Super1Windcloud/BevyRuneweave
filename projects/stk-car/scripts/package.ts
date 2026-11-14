@@ -4,13 +4,14 @@ import { join, relative, resolve } from "node:path";
 import { crc32, deflateRawSync } from "node:zlib";
 import { build } from "esbuild";
 import { trackData } from "../modules/stk-car/game/src/track-data.ts";
+import { courses } from "../modules/stk-car/game/src/courses.ts";
 
 const project = resolve(import.meta.dirname, "..");
 const assets = join(project, "modules/stk-car/game/assets");
 const manifest = JSON.parse(readFileSync(join(assets, "asset-manifest.json"), "utf8")) as { files: string[] };
 if (!Array.isArray(manifest.files) || manifest.files.some((path) => typeof path !== "string" || path.startsWith("/") || /^[A-Za-z]:/.test(path) || path.includes("\\") || path.split("/").some((part) => !part || part === "." || part === ".."))) throw new Error("Invalid asset manifest");
 const allowed = new Set([...manifest.files, "engineConfig.json", "stk-car.js", "asset-manifest.json"]);
-const required = [trackData.trackModel, trackData.kartModel, ...trackData.wheels.map((wheel) => wheel.path),
+const required = [trackData.trackModel, ...courses.flatMap((course) => [course.trackModel, course.skyModel, course.music, course.minimap.image]), "licenses/hacienda.txt", trackData.kartModel, ...trackData.wheels.map((wheel) => wheel.path),
   ...Object.values(trackData.audio), "audio/sfx/engine_small.ogg", "audio/sfx/start_race.ogg", "licenses/music.txt", "licenses/sfx.txt",
   ...Object.values(trackData.pickupModels),
   trackData.skyModel, trackData.menuSkyModel, ...trackData.karts.flatMap((kart) => [kart.model, kart.icon, ...kart.wheels.map((wheel) => wheel.path)]),

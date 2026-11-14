@@ -19,9 +19,9 @@ test("PC keys match STK KeyboardConfig, separating fire, drift, nitro and revers
 });
 test("PC settings validate persisted data; selected kart, laps, AI and reverse reach the simulation", () => {
   const session = new PcSession();
-  assert.equal(session.settings.laps, 4);
+  assert.equal(session.settings.laps, 3);
   assert.equal(session.settings.wasd, false);
-  session.settings = parseSettings('{"kartId":"wilber","laps":2,"aiCount":1,"difficulty":3,"reverse":true,"mode":"normal"}');
+  session.settings = parseSettings('{"trackId":"lighthouse","kartId":"wilber","laps":2,"aiCount":1,"difficulty":3,"reverse":true,"mode":"normal"}');
   session.start();
   assert.equal(session.race.player.kartId, "wilber"); assert.equal(session.race.laps, 2); assert.equal(session.race.racers.length, 2);
   assert.ok(Math.abs(angleDelta(session.race.circuit.sample(5).heading - circuit.sample(circuit.length - 5).heading)) > 2.8);
