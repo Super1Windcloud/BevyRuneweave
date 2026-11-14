@@ -184,31 +184,11 @@ objc2-foundation = { version = "0.3.2", default-features = false, features = [
 [profile.dev]
 debug = 0
 
-# Keep gameplay builds incremental while avoiding unoptimized rendering hot paths.
-[profile.dev.package.bevy_ecs]
-opt-level = 2
-
-[profile.dev.package.bevy_render]
-opt-level = 2
-
-[profile.dev.package.bevy_pbr]
-opt-level = 2
-
-# Metal calls spend substantial debug time parsing Objective-C method encodings.
-# Optimize these paths while retaining their debug assertions and ABI validation.
-[profile.dev.package.objc2]
-opt-level = 2
-
-[profile.dev.package.objc2-encode]
-opt-level = 2
-
-[profile.dev.package.wgpu-hal]
-opt-level = 2
-
-[profile.dev.package.wgpu-core]
-opt-level = 2
-
-[profile.dev.package.wgpu]
+# Keep workspace crates incremental while optimizing every dependency. Bevy's
+# task executor, UI, sprite and Vulkan paths are otherwise CPU-bound in debug
+# builds on mobile; Metal/objc2 and QuickJS C code are covered by this as well.
+# Debug assertions and ABI validation remain enabled.
+[profile.dev.package."*"]
 opt-level = 2
 
 #最快编译时间

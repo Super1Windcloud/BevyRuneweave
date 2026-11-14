@@ -44,7 +44,7 @@ function text(id: string, value: string, rect: Rect, size: number, color = ink, 
 interface Item { id: string; text: string; image?: string; selected?: boolean; }
 
 export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHost, changed: () => void, start: () => void): boolean {
-  if (!["kart", "setup", "tracks", "track-info", "menu", "options", "help"].includes(session.screen)) return false;
+  if (!["kart", "setup", "tracks", "track-info", "menu", "options", "help"].includes(session.screen) && !(session.screen === "main" && session.menu.dialog)) return false;
   const m = session.menu, page = menuPageFor(session);
   m.page = page;
   const scale = Math.max(0.5, Math.min(1.4, layout.width / 1280, layout.height / 720));
@@ -64,7 +64,9 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     }
     if (label) text(`${id}:label`, label, options.horizontal && options.image ? { x: rect.width * 0.25, y: 0, width: rect.width * 0.74, height: rect.height }
       : { x: 4 * scale, y: rect.height - captionHeight, width: rect.width - 8 * scale, height: captionHeight }, Math.max(13, 18 * scale), ink, "center", id);
-    host.register({ id, action: click, base: transparent, face: normal ? { id: `${id}:face`, normal, focused, selected: !!options.selected } : undefined,
+    const base = options.selected && !normal ? [0, 0.65, 0.7, 0.32] : transparent;
+    if (!normal && options.selected) ui_set_style(id, JSON.stringify({ background: base }));
+    host.register({ id, action: click, base, face: normal ? { id: `${id}:face`, normal, focused, selected: !!options.selected } : undefined,
       caption: label ? { id: `${id}:label:text`, text: label, size: Math.max(13, 18 * scale) } : undefined });
   }
   function items(id: string, currentPage: string): Item[] {
@@ -75,7 +77,8 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     if (id === "gps" || id === "gplist") return menuData.grandPrix.map((gp) => ({ id: `gp:${gp.id}`, text: sourceText(gp.name), image: menuData.tracks.find((track) => track.id === gp.tracks[0])?.image, selected: gp.id === m.grandPrix }));
     if (id === "tracks" && currentPage !== "edit_gp") {
       const gp = currentPage === "grand_prix_editor" || currentPage === "gp_info" ? menuData.grandPrix.find((gp) => gp.id === m.grandPrix) : undefined;
-      return menuData.tracks.filter((track) => track.id !== "overworld" && (gp ? gp.tracks.includes(track.id) : true)).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name), image: track.image, selected: track.id === m.track }));
+      const query = m.fields[`${currentPage}:search`]?.toLocaleLowerCase() ?? "";
+      return menuData.tracks.filter((track) => track.id !== "overworld" && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name), image: track.image, selected: track.id === m.track }));
     }
     if (id === "players") return m.profiles.map((name, index) => ({ id: `profile:${index}`, text: name === "Player" ? tr("Player", "玩家") : name, image: trackData.karts[index % trackData.karts.length].icon, selected: m.player === index }));
     if (id === "resolutions") return ["1280 × 720", "1600 × 900", "1920 × 1080"].map((label) => ({ id: `resolution:${label}`, text: label, selected: label === (m.values["resolution"] ?? "1280 × 720") }));
@@ -99,7 +102,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     if (id === "name" && currentPage === "track_info" || id === "selected_track") return sourceText(m.selectedTrack.name);
     if (id === "author") return m.selectedTrack.designer;
     if (id === "title" && currentPage === "options_device") return tr("Keyboard 0", "键盘 0");
-    if (id === "title" && currentPage.startsWith("profile_")) return `${sourceText(currentPage === "profile_friends" ? "Friends" : currentPage === "profile_settings" ? "Account Settings" : "Achievements")} — ${m.profiles[m.player]}`;
+    if (id === "title" && ["profile_friends", "profile_settings", "profile_achievements"].includes(currentPage)) return `${sourceText(currentPage === "profile_friends" ? "Friends" : currentPage === "profile_settings" ? "Account Settings" : "Achievements")} — ${m.profiles[m.player]}`;
     if (id === "highscores") return sourceText("High Scores");
     if (id === "target-type-text") return sourceText("Race target");
     if (id === "option-text") return sourceText("Reverse");
@@ -162,12 +165,15 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       const size = (node.tag === "header" ? 32 : node.tag === "small-header" ? 24 : node.tag === "bubble" ? 15.5 : 18) * scale;
       text(id, labelValue(logical, a.text ?? "", currentPage), r, Math.max(12, size), header ? blue : ink, a.text_align ?? (node.tag === "bubble" ? "left" : "center"));
     };
-    draw(guiLayout(source, rect, scale));
+    const filtered = (node: GuiNode): GuiNode => ({ ...node, children: node.children.filter((child) => !(currentPage === "track_info" && child.attributes.id === "ai-blue-div" && m.raceMode !== "soccer")).map(filtered) });
+    draw(guiLayout(filtered(source), rect, scale));
   }
   function selected(id: string, currentPage: string): boolean {
     const index = optionTabs.indexOf(id);
     if (index >= 0) return optionPages[index] === currentPage;
     if (/page[1-7]/.test(id)) return currentPage === `help${id.slice(4)}`;
+    if (currentPage === "addons_screen") return id === (m.values["addon-category"] ?? "tab_kart");
+    if (currentPage === "high_score_selection") return id === (m.scoreMode === "normal" ? "tab_normal_race" : m.scoreMode);
     return false;
   }
   function drawSpinner(id: string, logical: string, node: GuiNode, r: Rect): void {
@@ -188,9 +194,11 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     const height = guiLength(node.attributes.child_height, r.height, scale) ?? (tabs ? 46 * scale : width + 32 * scale);
     const columns = vertical ? 1 : tabs || ["ribbon", "buttonbar", "scrollable_toolbar", "scrollable_ribbon"].includes(node.tag) ? Math.max(1, list.length) : Math.max(1, Math.floor(r.width / (width + 8 * scale)));
     const rows = vertical ? list.length : tabs || ["ribbon", "buttonbar", "scrollable_toolbar", "scrollable_ribbon"].includes(node.tag) ? 1 : Math.max(1, Math.floor(r.height / Math.max(height, 1)));
-    const capacity = Math.max(1, columns * rows), offset = (m.listPages[id] ?? 0) * capacity, visible = list.slice(offset, offset + capacity);
+    const capacity = Math.max(1, columns * rows), total = Math.max(1, Math.ceil(list.length / capacity));
+    m.listPages[id] = Math.min(m.listPages[id] ?? 0, total - 1);
+    const offset = m.listPages[id] * capacity, visible = list.slice(offset, offset + capacity);
     visible.forEach((item, index) => {
-      const cellWidth = r.width / columns, cellHeight = r.height / Math.max(1, rows), gap = 5 * scale;
+      const cellWidth = r.width / columns, cellHeight = (r.height - (list.length > capacity ? 30 * scale : 0)) / Math.max(1, rows), gap = 5 * scale;
       const cell = { x: r.x + (index % columns) * cellWidth + gap, y: r.y + Math.floor(index / columns) * cellHeight + gap,
         width: cellWidth - gap * 2, height: Math.min(cellHeight - gap * 2, tabs ? cellHeight : height) };
       const normal = tabs ? skin(vertical ? "glasstab_vert" : "glasstab") : "", focused = tabs ? skin(vertical ? "glasstab_vert_focus" : "glasstab_focus") : "";
@@ -199,12 +207,13 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     if (list.length > capacity) pagination(id, r, Math.ceil(list.length / capacity));
     if (logical === "gamemode") host.focus(menuWidgetId(currentPage, `mode-${session.settings.mode}`));
     if (logical === "karts") host.focus(menuWidgetId(currentPage, `choose-${session.settings.kartId}`));
+    if (logical === "tracks" && currentPage === "tracks_and_gp") host.focus(menuWidgetId(currentPage, `track:${m.track}`));
   }
   function drawList(id: string, logical: string, list: Item[], r: Rect, currentPage: string): void {
     spawn(`${id}:background`, "node", "root", { ...position(r), background: [1, 1, 1, 0.3] });
     const rowHeight = 38 * scale, capacity = Math.max(1, Math.floor((r.height - (list.length * rowHeight > r.height ? 28 * scale : 0)) / rowHeight));
     const offset = (m.listPages[id] ?? 0) * capacity;
-    list.slice(offset, offset + capacity).forEach((item, index) => button(menuWidgetId(currentPage, item.id), { x: r.x + 5 * scale, y: r.y + index * rowHeight, width: r.width - 10 * scale, height: rowHeight }, item.text, action(item.id), { selected: item.selected, horizontal: true, image: item.image }));
+    list.slice(offset, offset + capacity).forEach((item, index) => { button(menuWidgetId(currentPage, item.id), { x: r.x + 5 * scale, y: r.y + index * rowHeight, width: r.width - 10 * scale, height: rowHeight }, item.text, action(item.id), { selected: item.selected, horizontal: true, image: item.image }); });
     if (!list.length) text(`${id}:empty`, sourceText(logical.includes("score") ? "No high scores yet" : ["server_list", "friends_list", "users"].includes(logical) ? "Not connected" : "No items available"), r, 18 * scale);
     if (list.length > capacity) pagination(id, r, Math.ceil(list.length / capacity));
   }
@@ -224,10 +233,10 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     text("story-title", sourceText("Story Mode"), { x: 0, y: 0, width: r.width, height: r.height * 0.1 }, 32 * scale, blue);
     button("story-back", { x: 15, y: 10, width: 64 * scale, height: 54 * scale }, "", action("back"), { image: "gui/icons/back.png", normal: "", focused: "" });
     text("story-progress", tr("0 trophies · Challenge map preview", "0 奖杯 · 挑战地图预览"), { x: r.width * 0.3, y: r.height * 0.86, width: r.width * 0.5, height: r.height * 0.08 }, 22 * scale);
-    ["lighthouse", "olivermath", "hacienda"].forEach((track, index) => button(`challenge-${track}`, { x: r.width * (0.25 + index * 0.2), y: r.height * (0.4 + (index % 2) * 0.2), width: 80 * scale, height: 75 * scale }, "", action(`challenge:${track}`), { image: "gui/icons/story_mode_book.png" }));
+    ["lighthouse", "olivermath", "hacienda"].forEach((track, index) => { button(`challenge-${track}`, { x: r.width * (0.25 + index * 0.2), y: r.height * (0.4 + (index % 2) * 0.2), width: 80 * scale, height: 75 * scale }, "", action(`challenge:${track}`), { image: "gui/icons/story_mode_book.png" }); });
   }
 
-  drawPage(page, { x: 0, y: 0, width: layout.width, height: layout.height });
+  if (session.screen !== "main") drawPage(page, { x: 0, y: 0, width: layout.width, height: layout.height });
   if (m.dialog) {
     spawn("menu-dialog-shade", "node", "root", { position: "absolute", left: 0, top: 0, width: "100%", height: "100%", background: [0, 0, 0, 0.55] });
     host.modal();

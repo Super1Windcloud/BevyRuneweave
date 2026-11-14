@@ -28,7 +28,7 @@ export function menuAction(session: PcSession, id: string, changed: () => void, 
     m.raceMode = id.slice(5);
     if (m.raceMode === "normal" || m.raceMode === "time-trial") session.settings.mode = m.raceMode;
     go("tracks_and_gp", "tracks");
-  } else if (id.startsWith("track:")) { m.track = id.slice(6); go("track_info", "track-info"); }
+  } else if (id.startsWith("track:")) { m.track = id.slice(6); if (page !== "edit_track") go("track_info", "track-info"); }
   else if (id.startsWith("gp:")) {
     m.grandPrix = id.slice(3);
     if (page !== "grand_prix_editor") go("gp_info");
@@ -39,6 +39,9 @@ export function menuAction(session: PcSession, id: string, changed: () => void, 
   else if (id === "rand-gp") { m.grandPrix = menuData.grandPrix[0].id; go("gp_info"); }
   else if (id.startsWith("group:") || id.startsWith("filter:")) { m.values[m.key("group")] = id.split(":")[1]; m.listPages = {}; }
   else if (id.startsWith("score-mode:")) { m.scoreMode = id.slice(11); }
+  else if (id.startsWith("tab_") && page === "high_score_selection") { m.scoreMode = id; }
+  else if (id.startsWith("tab_") && page === "addons_screen") { m.values["addon-category"] = id; }
+  else if (id.startsWith("resolution:")) { m.values.resolution = id.slice(11); m.preview(); }
   else if (id.startsWith("score:")) popup("high_score_info_dialog", sourceText(m.selectedTrack.name));
   else if (id === "remove-all") popup("confirm_dialog", tr("Clear high scores?", "清空最高成绩？"), "clear-scores");
   else if (id.startsWith("achievement:")) { m.achievement = Number(id.slice(12)); popup("achievement_progress_dialog", sourceText(menuData.achievements[m.achievement]?.name ?? "Achievements")); }
@@ -53,6 +56,7 @@ export function menuAction(session: PcSession, id: string, changed: () => void, 
   else if (id === "ok" && page === "user_screen") session.back();
   else if (id === "password_reset") popup("recovery_input", sourceText("Account Recovery"));
   else if (id === "user-id") go("user_screen");
+  else if (id === "register" || id === "register_button") go("register");
   else if (id === "lan") go("lan");
   else if (id === "wan") go("profile_servers");
   else if (id === "online") go("profile_friends");
@@ -72,6 +76,9 @@ export function menuAction(session: PcSession, id: string, changed: () => void, 
   else if (id === "device:keyboard") m.show("options_device");
   else if (id === "add_device" || id.startsWith("binding:")) popup("press_a_key_dialog", sourceText("Press fully and release..."), id);
   else if (id === "startTutorial") { go("help1", "help"); m.status = tr("Tutorial interface preview. Driving instructions are shown below.", "教程界面预览，驾驶说明见下方。"); }
+  else if (page === "splitscreen_player_dialog" && id === "add") { m.players = Math.min(4, m.players + 1); m.status = tr(`${m.players} local players (preview)`, `${m.players} 名本地玩家（预览）`); }
+  else if (page === "splitscreen_player_dialog" && id === "reset") { m.players = 2; m.preview(); }
+  else if (page === "splitscreen_player_dialog" && id === "connect") { m.close(); m.preview(); }
   else if (id === "selectkart") go("karts", "kart");
   else if (id === "options") session.open("options");
   else if (id === "help") session.open("help");
@@ -118,9 +125,9 @@ export function pollMenuText(session: PcSession, changed: () => void): boolean {
   if (input_key_just_pressed("Backspace")) next = value.slice(0, -1);
   const shift = input_key_pressed("ShiftLeft") || input_key_pressed("ShiftRight");
   for (const letter of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") if (input_key_just_pressed(`Key${letter}`)) next += shift ? letter : letter.toLowerCase();
-  for (const digit of "0123456789") if (input_key_just_pressed(`Digit${digit}`)) next += digit;
-  for (const [code, character] of [["Space", " "], ["Period", "."], ["Minus", shift ? "_" : "-"], ["Digit2", shift ? "@" : ""], ["Semicolon", shift ? ":" : ";"], ["Slash", "/"]]) {
-    if (character && input_key_just_pressed(code) && !(code === "Digit2" && !shift)) next += character;
+  for (const digit of "0123456789") if (input_key_just_pressed(`Digit${digit}`)) next += shift ? ")!@#$%^&*("[Number(digit)] : digit;
+  for (const [code, character] of [["Space", " "], ["Period", "."], ["Minus", shift ? "_" : "-"], ["Semicolon", shift ? ":" : ";"], ["Slash", "/"]]) {
+    if (input_key_just_pressed(code)) next += character;
   }
   if (next !== value) { m.setText(m.editing, next); changed(); }
   return true;

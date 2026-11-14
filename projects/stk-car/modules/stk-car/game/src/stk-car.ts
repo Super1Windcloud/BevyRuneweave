@@ -6,6 +6,7 @@ import { PcSession, parseSettings } from "./session.js";
 import { trackData } from "./track-data.js";
 import { GameAudio } from "./sound.js";
 import { advanceWheelSpin, kartFrame, wheelTransform } from "./kart-transform.js";
+import { setUiLanguage } from "./localization.js";
 
 const callbacks = globalThis as unknown as RuneweaveCallbacks;
 const session = new PcSession();
@@ -44,8 +45,8 @@ function refreshUi(): void {
   }
   storage_write("pc-race-settings-v1", JSON.stringify(session.settings));
   mountHud(session, layout, refreshUi, startRace, mobile, (id) => {
-    if (session.screen === "kart" && id.startsWith("choose-")) {
-      const kart = trackData.karts.find((kart) => `choose-${kart.id}` === id);
+    if (session.screen === "kart" && id.startsWith("gui:karts:choose-")) {
+      const kart = trackData.karts.find((kart) => `gui:karts:choose-${kart.id}` === id);
       if (kart && session.settings.kartId !== kart.id) { session.settings.kartId = kart.id; refreshUi(); }
     }
   });
@@ -136,6 +137,7 @@ function load(): void {
   sound.reset();
   const stored = storage_read("pc-race-settings-v1");
   session.settings = parseSettings(stored.state === "ok" ? stored.value : "{}"); session.screen = "main";
+  setUiLanguage(session.settings.language); session.menu.close(); session.menuHistory = [];
   scene_clear(); scene_set_3d_enabled(false); worldReady = false;
   previewId = "";
   accumulator = 0; uiClock = 0; wheelAngles.clear(); pickupVisible.clear(); trapIds.clear(); refreshUi();
@@ -147,7 +149,7 @@ callbacks.on_suspend = () => { if (session.screen === "race") { session.screen =
 function updateGame(frameDt: number): void {
   if (!Number.isFinite(frameDt) || frameDt < 0) return;
   if (input_key_just_pressed("F3")) { showPerformance = !showPerformance; updatePerformance(lastMetrics, showPerformance && session.screen !== "main"); }
-  if (input_key_just_pressed("Escape")) { session.back(); refreshUi(); }
+  if (input_key_just_pressed("Escape")) { if (session.menu.editing) session.menu.editing = ""; else session.back(); refreshUi(); return; }
   const previousScreen = session.screen;
   pollButtons();
   const dt = Math.min(frameDt, 0.1);

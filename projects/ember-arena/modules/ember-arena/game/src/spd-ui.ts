@@ -10,7 +10,7 @@ import type { TargetKind } from "./projectiles.js";
 import { staffCapacity, staffCharges, staffDamageRange } from "./staff.js";
 import { cloakActive, cloakCapacity, cloakEquipped, cloakValue } from "./cloak.js";
 import { sealArmor, sealMaximum, sealValue, shieldValue } from "./seal.js";
-import { joystickThumbStyle, mobileLayout, type MobileAction, type MobileHudState } from "./mobile-controls.js";
+import { mobileLayout, type MobileAction, type MobileHudState } from "./mobile-controls.js";
 
 export type UiPhase = "menu" | "heroes" | "playing" | "paused" | "won" | "lost" | "inventory" | "item" | "equipment" | "upgrade" | "affix" | "seal_transfer" | "hero" | "settings" | "checks" | "rankings" | "journal" | "news" | "changes" | "about" | "support" | "message";
 export interface SpdUiState {
@@ -321,7 +321,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       ] });
     }
     const mobile = state.mobile && state.phase === "playing" ? mobileLayout(m) : null;
-    const logX = mobile ? mobile.joystick.x + mobile.joystick.radius + 8 / s : 2;
+    const logX = 2;
     const logWidth = mobile ? Math.max(30, mobile.actionLeft - logX - 8 / s) : Math.max(90, w - 90);
     const logLines = state.logs.slice(0, 3).reverse().map((entry) => wrappedText(entry, logWidth, 6));
     const logHeights = logLines.map((lines) => Math.max(10, Math.ceil(lines.length * 7.2) + 2));
@@ -335,16 +335,7 @@ export function renderSpdUi(state: SpdUiState, on: Action): UiElement {
       node("boss_fill", { ...rect(0, 5, Math.max(0, state.bossHealth), 3), background: [0.65, 0.05, 0.04, 1] }), label("boss_label", t("monster.boss"), 0, -2, 100, 6, titleColor),
     ]));
     if (state.mobile && state.phase === "playing") {
-      const controls = state.mobile, layout = mobileLayout(m), stick = layout.joystick;
-      elements.push(node("mobile_joystick", {
-        ...rect(stick.x - stick.radius, stick.y - stick.radius, stick.radius * 2, stick.radius * 2),
-        borderRadius: stick.radius * s, background: [0.04, 0.045, 0.03, 0.65],
-      }, [
-        node("mobile_joystick_axis_x", { ...rect(8 / s, stick.radius - 1 / s, stick.radius * 2 - 16 / s, 2 / s), background: [0.8, 0.8, 0.7, 0.25] }),
-        node("mobile_joystick_axis_y", { ...rect(stick.radius - 1 / s, 8 / s, 2 / s, stick.radius * 2 - 16 / s), background: [0.8, 0.8, 0.7, 0.25] }),
-        node("mobile_joystick_thumb", joystickThumbStyle(m, controls.stick)),
-      ]));
-      elements.push(label("mobile_move_label", t("mobile.move"), stick.x - stick.radius, stick.y + stick.radius - 12 / s, stick.radius * 2, 10 / s, grey));
+      const controls = state.mobile, layout = mobileLayout(m);
       const buttons: [MobileAction, string, string, boolean, boolean][] = [
         ["mobile_attack", t("mobile.attack"), "", controls.attack, false],
         ["mobile_skill", controls.skill.label, controls.skill.detail, controls.skill.enabled, controls.skill.active],

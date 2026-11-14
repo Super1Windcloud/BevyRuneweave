@@ -6,7 +6,7 @@ import { canStep, cellDistance, cellKey, findPath, generateFloor, lineOfSight, p
 import { actorCellAt, actorSprite, advanceSpriteMotion, cellPosition, cellSize, clearDungeonVisuals, mobSprites, monsterIds, placeCell, renderedPosition, settleSpriteMotion, sprite, spriteVisibility } from "./dungeon-actors.js";
 import { defaultProfile, parseProfile, type Profile } from "./profile.js";
 import { message, renderMessage, type Message, type MessageKey } from "./i18n.js";
-import { mountUi, setUiStyle, unmountUi, updateUi } from "../../api/ui.js";
+import { mountUi, unmountUi, updateUi } from "../../api/ui.js";
 import { stepSeconds } from "./sprite-motion.js";
 import { renderSpdUi, uiMetrics, type UiPhase } from "./spd-ui.js";
 import { armorReduction, attackDelay, attackSkill, defenseSkill, equippedGear, gearDefinitions, isGearKind,
@@ -19,7 +19,7 @@ import { createStaffCharger, rechargeStaff, staffCapacity, staffChargeId, staffC
 import { cloakActive, cloakCapacity, cloakEquipped, cloakId, cloakKind, cloakRechargeStep, cloakStealthStep, cloakValue, createCloak, startCloak, stopCloak } from "./cloak.js";
 import { affixSeal, createSeal, detachSeal, ensureWarriorShield, maximumShield, sealArmor, sealId, sealValue, shieldDamage, shieldId, shieldStep, shieldValue } from "./seal.js";
 import { affectHunger, extendLockedFloor, hungerStep, lockedFloorStep, regenerationStep, starvingAt, type HungerStep } from "./survival.js";
-import { joystickThumbStyle, MobileControls, type MobileAction, type MobileFrame, type MobileHudState } from "./mobile-controls.js";
+import { MobileControls, type MobileAction, type MobileHudState } from "./mobile-controls.js";
 
 type Phase = UiPhase;
 
@@ -39,7 +39,6 @@ let floor: DungeonFloor | null = null;
 let queuedPath: Point[] = [];
 const mobileEnabled = typeof app_platform === "function" && ["android", "ios"].includes(app_platform());
 const mobileControls = new MobileControls();
-let joystickVisual = "";
 const renderedTiles = new Map<number, Terrain>();
 const renderedFog = new Set<number>();
 let nextId = 0;
@@ -127,7 +126,7 @@ function mobileHudState(): MobileHudState {
       enabled: inventory.cloak_of_shadows > 0 && cloakEquipped() && (active || cloakValue("health") > 0), active };
   }
   if (targeting) skill = { ...skill, label: t("mobile.cancel"), enabled: true, active: true };
-  return { stick: mobileControls.stick, attack: adjacentEnemy() !== undefined, healing: inventory.potion_healing, skill };
+  return { attack: adjacentEnemy() !== undefined, healing: inventory.potion_healing, skill };
 }
 
 function mobileAction(action: MobileAction): void {
@@ -208,7 +207,6 @@ function drawUi(): void {
   if (metrics.width <= 0 || metrics.height <= 0) return;
   viewport = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
   const localized = (value: Message): string => renderMessage(profile.language, value);
-  joystickVisual = "";
   mountUi(renderSpdUi({
     phase: previewPhase ?? phase, selectedClass, item: selectedItem, health: previewPhase === "lost" ? 0 : health(), maxHealth, level, strength, experience,
     targetExperience: targetExperience(), depth, gold, score, turns, hunger: getHungerStatus(hungerLevel()),
@@ -1010,7 +1008,7 @@ function examineCell(point: Point): void {
   overlayReturn = "playing"; setPhase("message");
 }
 
-function playerInput(dt: number, pointer: RuneweavePointerState, mobile?: MobileFrame): void {
+function playerInput(dt: number, pointer: RuneweavePointerState): void {
   actionCooldown = Math.max(0, actionCooldown - dt);
   if (input_key_just_pressed("KeyF")) { toggleExamine(); return; }
   if (input_key_just_pressed("KeyE") || input_key_just_pressed("Period")) { descend(); return; }
@@ -1025,13 +1023,6 @@ function playerInput(dt: number, pointer: RuneweavePointerState, mobile?: Mobile
     if (examining || targeting) { examining = false; targeting = null; drawUi(); }
     queuedPath = [];
     if (actionCooldown <= 0) { movePlayer(dx, dz); actionCooldown = stepSeconds; }
-    return;
-  }
-  if (mobile?.engaged && !targeting && !examining) {
-    queuedPath = [];
-    if ((mobile.direction.x || mobile.direction.y) && actionCooldown <= 0) {
-      movePlayer(mobile.direction.x, mobile.direction.y); actionCooldown = stepSeconds;
-    }
     return;
   }
   if (pointer.justPressed) {
@@ -1210,11 +1201,6 @@ callbacks.on_update = (delta: number): void => {
   const previousTurns = turns;
   const mobile = mobileEnabled ? mobileControls.sample(mobileContacts(pointer), uiMetrics(), { x: metrics.width, y: metrics.height }, phase === "playing") : undefined;
   if (mobile && phase === "playing") {
-    const visual = `${mobileControls.stick.x.toFixed(3)}:${mobileControls.stick.y.toFixed(3)}:${mobileControls.stick.active}`;
-    if (visual !== joystickVisual) {
-      joystickVisual = visual;
-      setUiStyle("mobile_joystick_thumb", joystickThumbStyle(uiMetrics(), mobileControls.stick));
-    }
     const action = mobile.actions[0];
     if (action) { mobileAction(action); return; }
   }
@@ -1269,6 +1255,6 @@ callbacks.on_update = (delta: number): void => {
   const gamePointer = mobile ? { ...pointer, pressed: !!contact, justPressed: !!contact,
     x: contact ? (contact.x - 0.5) * pointer.viewportWidth : 0,
     y: contact ? (0.5 - contact.y) * pointer.viewportHeight : 0 } : pointer;
-  playerInput(dt, gamePointer, mobile);
+  playerInput(dt, gamePointer);
 
 };

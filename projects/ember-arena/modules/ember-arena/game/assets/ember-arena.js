@@ -546,7 +546,6 @@
     "common.no": ["No", "\u5426"],
     "common.on": ["On", "\u5F00"],
     "common.off": ["Off", "\u5173"],
-    "mobile.move": ["MOVE", "\u79FB\u52A8"],
     "mobile.attack": ["Attack", "\u653B\u51FB"],
     "mobile.heal": ["Heal", "\u6CBB\u7597"],
     "mobile.wait": ["Wait", "\u7B49\u5F85"],
@@ -557,7 +556,7 @@
     "mobile.shield": ["Shield", "\u62A4\u76FE"],
     "mobile.passive": ["Passive", "\u88AB\u52A8"],
     "mobile.cancel": ["Cancel", "\u53D6\u6D88"],
-    "mobile.hint": ["Drag the left stick to move. Tap Attack beside an enemy; aim skills by tapping a tile.", "\u62D6\u52A8\u5DE6\u4FA7\u6447\u6746\u79FB\u52A8\uFF0C\u9760\u8FD1\u654C\u4EBA\u540E\u70B9\u653B\u51FB\uFF1B\u65BD\u6CD5\u6216\u5C04\u51FB\u540E\u70B9\u9009\u76EE\u6807\u683C\u3002"],
+    "mobile.hint": ["Tap a tile to move there. Tap Attack beside an enemy; aim skills by tapping a tile.", "\u70B9\u51FB\u76EE\u6807\u683C\u79FB\u52A8\uFF0C\u9760\u8FD1\u654C\u4EBA\u540E\u70B9\u653B\u51FB\uFF1B\u65BD\u6CD5\u6216\u5C04\u51FB\u540E\u70B9\u9009\u76EE\u6807\u683C\u3002"],
     "hero.choose": ["Choose Your Hero", "\u9009\u62E9\u4F60\u7684\u82F1\u96C4"],
     "hero.warrior.name": ["Warrior", "\u6218\u58EB"],
     "hero.mage.name": ["Mage", "\u6CD5\u5E08"],
@@ -1059,7 +1058,7 @@
   var spd_pixel_metrics_default = { "0": 0.537109375, "1": 0.341796875, "2": 0.537109375, "3": 0.537109375, "4": 0.537109375, "5": 0.537109375, "6": 0.537109375, "7": 0.537109375, "8": 0.537109375, "9": 0.537109375, " ": 0.244140625, "!": 0.1953125, '"': 0.390625, "#": 0.537109375, $: 0.5859375, "%": 0.68359375, "&": 0.634765625, "'": 0.1953125, "(": 0.390625, ")": 0.390625, "*": 0.634765625, "+": 0.48828125, ",": 0.1953125, "-": 0.390625, ".": 0.1953125, "/": 0.48828125, ":": 0.1953125, ";": 0.1953125, "<": 0.439453125, "=": 0.390625, ">": 0.439453125, "?": 0.48828125, "@": 0.537109375, A: 0.537109375, B: 0.537109375, C: 0.537109375, D: 0.537109375, E: 0.537109375, F: 0.537109375, G: 0.537109375, H: 0.537109375, I: 0.29296875, J: 0.48828125, K: 0.537109375, L: 0.48828125, M: 0.634765625, N: 0.537109375, O: 0.537109375, P: 0.537109375, Q: 0.537109375, R: 0.537109375, S: 0.537109375, T: 0.48828125, U: 0.537109375, V: 0.537109375, W: 0.634765625, X: 0.537109375, Y: 0.48828125, Z: 0.537109375, "[": 0.29296875, "\\": 0.634765625, "]": 0.29296875, "^": 0.537109375, _: 0.48828125, "`": 0.29296875, a: 0.48828125, b: 0.48828125, c: 0.48828125, d: 0.48828125, e: 0.48828125, f: 0.390625, g: 0.48828125, h: 0.48828125, i: 0.1953125, j: 0.29296875, k: 0.48828125, l: 0.29296875, m: 0.5859375, n: 0.48828125, o: 0.48828125, p: 0.48828125, q: 0.48828125, r: 0.390625, s: 0.48828125, t: 0.390625, u: 0.48828125, v: 0.48828125, w: 0.5859375, x: 0.48828125, y: 0.48828125, z: 0.537109375, "{": 0.390625, "|": 0.1953125, "}": 0.390625, "~": 0.68359375 };
 
   // modules/ember-arena/game/assets/fonts/noto-sans-sc-metrics.json
-  var noto_sans_sc_metrics_default = { "0": 0.555, "1": 0.555, "2": 0.555, "3": 0.555, "4": 0.555, "5": 0.555, "6": 0.555, "7": 0.555, "8": 0.555, "9": 0.555, " ": 0.224, "!": 0.323, '"': 0.474, "#": 0.555, $: 0.555, "%": 0.921, "&": 0.68, "'": 0.278, "(": 0.338, ")": 0.338, "*": 0.467, "+": 0.555, ",": 0.278, "-": 0.347, ".": 0.278, "/": 0.392, ":": 0.278, ";": 0.278, "<": 0.555, "=": 0.555, ">": 0.555, "?": 0.474, "@": 0.946, A: 0.608, B: 0.657, C: 0.638, D: 0.688, E: 0.589, F: 0.552, G: 0.689, H: 0.728, I: 0.293, J: 0.535, K: 0.646, L: 0.543, M: 0.812, N: 0.723, O: 0.742, P: 0.633, Q: 0.742, R: 0.635, S: 0.596, T: 0.599, U: 0.721, V: 0.575, W: 0.878, X: 0.573, Y: 0.531, Z: 0.603, "[": 0.338, "\\": 0.392, "]": 0.338, "^": 0.555, _: 0.559, "`": 0.606, a: 0.563, b: 0.618, c: 0.51, d: 0.62, e: 0.554, f: 0.325, g: 0.564, h: 0.607, i: 0.275, j: 0.275, k: 0.552, l: 0.284, m: 0.926, n: 0.61, o: 0.606, p: 0.62, q: 0.62, r: 0.388, s: 0.468, t: 0.377, u: 0.607, v: 0.521, w: 0.802, x: 0.498, y: 0.521, z: 0.475, "{": 0.338, "|": 0.27, "}": 0.338, "~": 0.555, \u7834: 1, \u788E: 1, \u7684: 1, \u50CF: 1, \u7D20: 1, \u5730: 1, \u7262: 1, \u7B80: 1, \u4F53: 1, \u4E2D: 1, \u6587: 1, \u8FDB: 1, \u5165: 1, \u652F: 1, \u6301: 1, \u6E38: 1, \u620F: 1, \u6392: 1, \u884C: 1, \u699C: 1, \u65E5: 1, \u5FD7: 1, \u65B0: 1, \u95FB: 1, \u8BBE: 1, \u7F6E: 1, \u66F4: 1, \u8BB0: 1, \u5F55: 1, \u5173: 1, \u4E8E: 1, \u4E3B: 1, \u83DC: 1, \u5355: 1, \u5F00: 1, \u59CB: 1, \u95ED: 1, \u8FD4: 1, \u56DE: 1, \u4E0B: 1, \u4E00: 1, \u9875: 1, \u662F: 1, \u5426: 1, \u9009: 1, \u62E9: 1, \u4F60: 1, \u82F1: 1, \u96C4: 1, \u6218: 1, \u58EB: 1, \u6CD5: 1, \u5E08: 1, \u76D7: 1, \u8D3C: 1, \u5973: 1, \u730E: 1, \u624B: 1, \u62A4: 1, \u7532: 1, \u4E0A: 1, \u9644: 1, \u6709: 1, \u635F: 1, \u7EB9: 1, \u7AE0: 1, \u8FD1: 1, "\u3002": 1, \u53D7: 1, \u51FB: 1, \u5C06: 1, \u4F7F: 1, \u751F: 1, \u547D: 1, \u964D: 1, \u81F3: 1, \u534A: 1, \u6216: 1, \u4EE5: 1, \u65F6: 1, \u89E6: 1, \u53D1: 1, \u76FE: 1, \u53E4: 1, \u8001: 1, \u6756: 1, \u5B66: 1, \u8005: 1, \u521D: 1, \u989D: 1, \u5916: 1, \u643A: 1, \u5E26: 1, \u5347: 1, \u7EA7: 1, \u5377: 1, \u8F74: 1, \u548C: 1, \u63A2: 1, \u62E5: 1, \u53EF: 1, \u5145: 1, \u80FD: 1, \u6697: 1, \u5F71: 1, \u6597: 1, \u7BF7: 1, \u6F5C: 1, \u74F6: 1, \u9690: 1, \u5F62: 1, \u836F: 1, \u6C34: 1, "\uFF0C": 1, \u7528: 1, \u52A8: 1, \u4F0F: 1, \u8352: 1, \u91CE: 1, \u7D22: 1, \u968F: 1, \u7B49: 1, \u6210: 1, \u957F: 1, \u7075: 1, \u77ED: 1, \u5F13: 1, \u98DF: 1, \u7269: 1, \u6DB2: 1, \u706B: 1, \u5242: 1, \u88C5: 1, \u5907: 1, \u4EF6: 1, \u4E8C: 1, \u9636: 1, \u9AD8: 1, \u6B66: 1, \u5668: 1, \u4E14: 1, \u4E0D: 1, \u5230: 1, \u529B: 1, \u91CF: 1, \u8DB3: 1, \u60E9: 1, \u7F5A: 1, \u5373: 1, \u89E3: 1, \u9501: 1, \u51B3: 1, \u5BB6: 1, \u5F7B: 1, \u5E95: 1, \u51C0: 1, \u5316: 1, \u4EFB: 1, \u610F: 1, \u8BC5: 1, \u5492: 1, \u7267: 1, "\uFF1A": 1, \u7ECF: 1, \u9A8C: 1, \u91D1: 1, \u5E01: 1, \u5C5E: 1, \u6027: 1, \u5929: 1, \u8D4B: 1, \u80CC: 1, \u5305: 1, \u9605: 1, \u8BFB: 1, \u996E: 1, \u6295: 1, \u63B7: 1, \u5C04: 1, \u65BD: 1, \u89C1: 1, \u683C: 1, \u5B50: 1, \u7784: 1, \u51C6: 1, \u9B54: 1, \u5F39: 1, \u4F1A: 1, \u98DE: 1, \u8FC7: 1, \u7A7A: 1, \u6309: 1, \u53D6: 1, \u6D88: 1, \u8017: 1, \u5C3D: 1, \u8BF7: 1, \u5F85: 1, \u5BF9: 1, \u81EA: 1, \u5DF1: 1, \u9020: 1, \u4E86: 1, \u70B9: 1, \u4F24: 1, \u5BB3: 1, \u6563: 1, \u8EAB: 1, \u76EE: 1, \u6807: 1, \u8F83: 1, \u96BE: 1, \u7130: 1, \u4E5F: 1, \u707C: 1, \u5F53: 1, \u524D: 1, \u89C6: 1, \u5185: 1, \u65E7: 1, \u5251: 1, \u5315: 1, \u9996: 1, \u9576: 1, \u9489: 1, \u5957: 1, \u5E03: 1, \u76AE: 1, "\u2013": 0.536, \u9700: 1, \u6C42: 1, \u653B: 1, \u6539: 1, \u5584: 1, \u8FD9: 1, \u51CF: 1, \u514D: 1, \u9632: 1, \u4E0E: 1, \u901F: 1, \u95EA: 1, \u907F: 1, \u79FB: 1, \u5EA6: 1, \u5408: 1, \u5378: 1, \u4F5C: 1, \u8981: 1, \u94A5: 1, \u5319: 1, \u542F: 1, \u7B2C: 1, \u5C42: 1, \u9053: 1, \u51FA: 1, \u53E3: 1, \u5728: 1, \u697C: 1, \u68AF: 1, \u5904: 1, \u9ECF: 1, \u56E2: 1, \u7C98: 1, \u5495: 1, \u7559: 1, \u70BC: 1, \u6750: 1, \u6599: 1, \u672C: 1, \u690D: 1, \u7248: 1, \u6682: 1, \u672A: 1, \u653E: 1, \u4EA4: 1, \u6613: 1, \u5899: 1, \u58C1: 1, \u677F: 1, \u9762: 1, \u95E8: 1, \u6253: 1, \u5411: 1, \u5DF2: 1, \u67E5: 1, \u770B: 1, \u8BE6: 1, \u60C5: 1, "\uFF1B": 1, \u518D: 1, \u6B21: 1, \u641C: 1, \u5468: 1, \u56F4: 1, "\uFF08": 1, "\uFF09": 1, \u6CBB: 1, \u7597: 1, \u9010: 1, \u6B65: 1, \u6062: 1, \u590D: 1, \u8150: 1, \u8680: 1, \u6E05: 1, \u9664: 1, \u6E29: 1, \u6696: 1, \u800C: 1, \u8212: 1, \u7F13: 1, \u6D41: 1, \u904D: 1, \u5168: 1, "\xD7": 1, \u540E: 1, \u71C3: 1, \u533A: 1, \u57DF: 1, \u88C2: 1, \u4E3A: 1, \u718A: 1, \u70C8: 1, "\uFF01": 1, \u4ECE: 1, \u654C: 1, \u4EBA: 1, \u5931: 1, \u6C38: 1, \u4E45: 1, \u589E: 1, \u52A0: 1, \u6D8C: 1, \u808C: 1, \u8089: 1, "\u3001": 1, \u72EC: 1, \u7ACB: 1, \u786E: 1, \u8BA4: 1, \u7B26: 1, \u878D: 1, \u63ED: 1, \u793A: 1, \u4F46: 1, \u5176: 1, \u5C40: 1, \u8111: 1, \u6D77: 1, \u6670: 1, \u8D77: 1, \u6765: 1, \u7CAE: 1, \u9965: 1, \u997F: 1, \u5403: 1, \u611F: 1, \u6E10: 1, \u9000: 1, \u65E0: 1, \u9650: 1, \u7BAD: 1, \u77E2: 1, \u66FF: 1, \u6362: 1, \u5F3A: 1, \u8D39: 1, \u6BCF: 1, \u7EF4: 1, \u9634: 1, \u505C: 1, \u6B62: 1, \u5148: 1, \u53D8: 1, \u51B7: 1, \u5374: 1, \u4E4B: 1, \u95F4: 1, \u8F6C: 1, \u62C6: 1, \u539F: 1, \u5417: 1, "\uFF1F": 1, \u9F20: 1, \u8C7A: 1, \u72FC: 1, \u4FA6: 1, \u5BDF: 1, \u5175: 1, \u8783: 1, \u87F9: 1, \u6781: 1, \u70E7: 1, \u663E: 1, \u754C: 1, \u8F93: 1, \u6570: 1, \u636E: 1, \u97F3: 1, \u9891: 1, \u8BED: 1, \u8A00: 1, \u6BD4: 1, \u4F8B: 1, \u6A2A: 1, \u5C4F: 1, \u7AD6: 1, \u64CD: 1, \u63D0: 1, \u5C11: 1, \u6001: 1, \u6548: 1, \u679C: 1, \u6307: 1, \u9488: 1, \u654F: 1, \u500D: 1, \u65B9: 1, \u952E: 1, \u53E5: 1, \u53F7: 1, \u7EDD: 1, \u5750: 1, \u8C03: 1, \u8282: 1, \u6700: 1, \u5206: 1, \u80DC: 1, \u5229: 1, \u5192: 1, \u9669: 1, \u673A: 1, \u79CD: 1, \u4FDD: 1, \u5B58: 1, \u4E50: 1, \u5E76: 1, \u6863: 1, \u4ECD: 1, \u8BDD: 1, \u6B63: 1, \u5E38: 1, \u73A9: 1, \u73B0: 1, \u517C: 1, \u5BB9: 1, \u8986: 1, \u76D6: 1, \u8BE5: 1, \u8D25: 1, \u91CD: 1, \u8BD5: 1, \u54CD: 1, \u91CC: 1, \u7A0B: 1, \u7891: 1, \u5B8C: 1, \u76D1: 1, \u72F1: 1, \u53CA: 1, \u7EED: 1, \u5C1A: 1, \u6B7B: 1, "\u2026": 1, \u9886: 1, \u88AB: 1, \u7ED3: 1, \u675F: 1, \u6DF1: 1, \u5357: 1, \u6536: 1, \u96C6: 1, \u54C1: 1, \u672F: 1, \u5236: 1, \u906D: 1, \u9047: 1, \u57FA: 1, \u521B: 1, \u8FD0: 1, \u7531: 1, \u6B22: 1, \u8FCE: 1, \u627E: 1, \u6361: 1, \u679A: 1, \u6389: 1, \u843D: 1, \u62FE: 1, \u6BB5: 1, \u6247: 1, \u85CF: 1, \u5FEB: 1, \u4E9B: 1, \u5427: 1, \u8EB2: 1, \u7EE7: 1, \u81A8: 1, \u80C0: 1, \u79BB: 1, \u5B83: 1, \u8303: 1, \u84C4: 1, \u64A4: 1, \u7206: 1, \u7AD9: 1, \u6321: 1, \u4F4F: 1, \u53BB: 1, \u8DEF: 1, \u5DE2: 1, \u7A74: 1, \u68C0: 1, \u6240: 1, \u5B9E: 1, \u53CD: 1, \u7EC4: 1, \u8BE2: 1, \u62D2: 1, \u503C: 1, \u7CBE: 1, \u5B57: 1, \u76F8: 1, \u5207: 1, \u9500: 1, \u6BC1: 1, \u6821: 1, \u7406: 1, \u76D8: 1, \u6478: 1, \u5B89: 1, \u77E5: 1, \u72B6: 1, \u5199: 1, \u5220: 1, \u50A8: 1, \u79C1: 1, \u6574: 1, \u753B: 1, \u89C9: 1, \u9F50: 1, \u63A5: 1, \u7F3A: 1, \u4ED6: 1, \u5E73: 1, \u53F0: 1, \u70ED: 1, \u8F7D: 1, \u7F51: 1, \u7EDC: 1, \u94AE: 1 };
+  var noto_sans_sc_metrics_default = { "0": 0.555, "1": 0.555, "2": 0.555, "3": 0.555, "4": 0.555, "5": 0.555, "6": 0.555, "7": 0.555, "8": 0.555, "9": 0.555, " ": 0.224, "!": 0.323, '"': 0.474, "#": 0.555, $: 0.555, "%": 0.921, "&": 0.68, "'": 0.278, "(": 0.338, ")": 0.338, "*": 0.467, "+": 0.555, ",": 0.278, "-": 0.347, ".": 0.278, "/": 0.392, ":": 0.278, ";": 0.278, "<": 0.555, "=": 0.555, ">": 0.555, "?": 0.474, "@": 0.946, A: 0.608, B: 0.657, C: 0.638, D: 0.688, E: 0.589, F: 0.552, G: 0.689, H: 0.728, I: 0.293, J: 0.535, K: 0.646, L: 0.543, M: 0.812, N: 0.723, O: 0.742, P: 0.633, Q: 0.742, R: 0.635, S: 0.596, T: 0.599, U: 0.721, V: 0.575, W: 0.878, X: 0.573, Y: 0.531, Z: 0.603, "[": 0.338, "\\": 0.392, "]": 0.338, "^": 0.555, _: 0.559, "`": 0.606, a: 0.563, b: 0.618, c: 0.51, d: 0.62, e: 0.554, f: 0.325, g: 0.564, h: 0.607, i: 0.275, j: 0.275, k: 0.552, l: 0.284, m: 0.926, n: 0.61, o: 0.606, p: 0.62, q: 0.62, r: 0.388, s: 0.468, t: 0.377, u: 0.607, v: 0.521, w: 0.802, x: 0.498, y: 0.521, z: 0.475, "{": 0.338, "|": 0.27, "}": 0.338, "~": 0.555, \u7834: 1, \u788E: 1, \u7684: 1, \u50CF: 1, \u7D20: 1, \u5730: 1, \u7262: 1, \u7B80: 1, \u4F53: 1, \u4E2D: 1, \u6587: 1, \u8FDB: 1, \u5165: 1, \u652F: 1, \u6301: 1, \u6E38: 1, \u620F: 1, \u6392: 1, \u884C: 1, \u699C: 1, \u65E5: 1, \u5FD7: 1, \u65B0: 1, \u95FB: 1, \u8BBE: 1, \u7F6E: 1, \u66F4: 1, \u8BB0: 1, \u5F55: 1, \u5173: 1, \u4E8E: 1, \u4E3B: 1, \u83DC: 1, \u5355: 1, \u5F00: 1, \u59CB: 1, \u95ED: 1, \u8FD4: 1, \u56DE: 1, \u4E0B: 1, \u4E00: 1, \u9875: 1, \u662F: 1, \u5426: 1, \u653B: 1, \u51FB: 1, \u6CBB: 1, \u7597: 1, \u7B49: 1, \u5F85: 1, \u65BD: 1, \u6CD5: 1, \u5C04: 1, \u9690: 1, \u8EAB: 1, \u89E3: 1, \u9664: 1, \u62A4: 1, \u76FE: 1, \u88AB: 1, \u52A8: 1, \u53D6: 1, \u6D88: 1, \u70B9: 1, \u76EE: 1, \u6807: 1, \u683C: 1, \u79FB: 1, "\uFF0C": 1, \u9760: 1, \u8FD1: 1, \u654C: 1, \u4EBA: 1, \u540E: 1, "\uFF1B": 1, \u6216: 1, \u9009: 1, "\u3002": 1, \u62E9: 1, \u4F60: 1, \u82F1: 1, \u96C4: 1, \u6218: 1, \u58EB: 1, \u5E08: 1, \u76D7: 1, \u8D3C: 1, \u5973: 1, \u730E: 1, \u624B: 1, \u7532: 1, \u4E0A: 1, \u9644: 1, \u6709: 1, \u635F: 1, \u7EB9: 1, \u7AE0: 1, \u53D7: 1, \u5C06: 1, \u4F7F: 1, \u751F: 1, \u547D: 1, \u964D: 1, \u81F3: 1, \u534A: 1, \u4EE5: 1, \u65F6: 1, \u89E6: 1, \u53D1: 1, \u53E4: 1, \u8001: 1, \u6756: 1, \u5B66: 1, \u8005: 1, \u521D: 1, \u989D: 1, \u5916: 1, \u643A: 1, \u5E26: 1, \u5347: 1, \u7EA7: 1, \u5377: 1, \u8F74: 1, \u548C: 1, \u63A2: 1, \u62E5: 1, \u53EF: 1, \u5145: 1, \u80FD: 1, \u6697: 1, \u5F71: 1, \u6597: 1, \u7BF7: 1, \u6F5C: 1, \u74F6: 1, \u5F62: 1, \u836F: 1, \u6C34: 1, \u7528: 1, \u4F0F: 1, \u8352: 1, \u91CE: 1, \u7D22: 1, \u968F: 1, \u6210: 1, \u957F: 1, \u7075: 1, \u77ED: 1, \u5F13: 1, \u98DF: 1, \u7269: 1, \u6DB2: 1, \u706B: 1, \u5242: 1, \u88C5: 1, \u5907: 1, \u4EF6: 1, \u4E8C: 1, \u9636: 1, \u9AD8: 1, \u6B66: 1, \u5668: 1, \u4E14: 1, \u4E0D: 1, \u5230: 1, \u529B: 1, \u91CF: 1, \u8DB3: 1, \u60E9: 1, \u7F5A: 1, \u5373: 1, \u9501: 1, \u51B3: 1, \u5BB6: 1, \u5F7B: 1, \u5E95: 1, \u51C0: 1, \u5316: 1, \u4EFB: 1, \u610F: 1, \u8BC5: 1, \u5492: 1, \u7267: 1, "\uFF1A": 1, \u7ECF: 1, \u9A8C: 1, \u91D1: 1, \u5E01: 1, \u5C5E: 1, \u6027: 1, \u5929: 1, \u8D4B: 1, \u80CC: 1, \u5305: 1, \u9605: 1, \u8BFB: 1, \u996E: 1, \u6295: 1, \u63B7: 1, \u89C1: 1, \u5B50: 1, \u7784: 1, \u51C6: 1, \u9B54: 1, \u5F39: 1, \u4F1A: 1, \u98DE: 1, \u8FC7: 1, \u7A7A: 1, \u6309: 1, \u8017: 1, \u5C3D: 1, \u8BF7: 1, \u5BF9: 1, \u81EA: 1, \u5DF1: 1, \u9020: 1, \u4E86: 1, \u4F24: 1, \u5BB3: 1, \u6563: 1, \u8F83: 1, \u96BE: 1, \u7130: 1, \u4E5F: 1, \u707C: 1, \u5F53: 1, \u524D: 1, \u89C6: 1, \u5185: 1, \u65E7: 1, \u5251: 1, \u5315: 1, \u9996: 1, \u9576: 1, \u9489: 1, \u5957: 1, \u5E03: 1, \u76AE: 1, "\u2013": 0.536, \u9700: 1, \u6C42: 1, \u6539: 1, \u5584: 1, \u8FD9: 1, \u51CF: 1, \u514D: 1, \u9632: 1, \u4E0E: 1, \u901F: 1, \u95EA: 1, \u907F: 1, \u5EA6: 1, \u5408: 1, \u5378: 1, \u4F5C: 1, \u8981: 1, \u94A5: 1, \u5319: 1, \u542F: 1, \u7B2C: 1, \u5C42: 1, \u9053: 1, \u51FA: 1, \u53E3: 1, \u5728: 1, \u697C: 1, \u68AF: 1, \u5904: 1, \u9ECF: 1, \u56E2: 1, \u7C98: 1, \u5495: 1, \u7559: 1, \u70BC: 1, \u6750: 1, \u6599: 1, \u672C: 1, \u690D: 1, \u7248: 1, \u6682: 1, \u672A: 1, \u653E: 1, \u4EA4: 1, \u6613: 1, \u5899: 1, \u58C1: 1, \u677F: 1, \u9762: 1, \u95E8: 1, \u6253: 1, \u5411: 1, \u5DF2: 1, \u67E5: 1, \u770B: 1, \u8BE6: 1, \u60C5: 1, \u518D: 1, \u6B21: 1, \u641C: 1, \u5468: 1, \u56F4: 1, "\uFF08": 1, "\uFF09": 1, \u9010: 1, \u6B65: 1, \u6062: 1, \u590D: 1, \u8150: 1, \u8680: 1, \u6E05: 1, \u6E29: 1, \u6696: 1, \u800C: 1, \u8212: 1, \u7F13: 1, \u6D41: 1, \u904D: 1, \u5168: 1, "\xD7": 1, \u71C3: 1, \u533A: 1, \u57DF: 1, \u88C2: 1, \u4E3A: 1, \u718A: 1, \u70C8: 1, "\uFF01": 1, \u4ECE: 1, \u5931: 1, \u6C38: 1, \u4E45: 1, \u589E: 1, \u52A0: 1, \u6D8C: 1, \u808C: 1, \u8089: 1, "\u3001": 1, \u72EC: 1, \u7ACB: 1, \u786E: 1, \u8BA4: 1, \u7B26: 1, \u878D: 1, \u63ED: 1, \u793A: 1, \u4F46: 1, \u5176: 1, \u5C40: 1, \u8111: 1, \u6D77: 1, \u6670: 1, \u8D77: 1, \u6765: 1, \u7CAE: 1, \u9965: 1, \u997F: 1, \u5403: 1, \u611F: 1, \u6E10: 1, \u9000: 1, \u65E0: 1, \u9650: 1, \u7BAD: 1, \u77E2: 1, \u66FF: 1, \u6362: 1, \u5F3A: 1, \u8D39: 1, \u6BCF: 1, \u7EF4: 1, \u9634: 1, \u505C: 1, \u6B62: 1, \u5148: 1, \u53D8: 1, \u51B7: 1, \u5374: 1, \u4E4B: 1, \u95F4: 1, \u8F6C: 1, \u62C6: 1, \u539F: 1, \u5417: 1, "\uFF1F": 1, \u9F20: 1, \u8C7A: 1, \u72FC: 1, \u4FA6: 1, \u5BDF: 1, \u5175: 1, \u8783: 1, \u87F9: 1, \u6781: 1, \u70E7: 1, \u663E: 1, \u754C: 1, \u8F93: 1, \u6570: 1, \u636E: 1, \u97F3: 1, \u9891: 1, \u8BED: 1, \u8A00: 1, \u6BD4: 1, \u4F8B: 1, \u6A2A: 1, \u5C4F: 1, \u7AD6: 1, \u64CD: 1, \u63D0: 1, \u5C11: 1, \u6001: 1, \u6548: 1, \u679C: 1, \u6307: 1, \u9488: 1, \u654F: 1, \u500D: 1, \u65B9: 1, \u952E: 1, \u53E5: 1, \u53F7: 1, \u7EDD: 1, \u5750: 1, \u8C03: 1, \u8282: 1, \u6700: 1, \u5206: 1, \u80DC: 1, \u5229: 1, \u5192: 1, \u9669: 1, \u673A: 1, \u79CD: 1, \u4FDD: 1, \u5B58: 1, \u4E50: 1, \u5E76: 1, \u6863: 1, \u4ECD: 1, \u8BDD: 1, \u6B63: 1, \u5E38: 1, \u73A9: 1, \u73B0: 1, \u517C: 1, \u5BB9: 1, \u8986: 1, \u76D6: 1, \u8BE5: 1, \u8D25: 1, \u91CD: 1, \u8BD5: 1, \u54CD: 1, \u91CC: 1, \u7A0B: 1, \u7891: 1, \u5B8C: 1, \u76D1: 1, \u72F1: 1, \u53CA: 1, \u7EED: 1, \u5C1A: 1, \u6B7B: 1, "\u2026": 1, \u9886: 1, \u7ED3: 1, \u675F: 1, \u6DF1: 1, \u5357: 1, \u6536: 1, \u96C6: 1, \u54C1: 1, \u672F: 1, \u5236: 1, \u906D: 1, \u9047: 1, \u57FA: 1, \u521B: 1, \u8FD0: 1, \u7531: 1, \u6B22: 1, \u8FCE: 1, \u627E: 1, \u6361: 1, \u679A: 1, \u6389: 1, \u843D: 1, \u62FE: 1, \u6BB5: 1, \u6247: 1, \u85CF: 1, \u5FEB: 1, \u4E9B: 1, \u5427: 1, \u8EB2: 1, \u7EE7: 1, \u81A8: 1, \u80C0: 1, \u79BB: 1, \u5B83: 1, \u8303: 1, \u84C4: 1, \u64A4: 1, \u7206: 1, \u7AD9: 1, \u6321: 1, \u4F4F: 1, \u53BB: 1, \u8DEF: 1, \u5DE2: 1, \u7A74: 1, \u68C0: 1, \u6240: 1, \u5B9E: 1, \u53CD: 1, \u7EC4: 1, \u8BE2: 1, \u62D2: 1, \u503C: 1, \u7CBE: 1, \u5B57: 1, \u76F8: 1, \u5207: 1, \u9500: 1, \u6BC1: 1, \u6821: 1, \u7406: 1, \u76D8: 1, \u6478: 1, \u5B89: 1, \u77E5: 1, \u72B6: 1, \u5199: 1, \u5220: 1, \u50A8: 1, \u79C1: 1, \u6574: 1, \u753B: 1, \u89C9: 1, \u9F50: 1, \u63A5: 1, \u7F3A: 1, \u4ED6: 1, \u5E73: 1, \u53F0: 1, \u70ED: 1, \u8F7D: 1, \u7F51: 1, \u7EDC: 1, \u94AE: 1 };
 
   // modules/ember-arena/game/src/text-layout.ts
   var hasCjk = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/u;
@@ -1427,11 +1426,9 @@
   function mobileLayout(m) {
     const s = m.scale, gap = 8 / s, margin = 12 / s;
     const bottom = m.height - 26 - gap;
-    const radius = Math.max(12 / s, Math.min(56 / s, (m.height - 26) * 0.28, (m.width - 144 / s) / 2));
     const attack = { x: m.width - margin - 56 / s, y: bottom - 56 / s, width: 56 / s, height: 56 / s };
     const skill = { x: attack.x - gap - 48 / s, y: bottom - 48 / s, width: 48 / s, height: 48 / s };
     return {
-      joystick: { x: margin + radius, y: bottom - radius, radius },
       buttons: {
         mobile_attack: attack,
         mobile_skill: skill,
@@ -1441,74 +1438,34 @@
       actionLeft: skill.x
     };
   }
-  function joystickThumbStyle(m, stick) {
-    const radius = mobileLayout(m).joystick.radius, thumb = 36 / m.scale;
-    return {
-      position: "absolute",
-      left: (radius + stick.x * radius * 0.55 - thumb / 2) * m.scale,
-      top: (radius + stick.y * radius * 0.55 - thumb / 2) * m.scale,
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      background: stick.active ? [0.91, 0.67, 0.26, 0.95] : [0.75, 0.75, 0.66, 0.75]
-    };
-  }
   var MobileControls = class {
     captures = /* @__PURE__ */ new Map();
     blocked = /* @__PURE__ */ new Set();
-    stick = { x: 0, y: 0, active: false };
     reset(contacts = []) {
       this.captures.clear();
       this.blocked = new Set(contacts.map((contact) => contact.id));
-      this.stick.x = 0;
-      this.stick.y = 0;
-      this.stick.active = false;
     }
     sample(contacts, m, size, active) {
-      const frame = { consumed: false, engaged: false, direction: { x: 0, y: 0 }, actions: [], worldTap: null };
+      const frame = { consumed: false, actions: [], worldTap: null };
       const live = new Set(contacts.map((contact) => contact.id));
       for (const id of this.captures.keys()) if (!live.has(id)) this.captures.delete(id);
       for (const id of this.blocked) if (!live.has(id)) this.blocked.delete(id);
       if (!active) {
         for (const id of this.captures.keys()) this.blocked.add(id);
         this.captures.clear();
-        this.stick.x = 0;
-        this.stick.y = 0;
-        this.stick.active = false;
         frame.consumed = this.blocked.size > 0;
         return frame;
       }
       const layout = mobileLayout(m);
-      this.stick.x = 0;
-      this.stick.y = 0;
-      this.stick.active = false;
       for (const contact of contacts) {
-        if (this.blocked.has(contact.id)) continue;
+        if (!contact.justPressed || this.blocked.has(contact.id) || this.captures.has(contact.id)) continue;
         const point = { x: (contact.x * size.x - m.left) / m.scale, y: (contact.y * size.y - m.top) / m.scale };
         if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
-        let capture = this.captures.get(contact.id);
-        if (!capture && contact.justPressed) {
-          if (Math.hypot(point.x - layout.joystick.x, point.y - layout.joystick.y) <= layout.joystick.radius) {
-            capture = [...this.captures.values()].includes("joystick") ? "ignore" : "joystick";
-          } else {
-            capture = Object.entries(layout.buttons).find(([, rect]) => point.x >= rect.x && point.y >= rect.y && point.x <= rect.x + rect.width && point.y <= rect.y + rect.height)?.[0];
-          }
-          if (capture) this.captures.set(contact.id, capture);
-          else frame.worldTap ??= contact;
-        }
-        if (capture === "joystick") {
-          frame.engaged = true;
-          this.stick.active = true;
-          const dx = (point.x - layout.joystick.x) / layout.joystick.radius;
-          const dy = (point.y - layout.joystick.y) / layout.joystick.radius;
-          const distance = Math.hypot(dx, dy), divisor = Math.max(1, distance);
-          this.stick.x = dx / divisor;
-          this.stick.y = dy / divisor;
-          if (distance >= 0.24) {
-            const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * Math.PI / 4;
-            frame.direction = { x: Math.round(Math.cos(angle)), y: Math.round(Math.sin(angle)) };
-          }
-        } else if (capture && capture !== "ignore" && contact.justPressed) frame.actions.push(capture);
+        const capture = Object.entries(layout.buttons).find(([, rect]) => point.x >= rect.x && point.y >= rect.y && point.x <= rect.x + rect.width && point.y <= rect.y + rect.height)?.[0];
+        if (capture) {
+          this.captures.set(contact.id, capture);
+          frame.actions.push(capture);
+        } else frame.worldTap ??= contact;
       }
       frame.consumed = this.captures.size > 0 || this.blocked.size > 0;
       return frame;
@@ -1805,7 +1762,7 @@
         });
       }
       const mobile = state.mobile && state.phase === "playing" ? mobileLayout(m) : null;
-      const logX = mobile ? mobile.joystick.x + mobile.joystick.radius + 8 / s : 2;
+      const logX = 2;
       const logWidth = mobile ? Math.max(30, mobile.actionLeft - logX - 8 / s) : Math.max(90, w - 90);
       const logLines = state.logs.slice(0, 3).reverse().map((entry) => wrappedText(entry, logWidth, 6));
       const logHeights = logLines.map((lines) => Math.max(10, Math.ceil(lines.length * 7.2) + 2));
@@ -1820,17 +1777,7 @@
         label("boss_label", t("monster.boss"), 0, -2, 100, 6, titleColor)
       ]));
       if (state.mobile && state.phase === "playing") {
-        const controls = state.mobile, layout = mobileLayout(m), stick = layout.joystick;
-        elements.push(node("mobile_joystick", {
-          ...rect(stick.x - stick.radius, stick.y - stick.radius, stick.radius * 2, stick.radius * 2),
-          borderRadius: stick.radius * s,
-          background: [0.04, 0.045, 0.03, 0.65]
-        }, [
-          node("mobile_joystick_axis_x", { ...rect(8 / s, stick.radius - 1 / s, stick.radius * 2 - 16 / s, 2 / s), background: [0.8, 0.8, 0.7, 0.25] }),
-          node("mobile_joystick_axis_y", { ...rect(stick.radius - 1 / s, 8 / s, 2 / s, stick.radius * 2 - 16 / s), background: [0.8, 0.8, 0.7, 0.25] }),
-          node("mobile_joystick_thumb", joystickThumbStyle(m, controls.stick))
-        ]));
-        elements.push(label("mobile_move_label", t("mobile.move"), stick.x - stick.radius, stick.y + stick.radius - 12 / s, stick.radius * 2, 10 / s, grey));
+        const controls = state.mobile, layout = mobileLayout(m);
         const buttons = [
           ["mobile_attack", t("mobile.attack"), "", controls.attack, false],
           ["mobile_skill", controls.skill.label, controls.skill.detail, controls.skill.enabled, controls.skill.active],
@@ -2074,7 +2021,6 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
   var queuedPath = [];
   var mobileEnabled = typeof app_platform === "function" && ["android", "ios"].includes(app_platform());
   var mobileControls = new MobileControls();
-  var joystickVisual = "";
   var renderedTiles = /* @__PURE__ */ new Map();
   var renderedFog = /* @__PURE__ */ new Set();
   var nextId = 0;
@@ -2163,7 +2109,7 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
       };
     }
     if (targeting) skill = { ...skill, label: t("mobile.cancel"), enabled: true, active: true };
-    return { stick: mobileControls.stick, attack: adjacentEnemy() !== void 0, healing: inventory.potion_healing, skill };
+    return { attack: adjacentEnemy() !== void 0, healing: inventory.potion_healing, skill };
   }
   function mobileAction(action) {
     if (phase !== "playing") return;
@@ -2243,7 +2189,6 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
     if (metrics.width <= 0 || metrics.height <= 0) return;
     viewport = `${pointer.viewportWidth}:${pointer.viewportHeight}:${safe.leftInset}:${safe.rightInset}:${safe.topInset}:${safe.bottomInset}:${metrics.width}:${metrics.height}`;
     const localized = (value) => renderMessage(profile.language, value);
-    joystickVisual = "";
     mountUi(renderSpdUi({
       phase: previewPhase ?? phase,
       selectedClass,
@@ -3362,7 +3307,7 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
     overlayReturn = "playing";
     setPhase("message");
   }
-  function playerInput(dt, pointer, mobile) {
+  function playerInput(dt, pointer) {
     actionCooldown = Math.max(0, actionCooldown - dt);
     if (input_key_just_pressed("KeyF")) {
       toggleExamine();
@@ -3403,14 +3348,6 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
       queuedPath = [];
       if (actionCooldown <= 0) {
         movePlayer(dx, dz);
-        actionCooldown = stepSeconds;
-      }
-      return;
-    }
-    if (mobile?.engaged && !targeting && !examining) {
-      queuedPath = [];
-      if ((mobile.direction.x || mobile.direction.y) && actionCooldown <= 0) {
-        movePlayer(mobile.direction.x, mobile.direction.y);
         actionCooldown = stepSeconds;
       }
       return;
@@ -3594,11 +3531,6 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
     const previousTurns = turns;
     const mobile = mobileEnabled ? mobileControls.sample(mobileContacts(pointer), uiMetrics(), { x: metrics.width, y: metrics.height }, phase === "playing") : void 0;
     if (mobile && phase === "playing") {
-      const visual = `${mobileControls.stick.x.toFixed(3)}:${mobileControls.stick.y.toFixed(3)}:${mobileControls.stick.active}`;
-      if (visual !== joystickVisual) {
-        joystickVisual = visual;
-        setUiStyle("mobile_joystick_thumb", joystickThumbStyle(uiMetrics(), mobileControls.stick));
-      }
       const action = mobile.actions[0];
       if (action) {
         mobileAction(action);
@@ -3671,6 +3603,6 @@ ${t("seal.armorStats", { amount: sealMaximum(spec.tier), level: sealValue("lifet
       x: contact ? (contact.x - 0.5) * pointer.viewportWidth : 0,
       y: contact ? (0.5 - contact.y) * pointer.viewportHeight : 0
     } : pointer;
-    playerInput(dt, gamePointer, mobile);
+    playerInput(dt, gamePointer);
   };
 })();

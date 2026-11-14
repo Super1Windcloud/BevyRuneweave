@@ -47,6 +47,9 @@ export class PcSession {
     this.screen = this.screen === "options" || this.screen === "help" || this.screen === "notice" ? this.returnScreen : previous[this.screen] ?? "main";
   }
   open(screen: "options" | "help"): void { this.returnScreen = this.screen; this.openMenu(screen === "options" ? "options_audio" : "help1", screen); }
-  openMenu(page: string, screen: Screen = "menu"): void { this.menuHistory.push({ screen: this.screen, page: this.menu.page }); this.screen = screen; this.menu.show(page); }
+  openMenu(page: string, screen: Screen = "menu"): void {
+    if (this.screen === "main") this.menuHistory = [];
+    this.menuHistory.push({ screen: this.screen, page: this.menu.page }); this.menu.close(); this.screen = screen; this.menu.show(page);
+  }
   notice(title: string, text: string): void { this.returnScreen = this.screen; this.noticeTitle = title; this.noticeText = text; this.screen = "notice"; }
 }
