@@ -4,6 +4,15 @@ interface BmsReflectReference {
   call(name: string, ...args: unknown[]): unknown;
 }
 
+/** Queue validated Ogg audio; true means accepted, not yet audible. IDs are script-scoped. */
+declare function audio_play(id: string, path: string, looping: boolean, volume: number): boolean;
+/** Linear volume 0..1, playback speed 0.25..4; focus suspension takes precedence. */
+declare function audio_update(id: string, volume: number, speed: number, paused: boolean): boolean;
+declare function audio_stop(id: string): boolean;
+/** unavailable means decoded audio could not acquire a device sink within five seconds. */
+declare function audio_state(id: string): "missing" | "queued" | "playing" | "paused" | "error" | "unavailable";
+declare function audio_clear(): void;
+
 declare function scene_spawn(id: string, x: number, y: number, z: number): boolean;
 declare function scene_set_sprite(id: string, path: string, width: number, height: number): boolean;
 /** Sprite-local drawing offset from its center; leaves the actor Transform unchanged. */

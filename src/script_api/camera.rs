@@ -41,12 +41,16 @@ pub(super) fn scene_set_camera_3d(
         let Some((mut transform, mut projection)) = query.iter_mut(world).next() else {
             return false;
         };
-        *transform = Transform::from_translation(position).looking_at(target, up);
+        transform.set_if_neq(Transform::from_translation(position).looking_at(target, up));
+        let fov = fov_degrees.to_radians();
+        if matches!(&*projection, Projection::Perspective(perspective) if perspective.fov == fov) {
+            return true;
+        }
         match &mut *projection {
-            Projection::Perspective(perspective) => perspective.fov = fov_degrees.to_radians(),
+            Projection::Perspective(perspective) => perspective.fov = fov,
             _ => {
                 *projection = Projection::Perspective(PerspectiveProjection {
-                    fov: fov_degrees.to_radians(),
+                    fov,
                     near: 0.1,
                     far: 2000.0,
                     ..default()
@@ -142,6 +146,59 @@ mod tests {
                     panic!("perspective camera");
                 };
                 assert!((projection.fov - 70.0_f32.to_radians()).abs() < 1e-6);
+            })?;
+            guard.with_world_mut(|world| world.clear_trackers())?;
+            assert!(scene_set_camera_3d(
+                context.clone(),
+                0.0,
+                8.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                70.0
+            )?);
+            guard.with_world_mut(|world| {
+                assert_eq!(
+                    world
+                        .query_filtered::<Entity, Changed<Projection>>()
+                        .iter(world)
+                        .count(),
+                    0
+                );
+                assert_eq!(
+                    world
+                        .query_filtered::<Entity, Changed<Transform>>()
+                        .iter(world)
+                        .count(),
+                    0
+                );
+            })?;
+            assert!(scene_set_camera_3d(
+                context.clone(),
+                1.0,
+                8.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                70.0
+            )?);
+            guard.with_world_mut(|world| {
+                assert_eq!(
+                    world
+                        .query_filtered::<Entity, Changed<Projection>>()
+                        .iter(world)
+                        .count(),
+                    0
+                );
+                assert_eq!(
+                    world
+                        .query_filtered::<Entity, Changed<Transform>>()
+                        .iter(world)
+                        .count(),
+                    1
+                );
             })?;
             guard.with_world_mut(|world| {
                 world.despawn(camera);

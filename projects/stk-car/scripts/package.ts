@@ -11,6 +11,7 @@ const manifest = JSON.parse(readFileSync(join(assets, "asset-manifest.json"), "u
 if (!Array.isArray(manifest.files) || manifest.files.some((path) => typeof path !== "string" || path.startsWith("/") || /^[A-Za-z]:/.test(path) || path.includes("\\") || path.split("/").some((part) => !part || part === "." || part === ".."))) throw new Error("Invalid asset manifest");
 const allowed = new Set([...manifest.files, "engineConfig.json", "stk-car.js", "asset-manifest.json"]);
 const required = [trackData.trackModel, trackData.kartModel, ...trackData.wheels.map((wheel) => wheel.path),
+  ...Object.values(trackData.audio), "audio/sfx/engine_small.ogg", "audio/sfx/start_race.ogg", "licenses/music.txt", "licenses/sfx.txt",
   ...Object.values(trackData.pickupModels),
   trackData.skyModel, trackData.menuSkyModel, ...trackData.karts.flatMap((kart) => [kart.model, kart.icon, ...kart.wheels.map((wheel) => wheel.path)]),
   "ui/background.jpg", "ui/logo.png", "ui/minimap.png",

@@ -1,6 +1,7 @@
 //! Script-facing Runeweave APIs registered through BMS.
 
 mod actor;
+mod audio;
 mod camera;
 mod environment;
 mod input;
@@ -12,7 +13,11 @@ mod ui;
 
 use std::path::{Component as PathComponent, Path};
 
-use bevy::{ecs::component::Mutable, prelude::*, sprite::Anchor};
+use bevy::{
+    ecs::{component::Mutable, query::QueryState},
+    prelude::*,
+    sprite::Anchor,
+};
 use bevy_mod_scripting::{
     bindings::{
         FunctionCallContext, InteropError, ReflectReference, ScriptValue, WorldExtensions,
@@ -24,7 +29,12 @@ use bevy_mod_scripting::{
 };
 
 use actor::{ScriptActor, scene_actor, scene_actor_ids, scene_actor_set};
+use audio::{audio_clear, audio_play, audio_state, audio_stop, audio_update};
 use camera::scene_set_camera_3d;
+
+pub(crate) fn install_audio(app: &mut App) {
+    audio::install(app);
+}
 use environment::scene_set_environment;
 use input::{
     input_key_just_pressed, input_key_just_released, input_key_pressed, input_primary_pointer,
@@ -60,6 +70,10 @@ pub struct ScriptGameState {
 
 #[derive(Component, Clone)]
 struct ScriptOwnedBy(ScriptAttachment);
+
+// Cache only Bevy query metadata. Components and ownership stay in the real World.
+#[derive(Resource)]
+struct SceneEntityQuery(QueryState<(Entity, &'static ScriptOwnedBy, &'static ScriptEntityId)>);
 
 #[derive(Component, Clone)]
 struct PendingScriptAnimation {
@@ -107,13 +121,19 @@ fn current_script(
 }
 
 fn find_owned_entity(world: &mut World, owner: &ScriptAttachment, id: &str) -> Option<Entity> {
-    let mut query = world.query::<(Entity, &ScriptOwnedBy, &ScriptEntityId)>();
-    query
-        .iter(world)
-        .find(|(_, candidate_owner, candidate_id)| {
-            candidate_owner.0 == *owner && candidate_id.0 == id
-        })
-        .map(|(entity, _, _)| entity)
+    if !world.contains_resource::<SceneEntityQuery>() {
+        let query = world.query::<(Entity, &ScriptOwnedBy, &ScriptEntityId)>();
+        world.insert_resource(SceneEntityQuery(query));
+    }
+    world.resource_scope(|world, mut query: Mut<SceneEntityQuery>| {
+        query
+            .0
+            .iter(world)
+            .find(|(_, candidate_owner, candidate_id)| {
+                candidate_owner.0 == *owner && candidate_id.0 == id
+            })
+            .map(|(entity, _, _)| entity)
+    })
 }
 
 /// Writes `value` only when it differs, so per-frame script syncs do not trigger
@@ -631,7 +651,7 @@ fn safe_area_value(viewport_width: f32, viewport_height: f32, insets: [f32; 4]) 
 }
 
 fn clear_owned_entities(world: &mut World, owner: &ScriptAttachment) {
-    let mut query = world.query::<(Entity, &ScriptOwnedBy)>();
+    let mut query = world.query_filtered::<(Entity, &ScriptOwnedBy), Without<audio::ScriptAudio>>();
     let entities = query
         .iter(world)
         .filter(|(_, candidate)| candidate.0 == *owner)
@@ -690,6 +710,7 @@ pub(crate) struct RuneweaveScriptApiPlugin;
 impl Plugin for RuneweaveScriptApiPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<ScriptEntityId>()
+            .register_type::<audio::ScriptAudio>()
             .register_type::<ScriptActor>()
             .register_type::<ScriptUiNode>()
             .register_type::<Transform>()
@@ -719,6 +740,11 @@ impl Plugin for RuneweaveScriptApiPlugin {
         let network = app.world().resource::<ScriptNetwork>().clone();
         NamespaceBuilder::<GlobalNamespace>::new_unregistered(app.world_mut())
             .register("scene_spawn", scene_spawn)
+            .register("audio_play", audio_play)
+            .register("audio_update", audio_update)
+            .register("audio_stop", audio_stop)
+            .register("audio_state", audio_state)
+            .register("audio_clear", audio_clear)
             .register("storage_read", storage_read)
             .register("storage_write", storage_write)
             .register("storage_remove", storage_remove)
@@ -797,6 +823,37 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn cached_entity_query_tracks_archetypes_despawns_and_script_ownership() {
+        let mut world = World::new();
+        let owner = ScriptAttachment::StaticScript(Handle::<ScriptAsset>::default());
+        let other = ScriptAttachment::EntityScript(world.spawn_empty().id(), Handle::default());
+        assert_eq!(find_owned_entity(&mut world, &owner, "car"), None);
+        let foreign = world
+            .spawn((ScriptOwnedBy(other.clone()), ScriptEntityId("car".into())))
+            .id();
+        let car = world
+            .spawn((
+                ScriptOwnedBy(owner.clone()),
+                ScriptEntityId("car".into()),
+                Transform::default(),
+            ))
+            .id();
+        assert_eq!(find_owned_entity(&mut world, &owner, "car"), Some(car));
+        assert_eq!(find_owned_entity(&mut world, &other, "car"), Some(foreign));
+        world.entity_mut(car).insert(Visibility::Visible);
+        assert_eq!(find_owned_entity(&mut world, &owner, "car"), Some(car));
+        world.despawn(car);
+        assert_eq!(find_owned_entity(&mut world, &owner, "car"), None);
+        let respawned = world
+            .spawn((ScriptOwnedBy(owner.clone()), ScriptEntityId("car".into())))
+            .id();
+        assert_eq!(
+            find_owned_entity(&mut world, &owner, "car"),
+            Some(respawned)
+        );
+    }
 
     #[test]
     fn scene_api_mutates_real_bevy_components() -> Result<(), InteropError> {

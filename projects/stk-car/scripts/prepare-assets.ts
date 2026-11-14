@@ -41,6 +41,7 @@ function write(path: string, data: string | Buffer) {
   if (assetPath && !assetPath.startsWith("..") && !isAbsolute(assetPath)) generatedFiles.add(assetPath.replaceAll("\\", "/"));
 }
 function copy(path: string, target: string) { write(join(assets, target), record(path)); }
+function copyAudioMetadata(path: string, target: string) { write(join(assets, target), `${record(path).toString("utf8").replace(/[\t ]+$/gm, "").trimEnd()}\n`); }
 function xml(path: string): string { return record(path).toString("utf8"); }
 function attributes(value: string): Record<string, string> {
   return Object.fromEntries([...value.matchAll(/([\w-]+)\s*=\s*"([^"]*)"/g)].map((match) => [match[1], match[2]]));
@@ -120,9 +121,21 @@ const pickups = ["small-nitro", "big-nitro", "banana", "item"].flatMap((tag) => 
   kind: tag, position: vector(`${item.x} ${item.y} ${item.z}`),
 })));
 const trackInfo = tags(xml(join(track, "track.xml")), "track")[0];
+function music(name: string): string {
+  const info = tags(xml(join(source, "music", name)), "music")[0];
+  const target = `audio/music/${info.file}`;
+  copy(join(source, "music", info.file), target);
+  copyAudioMetadata(join(source, "music", name), `licenses/${name}`);
+  return target;
+}
+const audio = { menu: music("main_theme.music"), race: music(trackInfo.music), result: music("race_win_theme.music"), lose: music("lose_theme.music") };
+for (const name of ["plopp", "appear", "locked", "pre_start_race", "start_race", "engine_small", "nitro", "skid", "grab_collectable", "energy_bar_full", "race_finish", "crash", "wee"]) copy(join(source, "sfx", `${name}.ogg`), `audio/sfx/${name}.ogg`);
+copyAudioMetadata(join(source, "music/licenses.txt"), "licenses/music.txt");
+copyAudioMetadata(join(source, "sfx/sfx.xml"), "licenses/sfx.xml");
+copyAudioMetadata(join(source, "sfx/licenses.txt"), "licenses/sfx.txt");
 const map = minimap(route);
 write(join(assets, "ui/minimap.png"), map.image);
-const manifest = { trackModel, kartModel, wheels, scenery, route, pickups, pickupModels, karts,
+const manifest = { trackModel, kartModel, wheels, scenery, route, pickups, pickupModels, karts, audio,
   menuSkyModel: "models/menu-background.glb",
   skyModel: fullScene.skyModel, sceneMetadata: fullScene.metadata, environment: fullScene.environment,
   minimap: map.bounds, defaultLaps: Number(trackInfo["default-number-of-laps"]), startGrid: tags(scene, "default-start")[0] };
@@ -132,11 +145,14 @@ copy(join(track, "screenshot.jpg"), "branding/lighthouse.jpg");
 copy(join(code, "data/ttf/wqy-microhei.ttf"), "fonts/wqy-microhei.ttf");
 copy(join(code, "data/ttf/Cantarell-Regular.otf"), "fonts/Cantarell-Regular.otf");
 copy(join(code, "data/ttf/SigmarOne.otf"), "fonts/SigmarOne.otf");
-for (const name of ["logo", "menu_race", "main_options", "main_help", "main_quit", "back", "green_check", "restart", "mode_normal", "mode_tt", "difficulty_easy", "difficulty_medium", "difficulty_hard", "difficulty_best", "speedback", "nitro", "lap_flag", "power", "zipper_collect", "banana"]) {
+for (const name of ["logo", "menu_story", "menu_story_focus", "menu_race", "menu_race_focus", "menu_multi", "menu_multi_focus", "menu_online", "menu_online_focus", "menu_addons", "menu_addons_focus", "main_options", "main_help", "tutorial", "crown", "gp_copy", "gpeditor", "main_about", "main_quit", "back", "green_check", "restart", "mode_normal", "mode_tt", "difficulty_easy", "difficulty_medium", "difficulty_hard", "difficulty_best", "speedback", "nitro", "lap_flag", "power", "zipper_collect", "banana"]) {
   copy(join(code, `data/gui/icons/${name}.png`), `ui/${name}.png`);
 }
-copy(join(code, "data/skins/cartoon/background.jpg"), "ui/background.jpg");
-const menuBackground = join(code, "data/skins/cartoon/background.jpg");
+copy(join(code, "data/skins/common/background.jpg"), "ui/background.jpg");
+copy(join(code, "data/skins/common/bottom_bar.png"), "ui/bottom_bar.png");
+copy(join(code, "data/skins/classic/glassbutton.png"), "ui/profile.png");
+copy(join(code, "data/skins/common/License.txt"), "licenses/common-skin.txt");
+const menuBackground = join(code, "data/skins/common/background.jpg");
 write(join(assets, "models/menu-background.glb"), writeGlb(skyMesh(new Array(6).fill(menuBackground)), (name) => name, new Map([[menuBackground, "unlit"]])));
 copy(join(code, "data/gui/icons/licenses.txt"), "licenses/gui-icons.txt");
 copy(join(code, "data/skins/cartoon/licenses.txt"), "licenses/skin.txt");
@@ -156,7 +172,7 @@ for (const [path, target] of [
 ] as const) copy(path, target);
 write(join(assets, "licenses/source-manifest.json"), `${JSON.stringify({
   source: "https://github.com/supertuxkart/stk-assets-mobile/releases/tag/git",
-  conversion: "SPM v1 to GLB; Z reflection; composed scene/library/LOD transforms baked including nonuniform scale; original skybox; straight kart poses; base color only; secondary textures and skeletons omitted.",
+  conversion: "SPM v1 to GLB; Z reflection; composed scene/library/LOD transforms baked including nonuniform scale; static opaque/masked material batching in 64m cells, transparent instances kept separate; original skybox; straight kart poses; base color only; secondary textures and skeletons omitted.",
   files: Object.fromEntries([...sourceFiles].sort(([a], [b]) => a.localeCompare(b))),
 }, null, 2)}\n`);
 console.log(`Prepared Lighthouse (${fullScene.metadata.modelInstances} model instances, ${fullScene.metadata.libraryInstances} library instances, ${route.length} route nodes), ${karts.length} karts and ${pickups.length} pickups.`);

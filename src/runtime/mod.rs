@@ -68,6 +68,45 @@ struct RuntimeConfig {
     )]
     icon: Option<String>,
     window: Option<serde_json::Value>,
+    render: Option<serde_json::Value>,
+}
+
+#[derive(Resource, Clone, Deserialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+struct RuntimeRenderSettings {
+    msaa_samples: u32,
+    fxaa: bool,
+}
+impl Default for RuntimeRenderSettings {
+    fn default() -> Self {
+        Self {
+            msaa_samples: 4,
+            fxaa: false,
+        }
+    }
+}
+impl RuntimeRenderSettings {
+    fn parse(value: Option<serde_json::Value>) -> Result<Self, String> {
+        let settings: Self = value
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error| format!("Invalid render configuration: {error}"))?
+            .unwrap_or_default();
+        if !matches!(settings.msaa_samples, 1 | 2 | 4 | 8)
+            || settings.fxaa && settings.msaa_samples != 1
+        {
+            return Err("render.msaaSamples must be 1, 2, 4 or 8; FXAA requires 1".into());
+        }
+        Ok(settings)
+    }
+    fn msaa(&self) -> Msaa {
+        match self.msaa_samples {
+            1 => Msaa::Off,
+            2 => Msaa::Sample2,
+            8 => Msaa::Sample8,
+            _ => Msaa::Sample4,
+        }
+    }
 }
 
 /// Apply desktop dimensions before winit creates and centers the native window.
@@ -78,11 +117,12 @@ fn initial_window(
 ) -> Result<Window, String> {
     let resolution = WindowResolution::new(WINDOW_WIDTH, WINDOW_HEIGHT);
     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
-    let resolution = if let Some(configuration) = configuration {
+    let (resolution, present_mode) = if let Some(configuration) = configuration {
         #[derive(Deserialize)]
         struct Dimensions {
             width: u32,
             height: u32,
+            vsync: Option<bool>,
         }
         let dimensions: Dimensions = serde_json::from_value(configuration)
             .map_err(|error| format!("Invalid desktop window configuration: {error}"))?;
@@ -91,10 +131,19 @@ fn initial_window(
                 "Desktop window dimensions must be integers between 1 and 16384".to_owned(),
             );
         }
-        WindowResolution::new(dimensions.width, dimensions.height)
+        (
+            WindowResolution::new(dimensions.width, dimensions.height),
+            if dimensions.vsync.unwrap_or(true) {
+                PresentMode::AutoVsync
+            } else {
+                PresentMode::AutoNoVsync
+            },
+        )
     } else {
-        resolution
+        (resolution, PresentMode::AutoVsync)
     };
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    let present_mode = PresentMode::AutoVsync;
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     let _ = configuration;
 
@@ -105,7 +154,7 @@ fn initial_window(
         mode: WindowMode::BorderlessFullscreen(MonitorSelection::Primary),
         #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
         position: WindowPosition::Centered(MonitorSelection::Primary),
-        present_mode: PresentMode::AutoVsync,
+        present_mode,
         resizable: true,
         ..default()
     })
@@ -114,10 +163,16 @@ fn initial_window(
 callback_labels!(OnUpdate => "on_update", OnSuspend => "on_suspend");
 
 #[derive(Resource)]
-struct ScriptLifecycle {
+pub(crate) struct ScriptLifecycle {
     focused: bool,
     active: bool,
     notified: bool,
+}
+
+impl ScriptLifecycle {
+    pub(crate) fn is_active(&self) -> bool {
+        self.focused && self.active
+    }
 }
 
 impl Default for ScriptLifecycle {
@@ -249,9 +304,11 @@ fn log_first_frame_presented(
     );
 }
 
-fn spawn_scene_camera(mut commands: Commands) {
+fn spawn_scene_camera(mut commands: Commands, settings: Option<Res<RuntimeRenderSettings>>) {
+    let settings = settings.as_deref().cloned().unwrap_or_default();
     commands.spawn((
         Camera2d,
+        settings.msaa(),
         IsDefaultUiCamera,
         Camera {
             order: 0,
@@ -264,8 +321,9 @@ fn spawn_scene_camera(mut commands: Commands) {
             ..OrthographicProjection::default_2d()
         }),
     ));
-    commands.spawn((
+    let mut camera_3d = commands.spawn((
         Camera3d::default(),
+        settings.msaa(),
         Camera {
             is_active: false,
             order: 1,
@@ -280,6 +338,9 @@ fn spawn_scene_camera(mut commands: Commands) {
         }),
         Transform::from_xyz(0.0, 18.0, 16.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
+    if settings.fxaa {
+        camera_3d.insert(bevy::anti_alias::fxaa::Fxaa::default());
+    }
     commands.spawn((
         DirectionalLight {
             illuminance: 12_000.0,
@@ -614,6 +675,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| format!("Script Squadron - {backend}"));
     let window = initial_window(title, runtime_config.window)?;
+    let render_settings = RuntimeRenderSettings::parse(runtime_config.render)?;
 
     let mut app = App::new();
     let scripting_plugins = runtime_scripting_plugins();
@@ -644,6 +706,7 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
     .add_plugins(scripting_plugins)
     .add_plugins(RuneweaveScriptApiPlugin)
     .insert_resource(RuntimeStartupTimer(startup_timer))
+    .insert_resource(render_settings)
     .insert_resource(LoadedScriptPath {
         source_path: asset_root.join(&asset_path),
         modified: fs::metadata(asset_root.join(&asset_path))
@@ -698,6 +761,15 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
             Render,
             log_first_frame_presented.after(RenderSystems::Render),
         );
+    crate::script_api::install_audio(&mut app);
+    #[cfg(debug_assertions)]
+    if std::env::var_os("RUNEWEAVE_RENDER_DIAGNOSTICS").is_some() {
+        app.add_plugins((
+            bevy::diagnostic::FrameTimeDiagnosticsPlugin::default(),
+            bevy::render::diagnostic::RenderDiagnosticsPlugin,
+            bevy::diagnostic::LogDiagnosticsPlugin::default(),
+        ));
+    }
     Ok(app)
 }
 
@@ -936,6 +1008,13 @@ mod tests {
             WindowPosition::Centered(MonitorSelection::Primary)
         ));
         assert!(window.resizable, "manual resizing must remain available");
+        assert_eq!(window.present_mode, PresentMode::AutoVsync);
+        let unsynchronized = initial_window(
+            "Game".into(),
+            Some(serde_json::json!({"width":1280,"height":720,"vsync":false})),
+        )
+        .unwrap();
+        assert_eq!(unsynchronized.present_mode, PresentMode::AutoNoVsync);
     }
 
     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
@@ -951,6 +1030,7 @@ mod tests {
             serde_json::json!({ "width": 1280.5, "height": 800 }),
             serde_json::json!({ "width": "1280", "height": 800 }),
             serde_json::json!({ "width": 1280 }),
+            serde_json::json!({ "width": 1280, "height": 720, "vsync": "false" }),
         ] {
             assert!(initial_window("Invalid".to_owned(), Some(configuration)).is_err());
         }
@@ -1132,6 +1212,52 @@ mod tests {
             panic!("3D scene camera must keep a fixed virtual height");
         };
         assert_eq!(viewport_height, 22.0);
+    }
+
+    #[test]
+    fn render_settings_validate_and_apply_without_changing_legacy_cameras() {
+        for configured in [false, true] {
+            let mut world = World::new();
+            if configured {
+                world.insert_resource(
+                    RuntimeRenderSettings::parse(Some(
+                        serde_json::json!({"msaaSamples":1,"fxaa":true}),
+                    ))
+                    .unwrap(),
+                );
+            }
+            world.run_system_cached(spawn_scene_camera).unwrap();
+            let cameras: Vec<_> = world
+                .query::<(
+                    &Msaa,
+                    Option<&Camera3d>,
+                    Option<&bevy::anti_alias::fxaa::Fxaa>,
+                )>()
+                .iter(&world)
+                .collect();
+            assert_eq!(cameras.len(), 2);
+            for (msaa, camera_3d, fxaa) in cameras {
+                assert_eq!(*msaa, if configured { Msaa::Off } else { Msaa::Sample4 });
+                assert_eq!(fxaa.is_some(), configured && camera_3d.is_some());
+            }
+        }
+        for samples in [1, 2, 4, 8] {
+            assert!(
+                RuntimeRenderSettings::parse(Some(serde_json::json!({"msaaSamples":samples})))
+                    .is_ok()
+            );
+        }
+        for value in [
+            serde_json::json!({"msaaSamples":0}),
+            serde_json::json!({"msaaSamples":3}),
+            serde_json::json!({"msaaSamples":1.5}),
+            serde_json::json!({"msaaSamples":"1"}),
+            serde_json::json!({"fxaa":true}),
+            serde_json::json!({"msaaSamples":4,"fxaa":true}),
+            serde_json::json!({"msaaSample":1}),
+        ] {
+            assert!(RuntimeRenderSettings::parse(Some(value)).is_err());
+        }
     }
 
     #[cfg(feature = "unified")]

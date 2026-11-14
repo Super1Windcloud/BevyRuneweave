@@ -199,6 +199,38 @@ through BMS; the Lua and QuickJS runtimes contain no Runeweave-specific service 
 
 TypeScript declarations and ergonomic wrappers live in `projects/ts/modules/shooter/api`.
 
+## Audio
+
+Audio functions use the same BMS registry for Lua and QuickJS/TypeScript. Playback is backed by
+owned Bevy audio entities; IDs are independent of scene/UI IDs. Native runtimes must be rebuilt
+to include the audio plugin and Ogg Vorbis decoder.
+
+| Function | Contract |
+| --- | --- |
+| `audio_play(id, path, looping, volume)` | Queues a relative `.ogg`/`.oga` asset. Linear volume is 0–1. Replaces an owned voice with the same ID; at most 64 voices per script. `true` means accepted, not audible yet. |
+| `audio_update(id, volume, speed, paused)` | Updates a queued or playing voice. Speed is 0.25–4. Returns `false` for an unknown voice or invalid parameters. |
+| `audio_state(id)` | Returns `missing`, `queued`, `playing`, `paused`, `error`, or `unavailable`. Missing/corrupt assets report `error`. A loaded asset without a device sink after five seconds reports `unavailable`; it may recover if playback becomes available. |
+| `audio_stop(id)` | Despawns one owned voice, returning whether it existed. |
+| `audio_clear()` | Despawns all voices belonging to this script. |
+
+Decoding validation runs on the asset I/O thread before playback, so corrupt headers become
+asset errors. Scripts cannot update or stop another attachment's voices. `scene_clear` preserves
+audio across scene transitions; script detach/unload removes it. Window focus loss/application
+suspension pauses existing and queued voices before playback. Foregrounding resumes only voices
+that the script itself has not paused. This contract is portable across Windows, macOS, Linux,
+Android and iOS; device/driver availability is reported separately from queue acceptance.
+
+For desktop games, `window.vsync` in `engineConfig.json` is an optional boolean, defaulting to
+`true`. Setting it to `false` requests Bevy's portable `AutoNoVsync` mode; the compositor may
+still limit presentation. Android/iOS keep their native presentation settings. In debug builds,
+`RUNEWEAVE_RENDER_DIAGNOSTICS=1` enables Bevy frame/render diagnostics. Metal CPU timings are
+available, while unsupported GPU timestamp measurements must not be interpreted as zero GPU cost.
+
+Optional `"render": { "msaaSamples": 1, "fxaa": true }` configures startup camera antialiasing.
+`msaaSamples` accepts 1 (off), 2, 4 or 8 and applies to both runtime cameras. FXAA applies only
+to the 3D camera and requires MSAA off. Invalid values, types, combinations or unknown render
+fields return a startup error. Omitted render settings retain 4× MSAA and no FXAA on every platform.
+
 ## Persistent Storage
 
 The BMS registry exposes `storage_read(key)`, `storage_write(key, value)` and `storage_remove(key)`

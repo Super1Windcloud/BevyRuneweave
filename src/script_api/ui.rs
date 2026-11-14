@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use bevy::prelude::*;
+use bevy::{ecs::query::QueryState, prelude::*};
 use bevy_mod_scripting::{
     bindings::{FunctionCallContext, InteropError, WorldExtensions},
     script::ScriptAttachment,
@@ -81,14 +81,26 @@ struct UiStyleSpec {
     image_tint: Option<[f32; 4]>,
 }
 
+#[derive(Resource)]
+struct UiEntityQuery(
+    QueryState<(Entity, &'static ScriptOwnedBy, &'static ScriptEntityId), With<ScriptUiNode>>,
+);
+
 fn find_ui_entity(world: &mut World, owner: &ScriptAttachment, id: &str) -> Option<Entity> {
-    let mut query = world.query::<(Entity, &ScriptOwnedBy, &ScriptEntityId, &ScriptUiNode)>();
-    query
-        .iter(world)
-        .find(|(_, candidate_owner, candidate_id, _)| {
-            candidate_owner.0 == *owner && candidate_id.0 == id
-        })
-        .map(|(entity, _, _, _)| entity)
+    if !world.contains_resource::<UiEntityQuery>() {
+        let query =
+            world.query_filtered::<(Entity, &ScriptOwnedBy, &ScriptEntityId), With<ScriptUiNode>>();
+        world.insert_resource(UiEntityQuery(query));
+    }
+    world.resource_scope(|world, mut query: Mut<UiEntityQuery>| {
+        query
+            .0
+            .iter(world)
+            .find(|(_, candidate_owner, candidate_id)| {
+                candidate_owner.0 == *owner && candidate_id.0 == id
+            })
+            .map(|(entity, _, _)| entity)
+    })
 }
 
 pub(super) fn ui_spawn(
@@ -500,6 +512,40 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn cached_ui_query_filters_scene_ids_and_tracks_new_archetypes() {
+        let mut world = World::new();
+        let owner = ScriptAttachment::StaticScript(Handle::<ScriptAsset>::default());
+        let other = ScriptAttachment::EntityScript(world.spawn_empty().id(), Handle::default());
+        world.spawn((ScriptOwnedBy(owner.clone()), ScriptEntityId("hud".into())));
+        world.spawn((
+            ScriptOwnedBy(other),
+            ScriptEntityId("hud".into()),
+            ScriptUiNode,
+        ));
+        assert_eq!(find_ui_entity(&mut world, &owner, "hud"), None);
+        let hud = world
+            .spawn((
+                ScriptOwnedBy(owner.clone()),
+                ScriptEntityId("hud".into()),
+                ScriptUiNode,
+            ))
+            .id();
+        assert_eq!(find_ui_entity(&mut world, &owner, "hud"), Some(hud));
+        world.entity_mut(hud).insert(Node::default());
+        assert_eq!(find_ui_entity(&mut world, &owner, "hud"), Some(hud));
+        world.despawn(hud);
+        assert_eq!(find_ui_entity(&mut world, &owner, "hud"), None);
+        let respawned = world
+            .spawn((
+                ScriptOwnedBy(owner.clone()),
+                ScriptEntityId("hud".into()),
+                ScriptUiNode,
+            ))
+            .id();
+        assert_eq!(find_ui_entity(&mut world, &owner, "hud"), Some(respawned));
+    }
 
     #[cfg(all(feature = "lua", any(feature = "js", feature = "typescript")))]
     #[test]

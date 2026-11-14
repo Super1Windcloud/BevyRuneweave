@@ -4,7 +4,8 @@
     "version": "0.1.0",
     "appName": "STK Car",
     "icon": "branding/tux.png",
-    "window": { "width": 1280, "height": 720 },
+    "window": { "width": 1280, "height": 720, "vsync": false },
+    "render": { "msaaSamples": 1, "fxaa": true },
     "mobile": { "orientation": "landscape" },
     "script": {
         "language": "typescript",

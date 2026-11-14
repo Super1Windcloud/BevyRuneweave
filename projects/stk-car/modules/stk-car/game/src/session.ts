@@ -1,9 +1,9 @@
 import { Circuit, Race, clamp } from "./race.js";
 import { trackData } from "./track-data.js";
 
-export type Screen = "main" | "kart" | "setup" | "tracks" | "track-info" | "options" | "help" | "race" | "paused" | "finished";
-export interface Settings { kartId: string; difficulty: number; mode: "normal" | "time-trial"; laps: number; aiCount: number; reverse: boolean; wasd: boolean; }
-export const defaultSettings = (): Settings => ({ kartId: "tux", difficulty: 1, mode: "normal", laps: trackData.defaultLaps, aiCount: 3, reverse: false, wasd: false });
+export type Screen = "main" | "kart" | "setup" | "tracks" | "track-info" | "options" | "help" | "notice" | "race" | "paused" | "finished";
+export interface Settings { kartId: string; difficulty: number; mode: "normal" | "time-trial"; laps: number; aiCount: number; reverse: boolean; wasd: boolean; musicVolume: number; sfxVolume: number; }
+export const defaultSettings = (): Settings => ({ kartId: "tux", difficulty: 1, mode: "normal", laps: trackData.defaultLaps, aiCount: 3, reverse: false, wasd: false, musicVolume: 0.6, sfxVolume: 0.7 });
 export function parseSettings(value: string): Settings {
   const defaults = defaultSettings();
   try {
@@ -15,6 +15,7 @@ export function parseSettings(value: string): Settings {
     if (data.mode === "normal" || data.mode === "time-trial") defaults.mode = data.mode;
     if (typeof data.reverse === "boolean") defaults.reverse = data.reverse;
     if (typeof data.wasd === "boolean") defaults.wasd = data.wasd;
+    for (const key of ["musicVolume", "sfxVolume"] as const) if (typeof data[key] === "number" && Number.isFinite(data[key])) defaults[key] = clamp(data[key], 0, 1);
   } catch { /* Preserve defaults for invalid or old saved values. */ }
   return defaults;
 }
@@ -24,6 +25,8 @@ export class PcSession {
   settings = defaultSettings();
   race = new Race(new Circuit(trackData.route), trackData.pickups, trackData.defaultLaps);
   best = 0;
+  noticeTitle = "";
+  noticeText = "";
   get bestKey(): string { return `pc-lighthouse-${this.settings.mode}-${this.settings.laps}-${this.settings.reverse ? "reverse" : "forward"}-${this.settings.difficulty}`; }
   start(): void {
     const route = this.settings.reverse ? [...trackData.route].reverse() : trackData.route;
@@ -32,7 +35,8 @@ export class PcSession {
   }
   back(): void {
     const previous: Partial<Record<Screen, Screen>> = { kart: "main", setup: "kart", tracks: "setup", "track-info": "tracks", paused: "race", finished: "track-info", race: "paused" };
-    this.screen = this.screen === "options" || this.screen === "help" ? this.returnScreen : previous[this.screen] ?? "main";
+    this.screen = this.screen === "options" || this.screen === "help" || this.screen === "notice" ? this.returnScreen : previous[this.screen] ?? "main";
   }
   open(screen: "options" | "help"): void { this.returnScreen = this.screen; this.screen = screen; }
+  notice(title: string, text: string): void { this.returnScreen = this.screen; this.noticeTitle = title; this.noticeText = text; this.screen = "notice"; }
 }

@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { bakePrimitive, identity, multiply, parseXml, skyMesh, sourceTransform, type XmlNode } from "./scene-source.ts";
 import { readSpm, writeGlb, type SpmMesh } from "./spm.ts";
+import { batchScene } from "./batch-scene.ts";
 
 export function prepareScene(source: string, track: string, record: (path: string) => Buffer, textureIndex: Map<string, string>, write: (relative: string, data: Buffer) => void) {
   const merged: SpmMesh = { materials: [], primitives: [] };
@@ -66,7 +67,9 @@ export function prepareScene(source: string, track: string, record: (path: strin
     for (const child of node.children) walk(child, directory, matrix, groups, stack, category);
   }
   walk(scene, track, identity(), new Map(), [], "track");
-  write("models/lighthouse-scene.glb", writeGlb(merged, (name) => name.slice(name.indexOf(":") + 1), shaders));
+  const batched = batchScene(merged, shaders);
+  console.log(`Lighthouse static primitives: ${merged.primitives.length} -> ${batched.primitives.length}`);
+  write("models/lighthouse-scene.glb", writeGlb(batched, (name) => name.slice(name.indexOf(":") + 1), shaders));
   const skyTextures = scene.children.find((child) => child.tag === "sky-box")!.attributes.texture.split(/\s+/).map((name) => texture(track, name));
   write("models/lighthouse-sky.glb", writeGlb(skyMesh(skyTextures), (name) => name, new Map(skyTextures.map((name) => [name, "unlit"]))));
   const sun = scene.children.find((child) => child.tag === "sun")!.attributes;

@@ -9,10 +9,14 @@ function load(locale: string, platform = "macos") {
   const texts = new Map<string, string>(), images = new Map<string, string>(), nodes = new Set<string>();
   const transforms = new Map<string, number[]>(), held = new Set<string>(), pressed = new Set<string>();
   const cameras: number[][] = [];
+  const voices = new Map<string, { path: string; volume: number; speed: number; paused: boolean }>();
   let width = 1280;
   const context = createContext({
     String: Object.freeze({ rustType: "String" }),
     app_locale: () => locale, app_platform: () => platform, app_request_exit: () => true,
+    audio_play: (id: string, path: string, _loop: boolean, volume: number) => { voices.set(id, { path, volume, speed: 1, paused: false }); return true; },
+    audio_update: (id: string, volume: number, speed: number, paused: boolean) => { const voice = voices.get(id); if (voice) Object.assign(voice, { volume, speed, paused }); return !!voice; },
+    audio_stop: (id: string) => voices.delete(id), audio_clear: () => voices.clear(), audio_state: (id: string) => voices.has(id) ? "playing" : "missing",
     scene_clear: () => { transforms.clear(); }, scene_set_3d_enabled: () => true, scene_set_environment: () => true,
     scene_spawn: () => true, scene_set_model: () => true, scene_despawn: () => true,
     scene_set_transform_3d: (id: string, ...values: number[]) => { transforms.set(id, values); return true; },
@@ -38,7 +42,7 @@ function load(locale: string, platform = "macos") {
     assert.ok(images.has("map"));
     for (let i = 0; i < 190; i++) frame();
   }
-  return { callbacks, frame, press, start, texts, images, nodes, transforms, cameras, held, resize: () => { width = 1000; } };
+  return { callbacks, frame, press, start, texts, images, nodes, transforms, cameras, held, voices, resize: () => { width = 1000; } };
 }
 test("PC menus use original assets, follow system language and exclude touch HUD", () => {
   for (const locale of ["en-US", "zh-CN", "zh-TW", "fr-FR"]) {
@@ -68,15 +72,36 @@ test("keyboard navigation traverses kart, setup, track and race confirmation scr
   game.press("Escape"); assert.equal(game.texts.get("title"), "Choose a Track");
   game.press("Escape"); assert.equal(game.texts.get("title"), "Race Setup");
 });
+test("reference main menu keeps five original entries, tool icons and honest notices; audio volume works", () => {
+  const game = load("en-US");
+  for (const name of ["story", "singleplayer", "multiplayer", "online", "addons"]) assert.ok(game.nodes.has(name));
+  assert.equal(game.images.get("singleplayer-icon"), "ui/menu_race_focus.png");
+  for (const name of ["options", "help", "tutorial", "highscores", "achievements", "gpeditor", "about", "quit"]) assert.ok(game.nodes.has(name));
+  assert.equal(game.images.get("bottom-bar"), "ui/bottom_bar.png");
+  assert.ok(game.voices.get("music")?.path.endsWith("menutheme.ogg"));
+  game.press("ArrowLeft"); game.press("Enter");
+  assert.equal(game.texts.get("title"), "Story Mode"); assert.match(game.texts.get("notice-text")!, /not implemented/);
+  game.press("Escape");
+  for (let index = 0; index < 4; index++) game.press("Tab");
+  game.press("Enter"); assert.equal(game.texts.get("title"), "Options");
+  game.press("Enter"); assert.equal(game.voices.get("music")?.volume, 0.5);
+});
 test("bundled PC callbacks drive, look back and stop on suspend until resumed", () => {
   const game = load("en-US"); game.start();
+  assert.ok(game.voices.get("music")?.path.endsWith("klabauter_dance.ogg"));
   const initial = game.transforms.get("tux")!;
+  const startCamera = game.cameras.at(-1)!;
+  assert.equal(startCamera[6], 55);
+  assert.ok(Math.hypot(startCamera[0] - initial[0], startCamera[2] - initial[2]) < 5, "chase camera keeps the stationary car readable");
   game.held.add("ArrowUp"); for (let i = 0; i < 40; i++) game.frame();
   assert.notDeepEqual(game.transforms.get("tux"), initial);
   const camera = game.cameras.at(-1)!;
+  const moving = game.transforms.get("tux")!;
+  assert.ok(Math.hypot(camera[0] - moving[0], camera[2] - moving[2]) < 5, "acceleration must not shrink the car through camera lag");
   game.held.add("KeyB"); game.frame();
   assert.notDeepEqual(game.cameras.at(-1), camera); game.held.delete("KeyB");
   game.callbacks.on_suspend?.(); game.frame(); assert.equal(game.texts.get("title"), "Paused");
+  assert.equal(game.voices.get("music")?.paused, true);
   const paused = game.transforms.get("tux");
   for (let i = 0; i < 20; i++) game.frame();
   assert.deepEqual(game.transforms.get("tux"), paused);

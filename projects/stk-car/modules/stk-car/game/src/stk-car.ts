@@ -1,18 +1,26 @@
-import { TouchControls, readControls } from "./controls.js";
-import { mountHud, pollButtons, readLayout, updateHud, updateStick } from "./hud.js";
+import { TouchControls, readControls, type Layout } from "./controls.js";
+import { mountHud, pollButtons, readLayout, updateHud, updateStick, updatePerformance } from "./hud.js";
+import { FrameProfiler, type FrameMetrics } from "./performance.js";
 import { angleDelta, fixedStep, interpolate, type Pose } from "./race.js";
 import { PcSession, parseSettings } from "./session.js";
 import { trackData } from "./track-data.js";
+import { GameAudio } from "./sound.js";
 
 const callbacks = globalThis as unknown as RuneweaveCallbacks;
 const session = new PcSession();
 const touch = new TouchControls();
 const mobile = ["android", "ios"].includes(app_platform());
+const profiler = new FrameProfiler();
+const sound = new GameAudio();
+let showPerformance = !mobile;
+let lastMetrics: FrameMetrics | null = null;
 const wheelAngles = new Map<string, number>();
 const pickupVisible = new Map<number, boolean>();
 const trapIds = new Set<string>();
 let accumulator = 0, uiClock = 0;
 let viewport = "", mountedScreen = "";
+let layout: Layout;
+let layoutClock = 0;
 let pendingRescue = false, pendingItem = false, lookBack = false;
 let worldReady = false;
 let previewId = "", previewAngle = 0;
@@ -24,7 +32,7 @@ function spawn(id: string, path: string, pose: Pose, scale = 1): void {
   scene_set_transform_3d(id, pose.x, pose.y, pose.z, pose.pitch, -pose.heading, 0, scale);
 }
 function refreshUi(): void {
-  const layout = readLayout();
+  layout = readLayout(); layoutClock = 0;
   touch.stickId = null; accumulator = 0; pendingItem = false; pendingRescue = false;
   if (session.screen === "kart") preparePreview();
   scene_set_3d_enabled(session.screen === "kart" || worldReady && (["race", "paused", "finished"].includes(session.screen) || ["options", "help"].includes(session.screen) && session.returnScreen === "paused"));
@@ -41,6 +49,7 @@ function refreshUi(): void {
     }
   });
   viewport = JSON.stringify(layout); mountedScreen = session.screen;
+  updatePerformance(lastMetrics, showPerformance && session.screen !== "main");
 }
 function preparePreview(): void {
   if (previewId === session.settings.kartId) return;
@@ -59,7 +68,7 @@ function renderPreview(dt: number): void {
     const [x, y, z] = kart.wheels[i].position;
     scene_set_transform_3d(`preview-wheel-${i}`, x * Math.cos(previewAngle) + z * Math.sin(previewAngle), y, -x * Math.sin(previewAngle) + z * Math.cos(previewAngle), 0, previewAngle, 0, 1);
   }
-  scene_set_camera_3d(3, 1.8, 4, 0, 0.5, 0, 35);
+  scene_set_camera_3d(2.5, 1.5, 3.6, 0, 0.5, 0, 32);
 }
 function startRace(): void {
   session.start(); accumulator = 0; uiClock = 0; lookBack = false;
@@ -103,11 +112,13 @@ function render(alpha: number, dt: number): void {
   }
   const target = interpolate(race.player, alpha), response = 1 - Math.exp(-Math.min(dt, 0.1) * 9);
   camera.x += (target.x - camera.x) * response; camera.y += (target.y - camera.y) * response; camera.z += (target.z - camera.z) * response;
+  const lagX = camera.x - target.x, lagZ = camera.z - target.z, lag = Math.hypot(lagX, lagZ);
+  if (lag > 0.75) { camera.x = target.x + lagX * 0.75 / lag; camera.z = target.z + lagZ * 0.75 / lag; }
   camera.heading += angleDelta(target.heading - camera.heading) * response;
-  const distance = 6.5 + Math.abs(race.player.speed) * 0.025, direction = lookBack ? -1 : 1;
-  if (!scene_set_camera_3d(camera.x - Math.sin(camera.heading) * distance * direction, camera.y + 3,
-    camera.z + Math.cos(camera.heading) * distance * direction, camera.x + Math.sin(camera.heading) * 1.6 * direction, camera.y + 0.7,
-    camera.z - Math.cos(camera.heading) * 1.6 * direction, 75)) throw new Error("3D follow camera unavailable");
+  const distance = 3.8 + Math.abs(race.player.speed) * 0.008, direction = lookBack ? -1 : 1;
+  if (!scene_set_camera_3d(camera.x - Math.sin(camera.heading) * distance * direction, camera.y + 1.9,
+    camera.z + Math.cos(camera.heading) * distance * direction, camera.x + Math.sin(camera.heading) * 1.1 * direction, camera.y + 0.65,
+    camera.z - Math.cos(camera.heading) * 1.1 * direction, 55)) throw new Error("3D follow camera unavailable");
   for (let i = 0; i < race.pickups.length; i++) {
     const pickup = race.pickups[i], visible = pickup.cooldown <= 0;
     if (pickupVisible.get(i) === visible) continue;
@@ -122,23 +133,30 @@ function render(alpha: number, dt: number): void {
   for (const id of trapIds) if (!active.has(id)) { scene_despawn(id); trapIds.delete(id); }
 }
 function load(): void {
+  sound.reset();
   const stored = storage_read("pc-race-settings-v1");
   session.settings = parseSettings(stored.state === "ok" ? stored.value : "{}"); session.screen = "main";
   scene_clear(); scene_set_3d_enabled(false); worldReady = false;
   previewId = "";
   accumulator = 0; uiClock = 0; wheelAngles.clear(); pickupVisible.clear(); trapIds.clear(); refreshUi();
+  sound.update(session, 0);
 }
 callbacks.on_script_loaded = load;
 callbacks.on_script_reloaded = load;
 callbacks.on_suspend = () => { if (session.screen === "race") { session.screen = "paused"; refreshUi(); } };
-callbacks.on_update = (frameDt) => {
+function updateGame(frameDt: number): void {
   if (!Number.isFinite(frameDt) || frameDt < 0) return;
+  if (input_key_just_pressed("F3")) { showPerformance = !showPerformance; updatePerformance(lastMetrics, showPerformance && session.screen !== "main"); }
   if (input_key_just_pressed("Escape")) { session.back(); refreshUi(); }
   const previousScreen = session.screen;
   pollButtons();
-  const layout = readLayout();
-  if (viewport !== JSON.stringify(layout) || mountedScreen !== session.screen) refreshUi();
   const dt = Math.min(frameDt, 0.1);
+  layoutClock += dt;
+  if (mobile || layoutClock >= 0.1) {
+    layoutClock = 0;
+    if (viewport !== JSON.stringify(readLayout())) refreshUi();
+  }
+  if (mountedScreen !== session.screen) refreshUi();
   if (session.screen === "kart") renderPreview(dt);
   if (session.screen !== "race") {
     if (previousScreen === "race") { pendingItem = false; pendingRescue = false; }
@@ -164,4 +182,16 @@ callbacks.on_update = (frameDt) => {
   }
   render(accumulator / fixedStep, dt); uiClock += dt;
   if (uiClock >= 0.1) { uiClock = 0; updateHud(session); }
+}
+callbacks.on_update = (frameDt) => {
+  profiler.begin(Date.now());
+  try { updateGame(frameDt); }
+  finally {
+    sound.update(session, Number.isFinite(frameDt) ? Math.max(0, Math.min(frameDt, 0.1)) : 0);
+    const metrics = profiler.end(Date.now());
+    if (metrics) {
+      lastMetrics = metrics; updatePerformance(metrics, showPerformance && session.screen !== "main");
+      if (showPerformance) console.log(`[stk-perf] ${JSON.stringify({ screen: session.screen, ...metrics })}`);
+    }
+  }
 };
