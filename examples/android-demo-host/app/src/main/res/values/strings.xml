@@ -70,6 +70,7 @@
     <string name="host_bootstrap_missing">The bundled host bootstrap script is missing</string>
     <string name="host_remote_http">Remote asset request failed with HTTP %1$s</string>
     <string name="host_remote_size">Remote asset response has an invalid size</string>
+    <string name="host_remote_too_large">Remote asset is too large (%1$s); maximum is %2$s</string>
     <string name="host_zip_truncated">Asset ZIP is truncated</string>
     <string name="host_zip_no_directory">Asset ZIP has no central directory</string>
     <string name="host_zip_directory_invalid">Asset ZIP directory is invalid</string>

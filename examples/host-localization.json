@@ -68,6 +68,7 @@
   ["bootstrap_missing","The bundled host bootstrap script is missing","缺少内置宿主引导脚本"],
   ["remote_http","Remote asset request failed with HTTP {status}","请求资源失败，HTTP 状态码：{status}"],
   ["remote_size","Remote asset response has an invalid size","资源响应大小无效"],
+  ["remote_too_large","Remote asset is too large ({size}); maximum is {limit}","资源包过大（{size}），最大允许 {limit}"],
   ["zip_truncated","Asset ZIP is truncated","ZIP 资源包不完整"],
   ["zip_no_directory","Asset ZIP has no central directory","ZIP 资源包缺少中央目录"],
   ["zip_directory_invalid","Asset ZIP directory is invalid","ZIP 资源包目录无效"],

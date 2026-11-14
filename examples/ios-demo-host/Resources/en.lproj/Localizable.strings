@@ -68,6 +68,7 @@
 "The bundled host bootstrap script is missing" = "The bundled host bootstrap script is missing";
 "Remote asset request failed with HTTP {status}" = "Remote asset request failed with HTTP %1$@";
 "Remote asset response has an invalid size" = "Remote asset response has an invalid size";
+"Remote asset is too large ({size}); maximum is {limit}" = "Remote asset is too large (%1$@); maximum is %2$@";
 "Asset ZIP is truncated" = "Asset ZIP is truncated";
 "Asset ZIP has no central directory" = "Asset ZIP has no central directory";
 "Asset ZIP directory is invalid" = "Asset ZIP directory is invalid";

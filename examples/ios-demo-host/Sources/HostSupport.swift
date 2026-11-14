@@ -18,7 +18,8 @@ func hostText(_ key: String, _ arguments: String...) -> String {
 let bootstrapScriptName = "host-bootstrap.js"
 let installedMarkerName = ".installed-package"
 let hostDarkModeDefaultsKey = "host.darkMode"
-let maxArchiveBytes = 64 * 1024 * 1024
+// Downloaded ZIPs can exceed 64 MiB; keep both archive and extraction budgets bounded.
+let maxArchiveBytes = 256 * 1024 * 1024
 let maxUnpackedBytes = 256 * 1024 * 1024
 let maxArchiveEntries = 10_000
 

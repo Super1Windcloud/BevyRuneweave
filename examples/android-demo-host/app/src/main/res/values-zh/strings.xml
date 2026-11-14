@@ -70,6 +70,7 @@
     <string name="host_bootstrap_missing">缺少内置宿主引导脚本</string>
     <string name="host_remote_http">请求资源失败，HTTP 状态码：%1$s</string>
     <string name="host_remote_size">资源响应大小无效</string>
+    <string name="host_remote_too_large">资源包过大（%1$s），最大允许 %2$s</string>
     <string name="host_zip_truncated">ZIP 资源包不完整</string>
     <string name="host_zip_no_directory">ZIP 资源包缺少中央目录</string>
     <string name="host_zip_directory_invalid">ZIP 资源包目录无效</string>

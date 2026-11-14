@@ -406,6 +406,10 @@ pub(super) const MESSAGES: &[(&str, &str)] = &[
         "版本查询任务意外停止",
     ),
     (
+        "Remote asset is too large ({size}); maximum is {limit}",
+        "资源包过大（{size}），最大允许 {limit}",
+    ),
+    (
         "Remote asset request failed with HTTP {status}",
         "请求资源失败，HTTP 状态码：{status}",
     ),
@@ -551,6 +555,9 @@ macro_rules! host_format {
     };
     ("Remote asset request failed with HTTP {status}", $($args:tt)*) => {
         if crate::i18n::is_chinese() { format!("请求资源失败，HTTP 状态码：{status}", $($args)*) } else { format!("Remote asset request failed with HTTP {status}", $($args)*) }
+    };
+    ("Remote asset is too large ({size}); maximum is {limit}", $($args:tt)*) => {
+        if crate::i18n::is_chinese() { format!("资源包过大（{size}），最大允许 {limit}", $($args)*) } else { format!("Remote asset is too large ({size}); maximum is {limit}", $($args)*) }
     };
     ("{count} in your library", $($args:tt)*) => {
         if crate::i18n::is_chinese() { format!("游戏库中有 {count} 个游戏", $($args)*) } else { format!("{count} in your library", $($args)*) }

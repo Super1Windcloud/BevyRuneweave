@@ -103,16 +103,21 @@ final class ReleaseClient {
         }.resume()
     }
 
-    private func validatedData(data: Data?, response: URLResponse?, error: Error?,
-                               maximumBytes: Int) -> Result<Data, Error> {
+    func validatedData(data: Data?, response: URLResponse?, error: Error?,
+                       maximumBytes: Int) -> Result<Data, Error> {
         if let error { return .failure(error) }
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
               http.url?.scheme?.lowercased() == "https" else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             return .failure(HostFailure(hostText("Remote asset request failed with HTTP {status}", String(status))))
         }
-        guard let data, !data.isEmpty, data.count <= maximumBytes else {
+        guard let data, !data.isEmpty else {
             return .failure(HostFailure(hostText("Remote asset response has an invalid size")))
+        }
+        guard data.count <= maximumBytes else {
+            return .failure(HostFailure(hostText("Remote asset is too large ({size}); maximum is {limit}",
+                                                 formattedByteCount(Int64(data.count)),
+                                                 formattedByteCount(Int64(maximumBytes)))))
         }
         return .success(data)
     }

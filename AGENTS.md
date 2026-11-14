@@ -63,6 +63,13 @@ cannot be executed in the current environment must be called out explicitly as a
   callbacks or runtime behavior, rebuild the unified Android library and iOS XCFramework, then
   rebuild and reinstall the hosts. Rebuilding TypeScript or Kotlin/Swift alone does not update
   the prebuilt runtime. Match the target, profile and packaged library to the current source.
+- Whenever a change affects the underlying native runtime (including Rust runtime code, BMS APIs,
+  language adapters, native dependencies, features or the C ABI), explicitly notify developers in
+  the final delivery that they must rebuild the affected runtime libraries: Android/Linux `.so`,
+  iOS static library/XCFramework, macOS `.dylib`, or Windows `.dll`, as applicable. For mobile
+  delivery, also state that the host must be rebuilt and reinstalled with the new library;
+  updating only the game ZIP or TypeScript does not update the installed runtime. Report which
+  target/profile builds and host installations were actually verified and which remain pending.
 - A running process or blank fullscreen surface does not prove that a game loaded. Launch the
   current bundle on the device, check script/native logs for missing API errors, and exercise
   gameplay input before reporting runtime acceptance.
