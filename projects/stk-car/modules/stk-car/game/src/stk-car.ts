@@ -34,8 +34,8 @@ function spawn(id: string, path: string, pose: Pose, scale = 1): void {
   scene_set_transform_3d(id, pose.x, pose.y, pose.z, pose.pitch, -pose.heading, 0, scale);
 }
 function refreshUi(): void {
-  layout = readLayout(); layoutClock = 0;
-  touch.stickId = null; accumulator = 0; pendingItem = false; pendingRescue = false;
+  layout = readLayout(mobile); layoutClock = 0;
+  touch.reset(); accumulator = 0; pendingItem = false; pendingRescue = false; lookBack = false;
   if (session.screen === "kart") preparePreview();
   scene_set_3d_enabled(session.screen === "kart" || worldReady && (["race", "paused", "finished"].includes(session.screen) || ["options", "help"].includes(session.screen) && session.returnScreen === "paused"));
   if (session.screen === "track-info") {
@@ -156,7 +156,7 @@ function updateGame(frameDt: number): void {
   layoutClock += dt;
   if (mobile || layoutClock >= 0.1) {
     layoutClock = 0;
-    if (viewport !== JSON.stringify(readLayout())) refreshUi();
+    if (viewport !== JSON.stringify(readLayout(mobile))) refreshUi();
   }
   if (mountedScreen !== session.screen) refreshUi();
   if (session.screen === "kart") renderPreview(dt);

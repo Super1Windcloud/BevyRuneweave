@@ -1,49 +1,7 @@
 import assert from "node:assert/strict";
-import { resolve } from "node:path";
 import test from "node:test";
-import { createContext, Script } from "node:vm";
-import { buildSync } from "esbuild";
+import { load } from "./game-fixture.ts";
 
-const bundle = buildSync({ entryPoints: [resolve(import.meta.dirname, "../modules/stk-car/game/src/stk-car.ts")], bundle: true, write: false, format: "iife", target: "es2023" }).outputFiles[0].text;
-function load(locale: string, platform = "macos") {
-  const texts = new Map<string, string>(), images = new Map<string, string>(), nodes = new Set<string>();
-  const transforms = new Map<string, number[]>(), held = new Set<string>(), pressed = new Set<string>();
-  const cameras: number[][] = [];
-  const voices = new Map<string, { path: string; volume: number; speed: number; paused: boolean }>();
-  let width = 1280;
-  const context = createContext({
-    String: Object.freeze({ rustType: "String" }),
-    app_locale: () => locale, app_platform: () => platform, app_request_exit: () => true,
-    audio_play: (id: string, path: string, _loop: boolean, volume: number) => { voices.set(id, { path, volume, speed: 1, paused: false }); return true; },
-    audio_update: (id: string, volume: number, speed: number, paused: boolean) => { const voice = voices.get(id); if (voice) Object.assign(voice, { volume, speed, paused }); return !!voice; },
-    audio_stop: (id: string) => voices.delete(id), audio_clear: () => voices.clear(), audio_state: (id: string) => voices.has(id) ? "playing" : "missing",
-    scene_clear: () => { transforms.clear(); }, scene_set_3d_enabled: () => true, scene_set_environment: () => true,
-    scene_spawn: () => true, scene_set_model: () => true, scene_despawn: () => true,
-    scene_set_transform_3d: (id: string, ...values: number[]) => { transforms.set(id, values); return true; },
-    scene_set_camera_3d: (...values: number[]) => { assert.ok(values.every(Number.isFinite)); cameras.push(values); return true; },
-    storage_read: (key: string) => key === "pc-race-settings-v1" ? { state: "missing" } : { state: "ok", value: "120.4" }, storage_write: () => ({ state: "ok" }),
-    window_metrics: () => ({ width, height: 720 }),
-    window_safe_area: () => ({ leftInset: 10, rightInset: 10, topInset: 0, bottomInset: 0 }),
-    input_primary_pointer: () => ({ pressed: false, justPressed: false, x: 0, y: 0, viewportWidth: width * 800 / 720, viewportHeight: 800 }),
-    input_touches: () => { if (platform === "macos") throw new Error("PC controls must not read touch input"); return []; },
-    input_key_pressed: (key: string) => held.has(key), input_key_just_pressed: (key: string) => pressed.has(key),
-    ui_clear: () => { texts.clear(); images.clear(); nodes.clear(); }, ui_spawn: (id: string) => { assert.ok(!nodes.has(id), `Duplicate UI ID ${id}`); nodes.add(id); return true; }, ui_set_style: () => true, ui_set_font: () => true,
-    ui_set_image: (id: string, path: string) => { images.set(id, path); return true; },
-    ui_set_text: (id: string, value: string) => { texts.set(id, value); return true; }, ui_button_just_pressed: () => false, ui_button_hovered: () => false,
-    console: { log: () => {} },
-  });
-  new Script(bundle).runInContext(context);
-  const callbacks = context as unknown as RuneweaveCallbacks;
-  callbacks.on_script_loaded();
-  function frame(dt = 1 / 60) { callbacks.on_update(dt); pressed.clear(); }
-  function press(key: string) { pressed.add(key); frame(); }
-  function start() {
-    for (let i = 0; i < 5; i++) press("Enter");
-    assert.ok(images.has("map"));
-    for (let i = 0; i < 190; i++) frame();
-  }
-  return { callbacks, frame, press, start, texts, images, nodes, transforms, cameras, held, voices, resize: () => { width = 1000; } };
-}
 test("PC menus use original assets, follow system language and exclude touch HUD", () => {
   for (const locale of ["en-US", "zh-CN", "zh-TW", "fr-FR"]) {
     const game = load(locale);
@@ -59,32 +17,28 @@ test("PC menus use original assets, follow system language and exclude touch HUD
     assert.ok(game.texts.has("singleplayer-label"));
   }
 });
-test("keyboard navigation traverses kart, setup, track and race confirmation screens", () => {
+test("keyboard navigation traverses source menus and preserves the race configuration on return", () => {
   const game = load("en-US");
-  game.press("Enter"); assert.equal(game.texts.get("title"), "Choose a Kart");
+  game.press("Enter"); assert.ok(game.nodes.has("gui:karts:choose-tux"));
   const preview = game.transforms.get("preview-body"); game.frame();
   assert.notDeepEqual(game.transforms.get("preview-body"), preview);
-  game.press("ArrowRight"); game.press("Enter"); assert.equal(game.texts.get("title"), "Race Setup");
-  game.press("Enter"); assert.equal(game.texts.get("title"), "Choose a Track");
-  game.press("Enter"); assert.equal(game.texts.get("title"), "Around the Lighthouse");
-  assert.equal(game.texts.get("lap-count"), "Laps  4");
-  assert.ok(game.texts.get("best")?.includes("2:00.400"));
-  game.press("Escape"); assert.equal(game.texts.get("title"), "Choose a Track");
-  game.press("Escape"); assert.equal(game.texts.get("title"), "Race Setup");
+  game.press("ArrowRight"); game.press("Enter"); assert.ok(game.nodes.has("gui:race_setup:mode-normal"));
+  game.press("Enter"); assert.ok(game.nodes.has("gui:tracks_and_gp:track:lighthouse"));
+  game.press("Enter"); assert.equal(game.texts.get("gui:track_info:name:text"), "Around the lighthouse");
+  assert.equal(game.texts.get("gui:track_info:target-value-spinner:value:text"), "4");
+  assert.ok([...game.texts.values()].some((text) => text.includes("2:00.400")));
+  game.press("Escape"); assert.ok(game.nodes.has("gui:tracks_and_gp:track:lighthouse"));
+  game.press("Escape"); assert.ok(game.nodes.has("gui:race_setup:mode-normal"));
 });
-test("reference main menu keeps five original entries, tool icons and honest notices; audio volume works", () => {
+test("reference home entries navigate to source pages and audio volume remains functional", () => {
   const game = load("en-US");
-  for (const name of ["story", "singleplayer", "multiplayer", "online", "addons"]) assert.ok(game.nodes.has(name));
+  for (const name of ["story", "singleplayer", "multiplayer", "online", "addons", "options", "help", "tutorial", "highscores", "achievements", "gpeditor", "about", "quit"]) assert.ok(game.nodes.has(name));
   assert.equal(game.images.get("singleplayer-icon"), "ui/menu_race_focus.png");
-  for (const name of ["options", "help", "tutorial", "highscores", "achievements", "gpeditor", "about", "quit"]) assert.ok(game.nodes.has(name));
   assert.equal(game.images.get("bottom-bar"), "ui/bottom_bar.png");
   assert.ok(game.voices.get("music")?.path.endsWith("menutheme.ogg"));
-  game.press("ArrowLeft"); game.press("Enter");
-  assert.equal(game.texts.get("title"), "Story Mode"); assert.match(game.texts.get("notice-text")!, /not implemented/);
-  game.press("Escape");
-  for (let index = 0; index < 4; index++) game.press("Tab");
-  game.press("Enter"); assert.equal(game.texts.get("title"), "Options");
-  game.press("Enter"); assert.equal(game.voices.get("music")?.volume, 0.5);
+  game.click("story"); assert.equal(game.texts.get("story-title:text"), "Story Mode");
+  game.press("Escape"); game.click("options");
+  game.click("gui:options_audio:music_volume:down"); assert.equal(game.voices.get("music")?.volume, 0.5);
 });
 test("bundled PC callbacks drive, look back and stop on suspend until resumed", () => {
   const game = load("en-US"); game.start();

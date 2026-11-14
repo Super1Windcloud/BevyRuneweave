@@ -47,7 +47,9 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   if (!["kart", "setup", "tracks", "track-info", "menu", "options", "help"].includes(session.screen) && !(session.screen === "main" && session.menu.dialog)) return false;
   const m = session.menu, page = menuPageFor(session);
   m.page = page;
-  const scale = Math.max(0.5, Math.min(1.4, layout.width / 1280, layout.height / 720));
+  const mobile = !!layout.mobile;
+  const safeRect = mobile ? { x: layout.left, y: layout.top, width: layout.width - layout.left - layout.right, height: layout.height - layout.top - layout.bottom } : { x: 0, y: 0, width: layout.width, height: layout.height };
+  const scale = Math.max(mobile ? 0.85 : 0.5, Math.min(1.4, safeRect.width / 1280, safeRect.height / 720));
   const counts = new Map<string, number>();
   const uid = (key: string) => { const count = counts.get(key) ?? 0; counts.set(key, count + 1); return count ? `${key}:${count}` : key; };
   const action = (id: string) => () => { m.editing = ""; menuAction(session, id, changed, start); };
@@ -78,7 +80,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     if (id === "tracks" && currentPage !== "edit_gp") {
       const gp = currentPage === "grand_prix_editor" || currentPage === "gp_info" ? menuData.grandPrix.find((gp) => gp.id === m.grandPrix) : undefined;
       const query = m.fields[`${currentPage}:search`]?.toLocaleLowerCase() ?? "";
-      return menuData.tracks.filter((track) => track.id !== "overworld" && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name), image: track.image, selected: track.id === m.track }));
+      return menuData.tracks.filter((track) => track.id !== "overworld" && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => Number(b.id === "lighthouse") - Number(a.id === "lighthouse")).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name), image: track.image, selected: track.id === m.track }));
     }
     if (id === "players") return m.profiles.map((name, index) => ({ id: `profile:${index}`, text: name === "Player" ? tr("Player", "玩家") : name, image: trackData.karts[index % trackData.karts.length].icon, selected: m.player === index }));
     if (id === "resolutions") return ["1280 × 720", "1600 × 900", "1920 × 1080"].map((label) => ({ id: `resolution:${label}`, text: label, selected: label === (m.values["resolution"] ?? "1280 × 720") }));
@@ -179,7 +181,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   function drawSpinner(id: string, logical: string, node: GuiNode, r: Rect): void {
     const choices = m.choices(logical), min = Number(node.attributes.min_value ?? 0), max = Number(node.attributes.max_value ?? (logical === "scale_rtts" || logical === "font_size" ? 150 : 10));
     picture(`${id}:background`, skin("glassspinner"), r, true);
-    const arrow = Math.min(30 * scale, r.width * 0.18), size = Math.min(r.height, 32 * scale), y = r.y + (r.height - size) / 2;
+    const arrow = Math.min(mobile ? 44 : 30 * scale, r.width * (mobile ? 0.28 : 0.18)), size = Math.min(r.height, mobile ? 44 : 32 * scale), y = r.y + (r.height - size) / 2;
     button(`${id}:down`, { x: r.x, y, width: arrow, height: size }, "", () => { m.editing = ""; m.adjust(logical, -1, session, min, max); changed(); }, { image: "skins/common/left_arrow.png", normal: "", focused: "" });
     button(`${id}:up`, { x: r.x + r.width - arrow, y, width: arrow, height: size }, "", () => { m.editing = ""; m.adjust(logical, 1, session, min, max); changed(); }, { image: "skins/common/right_arrow.png", normal: "", focused: "" });
     if (node.tag === "gauge" && !choices.length) {
@@ -236,12 +238,59 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     ["lighthouse", "olivermath", "hacienda"].forEach((track, index) => { button(`challenge-${track}`, { x: r.width * (0.25 + index * 0.2), y: r.height * (0.4 + (index % 2) * 0.2), width: 80 * scale, height: 75 * scale }, "", action(`challenge:${track}`), { image: "gui/icons/story_mode_book.png" }); });
   }
 
-  if (session.screen !== "main") drawPage(page, { x: 0, y: 0, width: layout.width, height: layout.height });
+  function drawMobilePage(r: Rect): boolean {
+    if (!["karts", "race_setup", "tracks_and_gp", "track_info"].includes(page)) return false;
+    const rect = (x: number, y: number, width: number, height: number): Rect => ({ x: r.x + x, y: r.y + y, width, height });
+    const title = page === "karts" ? tr("Choose a Kart", "选择赛车") : page === "race_setup" ? sourceText("Race Setup") : page === "tracks_and_gp" ? tr("Choose a Track", "选择赛道") : sourceText(m.selectedTrack.name);
+    text("mobile-page-title", title, rect(56, 0, r.width - 112, 42), 24, blue);
+    button(menuWidgetId(page, "back"), rect(0, 0, 48, 44), "", action("back"), { image: "gui/icons/back.png", normal: "" });
+    const card = (item: Item, bounds: Rect) => button(menuWidgetId(page, item.id), bounds, item.text, action(item.id), { image: item.image, selected: item.selected, normal: "" });
+    if (page === "karts") {
+      const height = Math.min(112, r.height * 0.33), width = Math.min(150, r.width / 5);
+      items("karts", page).forEach((item, index) => { card(item, rect((r.width - width * 4) / 2 + index * width, r.height - height, width - 8, height)); });
+      button(menuWidgetId(page, "continue"), rect(r.width - 110, 0, 110, 44), tr("Continue", "继续"), action("continue"));
+      host.focus(menuWidgetId(page, `choose-${session.settings.kartId}`));
+    } else if (page === "race_setup") {
+      const names = ["Novice", "Intermediate", "Expert", "SuperTux"], ids = ["novice", "intermediate", "expert", "best"], icons = ["easy", "medium", "hard", "best"];
+      const difficultyHeight = Math.min(92, r.height * 0.27);
+      names.forEach((name, index) => { card({ id: ids[index], text: sourceText(name), image: `gui/icons/difficulty_${icons[index]}.png`, selected: session.settings.difficulty === index }, rect(r.width / 4 * index + 4, 46, r.width / 4 - 8, difficultyHeight)); });
+      const y = 52 + difficultyHeight, height = (r.height - y) / 2;
+      items("gamemode", page).forEach((item, index) => { card(item, rect(r.width / 4 * (index % 4) + 4, y + Math.floor(index / 4) * height, r.width / 4 - 8, height - 4)); });
+      host.focus(menuWidgetId(page, `mode-${session.settings.mode}`));
+    } else if (page === "tracks_and_gp") {
+      const gpHeight = Math.min(84, r.height * 0.24);
+      items("gps", page).forEach((item, index) => { card(item, rect(index * r.width / 4 + 4, 46, r.width / 4 - 8, gpHeight)); });
+      const list = items("tracks", page), columns = Math.max(3, Math.min(5, Math.floor(r.width / 160))), capacity = columns * 2, key = "mobile-tracks";
+      const total = Math.max(1, Math.ceil(list.length / capacity)), number = Math.min(m.listPages[key] ?? 0, total - 1);
+      m.listPages[key] = number;
+      const y = gpHeight + 54, height = Math.max(44, (r.height - y - 30) / 2);
+      list.slice(number * capacity, (number + 1) * capacity).forEach((item, index) => { card(item, rect(index % columns * r.width / columns + 4, y + Math.floor(index / columns) * height, r.width / columns - 8, height - 4)); });
+      pagination(key, r, total);
+    } else {
+      const left = r.width * 0.43, right = left + 20, column = r.width - right;
+      picture("mobile-track-preview", m.selectedTrack.image, rect(0, 56, left, Math.max(70, r.height - 110)));
+      text("mobile-track-best", session.best > 0 ? `${tr("Best time", "最佳成绩")}  ${formatTime(session.best)}` : tr("No high score yet", "暂无最高成绩"), rect(0, r.height - 48, left, 40), 16);
+      const spinner = (id: string, label: string, y: number) => {
+        text(`mobile-${id}-label`, label, rect(right, y, column * 0.48, 44), 16, ink, "left");
+        drawSpinner(menuWidgetId(page, id), id, { tag: "spinner", attributes: { min_value: "0", max_value: "20" }, children: [] }, rect(right + column * 0.48, y, column * 0.52, 44));
+      };
+      spinner("target-value-spinner", tr("Number of laps", "圈数"), 56);
+      if (m.raceMode !== "time-trial") spinner("ai-spinner", tr("AI karts", "AI 赛车"), 108);
+      button(menuWidgetId(page, "option"), rect(right, 162, column, 44), `${session.settings.reverse ? "☑" : "☐"} ${tr("Reverse track", "反向赛道")}`, () => { session.settings.reverse = !session.settings.reverse; changed(); });
+      button(menuWidgetId(page, "start"), rect(right, r.height - 52, column, 48), tr("Start Race", "开始比赛"), action("start"));
+      host.focus(menuWidgetId(page, "start"));
+    }
+    return true;
+  }
+
+  if (session.screen !== "main" && !(mobile && drawMobilePage(safeRect))) drawPage(page, safeRect);
+  if (page === "track_info") host.focus(menuWidgetId(page, "start"));
   if (m.dialog) {
     spawn("menu-dialog-shade", "node", "root", { position: "absolute", left: 0, top: 0, width: "100%", height: "100%", background: [0, 0, 0, 0.55] });
     host.modal();
     const large = ["custom_video_settings", "custom_camera_settings", "select_challenge"].includes(m.dialog.page);
-    const r = { x: layout.width * (large ? 0.1 : 0.2), y: layout.height * (large ? 0.1 : 0.18), width: layout.width * (large ? 0.8 : 0.6), height: layout.height * (large ? 0.8 : 0.64) };
+    const marginX = mobile ? 0.03 : large ? 0.1 : 0.2, marginY = mobile ? 0.03 : large ? 0.1 : 0.18;
+    const r = { x: safeRect.x + safeRect.width * marginX, y: safeRect.y + safeRect.height * marginY, width: safeRect.width * (1 - marginX * 2), height: safeRect.height * (1 - marginY * 2) };
     picture("menu-dialog-frame", skin("dialog"), r, true);
     drawPage(m.dialog.page, { x: r.x + 18 * scale, y: r.y + 15 * scale, width: r.width - 36 * scale, height: r.height - 30 * scale });
   }

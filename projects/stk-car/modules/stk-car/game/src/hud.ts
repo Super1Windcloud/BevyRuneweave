@@ -1,4 +1,4 @@
-import type { Layout, TouchControls } from "./controls.js";
+import { makeLayout, touchControlRects, type Layout, type TouchControls } from "./controls.js";
 import { clamp, formatTime, nitroCapacity } from "./race.js";
 import type { PcSession } from "./session.js";
 import { trackData } from "./track-data.js";
@@ -7,6 +7,7 @@ import { menuSound } from "./sound.js";
 import { isChinese, tr } from "./localization.js";
 import { mountSourceMenu, type MenuButton, type MenuHost } from "./menu-view.js";
 import { pollMenuText } from "./menu-actions.js";
+import { raceHudLayout } from "./hud-layout.js";
 
 export { tr } from "./localization.js";
 const labels = new Map<string, string>();
@@ -46,15 +47,17 @@ function button(id: string, parent: string, value: string, action: () => void, s
 function mainIcon(id: string, parent: string, value: string, icon: string, action: () => void, size: number, small = false): void {
   node(id, parent, { width: small ? size : "18%", height: "100%", flexDirection: "column", alignItems: "center", gap: 2, background: [0, 0, 0, 0] }, "button");
   image(`${id}-icon`, id, `ui/${icon}.png`, { width: size, height: size, flexShrink: 0 });
-  if (!small) label(`${id}-label`, id, value, 21, { height: 50 }, [0, 0, 0, 1]);
+  if (!small) label(`${id}-label`, id, value, dimensions.mobile ? 16 : 21, { height: dimensions.mobile ? 42 : 50 }, [0, 0, 0, 1]);
   buttons.push({ id, action, base: [0, 0, 0, 0], icon: `ui/${icon}.png`, focusIcon: small ? undefined : `ui/${icon}_focus.png`, hint: small ? value : undefined });
 }
 function mountMainMenu(session: PcSession, act: (action: () => void) => () => void, layout: Layout): void {
+  const parent = "main-surface";
+  node(parent, "root", { position: "absolute", left: layout.mobile ? layout.left : 0, top: layout.mobile ? layout.top : 0, width: layout.mobile ? layout.width - layout.left - layout.right : layout.width, height: layout.mobile ? layout.height - layout.top - layout.bottom : layout.height });
   const unit = clamp(layout.height / 720, 0.5, 1.5);
   const open = (page: string) => act(() => session.openMenu(page));
   const chooseKarts = (players: number) => act(() => { session.menu.players = players; session.menu.raceMode = "normal"; session.settings.mode = "normal"; session.openMenu("karts", "kart"); if (players > 1) session.menu.popup("splitscreen_player_dialog", tr("Splitscreen Multiplayer", "分屏多人游戏"), "splitscreen"); });
-  image("logo", "root", "ui/logo.png", { position: "absolute", left: "33%", top: "0%", width: "34%", height: "44%" });
-  node("main-cards", "root", { position: "absolute", top: "51%", left: "5%", width: "90%", height: "31%", justifyContent: "space-between", flexDirection: "row" });
+  image("logo", parent, "ui/logo.png", { position: "absolute", left: "33%", top: "0%", width: "34%", height: "44%" });
+  node("main-cards", parent, { position: "absolute", top: "51%", left: "5%", width: "90%", height: "31%", justifyContent: "space-between", flexDirection: "row" });
   const size = Math.min(layout.width * 0.127, 166 * unit);
   mainIcon("story", "main-cards", tr("Story Mode", "故事模式"), "menu_story", open("story"), size);
   mainIcon("singleplayer", "main-cards", tr("Singleplayer", "单人游戏"), "menu_race", chooseKarts(1), size);
@@ -62,13 +65,13 @@ function mountMainMenu(session: PcSession, act: (action: () => void) => () => vo
   mainIcon("online", "main-cards", tr("Online", "在线"), "menu_online", open("online"), size);
   mainIcon("addons", "main-cards", tr("Addons", "附加组件"), "menu_addons", open("addons_screen"), size);
   focus = 1;
-  node("profile", "root", { position: "absolute", top: 2, right: 2, width: "27%", height: 30 * unit, alignItems: "center", justifyContent: "center" }, "button");
+  node("profile", parent, { position: "absolute", top: 2, right: 2, width: "27%", height: 30 * unit, alignItems: "center", justifyContent: "center" }, "button");
   buttons.push({ id: "profile", action: open("user_screen"), base: [0, 0, 0, 0] });
   image("profile-background", "profile", "ui/profile.png", { position: "absolute", width: "100%", height: "100%", imageMode: "stretch" });
   label("profile-name", "profile", session.menu.profiles[session.menu.player] === "Player" ? tr("Player", "玩家") : session.menu.profiles[session.menu.player], 21, {}, [0, 0, 0, 1]);
-  image("bottom-bar", "root", "ui/bottom_bar.png", { position: "absolute", bottom: 0, width: "100%", height: "8.5%", imageMode: "stretch" });
-  label("news", "root", tr("SuperTuxKart · PC Singleplayer", "SuperTuxKart · PC 单人竞速"), 18, { position: "absolute", bottom: "2%", left: "20%" }, [0, 0, 0, 1]);
-  node("main-bottom", "root", { position: "absolute", bottom: 0, right: "1%", width: "42%", height: "8%", flexDirection: "row", justifyContent: "space-between" });
+  image("bottom-bar", parent, "ui/bottom_bar.png", { position: "absolute", bottom: 0, width: "100%", height: "8.5%", imageMode: "stretch" });
+  label("news", parent, layout.mobile ? "SuperTuxKart" : tr("SuperTuxKart · PC Singleplayer", "SuperTuxKart · PC 单人竞速"), 18, { position: "absolute", bottom: "2%", left: layout.mobile ? "1%" : "20%" }, [0, 0, 0, 1]);
+  node("main-bottom", parent, { position: "absolute", bottom: 0, right: "1%", width: layout.mobile ? "60%" : "42%", height: layout.mobile ? 48 : "8%", flexDirection: "row", justifyContent: "space-between" });
   const tools: [string, string, string, () => void][] = [
     ["options", tr("Options", "选项"), "main_options", act(() => session.open("options"))],
     ["help", tr("Help", "帮助"), "main_help", act(() => session.open("help"))],
@@ -79,12 +82,12 @@ function mountMainMenu(session: PcSession, act: (action: () => void) => () => vo
     ["about", tr("About", "关于"), "main_about", open("credits")],
     ["quit", tr("Quit", "退出"), "main_quit", act(() => session.menu.popup("confirm_dialog", tr("Quit SuperTuxKart?", "退出 SuperTuxKart？"), "quit"))],
   ];
-  for (const [id, name, icon, action] of tools) mainIcon(id, "main-bottom", name, icon, action, Math.min(layout.width * 0.047, 54 * unit), true);
-  label("tool-tip", "root", "", 18, { position: "absolute", bottom: "9%", right: "1%", background: [1, 0.93, 0.7, 0.95], padding: 6, display: "none" }, [0, 0, 0, 1]);
+  for (const [id, name, icon, action] of tools) mainIcon(id, "main-bottom", name, icon, action, layout.mobile ? 44 : Math.min(layout.width * 0.047, 54 * unit), true);
+  label("tool-tip", parent, "", 18, { position: "absolute", bottom: "9%", right: "1%", background: [1, 0.93, 0.7, 0.95], padding: 6, display: "none" }, [0, 0, 0, 1]);
 }
 function heading(title: string, subtitle: string): void {
-  label("title", "root", title, 38, { position: "absolute", top: "4%", left: "16%" });
-  label("subtitle", "root", subtitle, 18, { position: "absolute", top: "13%", left: "16%" });
+  label("title", "root", title, dimensions.mobile ? 26 : 38, { position: "absolute", top: dimensions.top, left: "16%" });
+  label("subtitle", "root", subtitle, dimensions.mobile ? 16 : 18, { position: "absolute", top: dimensions.top + (dimensions.mobile ? 34 : 58), left: "16%" });
 }
 function centeredPanel(id: string, spec: Record<string, unknown> = {}): void {
   node(id, "root", { position: "absolute", left: "14%", top: "23%", width: "72%", height: "62%", padding: 22, gap: 16, background: panel, borderRadius: 18, flexDirection: "column", ...spec });
@@ -120,13 +123,10 @@ export function pollButtons(): void {
   if (buttons.length && (previous || next)) { focus = (focus + (previous ? -1 : 1) + buttons.length) % buttons.length; highlight(); menuSound("plopp"); focused(buttons[focus].id); }
   if (input_key_just_pressed("Enter")) { menuSound("appear"); buttons[focus]?.action(); }
 }
-export function readLayout(): Layout {
+export function readLayout(mobile = false): Layout {
   const size = window_metrics(), safe = window_safe_area(), pointer = input_primary_pointer();
-  const factor = size.height / Math.max(1, pointer.viewportHeight), unit = clamp(size.height / 720, 0.65, 1.2);
-  const layout = { width: size.width, height: size.height, left: Math.max(16, safe.leftInset * factor + 12), right: Math.max(16, safe.rightInset * factor + 12),
-    top: Math.max(12, safe.topInset * factor + 10), bottom: Math.max(14, safe.bottomInset * factor + 12), stickX: 0, stickY: 0, radius: 60 * unit, controlSize: 64 * unit };
-  layout.stickX = layout.left + layout.radius + 12; layout.stickY = layout.height - layout.bottom - layout.radius - 12;
-  return layout;
+  const factor = size.height / Math.max(1, pointer.viewportHeight);
+  return makeLayout(size.width, size.height, { left: safe.leftInset * factor, right: safe.rightInset * factor, top: safe.topInset * factor, bottom: safe.bottomInset * factor }, mobile);
 }
 export function mountHud(session: PcSession, layout: Layout, changed: () => void, start: () => void, mobile = false, focusChanged: (id: string) => void = () => {}): void {
   const screenKey = `${session.screen}:${session.menu.page}:${session.menu.dialog?.page ?? ""}`;
@@ -148,7 +148,7 @@ export function mountHud(session: PcSession, layout: Layout, changed: () => void
   const racing = screen === "race" || screen === "paused" || screen === "finished" || (screen === "options" || screen === "help") && session.returnScreen === "paused";
   if (!racing && screen !== "kart") {
     image("menu-background", "root", "ui/background.jpg", { position: "absolute", width: "100%", height: "100%", imageMode: "stretch" });
-  } else mountRaceHud(session, layout, mobile, changed);
+  } else if (racing) mountRaceHud(session, layout, mobile, changed);
   if (screen === "race") { performanceLabel(); updateHud(session); return; }
   if (racing) node("shade", "root", { position: "absolute", width: "100%", height: "100%", background: [0, 0.01, 0.02, 0.65] });
   if (screen !== "main" && mountSourceMenu(session, layout, host, changed, start)) { finish(); return; }
@@ -191,42 +191,44 @@ export function updatePerformance(metrics: FrameMetrics | null, visible: boolean
 }
 
 function mountRaceHud(session: PcSession, layout: Layout, mobile: boolean, changed: () => void): void {
-  const unit = clamp(layout.height / 720, 0.6, 1.5);
-  const mapSize = Math.round(180 * unit);
+  const { mapSize, mapBottom, speedUnit: unit, speedBottom } = raceHudLayout(layout);
   label("time", "root", "", 25, { position: "absolute", top: layout.top, left: "45%" });
   image("lap-flag", "root", "ui/lap_flag.png", { position: "absolute", top: layout.top, right: layout.right + 115, width: 42, height: 42 });
   label("lap", "root", "", 30, { position: "absolute", top: layout.top + 3, right: layout.right });
   label("status", "root", "", 48, { position: "absolute", top: "30%", left: "43%" });
   image("item-icon", "root", "ui/power.png", { position: "absolute", top: layout.top, left: "34%", width: 48, height: 48 });
   label("item-hint", "root", "", 16, { position: "absolute", top: layout.top + 50, left: "32%" });
-  node("positions", "root", { position: "absolute", top: layout.top + 12, left: layout.left, flexDirection: "column", gap: 8 });
+  node("positions", "root", { position: "absolute", top: layout.top + (mobile ? 0 : 12), left: layout.left, flexDirection: mobile ? "row" : "column", gap: mobile ? 4 : 8 });
   for (let i = 0; i < session.race.racers.length; i++) {
     node(`position-${i}`, "positions", { flexDirection: "row", alignItems: "center", gap: 8, padding: 5, borderRadius: 10, background: [0, 0.01, 0.02, 0.5] });
-    label(`position-number-${i}`, `position-${i}`, `${i + 1}`, 23);
-    image(`position-icon-${i}`, `position-${i}`, trackData.karts[0].icon, { width: 36, height: 36 });
-    label(`position-name-${i}`, `position-${i}`, "", 17);
+    label(`position-number-${i}`, `position-${i}`, `${i + 1}`, mobile ? 16 : 23);
+    image(`position-icon-${i}`, `position-${i}`, trackData.karts[0].icon, { width: mobile ? 26 : 36, height: mobile ? 26 : 36 });
+    if (!mobile) label(`position-name-${i}`, `position-${i}`, "", 17);
   }
-  image("map", "root", "ui/minimap.png", { position: "absolute", left: layout.left, bottom: layout.bottom, width: mapSize, height: mapSize });
+  image("map", "root", "ui/minimap.png", { position: "absolute", left: layout.left, bottom: mapBottom, width: mapSize, height: mapSize });
   for (const racer of session.race.racers) image(`map-${racer.id}`, "root", trackData.karts.find((kart) => kart.id === racer.kartId)!.icon, { position: "absolute", width: racer === session.race.player ? 22 : 16, height: racer === session.race.player ? 22 : 16 });
-  image("speed-meter", "root", "ui/speedback.png", { position: "absolute", right: layout.right + 28, bottom: layout.bottom, width: 145 * unit, height: 145 * unit });
-  label("speed", "root", "", 29, { position: "absolute", right: layout.right + 57 * unit, bottom: layout.bottom + 52 * unit });
-  label("speed-unit", "root", "km/h", 14, { position: "absolute", right: layout.right + 60 * unit, bottom: layout.bottom + 30 * unit });
-  image("nitro-bottle", "root", "ui/nitro.png", { position: "absolute", right: layout.right + 5, bottom: layout.bottom + 13, width: 29 * unit, height: 40 * unit });
-  node("nitro-bar", "root", { position: "absolute", right: layout.right + 5, bottom: layout.bottom + 62 * unit, width: 16 * unit, height: 90 * unit, background: [0, 0.03, 0.06, 0.8], borderRadius: 6 });
+  image("speed-meter", "root", "ui/speedback.png", { position: "absolute", right: layout.right + 28, bottom: speedBottom, width: 145 * unit, height: 145 * unit });
+  label("speed", "root", "", 29, { position: "absolute", right: layout.right + 57 * unit, bottom: speedBottom + 52 * unit });
+  label("speed-unit", "root", "km/h", 14, { position: "absolute", right: layout.right + 60 * unit, bottom: speedBottom + 30 * unit });
+  image("nitro-bottle", "root", "ui/nitro.png", { position: "absolute", right: layout.right + 5, bottom: speedBottom + 13, width: 29 * unit, height: 40 * unit });
+  node("nitro-bar", "root", { position: "absolute", right: layout.right + 5, bottom: speedBottom + 62 * unit, width: 16 * unit, height: 90 * unit, background: [0, 0.03, 0.06, 0.8], borderRadius: 6 });
   node("nitro-fill", "nitro-bar", { position: "absolute", bottom: 0, width: "100%", height: "0%", background: [0.2, 0.75, 1, 1], borderRadius: 6 });
-  if (mobile) {
+  if (mobile && session.screen === "race") {
     node("stick", "root", { position: "absolute", left: layout.stickX - layout.radius, top: layout.stickY - layout.radius, width: layout.radius * 2, height: layout.radius * 2, borderRadius: layout.radius, background: [0, 0.1, 0.2, 0.6] });
     node("stick-thumb", "root", { position: "absolute", width: layout.radius * 0.64, height: layout.radius * 0.64, borderRadius: layout.radius, background: [0.2, 0.8, 1, 0.8] });
-    for (const [id, name] of [["gas", "↑"], ["brake", "↓"], ["boost", "N"], ["drift", "V"], ["item", "Space"], ["rescue", "↶"]]) {
-      const index = ["gas", "brake", "boost", "drift", "item", "rescue"].indexOf(id), size = layout.controlSize, gap = size + 9;
-      button(id, "root", name, () => {}, { position: "absolute", right: layout.right + Math.floor(index / 2) * gap, bottom: layout.bottom + (1 - index % 2) * gap, width: size, height: size, padding: 0 });
+    const rects = touchControlRects(layout);
+    for (const [id, name] of [["gas", tr("Gas", "油门")], ["brake", tr("Brake", "刹车")], ["boost", tr("Nitro", "氮气")], ["drift", tr("Drift", "漂移")], ["item", tr("Fire", "道具")], ["rescue", tr("Rescue", "救援")], ["look-back", tr("Rear", "回看")]] as const) {
+      const r = rects[id];
+      node(id, "root", { position: "absolute", left: r.x, top: r.y, width: r.width, height: r.height, borderRadius: r.width / 2, background: panel, alignItems: "center", justifyContent: "center" });
+      label(`${id}-label`, id, name, 15);
     }
-    button("pause", "root", "Ⅱ", () => { session.screen = "paused"; changed(); }, { position: "absolute", right: layout.right, top: layout.top + 60, width: 50, height: 44 });
+    button("pause", "root", "Ⅱ", () => { session.screen = "paused"; changed(); }, { position: "absolute", left: layout.left, top: layout.top + 52, width: 50, height: 44 });
   }
 }
 export function updateStick(touch: TouchControls, layout: Layout): void {
   const radius = layout.radius * 0.32;
   style("stick-thumb", { left: layout.stickX + touch.dx * layout.radius * 0.7 - radius, top: layout.stickY + touch.dy * layout.radius * 0.7 - radius });
+  for (const id of Object.keys(touchControlRects(layout))) style(id, { background: touch.active.has(id as Parameters<typeof touch.active.has>[0]) ? [0.1, 0.65, 0.75, 0.85] : panel });
 }
 export function updateHud(session: PcSession): void {
   const race = session.race, player = race.player;
@@ -235,7 +237,7 @@ export function updateHud(session: PcSession): void {
   setLabel("speed", `${Math.round(Math.abs(player.speed) * 3.6)}`, 29);
   setLabel("status", race.phase === "countdown" ? race.countdown > 1.5 ? tr("Ready!", "预备！") : tr("Set!", "准备！")
     : player.falseStart && race.elapsed < 1 ? tr("False start!", "抢跑！") : player.offRoad > 0.3 ? tr("Off Road", "驶离赛道") : player.driftCharge >= 1 ? tr("Turbo Ready", "加速就绪") : race.elapsed < 1 ? tr("GO!", "开始！") : "", 48);
-  setLabel("item-hint", player.zipperCount > 0 ? `${tr("Space: zipper", "空格：加速")} ×${player.zipperCount}` : player.item ? tr("Space: drop banana", "空格：放置香蕉") : "", 16);
+  setLabel("item-hint", player.zipperCount > 0 ? `${dimensions.mobile ? tr("Fire: zipper", "道具：加速") : tr("Space: zipper", "空格：加速")} ×${player.zipperCount}` : player.item ? dimensions.mobile ? tr("Fire: banana", "道具：香蕉") : tr("Space: drop banana", "空格：放置香蕉") : "", 16);
   style("item-icon", { display: player.item || player.zipperCount > 0 ? "flex" : "none" });
   const itemPath = player.zipperCount > 0 ? "ui/zipper_collect.png" : "ui/banana.png";
   if (labels.get("item-icon") !== itemPath) { ui_set_image("item-icon", itemPath); labels.set("item-icon", itemPath); }
@@ -243,15 +245,15 @@ export function updateHud(session: PcSession): void {
   const ranking = race.ranking;
   for (let i = 0; i < ranking.length; i++) {
     const kart = trackData.karts.find((kart) => kart.id === ranking[i].kartId)!;
-    setLabel(`position-name-${i}`, `${kart.name}${ranking[i] === player ? tr(" · You", " · 你") : ""}`, 17);
+    if (!dimensions.mobile) setLabel(`position-name-${i}`, `${kart.name}${ranking[i] === player ? tr(" · You", " · 你") : ""}`, 17);
     const key = `position-icon-${i}`;
     if (labels.get(key) !== kart.icon) { ui_set_image(key, kart.icon); labels.set(key, kart.icon); }
   }
-  const size = Math.round(180 * clamp(dimensions.height / 720, 0.6, 1.5));
+  const { mapSize: size, mapBottom } = raceHudLayout(dimensions);
   for (const racer of race.racers) {
     const iconSize = racer === player ? 22 : 16;
     const left = dimensions.left + (racer.x - trackData.minimap.minX) / trackData.minimap.size * size - iconSize / 2;
-    const bottom = dimensions.bottom + (1 - (racer.z - trackData.minimap.minZ) / trackData.minimap.size) * size - iconSize / 2;
+    const bottom = mapBottom + (1 - (racer.z - trackData.minimap.minZ) / trackData.minimap.size) * size - iconSize / 2;
     style(`map-${racer.id}`, { left, bottom });
   }
 }

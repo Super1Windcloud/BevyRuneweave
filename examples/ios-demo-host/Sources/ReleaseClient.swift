@@ -52,7 +52,7 @@ final class ReleaseClient {
                     $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
                 })))
             case let .failure(error):
-                print("GitHub release API unavailable, using direct downloads: \(error)")
+                NSLog("GitHub release API unavailable, using direct downloads: %@", String(describing: error))
                 completion(.success(self.fallbackRelease()))
             }
         }

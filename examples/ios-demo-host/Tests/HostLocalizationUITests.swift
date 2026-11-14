@@ -59,6 +59,23 @@ final class HostLocalizationUITests: XCTestCase {
         }
     }
 
+    // Requires network access to the latest GitHub release.
+    func testDiscoverListsEveryReleaseAsset() {
+        launch("zh-Hans")
+        let latest = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "最新版本")).firstMatch
+        XCTAssertTrue(latest.waitForExistence(timeout: 30))
+        let assets = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", ".zip"))
+        print("Discover assets: \(assets.count), window=\(app.windows.firstMatch.frame)")
+        capture("ios-discover-top")
+        for index in 0..<assets.count {
+            let asset = assets.element(boundBy: index)
+            for _ in 0..<8 where !asset.isHittable { app.swipeUp() }
+            print("Discover asset \(index): \(asset.label.replacingOccurrences(of: "\n", with: " | ")) frame=\(asset.frame) hittable=\(asset.isHittable)")
+            XCTAssertTrue(asset.isHittable, asset.label)
+        }
+        capture("ios-discover-bottom")
+    }
+
     // Requires the current Ember Arena assets to be installed in the host's
     // private package store. This exercises the real embedded runtime, not a stub.
     func testInstalledGameTouchRotationAndBackgroundResume() {
