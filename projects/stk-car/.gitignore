@@ -1,6 +1,2 @@
-/modules/stk-car/game/assets/models/
-/modules/stk-car/game/assets/fonts/
-/modules/stk-car/game/assets/branding/
-/modules/stk-car/game/assets/ui/
-/modules/stk-car/game/assets/audio/
-/modules/stk-car/game/assets/stk-car.js
+# Game assets and generated runtime entries are versioned with their TypeScript sources.
+node_modules/

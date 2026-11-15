@@ -143,7 +143,12 @@ cannot be executed in the current environment must be called out explicitly as a
 
 Each game package must include `assets/engineConfig.json` with `schemaVersion`, `name`, `version`,
 and `script.language`/`script.entry`. Entry paths must remain relative to `assets` and must not use `..`.
-Keep generated output under `dist/`; never commit `.env`, tokens, or generated binaries.
+Version game assets under `projects/**/game/assets/`, including converted GLB models, textures,
+fonts, audio, manifests, licenses and generated script entries used by the runtime. Do not ignore
+these assets or require a separate local upstream asset checkout for ordinary game launches.
+Regenerate JavaScript entries through their TypeScript build command; do not edit them by hand.
+Keep build/release output under `dist/`; never commit `.env`, tokens, native runtime binaries,
+installers or release archives.
 `GITHUB_TOKEN` (or `GH_TOKEN`) can be read from `.env` in the repository root (or environment variables)
 by tooling and agents for GitHub API operations (such as upstream release queries, asset publishing,
 and changelog generation). Never print, log, or commit secret tokens or `.env` contents.
