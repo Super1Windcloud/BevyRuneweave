@@ -10,14 +10,20 @@ PC 和 Android 共用 TypeScript 玩法，Android 额外提供横屏触控菜单
 从仓库根目录执行，复用根目录的 `node_modules` 和 `target/`：
 
 ```sh
-just prepare-stk-car /Users/super/demo/stk-assets /Users/super/demo/stk-code
 just run-stk-car
 ```
 
+游戏所需的 GLB、字体、图片、音频、资源清单、许可证及运行入口 `stk-car.js` 均纳入 Git，克隆后无需另行准备官方资源目录即可运行。
+运行入口由 TypeScript 构建生成；修改脚本后通过 `npm --prefix projects/stk-car run build` 重新生成，不手动编辑 JavaScript。
+
+只有重新转换或更新上游资源时，才需要本地官方资源包和源码目录：
+
+```sh
+just prepare-stk-car /Users/super/demo/stk-assets /Users/super/demo/stk-code
+```
+
 路径是本机示例；也可运行 `npm --prefix projects/stk-car run prepare:assets -- --source=<stk-assets绝对路径> --code=<stk-code绝对路径>`。
-资源由本地官方资源包转换，不会将整个 706 MiB 资源目录复制到项目。
-转换后的 GLB、字体、图片及游戏 JS 已忽略，首次使用或克隆后先执行资源准备。
-源文件指纹保存在 `modules/stk-car/game/assets/licenses/source-manifest.json`。
+转换仅提取项目使用的资源，不会将整个 706 MiB 资源目录复制到项目。源文件指纹保存在 `modules/stk-car/game/assets/licenses/source-manifest.json`。
 
 ```sh
 npm --prefix projects/stk-car run check
