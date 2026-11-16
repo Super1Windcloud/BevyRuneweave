@@ -5,7 +5,7 @@ export interface MenuData {
   pages: Record<string, GuiNode>;
   sources: Record<string, string>;
   translations: Record<string, string>;
-  images: Record<string, { path: string; width: number; height: number }>;
+  images: Record<string, { path: string; width: number; height: number; borders?: number[]; slices?: string[]; preserveHorizontal?: boolean }>;
   tracks: MenuTrack[];
   grandPrix: MenuGrandPrix[];
   credits: string[];

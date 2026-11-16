@@ -9,20 +9,24 @@ import { formatTime } from "./race.js";
 import type { PcSession } from "./session.js";
 import { trackData } from "./track-data.js";
 import { courses, defaultCourse } from "./courses.js";
+import { kartMenuSource, menuGeometry, playerKartRects } from "./kart-layout.js";
 
 export interface MenuButton {
   id: string; action: () => void; base: number[]; hint?: string;
-  face?: { id: string; normal: string; focused: string; selected: boolean };
+  face?: { id: string; normal: string; focused: string; selected: boolean; slices?: { id: string; normal: string; focused: string }[] };
   caption?: { id: string; text: string; size: number };
+  field?: { inner: string; editing: boolean };
 }
 export interface MenuHost { register(button: MenuButton): void; modal(): void; focus(id: string): void; }
 export const menuWidgetId = (page: string, id: string): string => `gui:${page}:${id}`;
 const transparent = [0, 0, 0, 0], ink = [0, 0, 0, 1], blue = [0, 0, 0.7, 1];
+// Classic stkskin.xml text_field colors; STK edit boxes use solid fills, not button textures.
+export const textFieldColors = { border: [138 / 255, 138 / 255, 138 / 255, 1], focus: [243 / 255, 164 / 255, 80 / 255, 1], background: [200 / 255, 200 / 255, 200 / 255, 1], editing: [236 / 255, 226 / 255, 201 / 255, 1] };
 const containerTags = new Set(["stkgui", "div", "box", "bottombar"]);
 const gridTags = new Set(["ribbon_grid", "scrollable_ribbon", "scrollable_toolbar", "ribbon", "buttonbar", "tabs", "vertical-tabs"]);
 
 export function sourceImage(name: string): string { return menuData.images[name]?.path ?? name; }
-function skin(name: string): string { return sourceImage(`skins/classic/${name}.png`) !== `skins/classic/${name}.png` ? sourceImage(`skins/classic/${name}.png`) : sourceImage(`skins/common/${name}.png`); }
+function skin(name: string): string { return menuData.images[`skins/classic/${name}.png`] ? `skins/classic/${name}.png` : `skins/common/${name}.png`; }
 function spawn(id: string, kind: "node" | "button" | "image" | "text", parent: string, style: Record<string, unknown>): void {
   if (!ui_spawn(id, parent, kind) || !ui_set_style(id, JSON.stringify(style))) throw new Error(`Cannot create menu widget ${id}`);
 }
@@ -35,6 +39,20 @@ function picture(id: string, path: string, rect: Rect, stretch = false, parent =
   }
   spawn(id, "image", parent, { ...position(rect), imageMode: "stretch" });
   if (!ui_set_image(id, sourceImage(path))) throw new Error(`Missing menu image ${path}`);
+}
+function skinPicture(id: string, path: string, rect: Rect, scale: number, parent = "root"): void {
+  const image = menuData.images[path];
+  if (!image?.borders || !image.slices) { picture(id, path, rect, true, parent); return; }
+  spawn(id, "node", parent, position(rect));
+  const [left, right, top, bottom] = image.borders;
+  const vertical = Math.min(scale, rect.height / image.height);
+  const horizontal = Math.min(image.preserveHorizontal ? rect.height / image.height : vertical, rect.width / Math.max(1, left + right));
+  const xs = [0, left * horizontal, rect.width - right * horizontal, rect.width], ys = [0, top * vertical, rect.height - bottom * vertical, rect.height];
+  image.slices.forEach((slice, index) => {
+    if (!slice) return;
+    const x = index % 3, y = Math.floor(index / 3);
+    picture(`${id}:slice-${index}`, slice, { x: xs[x], y: ys[y], width: xs[x + 1] - xs[x], height: ys[y + 1] - ys[y] }, true, id);
+  });
 }
 function text(id: string, value: string, rect: Rect, size: number, color = ink, align = "center", parent = "root"): void {
   spawn(id, "node", parent, { ...position(rect), flexDirection: "column", alignItems: align === "left" ? "start" : "center", justifyContent: "center" });
@@ -49,8 +67,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   const m = session.menu, page = menuPageFor(session);
   m.page = page;
   const mobile = !!layout.mobile;
-  const safeRect = mobile ? { x: layout.left, y: layout.top, width: layout.width - layout.left - layout.right, height: layout.height - layout.top - layout.bottom } : { x: 0, y: 0, width: layout.width, height: layout.height };
-  const scale = Math.max(mobile ? 0.85 : 0.5, Math.min(1.4, safeRect.width / 1280, safeRect.height / 720));
+  const { rect: safeRect, scale } = menuGeometry(layout);
   const counts = new Map<string, number>();
   const uid = (key: string) => { const count = counts.get(key) ?? 0; counts.set(key, count + 1); return count ? `${key}:${count}` : key; };
   const action = (id: string) => () => { m.editing = ""; menuAction(session, id, changed, start); };
@@ -58,7 +75,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   function button(id: string, rect: Rect, label: string, click: () => void, options: { image?: string; normal?: string; focused?: string; selected?: boolean; horizontal?: boolean } = {}): void {
     spawn(id, "button", "root", { ...position(rect), background: transparent });
     const normal = options.normal ?? skin("glassbutton"), focused = options.focused ?? skin("glassbutton_focused");
-    if (normal) picture(`${id}:face`, normal, { x: 0, y: 0, width: rect.width, height: rect.height }, true, id);
+    if (normal) skinPicture(`${id}:face`, normal, { x: 0, y: 0, width: rect.width, height: rect.height }, scale, id);
     const captionHeight = label ? Math.min(rect.height * (options.image && !options.horizontal ? 0.31 : 1), 42 * scale) : 0;
     if (options.image) {
       const imageRect = options.horizontal ? { x: 6 * scale, y: 3 * scale, width: Math.min(rect.height - 6 * scale, rect.width * 0.28), height: rect.height - 6 * scale }
@@ -69,7 +86,8 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       : { x: 4 * scale, y: rect.height - captionHeight, width: rect.width - 8 * scale, height: captionHeight }, Math.max(13, 18 * scale), ink, "center", id);
     const base = options.selected && !normal ? [0, 0.65, 0.7, 0.32] : transparent;
     if (!normal && options.selected) ui_set_style(id, JSON.stringify({ background: base }));
-    host.register({ id, action: click, base, face: normal ? { id: `${id}:face`, normal, focused, selected: !!options.selected } : undefined,
+    const slices = menuData.images[normal]?.slices?.flatMap((path, index) => path ? [{ id: `${id}:face:slice-${index}`, normal: path, focused: menuData.images[focused]?.slices?.[index] || path }] : []);
+    host.register({ id, action: click, base, face: normal ? { id: `${id}:face`, normal: sourceImage(normal), focused: sourceImage(focused), selected: !!options.selected, slices } : undefined,
       caption: label ? { id: `${id}:label:text`, text: label, size: Math.max(13, 18 * scale) } : undefined });
   }
   function items(id: string, currentPage: string): Item[] {
@@ -131,7 +149,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       if (r.width < 1 || r.height < 1 || node.tag === "spacer" || logical.startsWith("test_")) return;
       const id = uid(menuWidgetId(currentPage, logical));
       if (containerTags.has(node.tag)) {
-        if (node.tag === "box") picture(`${id}:box`, skin("generic"), r, true);
+        if (node.tag === "box") skinPicture(`${id}:box`, skin("glass_section"), r, scale);
         if (logical === "animated_area") { drawCredits(id, r); return; }
         box.children.forEach(draw); return;
       }
@@ -144,7 +162,10 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       if (node.tag === "list") { drawList(id, logical, rows(logical, currentPage), r, currentPage); return; }
       if (node.tag === "placeholder") {
         const kart = trackData.karts.find((kart) => kart.id === session.settings.kartId)!;
-        text(`${id}:player`, `${m.profiles[m.player]} — ${kart.name}`, { x: r.x, y: r.y + r.height * 0.8, width: r.width, height: r.height * 0.18 }, 24 * scale, blue); return;
+        const areas = playerKartRects(r, scale);
+        const player = m.profiles[m.player] === "Player" ? tr("Player", "玩家") : m.profiles[m.player];
+        button(`${id}:player`, areas.player, player, action("user-id"), { normal: skin("glassspinner"), focused: skin("glassspinner_focus") });
+        text(`${id}:name`, kart.name, areas.name, 22 * scale, blue); return;
       }
       if (node.tag === "checkbox") {
         const checked = m.checked(logical, session), side = Math.min(r.height, r.width, 30 * scale), square = { x: r.x, y: r.y + (r.height - side) / 2, width: side, height: side };
@@ -156,7 +177,11 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       }
       if (node.tag === "textbox") {
         const value = m.text(logical), display = logical.includes("password") ? "●".repeat(value.length) : value;
-        button(id, r, `${display}${m.editing === logical ? "|" : ""}`, () => { m.editing = logical; changed(); }, { selected: m.editing === logical }); return;
+        const border = Math.min(3 * scale, r.width / 2, r.height / 2), inner = `${id}:inner`;
+        spawn(id, "button", "root", { ...position(r), background: textFieldColors.border });
+        spawn(inner, "node", id, { ...position({ x: border, y: border, width: r.width - border * 2, height: r.height - border * 2 }), background: textFieldColors.background });
+        text(`${id}:value`, `${display}${m.editing === logical ? "|" : ""}`, { x: border + 3 * scale, y: border, width: r.width - border * 2 - 6 * scale, height: r.height - border * 2 }, 18 * scale, ink, "left", id);
+        host.register({ id, action: () => { m.editing = logical; changed(); }, base: textFieldColors.border, field: { inner, editing: m.editing === logical } }); return;
       }
       if (node.tag === "icon" || node.tag === "icon-button") {
         let icon = a.icon;
@@ -172,7 +197,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       text(id, labelValue(logical, a.text ?? "", currentPage), r, Math.max(12, size), header ? blue : ink, a.text_align ?? (node.tag === "bubble" ? "left" : "center"));
     };
     const filtered = (node: GuiNode): GuiNode => ({ ...node, children: node.children.filter((child) => !(currentPage === "track_info" && child.attributes.id === "ai-blue-div" && m.raceMode !== "soccer")).map(filtered) });
-    draw(guiLayout(filtered(source), rect, scale));
+    draw(guiLayout(filtered(currentPage === "karts" && !mobile ? kartMenuSource() : source), rect, scale));
   }
   function selected(id: string, currentPage: string): boolean {
     const index = optionTabs.indexOf(id);
@@ -184,10 +209,11 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   }
   function drawSpinner(id: string, logical: string, node: GuiNode, r: Rect): void {
     const choices = m.choices(logical), min = Number(node.attributes.min_value ?? 0), max = Number(node.attributes.max_value ?? (logical === "scale_rtts" || logical === "font_size" ? 150 : 10));
-    picture(`${id}:background`, skin("glassspinner"), r, true);
+    skinPicture(`${id}:background`, skin("glassspinner"), r, scale);
     const arrow = Math.min(mobile ? 44 : 30 * scale, r.width * (mobile ? 0.28 : 0.18)), size = Math.min(r.height, mobile ? 44 : 32 * scale), y = r.y + (r.height - size) / 2;
-    button(`${id}:down`, { x: r.x, y, width: arrow, height: size }, "", () => { m.editing = ""; m.adjust(logical, -1, session, min, max); changed(); }, { image: "skins/common/left_arrow.png", normal: "", focused: "" });
-    button(`${id}:up`, { x: r.x + r.width - arrow, y, width: arrow, height: size }, "", () => { m.editing = ""; m.adjust(logical, 1, session, min, max); changed(); }, { image: "skins/common/right_arrow.png", normal: "", focused: "" });
+    // The source spinner skin already contains both arrows; these are hit regions only.
+    button(`${id}:down`, { x: r.x, y, width: arrow, height: size }, "", () => { m.editing = ""; m.adjust(logical, -1, session, min, max); changed(); }, { normal: "", focused: "" });
+    button(`${id}:up`, { x: r.x + r.width - arrow, y, width: arrow, height: size }, "", () => { m.editing = ""; m.adjust(logical, 1, session, min, max); changed(); }, { normal: "", focused: "" });
     if (node.tag === "gauge" && !choices.length) {
       const value = m.number(logical, session), width = Math.max(0, (r.width - arrow * 2) * Math.max(0, Math.min(1, (value - min) / Math.max(1, max - min))));
       if (width) picture(`${id}:fill`, skin("glasssgauge_fill"), { x: r.x + arrow, y: y + size * 0.5, width, height: size * 0.25 }, true);
