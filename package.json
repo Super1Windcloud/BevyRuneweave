@@ -27,6 +27,7 @@
     "typecheck:scripts": "tsc --project scripts/tsconfig.json",
     "prepare:host-locales": "tsx scripts/prepare-host-locales.ts",
     "test:host-locales": "tsx --test scripts/host-localization.test.ts scripts/ios-device-selection.test.ts",
+    "test:desktop-paths": "tsx --test scripts/desktop-host-paths.test.ts",
     "test:ios-download": "tsx --test scripts/ios-download.test.ts",
     "test:mobile-resources": "tsx --test scripts/mobile-resource-cleanup.test.ts",
     "test:release-assets": "tsx --test scripts/release-assets.test.ts",
