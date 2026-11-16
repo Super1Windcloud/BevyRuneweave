@@ -64,7 +64,10 @@ test("rescue and reverse cannot award a lap; item activation consumes one item",
   race.rescue();
   assert.equal(race.player.progress, progress);
   assert.equal(race.player.speed, 0);
-  for (const rival of race.racers.slice(1)) rival.routeDistance += 100;
+  for (const rival of race.racers.slice(1)) {
+    const distance = circuit.wrap(rival.routeDistance + 100);
+    Object.assign(rival, circuit.sample(distance, rival.lane), { routeDistance: distance });
+  }
   race.player.item = true;
   race.step(fixedStep, { ...emptyControls(), useItem: true });
   race.step(fixedStep, { ...emptyControls(), useItem: true });

@@ -1,3 +1,5 @@
+import { resolveKartContacts } from "./kart-collision.js";
+
 export interface Vec3 { x: number; y: number; z: number; }
 export interface RouteNode { center: readonly number[]; width: number; }
 export interface Controls { throttle: number; steer: number; brake: boolean; drift: boolean; nitro: boolean; rescue: boolean; useItem: boolean; lookBack?: boolean; }
@@ -9,6 +11,7 @@ export interface Racer extends Pose {
   id: string;
   kartId: string;
   speed: number;
+  sideSpeed: number;
   progress: number;
   routeDistance: number;
   segment: number;
@@ -119,11 +122,11 @@ export class Race {
     const kartIds = [options.kartId, ...["tux", "pidgin", "wilber", "suzanne"].filter((id) => id !== options.kartId)];
     const count = options.mode === "time-trial" ? 1 : clamp(Math.floor(options.aiCount), 0, 3) + 1;
     this.racers = ["tux", "comet", "pepper", "ocean"].slice(0, count).map((id, index) => {
-      const progress = -1.5 - Math.floor(index / 2) * 1.5;
+      const progress = -1.5 - Math.floor(index / 2) * 2;
       const lane = index % 2 ? 1.5 : -1.5;
       const pose = circuit.sample(progress, lane);
       return { ...pose, previous: { ...pose }, id, kartId: kartIds[index], progress, routeDistance: circuit.wrap(progress), lane,
-        speed: 0, nitro: 0, boost: 0, driftCharge: 0, steering: 0, offRoad: 0, stun: 0, falseStart: false, startBoostApplied: false, item: false, zipperCount: options.mode === "time-trial" ? laps : 0, finishedAt: null };
+        speed: 0, sideSpeed: 0, nitro: 0, boost: 0, driftCharge: 0, steering: 0, offRoad: 0, stun: 0, falseStart: false, startBoostApplied: false, item: false, zipperCount: options.mode === "time-trial" ? laps : 0, finishedAt: null };
     });
   }
   get player(): Racer { return this.racers[0]; }
@@ -135,11 +138,18 @@ export class Race {
   start(): void { if (this.phase === "ready") this.phase = "countdown"; }
   rescue(racer = this.player): void {
     const pose = this.circuit.sample(racer.routeDistance, racer.lane);
-    Object.assign(racer, pose, { previous: { ...pose }, speed: 0, offRoad: 0, boost: 0, driftCharge: 0 });
+    Object.assign(racer, pose, { previous: { ...pose }, speed: 0, sideSpeed: 0, offRoad: 0, boost: 0, driftCharge: 0 });
   }
   step(dt: number, controls: Controls): void {
     if (!Number.isFinite(dt) || dt <= 0 || dt > 0.05) return;
     for (const racer of this.racers) racer.previous = { x: racer.x, y: racer.y, z: racer.z, heading: racer.heading, pitch: racer.pitch };
+    // Bound relative travel even for head-on impacts during boost or a long accepted tick.
+    const speed = Math.max(1, ...this.racers.map((racer) => Math.hypot(racer.speed, racer.sideSpeed))) + 20 * dt + (controls.useItem ? 4.5 : 0);
+    const steps = Math.ceil(dt / Math.min(fixedStep, 0.2 / speed));
+    const held = controls.rescue || controls.useItem ? { ...controls, rescue: false, useItem: false } : controls;
+    for (let step = 0; step < steps; step++) this.tick(dt / steps, step ? held : controls);
+  }
+  private tick(dt: number, controls: Controls): void {
     if (this.phase === "countdown") {
       if (controls.throttle > 0 && this.countdown > 0.2) this.player.falseStart = true;
       this.countdown -= dt;
@@ -152,11 +162,19 @@ export class Race {
     const previousLap = Math.floor(player.progress / this.circuit.length);
     for (let i = 0; i < this.racers.length; i++) {
       const racer = this.racers[i];
-      if (racer.finishedAt !== null) { racer.speed = 0; continue; }
+      if (racer.finishedAt !== null) { racer.speed = 0; racer.sideSpeed = 0; continue; }
       racer.stun = Math.max(0, racer.stun - dt);
       racer.boost = Math.max(0, racer.boost - dt);
       if (i === 0) this.drive(racer, dt, controls);
       else this.driveAi(racer, i, dt);
+      this.updateRoad(racer, dt);
+    }
+    for (const racer of resolveKartContacts(this.racers)) {
+      // Rebase route coordinates after separation without awarding collision-correction distance.
+      this.updateRoad(racer, dt, false);
+    }
+    for (const racer of this.racers) {
+      if (racer.finishedAt !== null) continue;
       if (racer.progress >= this.circuit.length * this.laps) racer.finishedAt = this.elapsed;
       for (const pickup of this.pickups) {
         if (pickup.cooldown > 0 || Math.abs(racer.y - pickup.position[1]) > 4 || Math.hypot(racer.x - pickup.position[0], racer.z - pickup.position[2]) > 1.7) continue;
@@ -174,13 +192,6 @@ export class Race {
         racer.stun = 1.2; racer.speed *= 0.4; trap.lifetime = 0;
       }
       if (trap.lifetime <= 0) this.traps.splice(i, 1);
-    }
-    for (const rival of this.racers.slice(1)) {
-      if (Math.abs(player.y - rival.y) < 1 && Math.hypot(player.x - rival.x, player.z - rival.z) < 0.85 && player.speed > rival.speed) {
-        const transfer = (player.speed - rival.speed) * 0.45;
-        player.speed -= transfer;
-        rival.speed += transfer;
-      }
     }
     const lap = Math.floor(player.progress / this.circuit.length);
     if (lap > Math.max(0, previousLap) && this.lapTimes.length < lap) {
@@ -219,19 +230,23 @@ export class Race {
     if (controls.brake) racer.speed = Math.max(-baseSpeed * 0.65 * (light ? 0.8 : heavy ? 0.7 : 0.75), racer.speed - 15 * dt);
     if (controls.throttle === 0) racer.speed *= Math.exp(-dt * 0.5);
     racer.heading += racer.steering * clamp(racer.speed / 11, -0.6, 1.9) * (drifting ? 1.2 : 0.92) * dt;
-    racer.x += Math.sin(racer.heading) * racer.speed * dt;
-    racer.z -= Math.cos(racer.heading) * racer.speed * dt;
+    racer.sideSpeed *= Math.exp(-dt * 8);
+    racer.x += (Math.sin(racer.heading) * racer.speed + Math.cos(racer.heading) * racer.sideSpeed) * dt;
+    racer.z += (-Math.cos(racer.heading) * racer.speed + Math.sin(racer.heading) * racer.sideSpeed) * dt;
+  }
+  private updateRoad(racer: Racer, dt: number, advance = true): void {
     const road = this.circuit.project(racer.x, racer.z, racer.segment);
     let delta = road.distance - racer.routeDistance;
     if (delta > this.circuit.length / 2) delta -= this.circuit.length;
     if (delta < -this.circuit.length / 2) delta += this.circuit.length;
-    if (Math.abs(delta) <= Math.abs(racer.speed) * dt * 3 + 0.5 && road.lateral < road.width * 0.8) {
-      racer.progress = Math.max(-10, racer.progress + delta);
+    if (!advance || Math.abs(delta) <= Math.hypot(racer.speed, racer.sideSpeed) * dt * 3 + 0.5 && road.lateral < road.width * 0.8) {
+      if (advance) racer.progress = Math.max(-10, racer.progress + delta);
       racer.routeDistance = this.circuit.wrap(road.distance);
     }
     racer.segment = road.segment;
     racer.y += (road.y - racer.y) * (1 - Math.exp(-dt * 25));
     racer.pitch = this.circuit.sample(road.distance).pitch;
+    if (!advance) return;
     if (road.lateral > road.width * 0.48) {
       racer.speed *= Math.exp(-dt * 1.5);
       racer.offRoad += dt;
@@ -245,10 +260,14 @@ export class Race {
     const targetSpeed = racer.stun > 0 ? 8 : baseSpeed * (0.78 + index * 0.025) - Math.min(6, turn * 5);
     racer.speed += clamp(targetSpeed - racer.speed, -16 * dt, 9 * dt);
     const distance = racer.speed * dt;
-    racer.progress += distance;
-    racer.routeDistance = this.circuit.wrap(racer.routeDistance + distance);
-    const pose = this.circuit.sample(racer.routeDistance, racer.lane + Math.sin(this.elapsed * 0.7 + index) * 0.3);
-    racer.x = pose.x; racer.y = pose.y; racer.z = pose.z; racer.segment = pose.segment;
+    const lane = racer.lane + Math.sin(this.elapsed * 0.7 + index) * 0.3;
+    const origin = this.circuit.sample(racer.routeDistance, lane), pose = this.circuit.sample(racer.routeDistance + distance, lane);
+    // Follow the same route, but keep collision displacement and return to the lane at a bounded rate.
+    const cos = Math.cos(origin.heading), sin = Math.sin(origin.heading);
+    const correction = clamp(((origin.x - racer.x) * cos + (origin.z - racer.z) * sin) * 2, -1.5, 1.5);
+    racer.sideSpeed *= Math.exp(-dt * 8);
+    racer.x += pose.x - origin.x + cos * (racer.sideSpeed + correction) * dt;
+    racer.z += pose.z - origin.z + sin * (racer.sideSpeed + correction) * dt;
     racer.heading += angleDelta(pose.heading - racer.heading) * (1 - Math.exp(-dt * 9));
     racer.pitch = pose.pitch;
   }
