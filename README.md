@@ -190,11 +190,17 @@ just ts-build
 `package-lock.json` pins TypeScript 7.0.2. The compiled `modules/shooter/game/assets/shooter.js` is tracked, so a global
 `tsc` installation is not required just to run the game.
 
-Build commands use the debug profile by default. Add `--release` explicitly for release builds:
+Build, run, packaging and benchmark commands use the debug profile by default, including npm scripts.
+Add `--release` explicitly for release builds:
 
 ```bash
 just build
 just build-ts --release
+npm run package:macos                   # Debug installer
+npm run package:macos -- --release      # Release installer
+just bench                             # Debug measurements
+just bench save --release              # Save an optimized baseline
+just bench compare 25 --release        # Compare optimized measurements
 ```
 
 ## Cross-Platform Runtime

@@ -492,7 +492,7 @@ fn perf_baseline() -> Result<(), Box<dyn Error>> {
         .map(|value| value.parse::<f64>())
         .transpose()?;
     if cfg!(debug_assertions) {
-        println!("warning: debug build timings are not representative; run `just bench`");
+        println!("warning: debug build timings are not representative; run `just bench --release`");
     }
 
     match mode.as_str() {
