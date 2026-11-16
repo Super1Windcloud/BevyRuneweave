@@ -130,11 +130,11 @@ test-ts: ts-build
 # Run all script-engine gameplay tests.
 test: test-lua test-js test-ts
 
-# Measure script API hot paths in release mode and compare them with the local
+# Measure script API hot paths in debug mode and compare them with the local
 # baseline. `just bench save` records the baseline; `just bench compare 25`
-# fails when any median regresses by more than 25%.
-bench $RUNEWEAVE_PERF_BASELINE="compare" $RUNEWEAVE_PERF_MAX_REGRESSION="":
-    cargo test --release -p bevy-runeweave --lib perf_baseline -- --ignored --nocapture --test-threads=1
+# fails when any median regresses by more than 25%. Add --release for optimized timings.
+bench *args="":
+    npm exec -- tsx scripts/benchmark.ts {{args}}
 
 # Test the BMS Lua 5.5 adapter.
 bms-test-lua:

@@ -18,8 +18,8 @@
     "doc": "docs"
   },
   "scripts": {
-    "package:windows": "tsx scripts/package-desktop.ts windows --release",
-    "package:macos": "tsx scripts/package-desktop.ts macos --release",
+    "package:windows": "tsx scripts/package-desktop.ts windows",
+    "package:macos": "tsx scripts/package-desktop.ts macos",
     "package:android": "tsx scripts/package-android.ts",
     "create:game": "tsx scripts/create-game-project.ts",
     "release:assets": "tsx --env-file=.env scripts/publish-release.ts",
@@ -31,7 +31,8 @@
     "test:ios-download": "tsx --test scripts/ios-download.test.ts",
     "test:mobile-resources": "tsx --test scripts/mobile-resource-cleanup.test.ts",
     "test:release-assets": "tsx --test scripts/release-assets.test.ts",
-    "test": "npm run typecheck:scripts && npm run test:release-assets && npm run test:host-locales"
+    "test:build-defaults": "tsx --test scripts/benchmark.test.ts",
+    "test": "npm run typecheck:scripts && npm run test:build-defaults && npm run test:release-assets && npm run test:host-locales"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
