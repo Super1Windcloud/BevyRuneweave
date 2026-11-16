@@ -5,8 +5,8 @@ import type { UiLanguage } from "./localization.js";
 import { courseFor, defaultCourse } from "./courses.js";
 
 export type Screen = "main" | "kart" | "setup" | "tracks" | "track-info" | "options" | "help" | "notice" | "menu" | "race" | "paused" | "finished";
-export interface Settings { trackId: string; kartId: string; difficulty: number; mode: "normal" | "time-trial"; laps: number; aiCount: number; reverse: boolean; wasd: boolean; musicVolume: number; sfxVolume: number; language: UiLanguage; }
-export const defaultSettings = (): Settings => ({ trackId: defaultCourse.id, kartId: "tux", difficulty: 1, mode: "normal", laps: defaultCourse.defaultLaps, aiCount: 3, reverse: false, wasd: false, musicVolume: 0.6, sfxVolume: 0.7, language: "system" });
+export interface Settings { trackId: string; kartId: string; difficulty: number; mode: "normal" | "time-trial"; laps: number; aiCount: number; reverse: boolean; wasd: boolean; steeringAssist: boolean; musicVolume: number; sfxVolume: number; language: UiLanguage; }
+export const defaultSettings = (): Settings => ({ trackId: defaultCourse.id, kartId: "tux", difficulty: 1, mode: "normal", laps: defaultCourse.defaultLaps, aiCount: 3, reverse: false, wasd: false, steeringAssist: false, musicVolume: 0.6, sfxVolume: 0.7, language: "system" });
 export function parseSettings(value: string): Settings {
   const defaults = defaultSettings();
   try {
@@ -19,6 +19,7 @@ export function parseSettings(value: string): Settings {
     if (data.mode === "normal" || data.mode === "time-trial") defaults.mode = data.mode;
     if (typeof data.reverse === "boolean") defaults.reverse = data.reverse;
     if (typeof data.wasd === "boolean") defaults.wasd = data.wasd;
+    if (typeof data.steeringAssist === "boolean") defaults.steeringAssist = data.steeringAssist;
     for (const key of ["musicVolume", "sfxVolume"] as const) if (typeof data[key] === "number" && Number.isFinite(data[key])) defaults[key] = clamp(data[key], 0, 1);
     if (["system", "zh-CN", "en-US"].includes(data.language as string)) defaults.language = data.language as UiLanguage;
   } catch { /* Preserve defaults for invalid or old saved values. */ }

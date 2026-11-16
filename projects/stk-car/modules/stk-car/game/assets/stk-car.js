@@ -324,7 +324,7 @@
       const maxSpeed = racer.stun > 0 ? racer.falseStart && this.elapsed < 1 ? 0 : 9 : baseSpeed + (boosting ? 5 : 0);
       const acceleration = clamp(controls.throttle, -1, 1) * (boosting ? 17 : 11) - 0.07 * racer.speed;
       racer.speed = clamp(racer.speed + acceleration * dt, -8, Math.max(maxSpeed, racer.speed - 20 * dt));
-      if (controls.brake) racer.speed = Math.max(-baseSpeed * 0.65 * (light ? 0.8 : heavy ? 0.7 : 0.75), racer.speed - 15 * dt);
+      if (controls.brake) racer.speed = Math.max(controls.allowReverse === false ? 0 : -baseSpeed * 0.65 * (light ? 0.8 : heavy ? 0.7 : 0.75), racer.speed - 15 * dt);
       if (controls.throttle === 0) racer.speed *= Math.exp(-dt * 0.5);
       racer.heading += racer.steering * clamp(racer.speed / 11, -0.6, 1.9) * (drifting ? 1.2 : 0.92) * dt;
       racer.sideSpeed *= Math.exp(-dt * 8);
@@ -371,21 +371,20 @@
 
   // modules/stk-car/game/src/controls.ts
   function touchControlRects(layout2) {
-    const size = layout2.controlSize, gap = size + 9;
-    const rect = (column, row) => ({ x: layout2.width - layout2.right - column * gap - size, y: layout2.height - layout2.bottom - row * gap - size, width: size, height: size });
+    const size = layout2.controlSize, y = layout2.height - layout2.bottom - size, small = clamp(size * 0.68, 44, 60), steerWidth = size * 1.15;
     return {
-      gas: rect(0, 1),
-      brake: rect(0, 0),
-      boost: rect(1, 1),
-      drift: rect(1, 0),
-      item: rect(2, 1),
-      rescue: rect(2, 0),
-      "look-back": { x: layout2.stickX + layout2.radius + 14, y: layout2.height - layout2.bottom - size, width: size, height: size }
+      left: { x: layout2.left, y, width: steerWidth, height: size },
+      right: { x: layout2.left + steerWidth + 10, y, width: steerWidth, height: size },
+      boost: { x: layout2.width - layout2.right - size, y, width: size, height: size },
+      drift: { x: layout2.width - layout2.right - size * 2 - 14, y, width: size, height: size },
+      item: { x: layout2.width - layout2.right - small, y: y - small - 12, width: small, height: small },
+      rescue: { x: layout2.left + 52, y: layout2.top + 44, width: 44, height: 44 },
+      "look-back": { x: layout2.left + 104, y: layout2.top + 44, width: 44, height: 44 }
     };
   }
   function makeLayout(width, height, insets, mobile2 = false) {
     const unit = clamp(height / 720, 0.65, 1.2);
-    const layout2 = {
+    return {
       width,
       height,
       mobile: mobile2,
@@ -393,46 +392,43 @@
       right: Math.max(16, insets.right + 12),
       top: Math.max(12, insets.top + 10),
       bottom: Math.max(14, insets.bottom + 12),
-      stickX: 0,
-      stickY: 0,
-      radius: mobile2 ? clamp(height * 0.145, 44, 72) : 60 * unit,
-      controlSize: mobile2 ? clamp(Math.min(height * 0.145, (width - insets.left - insets.right) / 12), 44, 72) : 64 * unit
+      controlSize: mobile2 ? clamp(Math.min(height * 0.18, (width - insets.left - insets.right) / 10), 52, 88) : 64 * unit
     };
-    layout2.stickX = layout2.left + layout2.radius + 8;
-    layout2.stickY = height - layout2.bottom - layout2.radius - 8;
-    return layout2;
   }
   var TouchControls = class {
-    stickId = null;
-    dx = 0;
-    dy = 0;
+    braking = false;
+    drifting = false;
     active = /* @__PURE__ */ new Set();
     blocked = /* @__PURE__ */ new Set();
     capture = /* @__PURE__ */ new Map();
     rearm = false;
     reset() {
-      this.stickId = null;
-      this.dx = 0;
-      this.dy = 0;
+      this.braking = false;
+      this.drifting = false;
       this.active.clear();
       this.capture.clear();
       this.rearm = true;
     }
-    apply(input, contacts, layout2) {
+    apply(input, contacts, layout2, driving = true, assistedSteer = 0) {
       this.active.clear();
+      this.braking = false;
+      this.drifting = false;
+      input.allowReverse = false;
+      contacts = contacts.filter((contact) => Number.isFinite(contact.x) && Number.isFinite(contact.y));
       if (this.rearm) {
         this.blocked = new Set(contacts.map((contact) => contact.id));
         this.rearm = false;
       }
       for (const id of this.blocked) if (!contacts.some((contact) => contact.id === id)) this.blocked.delete(id);
-      contacts = contacts.filter((contact) => !this.blocked.has(contact.id));
+      if (this.blocked.size) {
+        Object.assign(input, emptyControls());
+        input.lookBack = false;
+        return;
+      }
       for (const id of this.capture.keys()) if (!contacts.some((contact) => contact.id === id)) this.capture.delete(id);
       const rects = touchControlRects(layout2);
       const contains = (r, c) => c.x >= r.x && c.x <= r.x + r.width && c.y >= r.y && c.y <= r.y + r.height;
-      if (this.stickId && !contacts.some((contact) => contact.id === this.stickId)) this.stickId = null;
       for (const contact of contacts) {
-        if (!this.stickId && contact.justPressed && Math.hypot(contact.x - layout2.stickX, contact.y - layout2.stickY) <= layout2.radius * 1.4) this.stickId = contact.id;
-        if (contact.id === this.stickId) continue;
         if (contact.justPressed) {
           for (const action2 of Object.keys(rects)) if (contains(rects[action2], contact)) {
             this.capture.set(contact.id, action2);
@@ -440,28 +436,34 @@
           }
         }
         const action = this.capture.get(contact.id);
+        if (action === "left" || action === "right") {
+          for (const direction of ["left", "right"]) if (contains(rects[direction], contact)) this.active.add(direction);
+          continue;
+        }
         if (!action || !contains(rects[action], contact)) continue;
         this.active.add(action);
-        if (action === "gas") input.throttle = 1;
-        if (action === "brake") input.brake = true;
         if (action === "boost") input.nitro = true;
-        if (action === "drift") input.drift = true;
         if (action === "look-back") input.lookBack = true;
         if (action === "item" && contact.justPressed) input.useItem = true;
         if (action === "rescue" && contact.justPressed) input.rescue = true;
       }
-      const stick = contacts.find((contact) => contact.id === this.stickId);
-      const x = stick ? (stick.x - layout2.stickX) / layout2.radius : 0, y = stick ? (stick.y - layout2.stickY) / layout2.radius : 0, length = Math.max(1, Math.hypot(x, y));
-      this.dx = x / length;
-      this.dy = y / length;
-      if (stick) {
-        input.steer = Math.abs(this.dx) > 0.12 ? this.dx : 0;
-        if (this.dy > 0.4) input.brake = true;
-        else input.throttle = 1;
+      if (this.active.has("left") || this.active.has("right")) input.steer = Number(this.active.has("right")) - Number(this.active.has("left"));
+      else if (!input.steer && driving) input.steer = assistedSteer;
+      if (this.active.has("drift")) {
+        if (Math.abs(input.steer) > 0.12) input.drift = true;
+        else input.brake = true;
       }
-      if (input.brake) input.throttle = 0;
+      input.throttle = driving && !input.brake ? 1 : 0;
+      this.braking = input.brake;
+      this.drifting = input.drift;
     }
   };
+  function assistedSteering(race) {
+    const player = race.player, road = race.circuit.sample(player.routeDistance);
+    const lane = (player.x - road.x) * Math.cos(road.heading) + (player.z - road.z) * Math.sin(road.heading);
+    const target = race.circuit.sample(player.routeDistance + Math.max(5, Math.abs(player.speed) * 0.35), clamp(lane, -road.width * 0.25, road.width * 0.25));
+    return clamp(angleDelta(Math.atan2(target.x - player.x, -(target.z - player.z)) - player.heading) * 2.6, -0.9, 0.9);
+  }
   function keyboardControls(held, pressed, wasd = false) {
     const input = emptyControls();
     input.throttle = held("ArrowUp") || wasd && held("KeyW") ? 1 : 0;
@@ -474,7 +476,7 @@
     input.useItem = pressed("Space");
     return input;
   }
-  function readControls(touch2, layout2, mobile2 = false, wasd = false) {
+  function readControls(touch2, layout2, mobile2 = false, wasd = false, driving) {
     const input = keyboardControls(input_key_pressed, input_key_just_pressed, wasd);
     if (!mobile2) return input;
     const contacts = input_touches().map((contact) => ({ id: contact.id, justPressed: contact.justPressed, x: contact.x * layout2.width, y: contact.y * layout2.height }));
@@ -485,7 +487,8 @@
       x: (pointer.x / pointer.viewportWidth + 0.5) * layout2.width,
       y: (0.5 - pointer.y / pointer.viewportHeight) * layout2.height
     });
-    touch2.apply(input, contacts, layout2);
+    const active = driving ? driving.race.phase === "racing" : true;
+    touch2.apply(input, contacts, layout2, active, active && driving?.steeringAssist ? assistedSteering(driving.race) : 0);
     return input;
   }
 
@@ -962,6 +965,7 @@
     else if (id === "custom_camera") popup("custom_camera_settings", sourceText("Camera Settings"));
     else if (id === "device:keyboard") m.show("options_device");
     else if (id === "device:touch") go("touch_controls");
+    else if (page === "touch_controls" && id === "steering-assist") session2.settings.steeringAssist = !session2.settings.steeringAssist;
     else if (id === "add_device" || id.startsWith("binding:")) popup("press_a_key_dialog", sourceText("Press fully and release..."), id);
     else if (id === "startTutorial") {
       go("help1", "help");
@@ -1434,10 +1438,11 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       button2(menuWidgetId(page, "back"), rect(0, 0, 48, 44), "", action("back"), { image: "gui/icons/back.png", normal: "" });
       const card = (item, bounds) => button2(menuWidgetId(page, item.id), bounds, item.text, action(item.id), { image: item.image, selected: item.selected, normal: "" });
       if (page === "touch_controls") {
-        picture("touch-controls-panel", skin("generic"), rect(0, 52, r.width, r.height - 52), true);
-        const rules = [tr("Drag left/right on the joystick to steer and accelerate.", "\u5DE6\u53F3\u62D6\u52A8\u6447\u6746\u8F6C\u5411\u5E76\u81EA\u52A8\u52A0\u901F\u3002"), tr("Pull down or hold Brake to slow down, then reverse.", "\u4E0B\u62C9\u6447\u6746\u6216\u6309\u4F4F\u5239\u8F66\u51CF\u901F\uFF0C\u505C\u8F66\u540E\u7EE7\u7EED\u6309\u4F4F\u53EF\u5012\u8F66\u3002"), tr("Hold Nitro or Drift while steering with another finger.", "\u8F6C\u5411\u65F6\uFF0C\u53E6\u4E00\u6839\u624B\u6307\u53EF\u6309\u4F4F\u6C2E\u6C14\u6216\u6F02\u79FB\u3002"), tr("Tap Fire or Rescue once; hold Rear to look behind.", "\u70B9\u51FB\u9053\u5177\u6216\u6551\u63F4\u89E6\u53D1\u4E00\u6B21\uFF1B\u6309\u4F4F\u56DE\u770B\u67E5\u770B\u540E\u65B9\u3002"), tr("Pause stops the race. Release your fingers before resuming.", "\u6682\u505C\u4F1A\u505C\u6B62\u6BD4\u8D5B\uFF0C\u6062\u590D\u524D\u8BF7\u5148\u677E\u5F00\u624B\u6307\u3002")];
+        skinPicture("touch-controls-panel", skin("glass_section"), rect(0, 52, r.width, r.height - 52), scale);
+        button2(menuWidgetId(page, "steering-assist"), rect(18, 60, Math.min(360, r.width - 36), 44), session2.settings.steeringAssist ? tr("Steering assist: On", "\u8F85\u52A9\u8F6C\u5411\uFF1A\u5F00\u542F") : tr("Steering assist: Off", "\u8F85\u52A9\u8F6C\u5411\uFF1A\u5173\u95ED"), action("steering-assist"), { selected: session2.settings.steeringAssist });
+        const rules = [tr("Automatic acceleration. Hold an arrow to steer, or slide between arrows.", "\u81EA\u52A8\u52A0\u901F\uFF1B\u6309\u4F4F\u5DE6\u53F3\u952E\u8F6C\u5411\uFF0C\u53EF\u5728\u4E24\u952E\u95F4\u6ED1\u52A8\u3002"), tr("Hold Drift while turning; press it on a straight to brake without reversing.", "\u8F6C\u5F2F\u65F6\u6309\u4F4F\u6F02\u79FB\uFF1B\u76F4\u7EBF\u65F6\u6309\u4E0B\u5239\u8F66\uFF0C\u505C\u8F66\u540E\u4E0D\u4F1A\u5012\u8F66\u3002"), tr("Release a charged drift for a boost. Hold Nitro to accelerate further.", "\u677E\u5F00\u5DF2\u84C4\u529B\u7684\u6F02\u79FB\u53EF\u52A0\u901F\uFF1B\u6309\u4F4F\u6C2E\u6C14\u6301\u7EED\u52A0\u901F\u3002"), tr("Tap Fire or Rescue once; hold Rear. Manual steering overrides assist.", "\u70B9\u51FB\u9053\u5177\u6216\u6551\u63F4\u89E6\u53D1\u4E00\u6B21\uFF0C\u6309\u4F4F\u56DE\u770B\uFF1B\u624B\u52A8\u8F6C\u5411\u4F18\u5148\u4E8E\u8F85\u52A9\u3002"), tr("Pause stops the race. Release your fingers before resuming.", "\u6682\u505C\u4F1A\u505C\u6B62\u6BD4\u8D5B\uFF0C\u6062\u590D\u524D\u8BF7\u5148\u677E\u5F00\u624B\u6307\u3002")];
         rules.forEach((rule, index) => {
-          text(`touch-control-rule-${index}`, rule, rect(18, 60 + index * (r.height - 68) / rules.length, r.width - 36, (r.height - 68) / rules.length), 18, ink, "left");
+          text(`touch-control-rule-${index}`, rule, rect(18, 112 + index * (r.height - 120) / rules.length, r.width - 36, (r.height - 120) / rules.length), 17, ink, "left");
         });
       } else if (page === "karts") {
         const height = Math.min(112, r.height * 0.33), width = Math.min(150, r.width / 5);
@@ -1546,9 +1551,9 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
   function raceHudLayout(layout2) {
     const mobile2 = !!layout2.mobile, unit = Math.max(0.6, Math.min(1.5, layout2.height / 720));
     const mapSize = Math.round((mobile2 ? 100 : 180) * (mobile2 ? Math.max(0.85, unit) : unit));
-    const mapBottom = mobile2 ? layout2.bottom + layout2.radius * 2 + 24 : layout2.bottom;
+    const mapBottom = mobile2 ? layout2.bottom + layout2.controlSize + 22 : layout2.bottom;
     const speedUnit = mobile2 ? 0.65 : unit;
-    const speedBottom = mobile2 ? layout2.bottom + layout2.controlSize * 2 + 24 : layout2.bottom;
+    const speedBottom = mobile2 ? layout2.bottom + layout2.controlSize + Math.max(44, Math.min(60, layout2.controlSize * 0.68)) + 32 : layout2.bottom;
     return { mapSize, mapBottom, speedUnit, speedBottom };
   }
 
@@ -1566,7 +1571,12 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
   var menuSession;
   var menuChanged = () => {
   };
-  var stickState = "";
+  var touchState = "";
+  function touchBackground(id, active = false) {
+    if (id === "boost") return active ? [0.1, 0.7, 1, 0.95] : [0.04, 0.24, 0.38, 0.85];
+    if (id === "drift") return active ? [0.95, 0.5, 0.08, 0.95] : [0.2, 0.13, 0.06, 0.8];
+    return active ? [0.1, 0.65, 0.75, 0.9] : [0.04, 0.08, 0.12, 0.65];
+  }
   var style = (id, value) => {
     ui_set_style(id, JSON.stringify(value));
   };
@@ -1724,7 +1734,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     buttons.length = 0;
     focus = 0;
     dimensions = layout2;
-    stickState = "";
+    touchState = "";
     focused = focusChanged;
     menuSession = session2;
     menuChanged = changed;
@@ -1837,28 +1847,30 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     node("nitro-bar", "root", { position: "absolute", right: layout2.right + 5, bottom: speedBottom + 62 * unit, width: 16 * unit, height: 90 * unit, background: [0, 0.03, 0.06, 0.8], borderRadius: 6 });
     node("nitro-fill", "nitro-bar", { position: "absolute", bottom: 0, width: "100%", height: "0%", background: [0.2, 0.75, 1, 1], borderRadius: 6 });
     if (mobile2 && session2.screen === "race") {
-      node("stick", "root", { position: "absolute", left: layout2.stickX - layout2.radius, top: layout2.stickY - layout2.radius, width: layout2.radius * 2, height: layout2.radius * 2, borderRadius: layout2.radius, background: [0, 0.1, 0.2, 0.6] });
-      node("stick-thumb", "root", { position: "absolute", width: layout2.radius * 0.64, height: layout2.radius * 0.64, borderRadius: layout2.radius, background: [0.2, 0.8, 1, 0.8] });
       const rects = touchControlRects(layout2);
-      for (const [id, name] of [["gas", tr("Gas", "\u6CB9\u95E8")], ["brake", tr("Brake", "\u5239\u8F66")], ["boost", tr("Nitro", "\u6C2E\u6C14")], ["drift", tr("Drift", "\u6F02\u79FB")], ["item", tr("Fire", "\u9053\u5177")], ["rescue", tr("Rescue", "\u6551\u63F4")], ["look-back", tr("Rear", "\u56DE\u770B")]]) {
+      for (const [id, name] of [["left", "\u2190"], ["right", "\u2192"], ["boost", tr("Nitro", "\u6C2E\u6C14")], ["drift", tr("Drift / Brake", "\u6F02\u79FB/\u5239\u8F66")], ["item", tr("Fire", "\u9053\u5177")], ["rescue", tr("Rescue", "\u6551\u63F4")], ["look-back", tr("Rear", "\u56DE\u770B")]]) {
         const r = rects[id];
-        node(id, "root", { position: "absolute", left: r.x, top: r.y, width: r.width, height: r.height, borderRadius: r.width / 2, background: panel, alignItems: "center", justifyContent: "center" });
-        label(`${id}-label`, id, name, 15);
+        const steering = id === "left" || id === "right", secondary = id === "rescue" || id === "look-back";
+        node(id, "root", { position: "absolute", left: r.x, top: r.y, width: r.width, height: r.height, borderRadius: steering ? 14 : r.width / 2, background: touchBackground(id), alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 2 });
+        if (id === "boost") image("touch-nitro-icon", id, "ui/nitro.png", { width: r.width * 0.26, height: r.height * 0.35 });
+        label(`${id}-label`, id, name, steering ? 34 : secondary ? 11 : id === "drift" ? 12 : 15, { maxWidth: "95%" });
       }
+      node("drift-charge", "drift", { position: "absolute", left: "15%", bottom: 8, width: "70%", height: 4, background: [0.1, 0.08, 0.04, 0.8], borderRadius: 2 });
+      node("drift-charge-fill", "drift-charge", { width: "0%", height: "100%", background: [1, 0.68, 0.15, 1], borderRadius: 2 });
       button("pause", "root", "\u2161", () => {
         session2.screen = "paused";
         changed();
-      }, { position: "absolute", left: layout2.left, top: layout2.top + 52, width: 50, height: 44 });
-      label("touch-hint", "root", tr("Drag to drive \xB7 Pull down to brake", "\u62D6\u52A8\u6447\u6746\u9A7E\u9A76 \xB7 \u4E0B\u62C9\u5239\u8F66"), 13, { position: "absolute", left: "28%", bottom: layout2.bottom, maxWidth: "34%" });
+      }, { position: "absolute", left: layout2.left, top: layout2.top + 44, width: 44, height: 44 });
+      const hintLeft = rects.right.x + rects.right.width + 12;
+      label("touch-hint", "root", session2.settings.steeringAssist ? tr("Auto accelerate \xB7 Steering assist", "\u81EA\u52A8\u52A0\u901F \xB7 \u8F85\u52A9\u8F6C\u5411") : tr("Auto accelerate \xB7 Tap to steer", "\u81EA\u52A8\u52A0\u901F \xB7 \u70B9\u6309\u8F6C\u5411"), 13, { position: "absolute", left: hintLeft, bottom: layout2.bottom, maxWidth: Math.max(0, rects.drift.x - hintLeft - 12) });
     }
   }
-  function updateStick(touch2, layout2) {
-    const state = `${touch2.dx.toFixed(3)}:${touch2.dy.toFixed(3)}:${[...touch2.active].sort().join(",")}`;
-    if (state === stickState) return;
-    stickState = state;
-    const radius = layout2.radius * 0.32;
-    style("stick-thumb", { left: layout2.stickX + touch2.dx * layout2.radius * 0.7 - radius, top: layout2.stickY + touch2.dy * layout2.radius * 0.7 - radius });
-    for (const id of Object.keys(touchControlRects(layout2))) style(id, { background: touch2.active.has(id) ? [0.1, 0.65, 0.75, 0.85] : panel });
+  function updateTouchControls(touch2, layout2) {
+    const state = `${touch2.braking}:${touch2.drifting}:${[...touch2.active].sort().join(",")}`;
+    if (state === touchState) return;
+    touchState = state;
+    for (const id of Object.keys(touchControlRects(layout2))) style(id, { background: touchBackground(id, touch2.active.has(id)) });
+    setLabel("drift-label", touch2.braking ? tr("Brake", "\u5239\u8F66") : touch2.drifting ? tr("Drift", "\u6F02\u79FB") : tr("Drift / Brake", "\u6F02\u79FB/\u5239\u8F66"), touch2.braking || touch2.drifting ? 15 : 12);
   }
   function updateHud(session2) {
     const race = session2.race, player = race.player;
@@ -1874,6 +1886,9 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       labels.set("item-icon", itemPath);
     }
     style("nitro-fill", { height: `${player.nitro / nitroCapacity * 100}%` });
+    if (dimensions.mobile && session2.screen === "race") {
+      style("drift-charge-fill", { width: `${Math.min(1, player.driftCharge / 3) * 100}%`, background: player.driftCharge >= 1 ? [1, 0.85, 0.2, 1] : [1, 0.5, 0.15, 1] });
+    }
     const ranking = race.ranking;
     for (let i = 0; i < ranking.length; i++) {
       const kart = trackData.karts.find((kart2) => kart2.id === ranking[i].kartId);
@@ -1934,7 +1949,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
   };
 
   // modules/stk-car/game/src/session.ts
-  var defaultSettings = () => ({ trackId: defaultCourse.id, kartId: "tux", difficulty: 1, mode: "normal", laps: defaultCourse.defaultLaps, aiCount: 3, reverse: false, wasd: false, musicVolume: 0.6, sfxVolume: 0.7, language: "system" });
+  var defaultSettings = () => ({ trackId: defaultCourse.id, kartId: "tux", difficulty: 1, mode: "normal", laps: defaultCourse.defaultLaps, aiCount: 3, reverse: false, wasd: false, steeringAssist: false, musicVolume: 0.6, sfxVolume: 0.7, language: "system" });
   function parseSettings(value) {
     const defaults = defaultSettings();
     try {
@@ -1950,6 +1965,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       if (data.mode === "normal" || data.mode === "time-trial") defaults.mode = data.mode;
       if (typeof data.reverse === "boolean") defaults.reverse = data.reverse;
       if (typeof data.wasd === "boolean") defaults.wasd = data.wasd;
+      if (typeof data.steeringAssist === "boolean") defaults.steeringAssist = data.steeringAssist;
       for (const key of ["musicVolume", "sfxVolume"]) if (typeof data[key] === "number" && Number.isFinite(data[key])) defaults[key] = clamp(data[key], 0, 1);
       if (["system", "zh-CN", "en-US"].includes(data.language)) defaults.language = data.language;
     } catch {
@@ -2285,9 +2301,9 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       if (worldReady && ["paused", "finished"].includes(session.screen)) render(1, 0);
       return;
     }
-    const controls = readControls(touch, layout, mobile, session.settings.wasd);
+    const controls = readControls(touch, layout, mobile, session.settings.wasd, { race: session.race, steeringAssist: session.settings.steeringAssist });
     lookBack = controls.lookBack ?? false;
-    if (mobile) updateStick(touch, layout);
+    if (mobile) updateTouchControls(touch, layout);
     if (session.race.phase === "racing") {
       pendingItem ||= controls.useItem;
       pendingRescue ||= controls.rescue;

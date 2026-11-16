@@ -277,9 +277,10 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     button(menuWidgetId(page, "back"), rect(0, 0, 48, 44), "", action("back"), { image: "gui/icons/back.png", normal: "" });
     const card = (item: Item, bounds: Rect) => button(menuWidgetId(page, item.id), bounds, item.text, action(item.id), { image: item.image, selected: item.selected, normal: "" });
     if (page === "touch_controls") {
-      picture("touch-controls-panel", skin("generic"), rect(0, 52, r.width, r.height - 52), true);
-      const rules = [tr("Drag left/right on the joystick to steer and accelerate.", "左右拖动摇杆转向并自动加速。"), tr("Pull down or hold Brake to slow down, then reverse.", "下拉摇杆或按住刹车减速，停车后继续按住可倒车。"), tr("Hold Nitro or Drift while steering with another finger.", "转向时，另一根手指可按住氮气或漂移。"), tr("Tap Fire or Rescue once; hold Rear to look behind.", "点击道具或救援触发一次；按住回看查看后方。"), tr("Pause stops the race. Release your fingers before resuming.", "暂停会停止比赛，恢复前请先松开手指。")];
-      rules.forEach((rule, index) => { text(`touch-control-rule-${index}`, rule, rect(18, 60 + index * (r.height - 68) / rules.length, r.width - 36, (r.height - 68) / rules.length), 18, ink, "left"); });
+      skinPicture("touch-controls-panel", skin("glass_section"), rect(0, 52, r.width, r.height - 52), scale);
+      button(menuWidgetId(page, "steering-assist"), rect(18, 60, Math.min(360, r.width - 36), 44), session.settings.steeringAssist ? tr("Steering assist: On", "辅助转向：开启") : tr("Steering assist: Off", "辅助转向：关闭"), action("steering-assist"), { selected: session.settings.steeringAssist });
+      const rules = [tr("Automatic acceleration. Hold an arrow to steer, or slide between arrows.", "自动加速；按住左右键转向，可在两键间滑动。"), tr("Hold Drift while turning; press it on a straight to brake without reversing.", "转弯时按住漂移；直线时按下刹车，停车后不会倒车。"), tr("Release a charged drift for a boost. Hold Nitro to accelerate further.", "松开已蓄力的漂移可加速；按住氮气持续加速。"), tr("Tap Fire or Rescue once; hold Rear. Manual steering overrides assist.", "点击道具或救援触发一次，按住回看；手动转向优先于辅助。"), tr("Pause stops the race. Release your fingers before resuming.", "暂停会停止比赛，恢复前请先松开手指。")];
+      rules.forEach((rule, index) => { text(`touch-control-rule-${index}`, rule, rect(18, 112 + index * (r.height - 120) / rules.length, r.width - 36, (r.height - 120) / rules.length), 17, ink, "left"); });
     } else if (page === "karts") {
       const height = Math.min(112, r.height * 0.33), width = Math.min(150, r.width / 5);
       items("karts", page).forEach((item, index) => { card(item, rect((r.width - width * 4) / 2 + index * width, r.height - height, width - 8, height)); });

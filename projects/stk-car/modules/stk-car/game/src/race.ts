@@ -2,7 +2,7 @@ import { resolveKartContacts } from "./kart-collision.js";
 
 export interface Vec3 { x: number; y: number; z: number; }
 export interface RouteNode { center: readonly number[]; width: number; }
-export interface Controls { throttle: number; steer: number; brake: boolean; drift: boolean; nitro: boolean; rescue: boolean; useItem: boolean; lookBack?: boolean; }
+export interface Controls { throttle: number; steer: number; brake: boolean; drift: boolean; nitro: boolean; rescue: boolean; useItem: boolean; lookBack?: boolean; allowReverse?: boolean; }
 export interface RaceOptions { difficulty: number; aiCount: number; mode: "normal" | "time-trial"; kartId: string; }
 export const nitroCapacity = 20;
 export interface Pose extends Vec3 { heading: number; pitch: number; }
@@ -227,7 +227,7 @@ export class Race {
     const maxSpeed = racer.stun > 0 ? (racer.falseStart && this.elapsed < 1 ? 0 : 9) : baseSpeed + (boosting ? 5 : 0);
     const acceleration = clamp(controls.throttle, -1, 1) * (boosting ? 17 : 11) - 0.07 * racer.speed;
     racer.speed = clamp(racer.speed + acceleration * dt, -8, Math.max(maxSpeed, racer.speed - 20 * dt));
-    if (controls.brake) racer.speed = Math.max(-baseSpeed * 0.65 * (light ? 0.8 : heavy ? 0.7 : 0.75), racer.speed - 15 * dt);
+    if (controls.brake) racer.speed = Math.max(controls.allowReverse === false ? 0 : -baseSpeed * 0.65 * (light ? 0.8 : heavy ? 0.7 : 0.75), racer.speed - 15 * dt);
     if (controls.throttle === 0) racer.speed *= Math.exp(-dt * 0.5);
     racer.heading += racer.steering * clamp(racer.speed / 11, -0.6, 1.9) * (drifting ? 1.2 : 0.92) * dt;
     racer.sideSpeed *= Math.exp(-dt * 8);
