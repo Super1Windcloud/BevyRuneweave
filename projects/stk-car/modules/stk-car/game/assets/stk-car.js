@@ -1,5 +1,76 @@
 "use strict";
 (() => {
+  // modules/stk-car/game/src/kart-bodies.ts
+  var kartBodies = { "tux": { "min": [-0.48100010633468626, 14305114759416426e-24, -0.736587643623352], "max": [0.4810000765323639, 0.7522428035736084, 0.7012922763824463] }, "pidgin": { "min": [-0.486230547996521, 0.013111038149833679, -0.5842000246047974], "max": [0.5062314420661926, 0.6488457322120667, 0.6594146490097046] }, "wilber": { "min": [-0.5070605337467193, 0.0029123441247940196, -0.8706939220428467], "max": [0.484653503944397, 0.9227755665779114, 0.8448808193206787] }, "suzanne": { "min": [-0.5049999966621399, -0.003698938488960274, -0.7005273103713989], "max": [0.5051594018340111, 0.7228091955184937, 0.7045331001281738] } };
+
+  // modules/stk-car/game/src/kart-collision.ts
+  function body(racer) {
+    const { min, max } = kartBodies[racer.kartId] ?? kartBodies.tux;
+    const cos = Math.cos(racer.heading), sin = Math.sin(racer.heading), x = (min[0] + max[0]) / 2, z = (min[2] + max[2]) / 2;
+    return {
+      x: racer.x + cos * x - sin * z,
+      z: racer.z + sin * x + cos * z,
+      right: { x: cos, z: sin },
+      back: { x: -sin, z: cos },
+      width: (max[0] - min[0]) / 2,
+      length: (max[2] - min[2]) / 2,
+      bottom: racer.y + min[1],
+      top: racer.y + max[1]
+    };
+  }
+  function kartContact(a, b) {
+    if (a.finishedAt !== null || b.finishedAt !== null) return null;
+    const first = body(a), second = body(b);
+    if (first.top <= second.bottom || second.top <= first.bottom) return null;
+    const dx = second.x - first.x, dz = second.z - first.z;
+    if (Math.hypot(dx, dz) > Math.hypot(first.width, first.length) + Math.hypot(second.width, second.length)) return null;
+    let contact = { x: 0, z: 0, depth: Infinity };
+    for (const axis of [first.right, first.back, second.right, second.back]) {
+      const extent = (box) => box.width * Math.abs(box.right.x * axis.x + box.right.z * axis.z) + box.length * Math.abs(box.back.x * axis.x + box.back.z * axis.z);
+      const distance = dx * axis.x + dz * axis.z, depth = extent(first) + extent(second) - Math.abs(distance);
+      if (depth <= 0) return null;
+      if (depth < contact.depth) {
+        const sign = distance < 0 ? -1 : 1;
+        contact = { x: axis.x * sign, z: axis.z * sign, depth };
+      }
+    }
+    return contact;
+  }
+  function velocity(racer) {
+    return {
+      x: Math.sin(racer.heading) * racer.speed + Math.cos(racer.heading) * racer.sideSpeed,
+      z: -Math.cos(racer.heading) * racer.speed + Math.sin(racer.heading) * racer.sideSpeed
+    };
+  }
+  function resolveKartContacts(racers) {
+    const moved = /* @__PURE__ */ new Set();
+    for (let iteration = 0; iteration < 16; iteration++) {
+      let overlap = false;
+      for (let i = 0; i < racers.length; i++) for (let j = i + 1; j < racers.length; j++) {
+        const a = racers[i], b = racers[j], contact = kartContact(a, b);
+        if (!contact) continue;
+        overlap = true;
+        moved.add(a);
+        moved.add(b);
+        const { x, z, depth } = contact, separation = (depth + 1e-4) / 2;
+        a.x -= x * separation;
+        a.z -= z * separation;
+        b.x += x * separation;
+        b.z += z * separation;
+        const av = velocity(a), bv = velocity(b), closing = (bv.x - av.x) * x + (bv.z - av.z) * z;
+        if (closing >= 0) continue;
+        const impulse = -closing * 1.1 / 2;
+        for (const [racer, v, sign] of [[a, av, -1], [b, bv, 1]]) {
+          const vx = v.x + sign * impulse * x, vz = v.z + sign * impulse * z;
+          racer.speed = vx * Math.sin(racer.heading) - vz * Math.cos(racer.heading);
+          racer.sideSpeed = vx * Math.cos(racer.heading) + vz * Math.sin(racer.heading);
+        }
+      }
+      if (!overlap) break;
+    }
+    return moved;
+  }
+
   // modules/stk-car/game/src/race.ts
   var nitroCapacity = 20;
   var fixedStep = 1 / 120;
@@ -96,7 +167,7 @@
       const kartIds = [options.kartId, ...["tux", "pidgin", "wilber", "suzanne"].filter((id) => id !== options.kartId)];
       const count = options.mode === "time-trial" ? 1 : clamp(Math.floor(options.aiCount), 0, 3) + 1;
       this.racers = ["tux", "comet", "pepper", "ocean"].slice(0, count).map((id, index) => {
-        const progress = -1.5 - Math.floor(index / 2) * 1.5;
+        const progress = -1.5 - Math.floor(index / 2) * 2;
         const lane = index % 2 ? 1.5 : -1.5;
         const pose = circuit.sample(progress, lane);
         return {
@@ -108,6 +179,7 @@
           routeDistance: circuit.wrap(progress),
           lane,
           speed: 0,
+          sideSpeed: 0,
           nitro: 0,
           boost: 0,
           driftCharge: 0,
@@ -147,11 +219,17 @@
     }
     rescue(racer = this.player) {
       const pose = this.circuit.sample(racer.routeDistance, racer.lane);
-      Object.assign(racer, pose, { previous: { ...pose }, speed: 0, offRoad: 0, boost: 0, driftCharge: 0 });
+      Object.assign(racer, pose, { previous: { ...pose }, speed: 0, sideSpeed: 0, offRoad: 0, boost: 0, driftCharge: 0 });
     }
     step(dt, controls) {
       if (!Number.isFinite(dt) || dt <= 0 || dt > 0.05) return;
       for (const racer of this.racers) racer.previous = { x: racer.x, y: racer.y, z: racer.z, heading: racer.heading, pitch: racer.pitch };
+      const speed = Math.max(1, ...this.racers.map((racer) => Math.hypot(racer.speed, racer.sideSpeed))) + 20 * dt + (controls.useItem ? 4.5 : 0);
+      const steps = Math.ceil(dt / Math.min(fixedStep, 0.2 / speed));
+      const held = controls.rescue || controls.useItem ? { ...controls, rescue: false, useItem: false } : controls;
+      for (let step = 0; step < steps; step++) this.tick(dt / steps, step ? held : controls);
+    }
+    tick(dt, controls) {
       if (this.phase === "countdown") {
         if (controls.throttle > 0 && this.countdown > 0.2) this.player.falseStart = true;
         this.countdown -= dt;
@@ -169,12 +247,20 @@
         const racer = this.racers[i];
         if (racer.finishedAt !== null) {
           racer.speed = 0;
+          racer.sideSpeed = 0;
           continue;
         }
         racer.stun = Math.max(0, racer.stun - dt);
         racer.boost = Math.max(0, racer.boost - dt);
         if (i === 0) this.drive(racer, dt, controls);
         else this.driveAi(racer, i, dt);
+        this.updateRoad(racer, dt);
+      }
+      for (const racer of resolveKartContacts(this.racers)) {
+        this.updateRoad(racer, dt, false);
+      }
+      for (const racer of this.racers) {
+        if (racer.finishedAt !== null) continue;
         if (racer.progress >= this.circuit.length * this.laps) racer.finishedAt = this.elapsed;
         for (const pickup of this.pickups) {
           if (pickup.cooldown > 0 || Math.abs(racer.y - pickup.position[1]) > 4 || Math.hypot(racer.x - pickup.position[0], racer.z - pickup.position[2]) > 1.7) continue;
@@ -196,13 +282,6 @@
           trap.lifetime = 0;
         }
         if (trap.lifetime <= 0) this.traps.splice(i, 1);
-      }
-      for (const rival of this.racers.slice(1)) {
-        if (Math.abs(player.y - rival.y) < 1 && Math.hypot(player.x - rival.x, player.z - rival.z) < 0.85 && player.speed > rival.speed) {
-          const transfer = (player.speed - rival.speed) * 0.45;
-          player.speed -= transfer;
-          rival.speed += transfer;
-        }
       }
       const lap = Math.floor(player.progress / this.circuit.length);
       if (lap > Math.max(0, previousLap) && this.lapTimes.length < lap) {
@@ -248,19 +327,23 @@
       if (controls.brake) racer.speed = Math.max(-baseSpeed * 0.65 * (light ? 0.8 : heavy ? 0.7 : 0.75), racer.speed - 15 * dt);
       if (controls.throttle === 0) racer.speed *= Math.exp(-dt * 0.5);
       racer.heading += racer.steering * clamp(racer.speed / 11, -0.6, 1.9) * (drifting ? 1.2 : 0.92) * dt;
-      racer.x += Math.sin(racer.heading) * racer.speed * dt;
-      racer.z -= Math.cos(racer.heading) * racer.speed * dt;
+      racer.sideSpeed *= Math.exp(-dt * 8);
+      racer.x += (Math.sin(racer.heading) * racer.speed + Math.cos(racer.heading) * racer.sideSpeed) * dt;
+      racer.z += (-Math.cos(racer.heading) * racer.speed + Math.sin(racer.heading) * racer.sideSpeed) * dt;
+    }
+    updateRoad(racer, dt, advance = true) {
       const road = this.circuit.project(racer.x, racer.z, racer.segment);
       let delta = road.distance - racer.routeDistance;
       if (delta > this.circuit.length / 2) delta -= this.circuit.length;
       if (delta < -this.circuit.length / 2) delta += this.circuit.length;
-      if (Math.abs(delta) <= Math.abs(racer.speed) * dt * 3 + 0.5 && road.lateral < road.width * 0.8) {
-        racer.progress = Math.max(-10, racer.progress + delta);
+      if (!advance || Math.abs(delta) <= Math.hypot(racer.speed, racer.sideSpeed) * dt * 3 + 0.5 && road.lateral < road.width * 0.8) {
+        if (advance) racer.progress = Math.max(-10, racer.progress + delta);
         racer.routeDistance = this.circuit.wrap(road.distance);
       }
       racer.segment = road.segment;
       racer.y += (road.y - racer.y) * (1 - Math.exp(-dt * 25));
       racer.pitch = this.circuit.sample(road.distance).pitch;
+      if (!advance) return;
       if (road.lateral > road.width * 0.48) {
         racer.speed *= Math.exp(-dt * 1.5);
         racer.offRoad += dt;
@@ -274,13 +357,13 @@
       const targetSpeed = racer.stun > 0 ? 8 : baseSpeed * (0.78 + index * 0.025) - Math.min(6, turn * 5);
       racer.speed += clamp(targetSpeed - racer.speed, -16 * dt, 9 * dt);
       const distance = racer.speed * dt;
-      racer.progress += distance;
-      racer.routeDistance = this.circuit.wrap(racer.routeDistance + distance);
-      const pose = this.circuit.sample(racer.routeDistance, racer.lane + Math.sin(this.elapsed * 0.7 + index) * 0.3);
-      racer.x = pose.x;
-      racer.y = pose.y;
-      racer.z = pose.z;
-      racer.segment = pose.segment;
+      const lane = racer.lane + Math.sin(this.elapsed * 0.7 + index) * 0.3;
+      const origin = this.circuit.sample(racer.routeDistance, lane), pose = this.circuit.sample(racer.routeDistance + distance, lane);
+      const cos = Math.cos(origin.heading), sin = Math.sin(origin.heading);
+      const correction = clamp(((origin.x - racer.x) * cos + (origin.z - racer.z) * sin) * 2, -1.5, 1.5);
+      racer.sideSpeed *= Math.exp(-dt * 8);
+      racer.x += pose.x - origin.x + cos * (racer.sideSpeed + correction) * dt;
+      racer.z += pose.z - origin.z + sin * (racer.sideSpeed + correction) * dt;
       racer.heading += angleDelta(pose.heading - racer.heading) * (1 - Math.exp(-dt * 9));
       racer.pitch = pose.pitch;
     }
