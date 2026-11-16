@@ -85,6 +85,7 @@ export function menuAction(session: PcSession, id: string, changed: () => void, 
   else if (id === "custom_camera") popup("custom_camera_settings", sourceText("Camera Settings"));
   else if (id === "device:keyboard") m.show("options_device");
   else if (id === "device:touch") go("touch_controls");
+  else if (page === "touch_controls" && id === "steering-assist") session.settings.steeringAssist = !session.settings.steeringAssist;
   else if (id === "add_device" || id.startsWith("binding:")) popup("press_a_key_dialog", sourceText("Press fully and release..."), id);
   else if (id === "startTutorial") { go("help1", "help"); m.status = tr("Tutorial interface preview. Driving instructions are shown below.", "教程界面预览，驾驶说明见下方。"); }
   else if (page === "splitscreen_player_dialog" && id === "add") { m.players = Math.min(4, m.players + 1); m.status = tr(`${m.players} local players (preview)`, `${m.players} 名本地玩家（预览）`); }

@@ -1,5 +1,5 @@
 import { TouchControls, readControls, type Layout } from "./controls.js";
-import { mountHud, pollButtons, readLayout, updateHud, updateStick, updatePerformance } from "./hud.js";
+import { mountHud, pollButtons, readLayout, updateHud, updateTouchControls, updatePerformance } from "./hud.js";
 import { FrameProfiler, type FrameMetrics } from "./performance.js";
 import { angleDelta, fixedStep, interpolate, type Pose } from "./race.js";
 import { PcSession, parseSettings } from "./session.js";
@@ -172,8 +172,8 @@ function updateGame(frameDt: number): void {
     if (worldReady && ["paused", "finished"].includes(session.screen)) render(1, 0);
     return;
   }
-  const controls = readControls(touch, layout, mobile, session.settings.wasd); lookBack = controls.lookBack ?? false;
-  if (mobile) updateStick(touch, layout);
+  const controls = readControls(touch, layout, mobile, session.settings.wasd, { race: session.race, steeringAssist: session.settings.steeringAssist }); lookBack = controls.lookBack ?? false;
+  if (mobile) updateTouchControls(touch, layout);
   if (session.race.phase === "racing") { pendingItem ||= controls.useItem; pendingRescue ||= controls.rescue; }
   accumulator += dt;
   while (accumulator >= fixedStep) {

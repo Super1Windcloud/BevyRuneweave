@@ -1,4 +1,4 @@
-import { makeLayout, touchControlRects, type Layout, type TouchControls } from "./controls.js";
+import { makeLayout, touchControlRects, type Layout, type TouchAction, type TouchControls } from "./controls.js";
 import { clamp, formatTime, nitroCapacity } from "./race.js";
 import type { PcSession } from "./session.js";
 import { trackData } from "./track-data.js";
@@ -21,7 +21,12 @@ let focused: (id: string) => void = () => {};
 let dimensions: Layout;
 let menuSession: PcSession;
 let menuChanged = () => {};
-let stickState = "";
+let touchState = "";
+function touchBackground(id: TouchAction, active = false): number[] {
+  if (id === "boost") return active ? [0.1, 0.7, 1, 0.95] : [0.04, 0.24, 0.38, 0.85];
+  if (id === "drift") return active ? [0.95, 0.5, 0.08, 0.95] : [0.2, 0.13, 0.06, 0.8];
+  return active ? [0.1, 0.65, 0.75, 0.9] : [0.04, 0.08, 0.12, 0.65];
+}
 export const style = (id: string, value: Record<string, unknown>): void => { ui_set_style(id, JSON.stringify(value)); };
 function node(id: string, parent: string, spec: Record<string, unknown>, kind: "node" | "button" = "node"): void {
   if (!ui_spawn(id, parent, kind)) throw new Error(`Cannot create UI ${id}`);
@@ -137,7 +142,7 @@ export function readLayout(mobile = false): Layout {
 export function mountHud(session: PcSession, layout: Layout, changed: () => void, start: () => void, mobile = false, focusChanged: (id: string) => void = () => {}): void {
   const screenKey = `${session.screen}:${session.menu.page}:${session.menu.dialog?.page ?? ""}`;
   const focusedId = previousScreen === screenKey ? buttons[focus]?.id : undefined;
-  ui_clear(); labels.clear(); buttons.length = 0; focus = 0; dimensions = layout; stickState = "";
+  ui_clear(); labels.clear(); buttons.length = 0; focus = 0; dimensions = layout; touchState = "";
   focused = focusChanged;
   menuSession = session; menuChanged = changed;
   const screen = session.screen;
@@ -221,25 +226,27 @@ function mountRaceHud(session: PcSession, layout: Layout, mobile: boolean, chang
   node("nitro-bar", "root", { position: "absolute", right: layout.right + 5, bottom: speedBottom + 62 * unit, width: 16 * unit, height: 90 * unit, background: [0, 0.03, 0.06, 0.8], borderRadius: 6 });
   node("nitro-fill", "nitro-bar", { position: "absolute", bottom: 0, width: "100%", height: "0%", background: [0.2, 0.75, 1, 1], borderRadius: 6 });
   if (mobile && session.screen === "race") {
-    node("stick", "root", { position: "absolute", left: layout.stickX - layout.radius, top: layout.stickY - layout.radius, width: layout.radius * 2, height: layout.radius * 2, borderRadius: layout.radius, background: [0, 0.1, 0.2, 0.6] });
-    node("stick-thumb", "root", { position: "absolute", width: layout.radius * 0.64, height: layout.radius * 0.64, borderRadius: layout.radius, background: [0.2, 0.8, 1, 0.8] });
     const rects = touchControlRects(layout);
-    for (const [id, name] of [["gas", tr("Gas", "油门")], ["brake", tr("Brake", "刹车")], ["boost", tr("Nitro", "氮气")], ["drift", tr("Drift", "漂移")], ["item", tr("Fire", "道具")], ["rescue", tr("Rescue", "救援")], ["look-back", tr("Rear", "回看")]] as const) {
+    for (const [id, name] of [["left", "←"], ["right", "→"], ["boost", tr("Nitro", "氮气")], ["drift", tr("Drift / Brake", "漂移/刹车")], ["item", tr("Fire", "道具")], ["rescue", tr("Rescue", "救援")], ["look-back", tr("Rear", "回看")]] as const) {
       const r = rects[id];
-      node(id, "root", { position: "absolute", left: r.x, top: r.y, width: r.width, height: r.height, borderRadius: r.width / 2, background: panel, alignItems: "center", justifyContent: "center" });
-      label(`${id}-label`, id, name, 15);
+      const steering = id === "left" || id === "right", secondary = id === "rescue" || id === "look-back";
+      node(id, "root", { position: "absolute", left: r.x, top: r.y, width: r.width, height: r.height, borderRadius: steering ? 14 : r.width / 2, background: touchBackground(id), alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 2 });
+      if (id === "boost") image("touch-nitro-icon", id, "ui/nitro.png", { width: r.width * 0.26, height: r.height * 0.35 });
+      label(`${id}-label`, id, name, steering ? 34 : secondary ? 11 : id === "drift" ? 12 : 15, { maxWidth: "95%" });
     }
-    button("pause", "root", "Ⅱ", () => { session.screen = "paused"; changed(); }, { position: "absolute", left: layout.left, top: layout.top + 52, width: 50, height: 44 });
-    label("touch-hint", "root", tr("Drag to drive · Pull down to brake", "拖动摇杆驾驶 · 下拉刹车"), 13, { position: "absolute", left: "28%", bottom: layout.bottom, maxWidth: "34%" });
+    node("drift-charge", "drift", { position: "absolute", left: "15%", bottom: 8, width: "70%", height: 4, background: [0.1, 0.08, 0.04, 0.8], borderRadius: 2 });
+    node("drift-charge-fill", "drift-charge", { width: "0%", height: "100%", background: [1, 0.68, 0.15, 1], borderRadius: 2 });
+    button("pause", "root", "Ⅱ", () => { session.screen = "paused"; changed(); }, { position: "absolute", left: layout.left, top: layout.top + 44, width: 44, height: 44 });
+    const hintLeft = rects.right.x + rects.right.width + 12;
+    label("touch-hint", "root", session.settings.steeringAssist ? tr("Auto accelerate · Steering assist", "自动加速 · 辅助转向") : tr("Auto accelerate · Tap to steer", "自动加速 · 点按转向"), 13, { position: "absolute", left: hintLeft, bottom: layout.bottom, maxWidth: Math.max(0, rects.drift.x - hintLeft - 12) });
   }
 }
-export function updateStick(touch: TouchControls, layout: Layout): void {
-  const state = `${touch.dx.toFixed(3)}:${touch.dy.toFixed(3)}:${[...touch.active].sort().join(",")}`;
-  if (state === stickState) return;
-  stickState = state;
-  const radius = layout.radius * 0.32;
-  style("stick-thumb", { left: layout.stickX + touch.dx * layout.radius * 0.7 - radius, top: layout.stickY + touch.dy * layout.radius * 0.7 - radius });
-  for (const id of Object.keys(touchControlRects(layout))) style(id, { background: touch.active.has(id as Parameters<typeof touch.active.has>[0]) ? [0.1, 0.65, 0.75, 0.85] : panel });
+export function updateTouchControls(touch: TouchControls, layout: Layout): void {
+  const state = `${touch.braking}:${touch.drifting}:${[...touch.active].sort().join(",")}`;
+  if (state === touchState) return;
+  touchState = state;
+  for (const id of Object.keys(touchControlRects(layout)) as TouchAction[]) style(id, { background: touchBackground(id, touch.active.has(id)) });
+  setLabel("drift-label", touch.braking ? tr("Brake", "刹车") : touch.drifting ? tr("Drift", "漂移") : tr("Drift / Brake", "漂移/刹车"), touch.braking || touch.drifting ? 15 : 12);
 }
 export function updateHud(session: PcSession): void {
   const race = session.race, player = race.player;
@@ -253,6 +260,9 @@ export function updateHud(session: PcSession): void {
   const itemPath = player.zipperCount > 0 ? "ui/zipper_collect.png" : "ui/banana.png";
   if (labels.get("item-icon") !== itemPath) { ui_set_image("item-icon", itemPath); labels.set("item-icon", itemPath); }
   style("nitro-fill", { height: `${player.nitro / nitroCapacity * 100}%` });
+  if (dimensions.mobile && session.screen === "race") {
+    style("drift-charge-fill", { width: `${Math.min(1, player.driftCharge / 3) * 100}%`, background: player.driftCharge >= 1 ? [1, 0.85, 0.2, 1] : [1, 0.5, 0.15, 1] });
+  }
   const ranking = race.ranking;
   for (let i = 0; i < ranking.length; i++) {
     const kart = trackData.karts.find((kart) => kart.id === ranking[i].kartId)!;

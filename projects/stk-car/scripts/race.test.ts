@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { TouchControls, type Layout } from "../modules/stk-car/game/src/controls.ts";
+import { TouchControls, makeLayout, touchControlRects } from "../modules/stk-car/game/src/controls.ts";
 import { Circuit, Race, angleDelta, clamp, emptyControls, fixedStep, interpolate } from "../modules/stk-car/game/src/race.ts";
 import { trackData } from "../modules/stk-car/game/src/track-data.ts";
 
@@ -93,20 +93,19 @@ test("simulation gives the same result at 30 and 120 render frames per second", 
   assert.ok(Math.abs(a.player.progress - b.player.progress) < 0.3);
   assert.ok(Math.abs(a.elapsed - b.elapsed) < 0.01);
 });
-test("touch steering captures an ID while a second finger holds nitro; release clears steering", () => {
-  const layout: Layout = { width: 1000, height: 600, left: 20, right: 20, top: 20, bottom: 20, stickX: 100, stickY: 500, radius: 60, controlSize: 64 };
+test("touch steering slides between arrows while another finger holds nitro; release clears steering", () => {
+  const layout = makeLayout(1000, 600, { left: 0, right: 0, top: 0, bottom: 0 }, true), rects = touchControlRects(layout);
+  const contact = (id: string, r: typeof rects.left, justPressed = true) => ({ id, justPressed, x: r.x + r.width / 2, y: r.y + r.height / 2 });
   const touch = new TouchControls();
   const input = emptyControls();
-  touch.apply(input, [{ id: "a", justPressed: true, x: 130, y: 500 }, { id: "b", justPressed: true, x: 880, y: 480 }], layout);
-  assert.equal(input.steer, 0.5);
+  touch.apply(input, [contact("a", rects.left), contact("b", rects.boost)], layout);
+  assert.equal(input.steer, -1);
   assert.equal(input.throttle, 1);
   assert.equal(input.nitro, true);
-  assert.equal(touch.stickId, "a");
-  touch.apply(emptyControls(), [{ id: "a", justPressed: false, x: 400, y: 500 }], layout);
-  assert.equal(touch.dx, 1);
+  const switched = emptyControls(); touch.apply(switched, [contact("a", rects.right, false)], layout);
+  assert.equal(switched.steer, 1); assert.equal(switched.nitro, false);
   const released = emptyControls();
   touch.apply(released, [], layout);
   assert.equal(released.steer, 0);
-  assert.equal(released.throttle, 0);
-  assert.equal(touch.stickId, null);
+  assert.equal(released.throttle, 1);
 });
