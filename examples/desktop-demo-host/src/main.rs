@@ -6,6 +6,7 @@
 mod localized_messages;
 mod i18n;
 mod launcher;
+mod paths;
 use flate2::read::GzDecoder;
 use i18n::text;
 use libloading::{Library, Symbol};
@@ -470,26 +471,6 @@ fn directory_open_command(path: &Path) -> Command {
     command
 }
 
-fn repo_root() -> Result<PathBuf, String> {
-    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
-    if let Some(directory) = executable.parent()
-        && directory.join("lib").is_dir()
-    {
-        return Ok(directory.to_path_buf());
-    }
-    for ancestor in executable.ancestors() {
-        if ancestor.join("include/game_runtime.h").is_file() {
-            return Ok(ancestor.to_path_buf());
-        }
-    }
-    let current = std::env::current_dir().map_err(|error| error.to_string())?;
-    if current.join("include/game_runtime.h").is_file() {
-        Ok(current)
-    } else {
-        Err(text("Could not find the Bevy RuneWeave runtime directory").to_owned())
-    }
-}
-
 fn executable_directory() -> Result<PathBuf, String> {
     std::env::current_exe()
         .map_err(|error| error.to_string())?
@@ -498,42 +479,20 @@ fn executable_directory() -> Result<PathBuf, String> {
         .ok_or_else(|| text("Could not determine the launcher directory").to_owned())
 }
 
-fn bundled_assets_root() -> Result<PathBuf, String> {
-    let executable = executable_directory()?;
-    let adjacent = executable.join("assets");
-    if adjacent.join(CONFIG_FILE).is_file() {
-        return Ok(adjacent);
-    }
-    let app_resources = executable
-        .parent()
-        .map(|contents| contents.join("Resources/assets"));
-    if let Some(resources) = app_resources
-        && resources.join(CONFIG_FILE).is_file()
-    {
-        return Ok(resources);
-    }
-    Err(text("The installed application does not contain default assets").to_owned())
+fn default_assets_root() -> Result<PathBuf, String> {
+    paths::default_assets_root(&executable_directory()?)
+        .ok_or_else(|| text("The installed application does not contain default assets").to_owned())
 }
 
 fn platform_data_root() -> Result<PathBuf, String> {
-    if let Some(path) = std::env::var_os("RUNEWEAVE_DATA_DIR") {
-        return Ok(PathBuf::from(path));
-    }
-    #[cfg(target_os = "windows")]
-    let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
-    #[cfg(target_os = "macos")]
-    let base = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join("Library/Application Support"));
-    #[cfg(target_os = "linux")]
-    let base = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME")
-                .map(PathBuf::from)
-                .map(|home| home.join(".local/share"))
-        });
-    base.map(|path| path.join("Bevy RuneWeave"))
+    let override_directory = std::env::var_os("RUNEWEAVE_DATA_DIR").map(PathBuf::from);
+    let base = paths::data_base(
+        platform_directory(),
+        std::env::var_os("LOCALAPPDATA").map(PathBuf::from),
+        std::env::var_os("HOME").map(PathBuf::from),
+        std::env::var_os("XDG_DATA_HOME").map(PathBuf::from),
+    );
+    paths::data_root(override_directory, base)
         .ok_or_else(|| text("Could not determine the user data directory").to_owned())
 }
 
@@ -611,17 +570,12 @@ fn redirect_standard_streams(file: File) -> io::Result<()> {
     Ok(())
 }
 
-fn active_assets_root() -> Result<PathBuf, String> {
-    let installed_root = platform_data_root()?;
-    fs::create_dir_all(&installed_root).map_err(|error| error.to_string())?;
-    active_assets_root_at(&installed_root).or_else(|_| {
-        if let Ok(bundled) = bundled_assets_root() {
-            load_config(&bundled)?;
-            return Ok(bundled);
-        }
-        let development = repo_root()?.join("assets");
-        load_config(&development)?;
-        Ok(development)
+fn active_assets_root(installed_root: &Path) -> Result<PathBuf, String> {
+    fs::create_dir_all(installed_root).map_err(|error| error.to_string())?;
+    active_assets_root_at(installed_root).or_else(|_| {
+        let fallback = default_assets_root()?;
+        load_config(&fallback)?;
+        Ok(fallback)
     })
 }
 
@@ -1345,8 +1299,10 @@ fn runtime_library_name() -> &'static str {
     }
 }
 
-fn prepare_runtime_icon(assets: &Path, icon: &str) -> Result<(), String> {
-    let target = assets.join(".runtime-icon.png");
+fn prepare_runtime_icon(assets: &Path, data_root: &Path, icon: &str) -> Result<(), String> {
+    let Some(target) = paths::runtime_icon_path(assets, data_root) else {
+        return Ok(());
+    };
     if icon.starts_with("http://") || icon.starts_with("https://") {
         let response = reqwest::blocking::get(icon)
             .and_then(reqwest::blocking::Response::error_for_status)
@@ -1408,34 +1364,23 @@ fn prepare_runtime_icon(assets: &Path, icon: &str) -> Result<(), String> {
 }
 
 fn run_game() -> Result<(), String> {
-    let assets = active_assets_root()?;
+    let data_root = platform_data_root()?;
+    let assets = active_assets_root(&data_root)?;
     let config = load_config(&assets)?;
     if let Some(icon) = config.icon.as_deref()
-        && let Err(error) = prepare_runtime_icon(&assets, icon)
+        && let Err(error) = prepare_runtime_icon(&assets, &data_root, icon)
     {
         eprintln!("Bevy RuneWeave: {error}; using the default runtime icon");
     }
     let executable_dir = executable_directory()?;
     let library_name = runtime_library_name();
-    let bundled = executable_dir.join("lib").join(library_name);
-    let app_framework = executable_dir
-        .parent()
-        .map(|contents| contents.join("Frameworks").join(library_name));
-    let development = repo_root()?
-        .join("dist/runtimes")
-        .join(platform_directory())
-        .join(BUILD_TARGET)
-        .join("lib")
-        .join(library_name);
-    let library_path = if bundled.is_file() {
-        bundled
-    } else if let Some(framework) = app_framework
-        && framework.is_file()
-    {
-        framework
-    } else {
-        development
-    };
+    let library_path = paths::runtime_library_path(
+        &executable_dir,
+        platform_directory(),
+        BUILD_TARGET,
+        library_name,
+    )
+    .ok_or_else(|| text("Could not find the Bevy RuneWeave runtime directory").to_owned())?;
     let library = unsafe { Library::new(&library_path) }.map_err(|error| {
         host_format!(
             "Could not load {}: {error}",
@@ -1470,6 +1415,7 @@ fn launch_runtime_process() -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
     let mut command = Command::new(executable);
     command.arg("--run-game");
+    command.env("RUNEWEAVE_DATA_DIR", platform_data_root()?);
     eprintln!("[launcher-timing] spawning runtime process");
     command.spawn().map_err(|error| error.to_string())?;
     Ok(())
@@ -1632,7 +1578,7 @@ mod tests {
         let icon = assets.path().join(".runtime-icon.png");
         fs::write(&icon, b"project icon bytes").unwrap();
 
-        prepare_runtime_icon(assets.path(), ".runtime-icon.png").unwrap();
+        prepare_runtime_icon(assets.path(), assets.path(), ".runtime-icon.png").unwrap();
 
         assert_eq!(fs::read(icon).unwrap(), b"project icon bytes");
     }
@@ -1647,7 +1593,7 @@ mod tests {
         )
         .unwrap();
 
-        prepare_runtime_icon(assets.path(), "branding/icon.png").unwrap();
+        prepare_runtime_icon(assets.path(), assets.path(), "branding/icon.png").unwrap();
 
         assert_eq!(
             fs::read(assets.path().join(".runtime-icon.png")).unwrap(),

@@ -56,6 +56,28 @@ Before starting a game through the launcher, build the runtime for your desktop 
 example, on macOS run `just build-runtime-macos` first. `just run-desktop-demo` builds and starts
 the launcher without rebuilding the runtime library.
 
+Debug and Release use the same path resolution rules, independent of the working directory:
+
+- Downloaded games and the active selection use the application-data directory listed below.
+  The runtime child receives that absolute directory through `RUNEWEAVE_DATA_DIR`, so project
+  saves remain under the same root as the launcher data.
+- Default assets come from `assets` beside the executable or `Contents/Resources/assets` in a
+  macOS app. Executables inside the source repository can fall back to
+  `projects/ts/modules/shooter/game/assets`, matching the default game included by installers.
+- Native libraries come from `lib` beside the executable or `Contents/Frameworks` in a macOS app.
+  Only when neither contains the library does a repository executable use
+  `dist/runtimes/<platform>/<target>/lib`. A complete installed app needs no source checkout.
+- Icon preparation writes `.runtime-icon.png` only inside downloaded game assets under the data
+  directory. Bundled and source fallback assets remain read-only; the runtime resolves their
+  existing icon or uses its embedded default.
+- `RUNEWEAVE_DATA_DIR` must be absolute; relative overrides fail instead of separating downloaded
+  resources from runtime saves. On Linux, a relative `XDG_DATA_HOME` falls back to the home directory.
+
+Run `npm run test:desktop-paths` from the repository root to verify these rules with both Debug
+and Release compiler settings, without launching the UI or rebuilding the native runtime.
+The cross-target checks require the Rust standard-library targets `aarch64-apple-darwin`,
+`x86_64-pc-windows-msvc` and `x86_64-unknown-linux-gnu` (`rustup target add <target>`).
+
 The packaged launcher selects the native library for its operating system and keeps downloaded
 assets in the user's application-data directory. Complete installers also include the TypeScript
 Script Squadron assets as a read-only fallback:
