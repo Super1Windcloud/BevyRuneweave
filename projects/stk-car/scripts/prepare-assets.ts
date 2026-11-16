@@ -4,7 +4,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import { readSpm, writeGlb, wheelRadius, type SpmMesh } from "./spm.ts";
 import { prepareScene } from "./prepare-scene.ts";
 import { minimap } from "./minimap.ts";
-import { skyMesh } from "./scene-source.ts";
+import { kartPreviewBasis } from "../modules/stk-car/game/src/kart-layout.js";
 import { prepareMenus } from "./prepare-menus.ts";
 
 const project = resolve(import.meta.dirname, "..");
@@ -176,7 +176,13 @@ copy(join(code, "data/skins/common/bottom_bar.png"), "ui/bottom_bar.png");
 copy(join(code, "data/skins/classic/glassbutton.png"), "ui/profile.png");
 copy(join(code, "data/skins/common/License.txt"), "licenses/common-skin.txt");
 const menuBackground = join(code, "data/skins/common/background.jpg");
-write(join(assets, "models/menu-background.glb"), writeGlb(skyMesh(new Array(6).fill(menuBackground)), (name) => name, new Map([[menuBackground, "unlit"]])));
+const { right: menuRight, up: menuUp, forward: menuForward } = kartPreviewBasis();
+const menuBackdrop = { materials: [{ texture: menuBackground, secondary: "" }], primitives: [{
+  positions: [[-1, -0.5], [1, -0.5], [1, 0.5], [-1, 0.5]].flatMap(([x, y]) => menuRight.map((value, axis) => value * x + menuUp[axis] * y)),
+  normals: Array.from({ length: 4 }, () => menuForward.map((value) => -value)).flat(),
+  uvs: [0, 1, 1, 1, 1, 0, 0, 0], colors: new Array(16).fill(1), indices: [0, 1, 2, 0, 2, 3], material: 0,
+}] };
+write(join(assets, "models/menu-background.glb"), writeGlb(menuBackdrop, (name) => name, new Map([[menuBackground, "unlit"]])));
 copy(join(code, "data/gui/icons/licenses.txt"), "licenses/gui-icons.txt");
 copy(join(code, "data/skins/cartoon/licenses.txt"), "licenses/skin.txt");
 for (const name of fullScene.metadata.libraries) {

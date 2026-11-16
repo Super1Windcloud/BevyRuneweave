@@ -5,7 +5,7 @@ import { trackData } from "./track-data.js";
 import type { FrameMetrics } from "./performance.js";
 import { menuSound } from "./sound.js";
 import { isChinese, tr } from "./localization.js";
-import { mountSourceMenu, type MenuButton, type MenuHost } from "./menu-view.js";
+import { mountSourceMenu, textFieldColors, type MenuButton, type MenuHost } from "./menu-view.js";
 import { pollMenuText } from "./menu-actions.js";
 import { raceHudLayout } from "./hud-layout.js";
 
@@ -96,9 +96,14 @@ function centeredPanel(id: string, spec: Record<string, unknown> = {}): void {
 function highlight(): void {
   for (let i = 0; i < buttons.length; i++) {
     const button = buttons[i];
-    if (button.face) {
+    if (button.field) {
+      const active = i === focus || button.field.editing;
+      style(button.id, { background: active ? textFieldColors.focus : textFieldColors.border });
+      style(button.field.inner, { background: active ? textFieldColors.editing : textFieldColors.background });
+    } else if (button.face) {
       const active = i === focus || button.face.selected;
-      ui_set_image(button.face.id, active ? button.face.focused || button.face.normal : button.face.normal);
+      if (button.face.slices) for (const slice of button.face.slices) ui_set_image(slice.id, active ? slice.focused : slice.normal);
+      else ui_set_image(button.face.id, active ? button.face.focused || button.face.normal : button.face.normal);
       if (button.caption) { const c = button.caption; ui_set_text(c.id, c.text, c.size, active ? 1 : 0, active ? 1 : 0, active ? 1 : 0, 1); }
     } else if (button.icon) ui_set_image(`${button.id}-icon`, i === focus ? button.focusIcon ?? button.icon : button.icon);
     else style(button.id, { background: i === focus ? [0.52, 0.3, 0.045, 0.95] : button.base });
@@ -184,7 +189,8 @@ export function mountHud(session: PcSession, layout: Layout, changed: () => void
   finish();
 }
 function performanceLabel(): void {
-  label("performance", "root", "", 14, { position: "absolute", left: "40%", bottom: 6, display: "none", background: [0, 0, 0, 0.65] });
+  const placement = menuSession.screen === "kart" ? { left: "55%", top: "14%" } : { left: "40%", bottom: 6 };
+  label("performance", "root", "", 14, { position: "absolute", ...placement, display: "none", background: [0, 0, 0, 0.65] });
 }
 export function updatePerformance(metrics: FrameMetrics | null, visible: boolean): void {
   style("performance", { display: visible && metrics ? "flex" : "none" });

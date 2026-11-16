@@ -8,6 +8,7 @@ export function load(locale: string, platform = "macos", geometry = { width: 128
   const texts = new Map<string, string>(), images = new Map<string, string>(), nodes = new Set<string>();
   const transforms = new Map<string, number[]>(), held = new Set<string>(), pressed = new Set<string>();
   const models = new Map<string, string>();
+  const kinds = new Map<string, string>(), parents = new Map<string, string>();
   const cameras: number[][] = [];
   const voices = new Map<string, { path: string; volume: number; speed: number; paused: boolean }>();
   let width = geometry.width, height = geometry.height, clicked = "";
@@ -30,14 +31,14 @@ export function load(locale: string, platform = "macos", geometry = { width: 128
     input_primary_pointer: () => ({ pressed: false, justPressed: false, x: 0, y: 0, viewportWidth: width * 800 / height, viewportHeight: 800 }),
     input_touches: () => { if (platform === "macos") throw new Error("PC controls must not read touch input"); return contacts; },
     input_key_pressed: (key: string) => held.has(key), input_key_just_pressed: (key: string) => pressed.has(key),
-    ui_clear: () => { texts.clear(); images.clear(); nodes.clear(); styles.clear(); }, ui_spawn: (id: string) => { assert.ok(!nodes.has(id), `Duplicate UI ID ${id}`); nodes.add(id); return true; }, ui_set_style: (id: string, value: string) => {
+    ui_clear: () => { texts.clear(); images.clear(); nodes.clear(); styles.clear(); kinds.clear(); parents.clear(); }, ui_spawn: (id: string, parent: string, kind: string) => { assert.ok(!nodes.has(id), `Duplicate UI ID ${id}`); nodes.add(id); kinds.set(id, kind); parents.set(id, parent); return true; }, ui_set_style: (id: string, value: string) => {
       const style = JSON.parse(value);
       // Match the native enum contract; browsers accept flex-start, BMS uses start.
       if (style.alignItems && !["start", "end", "center", "stretch", "baseline"].includes(style.alignItems)) return false;
       if (style.justifyContent && !["start", "end", "center", "space-between", "space-around", "space-evenly"].includes(style.justifyContent)) return false;
       styles.set(id, { ...styles.get(id), ...style }); return true;
     }, ui_set_font: () => true,
-    ui_set_image: (id: string, path: string) => { images.set(id, path); return true; },
+    ui_set_image: (id: string, path: string) => { if (kinds.get(id) !== "image") return false; images.set(id, path); return true; },
     ui_set_text: (id: string, value: string) => { texts.set(id, value); return true; }, ui_button_just_pressed: (id: string) => id === clicked, ui_button_hovered: () => false,
     console: { log: () => {} },
   });
@@ -54,5 +55,5 @@ export function load(locale: string, platform = "macos", geometry = { width: 128
     assert.ok(images.has("map"));
     for (let i = 0; i < 190; i++) frame();
   }
-  return { callbacks, frame, press, click, start, contacts, styles, saved, models, texts, images, nodes, transforms, cameras, held, voices, resize: (w = 1000, h = height) => { width = w; height = h; } };
+  return { callbacks, frame, press, click, start, contacts, styles, saved, models, texts, images, nodes, parents, transforms, cameras, held, voices, resize: (w = 1000, h = height) => { width = w; height = h; } };
 }

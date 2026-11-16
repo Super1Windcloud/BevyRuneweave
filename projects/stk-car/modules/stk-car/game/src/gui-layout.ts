@@ -38,6 +38,11 @@ function natural(node: GuiNode, horizontal: boolean, span: number, scale: number
 /** STK's percent/pixel/font units and proportional rows, evaluated in logical window pixels. */
 export function guiLayout(node: GuiNode, rect: Rect, scale = 1, path = "0"): GuiBox {
   const attrs = node.attributes, children: GuiBox[] = [];
+  const outer = rect;
+  if (node.tag === "box") {
+    const padding = Math.min(guiLength(attrs.padding, Math.min(rect.width, rect.height), scale) ?? 12 * scale, rect.width / 2, rect.height / 2);
+    rect = { x: rect.x + padding, y: rect.y + padding, width: rect.width - padding * 2, height: rect.height - padding * 2 };
+  }
   const layout = attrs.layout;
   if (layout !== "vertical-row" && layout !== "horizontal-row") {
     node.children.forEach((child, index) => {
@@ -60,11 +65,11 @@ export function guiLayout(node: GuiNode, rect: Rect, scale = 1, path = "0"): Gui
       const along = proportion && weight ? remaining * proportion / weight : sizes[index] * shrink;
       const crossValue = a[horizontal ? "height" : "width"];
       const across = Math.min(cross, guiLength(crossValue, cross, scale) ?? (horizontal && (!containers.has(child.tag) || crossValue === "fit") ? natural(child, false, cross, scale) : cross));
-      const offset = a.align === "center" ? (cross - across) / 2 : a.align === "right" ? cross - across : 0;
+      const offset = a.align === "center" ? (cross - across) / 2 : a.align === (horizontal ? "bottom" : "right") ? cross - across : 0;
       const x = rect.x + (horizontal ? cursor : offset), y = rect.y + (horizontal ? offset : cursor);
       children.push(guiLayout(child, { x, y, width: horizontal ? along : across, height: horizontal ? across : along }, scale, `${path}.${index}`));
       cursor += along;
     });
   }
-  return { node, rect, path, children };
+  return { node, rect: outer, path, children };
 }

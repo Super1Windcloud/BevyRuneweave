@@ -2,6 +2,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import type { MenuData, GuiNode } from "../modules/stk-car/game/src/menu-data-types.js";
 import { parseXml } from "./scene-source.ts";
+import { skinSlices } from "./skin-slices.ts";
 
 export const menuSources = [
   "screens/main_menu", "screens/karts", "screens/race_setup", "screens/tracks_and_gp", "screens/track_info", "screens/gp_info",
@@ -73,6 +74,23 @@ export function prepareMenus(source: string, code: string, record: (path: string
   for (const name of ["dialog", "textbubble", "table_header", "scrollbar_bg", "scrollbar_thumb", "left_arrow", "right_arrow", "bottom_bar"]) {
     const scope = existsSync(join(code, `data/skins/classic/${name}.png`)) ? "classic" : "common";
     image(`skins/${scope}/${name}.png`);
+  }
+  // A <box> uses the section skin, never the generic notification skin.
+  image("skins/common/glass_section.png");
+  const skin = parseXml(record(join(code, "data/skins/classic/stkskin.xml")).toString("utf8"));
+  const slicedSkins = new Set(["glass_section.png", "glassbutton.png", "glassbutton_focused.png", "glassspinner.png", "glassspinner_focus.png", "glasstab.png", "glasstab_focus.png", "glasstab_vert.png", "glasstab_vert_focus.png"]);
+  for (const element of skin.children) {
+    const a = element.attributes;
+    const name = `skins/${a.common === "y" ? "common" : "classic"}/${a.image}`;
+    const info = data.images[name];
+    if (!info || info.slices || !slicedSkins.has(a.image) || a.left_border === undefined) continue;
+    const borders = ["left_border", "right_border", "top_border", "bottom_border"].map((key) => Number(a[key] ?? 0));
+    const slices = skinSlices(record(join(code, "data", name)), borders).map((bytes, index) => {
+      if (!bytes.length) return "";
+      const path = `ui/slices/${basename(name, ".png")}-${index}.png`;
+      write(path, bytes); return path;
+    });
+    Object.assign(info, { borders, slices, preserveHorizontal: a.preserve_h_aspect_ratios === "true" });
   }
   for (const name of ["blue_plus", "remove", "rename", "gp_new", "gp_copy", "gp_edit", "gp_remove", "green_check", "red_x", "track_random", "logo_slim", "karts", "mode_normal", "mode_tt", "mode_ftl", "mode_weapons", "mode_soccer", "mode_easter", "mode_ghost", "mode_laptrial", "story_mode_book"]) image(`gui/icons/${name}.png`);
   for (const entry of readdirSync(join(source, "tracks"), { withFileTypes: true }).filter((entry) => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {

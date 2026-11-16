@@ -7,6 +7,7 @@ import { trackData } from "./track-data.js";
 import { GameAudio } from "./sound.js";
 import { advanceWheelSpin, kartFrame, wheelTransform } from "./kart-transform.js";
 import { setUiLanguage } from "./localization.js";
+import { kartBackdropTransform, kartPreviewCamera } from "./kart-layout.js";
 
 const callbacks = globalThis as unknown as RuneweaveCallbacks;
 const session = new PcSession();
@@ -36,7 +37,13 @@ function spawn(id: string, path: string, pose: Pose, scale = 1): void {
 function refreshUi(): void {
   layout = readLayout(mobile); layoutClock = 0;
   touch.reset(); accumulator = 0; pendingItem = false; pendingRescue = false; lookBack = false;
-  if (session.screen === "kart") preparePreview();
+  if (session.screen === "kart") {
+    preparePreview();
+    const camera = kartPreviewCamera(layout), [x, y, z, tx, ty, tz, fov] = camera;
+    scene_set_camera_3d(x, y, z, tx, ty, tz, fov);
+    const [bx, by, bz, rx, ry, rz, scale] = kartBackdropTransform(layout, camera);
+    scene_set_transform_3d("preview-background", bx, by, bz, rx, ry, rz, scale);
+  }
   scene_set_3d_enabled(session.screen === "kart" || worldReady && (["race", "paused", "finished"].includes(session.screen) || ["options", "help"].includes(session.screen) && session.returnScreen === "paused"));
   if (session.screen === "track-info") {
     const stored = storage_read(session.bestKey);
@@ -71,7 +78,6 @@ function renderPreview(dt: number): void {
     const wheel = wheelTransform(frame, kart.wheels[i].position, 0, 0);
     scene_set_transform_3d(`preview-wheel-${i}`, wheel.position.x, wheel.position.y, wheel.position.z, ...wheel.rotation, 1);
   }
-  scene_set_camera_3d(2.5, 1.5, 3.6, 0, 0.5, 0, 32);
 }
 function startRace(): void {
   session.start(); accumulator = 0; uiClock = 0; lookBack = false;
