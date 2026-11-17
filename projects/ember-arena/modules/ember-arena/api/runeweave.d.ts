@@ -145,3 +145,12 @@ declare function storage_remove(key: string): StorageWriteResult | { state: "mis
 
 /** Logical pixel dimensions for native Bevy UI, distinct from virtual pointer units. */
 declare function window_metrics(): { width: number; height: number };
+
+/** Download and verify a JSON resource pack descriptor asynchronously. Zero means busy. */
+declare function asset_pack_request(descriptorJson: string): number;
+/** Terminal results are consumed; returned cache:// roots are portable Bevy asset paths. */
+declare function asset_pack_poll(id: number):
+  | { state: "pending"; received: number; total: number }
+  | { state: "ready"; root: string }
+  | { state: "error"; error: string }
+  | { state: "unknown" };

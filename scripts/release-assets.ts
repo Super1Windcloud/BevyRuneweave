@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { extname, join } from "node:path";
 
 export interface ReleaseAsset {
@@ -15,6 +15,15 @@ export interface ReleaseCandidate {
   prepare(): Promise<string>;
 }
 
+/** Optional explicit startup payload; production source assets never enter this ZIP. */
+export function startupAssetFiles(assets: string): Set<string> | null {
+  const path = join(assets, "startup-manifest.json");
+  if (!existsSync(path)) return null;
+  const manifest = JSON.parse(readFileSync(path, "utf8")) as { schemaVersion: number; files: string[] };
+  if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.files) || manifest.files.some((name) => typeof name !== "string" || !name || /[\\:\x00-\x1f]/.test(name) || name.split("/").some((part) => !part || part === "." || part === ".."))) throw new Error("Invalid startup manifest");
+  return new Set(manifest.files);
+}
+
 // Hash the payload before randomized encryption. Keyed hashing also invalidates
 // packages when the encryption key changes without publishing a key checksum.
 export function releaseAssetLabel(
@@ -25,13 +34,14 @@ export function releaseAssetLabel(
   key: Buffer,
 ): string {
   const files = new Map<string, Buffer>([[scriptEntry.replaceAll("\\", "/"), Buffer.from(script)]]);
+  const startup = startupAssetFiles(assets);
   const excluded = new Set(language === "lua" ? [".lua"] : [".js", ".mjs", ".cjs"]);
   const visit = (directory: string, prefix: string) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name);
       const name = `${prefix}${entry.name}`;
       if (entry.isDirectory()) visit(path, `${name}/`);
-      else if (entry.isFile() && !excluded.has(extname(entry.name).toLowerCase())) {
+      else if (entry.isFile() && (!startup || startup.has(name)) && !excluded.has(extname(entry.name).toLowerCase())) {
         files.set(name, readFileSync(path));
       }
     }

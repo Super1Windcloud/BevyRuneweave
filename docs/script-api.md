@@ -4,6 +4,10 @@ Runeweave registers script-facing operations once in `AppScriptFunctionRegistry`
 and TypeScript receive the same functions through their BMS language adapters. Scene data is stored
 as real reflected Bevy components and resources; there is no script-side ECS snapshot in Rust.
 
+Verified asynchronous resource downloads use `asset_pack_request` and `asset_pack_poll`.
+See [Resource pack API and STK delivery](stk-resource-delivery.md#native-api) for the
+descriptor, result states, cache paths and native rebuild requirements.
+
 ## Lifecycle callbacks
 
 Mobile example hosts accept an optional package setting in `assets/engineConfig.json`:

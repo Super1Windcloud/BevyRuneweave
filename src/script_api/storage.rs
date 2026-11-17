@@ -28,7 +28,7 @@ fn valid_name(name: &str) -> bool {
             .all(|value| value.is_ascii_alphanumeric() || matches!(value, b'-' | b'_'))
 }
 
-fn native_data_root() -> Option<PathBuf> {
+pub(super) fn native_data_root() -> Option<PathBuf> {
     if let Some(value) = std::env::var_os("RUNEWEAVE_DATA_DIR") {
         return Some(PathBuf::from(value)).filter(|path| path.is_absolute());
     }
@@ -431,6 +431,8 @@ mod tests {
                     check(window_metrics().width === 640 && window_metrics().height === 360);
                     check(typeof app_locale() === "string" && app_locale().length > 0);
                     check(storage_read("profile").state === "missing");
+                    check(asset_pack_poll(0).state === "unknown");
+                    check(asset_pack_request("{}") > 0);
                     check(storage_write("profile", "saved").state === "ok");
                     check(storage_read("profile").value === "saved");
                     check(storage_write("profile", "updated").state === "ok");
@@ -475,6 +477,8 @@ mod tests {
                     assert(window_metrics().width == 640 and window_metrics().height == 360)
                     assert(type(app_locale()) == "string" and #app_locale() > 0)
                     assert(storage_read("profile").state == "missing")
+                    assert(asset_pack_poll(0).state == "unknown")
+                    assert(asset_pack_request("{}") > 0)
                     assert(storage_write("profile", "saved").state == "ok")
                     assert(storage_read("profile").value == "saved")
                     assert(storage_write("profile", "updated").state == "ok")

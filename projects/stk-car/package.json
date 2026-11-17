@@ -10,8 +10,11 @@
     "check": "biome check . --error-on-warnings",
     "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.scripts.json --noEmit",
     "prepare:assets": "tsx scripts/prepare-assets.ts",
+    "prepare:packs": "tsx scripts/prepare-packs.ts",
     "test": "tsx --test scripts/*.test.ts",
-    "package": "tsx scripts/package.ts"
+    "package": "npm run prepare:packs && tsx scripts/package.ts",
+    "publish:packs": "tsx --env-file=../../.env scripts/publish-packs.ts",
+    "import:local-assets": "tsx scripts/import-local-assets.ts"
   },
   "devDependencies": {
     "esbuild": "^0.28.1",

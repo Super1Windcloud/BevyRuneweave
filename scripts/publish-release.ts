@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { deflateRawSync } from "node:zlib";
 import { build, transform } from "esbuild";
-import { listReleaseAssets, releaseAssetLabel, syncReleaseAssets, type ReleaseCandidate } from "./release-assets.js";
+import { listReleaseAssets, releaseAssetLabel, startupAssetFiles, syncReleaseAssets, type ReleaseCandidate } from "./release-assets.js";
 
 const require = createRequire(import.meta.url);
 const luamin = require("luamin") as { minify(source: string): string };
@@ -277,7 +277,10 @@ async function prepareScript(project: ReleaseProject): Promise<string> {
 }
 
 function prepareAssets(project: ReleaseProject, destination: string, bundled: string) {
-  cpSync(project.assets, destination, { recursive: true });
+  const startup = startupAssetFiles(project.assets);
+  if (startup) {
+    for (const file of startup) { const target = join(destination, file); mkdirSync(dirname(target), { recursive: true }); cpSync(join(project.assets, file), target); }
+  } else cpSync(project.assets, destination, { recursive: true });
   const script = join(destination, project.scriptEntry);
   mkdirSync(dirname(script), { recursive: true });
   if (project.language === "lua") {

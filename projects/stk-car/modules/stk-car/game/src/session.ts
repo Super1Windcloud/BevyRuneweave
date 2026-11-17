@@ -4,7 +4,7 @@ import { MenuState } from "./menu-state.js";
 import type { UiLanguage } from "./localization.js";
 import { courseFor, defaultCourse } from "./courses.js";
 
-export type Screen = "main" | "kart" | "setup" | "tracks" | "track-info" | "options" | "help" | "notice" | "menu" | "race" | "paused" | "finished";
+export type Screen = "main" | "kart" | "setup" | "tracks" | "track-info" | "options" | "help" | "notice" | "menu" | "race" | "paused" | "finished" | "downloading";
 export interface Settings { trackId: string; kartId: string; difficulty: number; mode: "normal" | "time-trial"; laps: number; aiCount: number; reverse: boolean; wasd: boolean; steeringAssist: boolean; musicVolume: number; sfxVolume: number; language: UiLanguage; }
 export const defaultSettings = (): Settings => ({ trackId: defaultCourse.id, kartId: "tux", difficulty: 1, mode: "normal", laps: defaultCourse.defaultLaps, aiCount: 3, reverse: false, wasd: false, steeringAssist: false, musicVolume: 0.6, sfxVolume: 0.7, language: "system" });
 export function parseSettings(value: string): Settings {
@@ -33,6 +33,8 @@ export class PcSession {
   best = 0;
   noticeTitle = "";
   noticeText = "";
+  resourceText = "";
+  resourceFailed = false;
   menu = new MenuState();
   menuHistory: { screen: Screen; page: string }[] = [];
   get course() { return courseFor(this.settings.trackId) ?? defaultCourse; }
@@ -48,7 +50,7 @@ export class PcSession {
       const previous = this.menuHistory.pop()!; this.screen = previous.screen; this.menu.show(previous.page); return;
     }
     const previous: Partial<Record<Screen, Screen>> = { kart: "main", setup: "kart", tracks: "setup", "track-info": "tracks", paused: "race", finished: "track-info", race: "paused" };
-    this.screen = this.screen === "options" || this.screen === "help" || this.screen === "notice" ? this.returnScreen : previous[this.screen] ?? "main";
+    this.screen = this.screen === "options" || this.screen === "help" || this.screen === "notice" || this.screen === "downloading" ? this.returnScreen : previous[this.screen] ?? "main";
   }
   open(screen: "options" | "help"): void { this.returnScreen = this.screen; this.openMenu(screen === "options" ? "options_audio" : "help1", screen); }
   openMenu(page: string, screen: Screen = "menu"): void {

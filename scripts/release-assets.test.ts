@@ -4,11 +4,22 @@ import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
-import { listReleaseAssets, releaseAssetLabel, syncReleaseAssets, type ReleaseAsset, type ReleaseCandidate } from "./release-assets.js";
+import { listReleaseAssets, releaseAssetLabel, startupAssetFiles, syncReleaseAssets, type ReleaseAsset, type ReleaseCandidate } from "./release-assets.js";
 
 function asset(id: number, name: string, label: string | null, state = "uploaded"): ReleaseAsset {
   return { id, name, label, state };
 }
+
+test("startup manifests isolate published payloads from production sources and reject traversal", (t) => {
+  const parent = resolve(import.meta.dirname, "../target/release-assets-tests"); mkdirSync(parent, { recursive: true });
+  const assets = mkdtempSync(join(parent, "startup-")); t.after(() => rmSync(assets, { recursive: true, force: true }));
+  writeFileSync(join(assets, "core.txt"), "core"); writeFileSync(join(assets, "source.txt"), "production source");
+  writeFileSync(join(assets, "startup-manifest.json"), JSON.stringify({ schemaVersion: 1, files: ["core.txt", "startup-manifest.json"] }));
+  const label = () => releaseAssetLabel(assets, "ts", "game.js", "script", Buffer.alloc(32, 1)); const original = label();
+  writeFileSync(join(assets, "source.txt"), "updated source"); assert.equal(label(), original);
+  writeFileSync(join(assets, "core.txt"), "changed core"); assert.notEqual(label(), original);
+  writeFileSync(join(assets, "startup-manifest.json"), JSON.stringify({ schemaVersion: 1, files: ["../escape"] })); assert.throws(() => startupAssetFiles(assets));
+});
 
 test("payload fingerprints track packaged content and keys, ignoring emitted scripts and timestamps", (t) => {
   const parent = resolve(import.meta.dirname, "../target/release-assets-tests");

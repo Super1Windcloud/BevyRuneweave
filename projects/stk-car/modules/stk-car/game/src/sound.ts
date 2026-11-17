@@ -1,6 +1,7 @@
 import { clamp } from "./race.js";
 import type { PcSession } from "./session.js";
 import { trackData } from "./track-data.js";
+import { resources } from "./resources.js";
 
 let effectVolume = 0.7, effectIndex = 0;
 export function menuSound(name: string): void {
@@ -31,10 +32,13 @@ export class GameAudio {
     const inRace = screen === "race" || screen === "paused" || ["options", "help"].includes(screen) && session.returnScreen === "paused";
     const paused = inRace && screen !== "race";
     const pauseChanged = this.paused !== paused;
-    const music = screen === "finished" ? race.ranking[0] === player ? trackData.audio.result : trackData.audio.lose : inRace ? session.course.music : trackData.audio.menu;
+    const source = screen === "finished" ? race.ranking[0] === player ? trackData.audio.result : trackData.audio.lose : inRace ? session.course.music : trackData.audio.menu;
+    resources.ensure([source], -10);
+    const music = resources.path(source);
     if (music !== this.music) {
       this.music = music; this.musicVolume = settings.musicVolume; this.paused = paused;
-      audio_play("music", music, true, settings.musicVolume); audio_update("music", settings.musicVolume, 1, paused);
+      if (music) { audio_play("music", music, true, settings.musicVolume); audio_update("music", settings.musicVolume, 1, paused); }
+      else audio_stop("music");
     } else if (this.musicVolume !== settings.musicVolume || this.paused !== paused) {
       this.musicVolume = settings.musicVolume; this.paused = paused;
       audio_update("music", settings.musicVolume, 1, paused);
