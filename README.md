@@ -306,3 +306,9 @@ the current working directory.
 
 All example hosts use `assets/branding/bevy_icon.png`. Windows and Linux set a runtime window icon,
 macOS sets the Dock icon, and Android and iOS generate their platform launcher/AppIcon resources.
+The shared artwork is `assets/branding/runeweave-icon.png`; it supplies the engraved R and orbital
+glow icon. To regenerate desktop and mobile sizes, expose the optional `sharp` package through
+`NODE_PATH` and run `npm run prepare:branding`. The generator preserves transparency on desktop
+and Android, adds the standard macOS inset, and emits opaque iOS AppIcon images. Existing hosts
+must be rebuilt to display the new icon; the desktop runtime also embeds its fallback icon, so
+rebuild its `.dll`, `.dylib`, or `.so`. No runtime API or game-bundle changes are required.
