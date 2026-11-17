@@ -63,6 +63,8 @@ function mountMainMenu(session: PcSession, act: (action: () => void) => () => vo
   const open = (page: string) => act(() => session.openMenu(page));
   const chooseKarts = (players: number) => act(() => { session.menu.players = players; session.menu.raceMode = "normal"; session.settings.mode = "normal"; session.openMenu("karts", "kart"); if (players > 1) session.menu.popup("splitscreen_player_dialog", tr("Splitscreen Multiplayer", "分屏多人游戏"), "splitscreen"); });
   image("logo", parent, "ui/logo.png", { position: "absolute", left: "33%", top: "0%", width: "34%", height: "44%" });
+  node("resource-status-row", parent, { position: "absolute", left: "8%", top: "44%", width: "84%", flexDirection: "row", justifyContent: "center" });
+  label("resource-status", "resource-status-row", session.resourceText, layout.mobile ? 12 : 15, { maxWidth: "100%", background: [0, 0, 0, 0.6], borderRadius: 5, padding: 3 });
   node("main-cards", parent, { position: "absolute", top: "51%", left: "5%", width: "90%", height: "31%", justifyContent: "space-between", flexDirection: "row" });
   const size = layout.mobile ? Math.min(layout.width * 0.127, layout.height * 0.22) : Math.min(layout.width * 0.127, 166 * unit);
   mainIcon("story", "main-cards", tr("Story Mode", "故事模式"), "menu_story", open("story"), size);
@@ -156,6 +158,14 @@ export function mountHud(session: PcSession, layout: Layout, changed: () => void
   node("root", "", { width: "100%", height: "100%", position: "absolute" });
   const act = (action: () => void) => () => { action(); changed(); };
   const back = act(() => session.back());
+  if (screen === "downloading") {
+    image("menu-background", "root", "ui/background.jpg", { position: "absolute", width: "100%", height: "100%", imageMode: "stretch" });
+    heading(tr("Preparing race", "准备比赛资源"), ""); centeredPanel("download-panel");
+    label("resource-status", "download-panel", session.resourceText, 20);
+    button("download-retry", "download-panel", tr("Retry", "重试"), start, { height: 48 });
+    button("download-back", "download-panel", tr("Back", "返回"), back, { height: 48 });
+    finish(); return;
+  }
   const racing = screen === "race" || screen === "paused" || screen === "finished" || (screen === "options" || screen === "help") && session.returnScreen === "paused";
   if (!racing && screen !== "kart") {
     image("menu-background", "root", "ui/background.jpg", { position: "absolute", width: "100%", height: "100%", imageMode: "stretch" });
@@ -197,6 +207,7 @@ function performanceLabel(): void {
   const placement = menuSession.screen === "kart" ? { left: "55%", top: "14%" } : { left: "40%", bottom: 6 };
   label("performance", "root", "", 14, { position: "absolute", ...placement, display: "none", background: [0, 0, 0, 0.65] });
 }
+export function updateResourceStatus(value: string): void { setLabel("resource-status", value, menuSession.screen === "downloading" ? 20 : dimensions.mobile ? 12 : 15); }
 export function updatePerformance(metrics: FrameMetrics | null, visible: boolean): void {
   style("performance", { display: visible && metrics ? "flex" : "none" });
   if (metrics) setLabel("performance", `FPS ${metrics.fps.toFixed(1)}  |  ${tr("Script", "脚本")} ${metrics.scriptMeanMs.toFixed(1)} ms  |  P95 ${metrics.frameP95Ms.toFixed(0)} ms  [F3]`, 14);

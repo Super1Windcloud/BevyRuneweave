@@ -6,6 +6,7 @@ mod camera;
 mod environment;
 mod input;
 mod network;
+pub(crate) mod packs;
 #[cfg(test)]
 mod perf_baseline;
 pub(crate) mod storage;
@@ -87,6 +88,10 @@ fn valid_entity_id(id: &str) -> bool {
 }
 
 fn valid_asset_path(path: &str) -> bool {
+    let path = path.strip_prefix("cache://").unwrap_or(path);
+    if path.contains(['\\', ':']) {
+        return false;
+    }
     let path = Path::new(path);
     !path.as_os_str().is_empty()
         && !path.is_absolute()
@@ -728,11 +733,13 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .init_resource::<ScriptNetwork>()
             .init_resource::<ScriptGameState>()
             .init_resource::<ScriptStorage>()
+            .init_resource::<packs::ScriptPacks>()
             .add_systems(
                 Update,
                 (
                     clear_detached_script_entities,
                     clear_detached_storage_bindings,
+                    packs::clear_detached_packs,
                     bind_pending_script_animations,
                 ),
             );
@@ -748,6 +755,8 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("storage_read", storage_read)
             .register("storage_write", storage_write)
             .register("storage_remove", storage_remove)
+            .register("asset_pack_request", packs::asset_pack_request)
+            .register("asset_pack_poll", packs::asset_pack_poll)
             .register("scene_actor_set", scene_actor_set)
             .register("scene_actor", scene_actor)
             .register("scene_actor_ids", scene_actor_ids)

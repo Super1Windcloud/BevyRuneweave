@@ -1,5 +1,6 @@
 import type { Layout } from "./controls.js";
 import { guiLayout, guiLength, type GuiBox, type Rect } from "./gui-layout.js";
+import { resources } from "./resources.js";
 import { menuData } from "./menu-data.js";
 import type { GuiNode } from "./menu-data-types.js";
 import { menuAction, menuPageFor } from "./menu-actions.js";
@@ -25,7 +26,11 @@ export const textFieldColors = { border: [138 / 255, 138 / 255, 138 / 255, 1], f
 const containerTags = new Set(["stkgui", "div", "box", "bottombar"]);
 const gridTags = new Set(["ribbon_grid", "scrollable_ribbon", "scrollable_toolbar", "ribbon", "buttonbar", "tabs", "vertical-tabs"]);
 
-export function sourceImage(name: string): string { return menuData.images[name]?.path ?? name; }
+export function sourceImage(name: string): string {
+  const path = menuData.images[name]?.path ?? name;
+  resources.ensure([path], 10);
+  return resources.path(path) || "ui/background.jpg";
+}
 function skin(name: string): string { return menuData.images[`skins/classic/${name}.png`] ? `skins/classic/${name}.png` : `skins/common/${name}.png`; }
 function spawn(id: string, kind: "node" | "button" | "image" | "text", parent: string, style: Record<string, unknown>): void {
   if (!ui_spawn(id, parent, kind) || !ui_set_style(id, JSON.stringify(style))) throw new Error(`Cannot create menu widget ${id}`);

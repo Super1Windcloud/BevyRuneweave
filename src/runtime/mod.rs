@@ -10,10 +10,9 @@ use std::{
     time::Instant,
 };
 
-#[cfg(target_os = "android")]
 use bevy::asset::{
     AssetApp,
-    io::{AssetSourceBuilder, AssetSourceId, file::FileAssetReader},
+    io::{AssetSourceBuilder, file::FileAssetReader},
 };
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use bevy::window::PrimaryWindow;
@@ -546,6 +545,7 @@ fn request_asset_reload(
     asset_root: Res<RuntimeAssetRoot>,
     mut path: ResMut<LoadedScriptPath>,
     mut storage: ResMut<crate::script_api::storage::ScriptStorage>,
+    mut packs: ResMut<crate::script_api::packs::ScriptPacks>,
     scripts: Query<Entity, With<ScriptComponent>>,
 ) {
     let Some(request) = take_runtime_request() else {
@@ -566,6 +566,7 @@ fn request_asset_reload(
             }
         };
         storage.refresh_for_assets(&asset_root.0);
+        packs.refresh_for_assets(&asset_root.0);
         for entity in &scripts {
             commands.entity(entity).despawn();
         }
@@ -590,6 +591,7 @@ fn request_asset_reload(
 
     info!("Reloading script: {}", path.source_path.display());
     storage.refresh_for_assets(&asset_root.0);
+    packs.refresh_for_assets(&asset_root.0);
     asset_server.reload(path.asset_path.clone());
 }
 
@@ -686,12 +688,18 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
 
     let mut app = App::new();
     let scripting_plugins = runtime_scripting_plugins();
+    if let Some(root) = crate::script_api::packs::cache_root() {
+        app.register_asset_source(
+            "cache",
+            AssetSourceBuilder::new(move || Box::new(FileAssetReader::new(root.clone()))),
+        );
+    }
 
     #[cfg(target_os = "android")]
     {
         let file_asset_root = asset_root.clone();
         app.register_asset_source(
-            AssetSourceId::Default,
+            bevy::asset::io::AssetSourceId::Default,
             AssetSourceBuilder::new(move || {
                 Box::new(FileAssetReader::new(file_asset_root.clone()))
             }),
@@ -722,6 +730,9 @@ pub fn build_app_with_assets(asset_root: PathBuf, script_path: PathBuf) -> Resul
         asset_path,
     })
     .insert_resource(RuntimeAssetRoot(asset_root.clone()))
+    .insert_resource(crate::script_api::packs::ScriptPacks::for_assets(
+        &asset_root,
+    ))
     .init_resource::<ScriptLifecycle>()
     .insert_resource(crate::script_api::storage::ScriptStorage::for_assets(
         &asset_root,

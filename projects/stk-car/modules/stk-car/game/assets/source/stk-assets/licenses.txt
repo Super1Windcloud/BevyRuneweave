@@ -1,0 +1,267 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: SuperTuxKart
+Upstream-Contact:
+ Joerg Henrichs <henrichsjoerg@gmail.com>
+ Marianne Gagnon <auria.mg@gmail.com>
+ Jean-Manuel Clémençon <sam.un@protonmail.com>
+Source: https://supertuxkart.net
+License: GPL2+ and CC-BY-SA
+
+Files: check_licenses.php
+Copyright: Copyright 2017-2018 Matthew Trescott <matthewtrescott@gmail.com>
+License: GPL 3.0+
+Comment: Super hacky but will check for undocumented files that you're about to add
+
+Files:
+ library/gfx_advertisingScreenArena_a/*
+ library/gfx_cameraRig_a/*
+ library/gfx_fireflies_a/*
+ library/gfx_fireworksExplosion_a/*
+ library/gfx_fireworkTube_a/*
+ library/gfx_fireworkTubeBlueSparks_a/*
+ library/gfx_jetblastGround_a/*
+ library/gfx_lightFlash_a/*
+ library/gfx_lightning_a/*
+ library/gfx_medeorit_a/*
+ library/gfx_rocketBlast_sa/*
+ library/gfx_solarCore_a/*
+ library/gfx_volumetricNebula_a/*
+ library/stk_combineHarvester_a/*
+ library/stklib_accacia_a/*
+ library/stklib_agave_a/*
+ library/stklib_airConditioner_a/*
+ library/stklib_animGrass_a/*
+ library/stklib_armchair_a/*
+ library/stklib_asianLantern_a/*
+ library/stklib_asianWoodPost_a/*
+ library/stklib_autumnSmallBush_a/*
+ library/stklib_autumnTree_a/*
+ library/stklib_aztecFountain_a/*
+ library/stklib_aztecHouse_a/*
+ library/stklib_aztecHouse_b/*
+ library/stklib_aztecTorch_a/*
+ library/stklib_balcony_a/*
+ library/stklib_bambooTorch_a/*
+ library/stklib_beachWomen_a/*
+ library/stklib_bench_a/*
+ library/stklib_bigAirBlower_a/*
+ library/stklib_bigBlueFutureLight_a/*
+ library/stklib_blueRadioTower_a/*
+ library/stklib_boxGrid_a/*
+ library/stklib_cabbage_a/*
+ library/stklib_candle_a/*
+ library/stklib_carrot_a/*
+ library/stklib_cartraffic_a/*
+ library/stklib_cattail_a/*
+ library/stklib_chimney_a/*
+ library/stklib_chimney_b/*
+ library/stklib_classchair_a/*
+ library/stklib_cliffGrassEarth_a/*
+ library/stklib_computerScreenMail_a/*
+ library/stklib_computer_a/*
+ library/stklib_conifer_a/*
+ library/stklib_cornPlant_a/*
+ library/stklib_cypress_a/*
+ library/stklib_deadTree_a/*
+ library/stklib_electricalBox_a/*
+ library/stklib_electricalFenceGate_a/*
+ library/stklib_electricalFencePost_a/*
+ library/stklib_electricFence_a/*
+ library/stklib_fern_a/*
+ library/stklib_fishSkeleton_a/*
+ library/stklib_fitchBarrelTest_a/*
+ library/stklib_fitchBarrel_a/*
+ library/stklib_giantPlasticBag_a/*
+ library/stklib_greenRadioTower_a/*
+ library/stklib_hayBall_a/*
+ library/stklib_hayBall_a_mesh/*
+ library/stklib_hexajet_a/*
+ library/stklib_igloo_a/*
+ library/stklib_inflatableFence_a/*
+ library/stklib_inflatableFence_b/*
+ library/stklib_inflatableFence_c/*
+ library/stklib_jetBlast_a/*
+ library/stklib_jungleTree_a/*
+ library/stklib_jungleTree_b/*
+ library/stklib_lamponeFlag_a/*
+ library/stklib_liana_a/*
+ library/stklib_logBarrier_a/*
+ library/stklib_loudspeaker_a/*
+ library/stklib_loveAlcove_a/*
+ library/stklib_loveGate_a/*
+ library/stklib_loveLantern_a/*
+ library/stklib_lowAnimGrass_a/*
+ library/stklib_lowPalmTree_a/*
+ library/stklib_lowPineTree_a/*
+ library/stklib_lowRockBarrier_a/*
+ library/stklib_luggage_a/*
+ library/stklib_mailbox_a/*
+ library/stklib_metalPostLamp_a/*
+ library/stklib_metalSupportBeam_a/*
+ library/stklib_mineLantern_a/*
+ library/stklib_modernHousing_a/*
+ library/stklib_modernHousing_b/*
+ library/stklib_movingMapPlane_a/*
+ library/stklib_mudpot_a/*
+ library/stklib_mushroom_a/*
+ library/stklib_mushroom_b/*
+ library/stklib_nolokFlags_a/*
+ library/stklib_oldCar_a/*
+ library/stklib_oldLantern_a/*
+ library/stklib_oldLightBulbGroup/*
+ library/stklib_oldschoolLampVerticalSupport_a/*
+ library/stklib_oldschoolLamp_a/*
+ library/stklib_orangeCocktail_a/*
+ library/stklib_pallet_a/*
+ library/stklib_palmTree_a/*
+ library/stklib_papiAirport_a/*
+ library/stklib_partyFlags_a/*
+ library/stklib_pencilPaint_a/*
+ library/stklib_pinetree_a/*
+ library/stklib_pinkRibbon_a/*
+ library/stklib_poseidon_a/*
+ library/stklib_prayerFlags_a/*
+ library/stklib_princessSaraDepartureAirport_a/*
+ library/stklib_pumpkin_a/*
+ library/stklib_ranchPortal_a/*
+ library/stklib_redCrab_a/*
+ library/stklib_redFlowerBush_a/*
+ library/stklib_redParrot_a/*
+ library/stklib_redSeaweed_a/*
+ library/stklib_redShell_a/*
+ library/stklib_redTorii_Portal_a/*
+ library/stklib_redXmasLight_a/*
+ library/stklib_reef_a/*
+ library/stklib_rocketBooster_a/*
+ library/stklib_roots_a/*
+ library/stklib_runwayBeacon_a/*
+ library/stklib_sagebrush_a/*
+ library/stklib_sandCastle_a/*
+ library/stklib_saraVertical_a/*
+ library/stklib_seaLantern_a/*
+ library/stklib_seaweed_a/*
+ library/stklib_showProjector_a/*
+ library/stklib_silvianClock_a/*
+ library/stklib_silvianGirl_a/*
+ library/stklib_silvianHouse_a/*
+ library/stklib_silvianHouse_b/*
+ library/stklib_silvianHouse_c/*
+ library/stklib_silvianKiosk_a/*
+ library/stklib_skyBeam_a/*
+ library/stklib_slivianFountain_a/*
+ library/stklib_smartphone_a/*
+ library/stklib_snowRocks_a/*
+ library/stklib_snowSmallBush_a/*
+ library/stklib_speedTrap_a/*
+ library/stklib_spiralBlueShell_a/*
+ library/stklib_stkVertical_a/*
+ library/stklib_stormLantern_a/*
+ library/stklib_tetrapodUnderwater_a/*
+ library/stklib_trainSemaphore_a/*
+ library/stklib_trijet_a/*
+ library/stklib_tropicalPlant_a/*
+ library/stklib_umbrellaBeach_a/*
+ library/stklib_waterLily_a/*
+ library/stklib_waterTower_a/*
+ library/stklib_weatherCock_a/*
+ library/stklib_welcomeAboard_a/*
+ library/stklib_windpump_a/*
+ library/stklib_woodLittleBridge_a/*
+ library/stklib_woodLodge_a/*
+ library/stklib_woodPostLamp_a/*
+Copyright: Copyright 2014-2017 Jean-Manuel Clémençon
+License: CC-BY-SA 4.0
+Comment: stklib_pallet_a was confirmed to be samuncle's work, despite being committed with that of GeekPenguinBR and TuxKartDriver. (See IRC logs from 2017-01-23 at http://irc.wxm.be/logs.)
+
+Files: library/stklib_animalPig_a/*
+Copyright:
+ Public Domain by Bitiquinho from OpenGameArt.org
+ Copyright 2017 Jean-Manuel Clémençon
+License: CC-BY-SA 4.0
+Comment: Original untextured model is public domain. Modified (textured) by Jean-Manuel Clémençon.
+
+Files: library/stklib_aztecHut_a/*
+Copyright:
+ Copyright 2014 Anon
+ Copyright 2014 Jean-Manuel Clémençon
+License: CC-BY-SA 4.0 AND CC-BY-SA 3.0 Unported
+
+Files:
+ library/stklib_aztekVase_a/*
+ library/stklib_cocoaTree_a/*
+ library/stklib_mermaid_a/*
+ library/stklib_olmec_a/*
+ library/stklib_piranha_a/*
+ library/stklib_quetzalcoatl_a/*
+Copyright: Copyright 2014 Anon
+License: CC-BY-SA 4.0 AND CC-BY-SA 3.0 Unported
+Comment: Source: http://forum.freegamedev.net/viewtopic.php?f=90&t=5726
+
+Files:
+ library/stklib_blimp_a/*
+ library/stklib_tiresBarrier_a/*
+ library/stklib_tvVan_a/*
+ library/stklib_wilbertCam_a/*
+ library/stklib_wilbertSecurity_a/*
+Copyright:
+ Copyright 2016 GeekPenguinBR
+ Copyright 2016 TuxKartDriver
+License: CC-BY-SA 3.0
+
+Files:
+ library/stklib_entranceGuardianMale_a/*
+ textures/stklib_entranceGuardianMale_a.png
+Copyright: Public Domain by Colorado Stark
+License: CC0
+Comment: See http://opengameart.org/content/statue-holding-lightpost. Modified by Jean-Manuel Clémençon.
+
+Files: library/stklib_gnuMeditation_a/*
+Copyright:
+ Copyright 2009 Benjamin Arnaudet
+ Copyright 2010 STKRudy85
+ Copyright 2013 Lionel Fuentes
+ Copyright 2015 Jean-Manuel Clémençon
+ Copyright 2016 Benau
+License: GPL v3
+Comment: Converted from kart to library node by Jean-Manuel Clémençon. Benau added the colorization mask.
+
+Files:
+ library/stklib_gramophone_a/*
+ library/stklib_skeletonHand_a/*
+Copyright:
+ Copyright 2017 Néd J. Édoire
+License: CC-BY-SA 4.0
+Comment: Original model by Néd J. Édoire.
+
+Files: library/stklib_malampoorFlag_a/*
+Copyright: Copyright 2017 Matthew Trescott
+License: CC-BY-SA 4.0
+Comment: Based on the Lampone flag model by samuncle (CC-BY-SA 4.0)
+
+Files: library/stklib_monkeyCheering_a/*
+Copyright:
+ Copyright 2014, 2015 Jean-Manuel Clémençon
+ Copyright 2016 Benau
+License: CC-BY-SA 4.0
+Comment: Benau added more animations.
+
+Files: textures/stkflag_stellacoffee_a.png
+Copyright:
+ Public Domain by GDJ from OpenClipArt.org
+ Copyright 2017 Jean-Manuel Clémençon
+License: CC-BY-SA 4.0
+Comment: Mermaid picture from here: https://openclipart.org/detail/253291/blonde-mermaid. Modified into a logo by Jean-Manuel Clémençon.
+
+Files: textures/stklib_entranceGuardianMale_a.png
+Copyright: Public Domain by Colorado Stark
+License: CC0
+Comment: See http://opengameart.org/content/statue-holding-lightpost
+
+Files: textures/stktex_boxGrid_a.png
+Copyright: Copyright 2015 Néd J. Édoire
+License: CC-BY-SA 4.0
+
+Files: textures/stkflag_malampoorVertical_a.png
+Copyright: Copyright 2017 Matthew Trescott
+License: CC-BY-SA 4.0
+Comment: Incorporates a basic cloth texture by Jean-Manuel Clémençon, CC-BY-SA 4.0. Design and colors by Matthew Trescott.
