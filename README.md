@@ -312,3 +312,5 @@ glow icon. To regenerate desktop and mobile sizes, expose the optional `sharp` p
 and Android, adds the standard macOS inset, and emits opaque iOS AppIcon images. Existing hosts
 must be rebuilt to display the new icon; the desktop runtime also embeds its fallback icon, so
 rebuild its `.dll`, `.dylib`, or `.so`. No runtime API or game-bundle changes are required.
+The GPUI desktop launcher sets its macOS Dock icon at startup too, including direct `cargo run`
+launches outside a packaged `.app` bundle.

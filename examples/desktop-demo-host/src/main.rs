@@ -4,6 +4,8 @@
 
 #[macro_use]
 mod localized_messages;
+#[cfg(target_os = "macos")]
+mod app_icon;
 mod i18n;
 mod launcher;
 mod paths;

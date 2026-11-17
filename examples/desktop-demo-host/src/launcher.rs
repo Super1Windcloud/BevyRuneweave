@@ -899,6 +899,8 @@ fn configure_theme(mode: ThemeMode, cx: &mut App) {
 
 pub(super) fn run() {
     gpui_kit::application().with_assets(AllAssets).run(|cx| {
+        #[cfg(target_os = "macos")]
+        crate::app_icon::set();
         gpui_kit::init(cx);
         configure_theme(cx.window_appearance().into(), cx);
         cx.on_window_closed(|cx, _| {
