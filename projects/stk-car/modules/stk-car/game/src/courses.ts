@@ -15,3 +15,4 @@ export const courses: readonly Course[] = [dayCourseData, {
 }];
 export const defaultCourse = courses[0];
 export function courseFor(id: string): Course | undefined { return courses.find((course) => course.id === id); }
+export function courseModelPaths(course: Course): string[] { return [course.trackModel, course.skyModel]; }

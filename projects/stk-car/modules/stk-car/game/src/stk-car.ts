@@ -9,6 +9,7 @@ import { advanceWheelSpin, kartFrame, wheelTransform } from "./kart-transform.js
 import { setUiLanguage, tr } from "./localization.js";
 import { resources } from "./resources.js";
 import { kartBackdropTransform, kartPreviewCamera } from "./kart-layout.js";
+import { courseFor, courseModelPaths } from "./courses.js";
 
 const callbacks = globalThis as unknown as RuneweaveCallbacks;
 const session = new PcSession();
@@ -32,19 +33,21 @@ let camera: Pose = { ...session.race.player };
 let requiredResources: string[] = [];
 function raceResources(): string[] {
   const race = new Race(new Circuit(session.course.route), session.course.pickups, session.settings.laps, session.settings);
-  return [session.course.trackModel, session.course.skyModel, ...race.racers.flatMap((racer) => {
+  return [...courseModelPaths(session.course), ...race.racers.flatMap((racer) => {
     const kart = trackData.karts.find((kart) => kart.id === racer.kartId)!;
     return [kart.model, ...kart.wheels.map((wheel) => wheel.path)];
   })];
 }
 function resourceStatus(): void {
-  const status = resources.status(session.screen === "downloading" ? requiredResources : undefined);
+  const course = session.screen === "track-info" ? courseFor(session.menu.track) : undefined;
+  if (session.screen === "track-info" && !course) return;
+  const status = resources.status(course ? courseModelPaths(course) : session.screen === "downloading" ? requiredResources : undefined);
   session.resourceFailed = !!status.error;
   session.resourceText = status.error === "runtime_update_required" ? tr("Update the game runtime to download resources.", "请更新游戏运行时以下载资源。")
     : status.error ? tr("Download failed. Retry when starting the race.", "资源下载失败，可在开始比赛时重试。")
     : status.ready ? tr("Resources ready", "资源已就绪")
     : `${tr("Downloading resources", "正在下载资源")} ${(status.received / 1048576).toFixed(1)} / ${(status.total / 1048576).toFixed(1)} MiB`;
-  if (session.screen === "main" || session.screen === "downloading") updateResourceStatus(session.resourceText);
+  if (session.screen === "main" || session.screen === "downloading" || course) updateResourceStatus(session.resourceText);
 }
 const zeroPose = (): Pose => ({ x: 0, y: 0, z: 0, heading: 0, pitch: 0 });
 
@@ -65,9 +68,13 @@ function refreshUi(): void {
   }
   scene_set_3d_enabled(session.screen === "kart" || worldReady && (["race", "paused", "finished"].includes(session.screen) || ["options", "help"].includes(session.screen) && session.returnScreen === "paused"));
   if (session.screen === "track-info") {
-    const stored = storage_read(session.bestKey);
-    const value = stored.state === "ok" ? Number(stored.value) : 0;
-    session.best = Number.isFinite(value) && value > 0 ? value : 0;
+    const course = courseFor(session.menu.track);
+    if (course) {
+      resources.ensure(courseModelPaths(course), 90);
+      const stored = storage_read(session.bestKey);
+      const value = stored.state === "ok" ? Number(stored.value) : 0;
+      session.best = Number.isFinite(value) && value > 0 ? value : 0;
+    }
   }
   storage_write("pc-race-settings-v1", JSON.stringify(session.settings));
   mountHud(session, layout, refreshUi, startRace, mobile, (id) => {
@@ -76,6 +83,7 @@ function refreshUi(): void {
       if (kart && session.settings.kartId !== kart.id) { session.settings.kartId = kart.id; refreshUi(); }
     }
   });
+  if (session.screen === "track-info") resourceStatus();
   viewport = JSON.stringify(layout); mountedScreen = session.screen;
   updatePerformance(lastMetrics, showPerformance && session.screen !== "main");
 }

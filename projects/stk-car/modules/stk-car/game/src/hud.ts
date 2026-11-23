@@ -149,7 +149,15 @@ export function mountHud(session: PcSession, layout: Layout, changed: () => void
   menuSession = session; menuChanged = changed;
   const screen = session.screen;
   let preferredFocus = "";
-  const host: MenuHost = { register: (button) => buttons.push(button), modal: () => { buttons.length = 0; focus = 0; preferredFocus = ""; }, focus: (id) => { preferredFocus = id; } };
+  const host: MenuHost = {
+    register: (button) => buttons.push(button),
+    modal: () => { buttons.length = 0; focus = 0; preferredFocus = ""; },
+    focus: (id) => { preferredFocus = id; },
+    resourceStatus: ({ x, y, width, height }) => {
+      node("track-resource-status", "root", { position: "absolute", left: x, top: y, width, height, alignItems: "center", justifyContent: "center" });
+      label("resource-status", "track-resource-status", session.resourceText, mobile ? 12 : 15, { maxWidth: "100%", background: [0, 0, 0, 0.6], borderRadius: 5, padding: 3 });
+    },
+  };
   const finish = () => {
     const wanted = focusedId ?? preferredFocus, index = buttons.findIndex((button) => button.id === wanted);
     if (index >= 0) focus = index;

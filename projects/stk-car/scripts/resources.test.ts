@@ -6,6 +6,8 @@ import { ResourceDownloads } from "../modules/stk-car/game/src/resources.ts";
 import type { ResourceCatalog } from "../modules/stk-car/game/src/resource-types.ts";
 import { packFor, safePath, sha256, zipFiles } from "./resource-packs.ts";
 import { resourceCatalog } from "../modules/stk-car/game/src/resource-catalog.ts";
+import { courseFor, courseModelPaths } from "../modules/stk-car/game/src/courses.ts";
+import { menuData } from "../modules/stk-car/game/src/menu-data.ts";
 import { load } from "./game-fixture.ts";
 
 const catalog: ResourceCatalog = { schemaVersion: 1, owners: { "a.glb": "a", "b.glb": "b", "c.ogg": "c" }, packs: ["a", "b", "c"].map((id) => ({ id, url: `https://example.com/${id}.zip`, bytes: 100, sha256: "a".repeat(64), files: [] })) };
@@ -31,6 +33,65 @@ test("failed packs stay unavailable until explicit retry and missing APIs fail w
   globalThis.asset_pack_poll = () => ({ state: "ready", root: "" }); downloads.tick(); assert.equal(downloads.path("a.glb"), "a.glb");
   const game = load("zh-CN", "ios", undefined, ["asset_pack_request", "asset_pack_poll"]);
   assert.match(game.texts.get("resource-status")!, /更新游戏运行时/); assert.ok(game.nodes.has("singleplayer"));
+});
+test("selecting a playable course prefetches its models and shows progress before starting on mobile and desktop", () => {
+  const course = courseFor("lighthouse")!;
+  for (const platform of ["android", "windows"]) {
+    const game = load("zh-CN", platform);
+    game.click("singleplayer");
+    if (platform === "android") game.click("gui:karts:continue");
+    else game.press("Enter");
+    game.click("gui:race_setup:mode-normal");
+    const requested = () => [...game.packRequests.values()].flatMap((pack) => pack.files.map((file) => file.path));
+    assert.ok(!requested().includes(course.trackModel), platform);
+
+    game.downloads.hold = true;
+    game.click("gui:tracks_and_gp:track:lighthouse");
+    for (const model of courseModelPaths(course)) assert.ok(requested().includes(model), `${platform}: ${model}`);
+    assert.ok(game.nodes.has("resource-status"));
+    assert.match(game.texts.get("resource-status")!, /正在下载资源 0\.0 \/ /);
+    game.downloads.received = 1048576;
+    game.frame();
+    assert.match(game.texts.get("resource-status")!, /正在下载资源 [1-9]\d*\.\d \/ /);
+    assert.ok(!game.models.has("track"));
+
+    game.downloads.hold = false;
+    game.settle();
+    assert.equal(game.texts.get("resource-status"), "资源已就绪");
+    game.click("gui:track_info:start");
+    assert.equal(game.models.get("track"), course.trackModel);
+  }
+});
+test("preview-only track details have no start action or race model requests", () => {
+  const track = menuData.tracks.find(({ id }) => id !== "overworld" && !courseFor(id))!;
+  for (const platform of ["android", "windows"]) {
+    const game = load("zh-CN", platform);
+    game.click("singleplayer");
+    if (platform === "android") game.click("gui:karts:continue");
+    else game.press("Enter");
+    game.click("gui:race_setup:mode-normal");
+    const id = `gui:tracks_and_gp:track:${track.id}`;
+    assert.match(game.texts.get(`${id}:label:text`)!, /预览$/);
+    const lastRequest = game.packRequests.size;
+    game.click(id);
+    assert.ok([...game.texts.values()].some((value) => value.includes("仅供预览")));
+    assert.ok(!game.nodes.has("gui:track_info:start"));
+    assert.ok(!game.nodes.has("resource-status"));
+    const newFiles = [...game.packRequests.values()].slice(lastRequest).flatMap((pack) => pack.files);
+    assert.ok(newFiles.every(({ path }) => !path.endsWith(".glb")));
+  }
+});
+test("desktop Grand Prix previews offer a playable single race instead of a Grand Prix start", () => {
+  const game = load("zh-CN", "windows");
+  game.click("singleplayer"); game.press("Enter"); game.click("gui:race_setup:mode-normal");
+  game.click(`gui:tracks_and_gp:gp:${menuData.grandPrix[0].id}`);
+  assert.match(game.texts.get("gui:gp_info:name:text")!, /预览$/);
+  assert.ok(!game.nodes.has("gui:gp_info:start"));
+  assert.ok(!game.nodes.has("gui:gp_info:continue"));
+  game.click("gui:gp_info:single-race");
+  assert.equal(game.texts.get("resource-status"), "资源已就绪");
+  game.click("gui:track_info:start");
+  assert.equal(game.models.get("track"), courseFor("hacienda")!.trackModel);
 });
 test("starting a race waits for scene and AI vehicles; leaving the download page cannot auto-start later", () => {
   const game = load("en-US", "android", undefined, [], { hold: true, error: "", root: "" });

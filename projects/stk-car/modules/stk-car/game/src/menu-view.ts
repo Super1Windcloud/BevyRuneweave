@@ -9,7 +9,7 @@ import { isChinese, sourceText, tr } from "./localization.js";
 import { formatTime } from "./race.js";
 import type { PcSession } from "./session.js";
 import { trackData } from "./track-data.js";
-import { courses, defaultCourse } from "./courses.js";
+import { courseFor, courses, defaultCourse } from "./courses.js";
 import { kartMenuSource, menuGeometry, playerKartRects } from "./kart-layout.js";
 
 export interface MenuButton {
@@ -18,7 +18,7 @@ export interface MenuButton {
   caption?: { id: string; text: string; size: number };
   field?: { inner: string; editing: boolean };
 }
-export interface MenuHost { register(button: MenuButton): void; modal(): void; focus(id: string): void; }
+export interface MenuHost { register(button: MenuButton): void; modal(): void; focus(id: string): void; resourceStatus(rect: Rect): void; }
 export const menuWidgetId = (page: string, id: string): string => `gui:${page}:${id}`;
 const transparent = [0, 0, 0, 0], ink = [0, 0, 0, 1], blue = [0, 0, 0.7, 1];
 // Classic stkskin.xml text_field colors; STK edit boxes use solid fills, not button textures.
@@ -72,6 +72,9 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   const m = session.menu, page = menuPageFor(session);
   m.page = page;
   const mobile = !!layout.mobile;
+  const playableTrack = page === "track_info" && !!courseFor(m.track);
+  const previewNote = tr("Preview only. This track has no race available.", "仅供预览，当前赛道暂未开放比赛。");
+  const singleRaceLabel = tr(`Play ${defaultCourse.name} Single Race`, "玩庄园单场比赛");
   const { rect: safeRect, scale } = menuGeometry(layout);
   const counts = new Map<string, number>();
   const uid = (key: string) => { const count = counts.get(key) ?? 0; counts.set(key, count + 1); return count ? `${key}:${count}` : key; };
@@ -105,7 +108,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       const gp = currentPage === "grand_prix_editor" || currentPage === "gp_info" ? menuData.grandPrix.find((gp) => gp.id === m.grandPrix) : undefined;
       const query = m.fields[`${currentPage}:search`]?.toLocaleLowerCase() ?? "";
       const priority = (id: string) => { const index = courses.findIndex((course) => course.id === id); return index < 0 ? courses.length : index; };
-      return menuData.tracks.filter((track) => track.id !== "overworld" && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => priority(a.id) - priority(b.id)).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name), image: track.image, selected: track.id === m.track }));
+      return menuData.tracks.filter((track) => track.id !== "overworld" && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => priority(a.id) - priority(b.id)).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name) + (currentPage === "tracks_and_gp" && !courseFor(track.id) ? tr(" · Preview", " · 预览") : ""), image: track.image, selected: track.id === m.track }));
     }
     if (id === "players") return m.profiles.map((name, index) => ({ id: `profile:${index}`, text: name === "Player" ? tr("Player", "玩家") : name, image: trackData.karts[index % trackData.karts.length].icon, selected: m.player === index }));
     if (id === "resolutions") return ["1280 × 720", "1600 × 900", "1920 × 1080"].map((label) => ({ id: `resolution:${label}`, text: label, selected: label === (m.values["resolution"] ?? "1280 × 720") }));
@@ -128,6 +131,10 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     if (mobile && currentPage === "options_input" && id === "help1") return tr("Tap a device to view its controls.", "点击设备查看操作方式。");
     if (mobile && currentPage === "options_input" && id === "help2") return tr("Drag the virtual joystick to drive. Combine it with the action buttons using another finger.", "拖动虚拟摇杆驾驶，另一根手指可同时操作技能按钮。");
     if (m.dialog && id === "title") return m.dialog.title;
+    if (id === "name" && currentPage === "gp_info") {
+      const name = menuData.grandPrix.find((gp) => gp.id === m.grandPrix)?.name;
+      return `${name ? sourceText(name) : tr("Grand Prix", "大奖赛")}${tr(" · Preview", " · 预览")}`;
+    }
     if (id === "name" && currentPage === "track_info" || id === "selected_track") return sourceText(m.selectedTrack.name);
     if (id === "author") return m.selectedTrack.designer;
     if (id === "title" && currentPage === "options_device") return tr("Keyboard 0", "键盘 0");
@@ -153,12 +160,24 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       const { node, path } = box, a = node.attributes, logical = a.id ?? `node-${path}`, r = box.rect;
       if (r.width < 1 || r.height < 1 || node.tag === "spacer" || logical.startsWith("test_")) return;
       const id = uid(menuWidgetId(currentPage, logical));
+      if (currentPage === "track_info") {
+        if (!playableTrack && ["race-options-box", "buttons"].includes(logical)) return;
+        if (logical === "max-arena-players") {
+          if (playableTrack) host.resourceStatus(r);
+          else text(id, previewNote, r, Math.max(12, 15 * scale));
+          return;
+        }
+      }
       if (containerTags.has(node.tag)) {
         if (node.tag === "box") skinPicture(`${id}:box`, skin("glass_section"), r, scale);
         if (logical === "animated_area") { drawCredits(id, r); return; }
         box.children.forEach(draw); return;
       }
       if (gridTags.has(node.tag)) {
+        if (currentPage === "gp_info" && logical === "buttons") {
+          button(menuWidgetId(currentPage, "single-race"), r, singleRaceLabel, action("single-race"));
+          return;
+        }
         let list = items(logical, currentPage);
         if (!list.length && node.children.length) list = node.children.map((child, index) => ({ id: child.attributes.id ?? `item-${index}`, text: sourceText(child.attributes.text ?? ""), image: child.attributes.icon, selected: selected(child.attributes.id ?? "", currentPage) }));
         if (currentPage === "race_setup" && logical === "difficulty") list = list.map((item, index) => ({ ...item, selected: session.settings.difficulty === index }));
@@ -317,10 +336,14 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       text("mobile-gp-tracks", tracks.map((track) => sourceText(track.name)).join(" · "), rect(0, r.height - 68, left, 60), 15);
       text("mobile-gp-note", tr("Grand Prix menu preview. Hacienda and Lighthouse single races are playable.", "大奖赛菜单预览。当前可玩庄园和灯塔单场比赛。"), rect(right, 60, column, Math.max(70, r.height - 180)), 18, ink, "left");
       button(menuWidgetId(page, "start"), rect(right, r.height - 112, column, 44), tr("Grand Prix Preview", "大奖赛预览"), action("start"));
-      button(menuWidgetId(page, "single-race"), rect(right, r.height - 56, column, 48), tr(`Play ${defaultCourse.name} Single Race`, "玩庄园单场比赛"), action("single-race"));
+      button(menuWidgetId(page, "single-race"), rect(right, r.height - 56, column, 48), singleRaceLabel, action("single-race"));
     } else {
       const left = r.width * 0.43, right = left + 20, column = r.width - right;
       picture("mobile-track-preview", m.selectedTrack.image, rect(0, 56, left, Math.max(70, r.height - 110)));
+      if (!playableTrack) {
+        text("mobile-track-preview-note", previewNote, rect(right, 56, column, Math.max(70, r.height - 110)), 16);
+        return true;
+      }
       text("mobile-track-best", session.best > 0 ? `${tr("Best time", "最佳成绩")}  ${formatTime(session.best)}` : tr("No high score yet", "暂无最高成绩"), rect(0, r.height - 48, left, 40), 16);
       const spinner = (id: string, label: string, y: number) => {
         text(`mobile-${id}-label`, label, rect(right, y, column * 0.48, 44), 16, ink, "left");
@@ -329,8 +352,8 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       spinner("target-value-spinner", tr("Number of laps", "圈数"), 56);
       if (m.raceMode !== "time-trial") spinner("ai-spinner", tr("AI karts", "AI 赛车"), 108);
       button(menuWidgetId(page, "option"), rect(right, 162, column, 44), `${session.settings.reverse ? "☑" : "☐"} ${tr("Reverse track", "反向赛道")}`, () => { session.settings.reverse = !session.settings.reverse; changed(); });
+      host.resourceStatus(rect(right, r.height - 88, column, 32));
       button(menuWidgetId(page, "start"), rect(right, r.height - 52, column, 48), tr("Start Race", "开始比赛"), action("start"));
-      host.focus(menuWidgetId(page, "start"));
     }
     return true;
   }
@@ -356,7 +379,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   }
 
   if (session.screen !== "main" && !(mobile && drawMobilePage(safeRect))) drawPage(page, safeRect);
-  if (page === "track_info") host.focus(menuWidgetId(page, "start"));
+  if (playableTrack) host.focus(menuWidgetId(page, "start"));
   if (m.dialog) {
     spawn("menu-dialog-shade", "node", "root", { position: "absolute", left: 0, top: 0, width: "100%", height: "100%", background: [0, 0, 0, 0.55] });
     host.modal();

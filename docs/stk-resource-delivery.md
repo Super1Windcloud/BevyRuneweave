@@ -44,9 +44,11 @@ libraries and remote payloads from its game ZIP.
 ## Runtime behavior
 
 The homepage renders locally and queues the selected course and all its default
-race's karts, with at most two active requests. Selected previews/karts raise queued
-priority. Starting checks the actual player and AI roster and shows a bilingual
-preparation screen until required packs are installed. Returning cancels the start
+race's karts, with at most two active requests. Opening a playable course's details
+prioritizes its scene and sky packs and shows their progress. Preview-only tracks
+are labeled in the course picker and have no race start action. Grand Prix previews
+offer a single-race entry. Starting checks the actual player and AI roster and shows
+a bilingual preparation screen until required packs are installed. Returning cancels the start
 intent; downloads may finish in the background. Errors allow retry. Music has lower
 priority and never prevents racing.
 

@@ -794,6 +794,9 @@
   function courseFor(id) {
     return courses.find((course) => course.id === id);
   }
+  function courseModelPaths(course) {
+    return [course.trackModel, course.skyModel];
+  }
 
   // modules/stk-car/game/src/menu-state.ts
   var optionPages = ["options_general", "options_display", "options_video", "options_audio", "options_ui", "user_screen_tab", "options_input", "options_language"];
@@ -950,6 +953,15 @@
     const m = session2.menu, page = m.activePage;
     const go = (target, screen = "menu") => session2.openMenu(target, screen);
     const popup = (target, title, purpose = "") => m.popup(target, title, purpose);
+    const selectTrack = (trackId) => {
+      const course = courseFor(trackId);
+      m.track = trackId;
+      if (course && session2.settings.trackId !== trackId) {
+        session2.settings.trackId = trackId;
+        session2.settings.laps = course.defaultLaps;
+      }
+      if (page !== "edit_track") go("track_info", "track-info");
+    };
     if (id === "back" || id === "cancel" || id === "backbtn" || id === "back_to_device_list") {
       if (id === "back_to_device_list") m.show("options_input");
       else session2.back();
@@ -968,15 +980,8 @@
       m.raceMode = id.slice(5);
       if (m.raceMode === "normal" || m.raceMode === "time-trial") session2.settings.mode = m.raceMode;
       go("tracks_and_gp", "tracks");
-    } else if (id.startsWith("track:")) {
-      const trackId = id.slice(6), course = courseFor(trackId);
-      m.track = trackId;
-      if (course && session2.settings.trackId !== trackId) {
-        session2.settings.trackId = trackId;
-        session2.settings.laps = course.defaultLaps;
-      }
-      if (page !== "edit_track") go("track_info", "track-info");
-    } else if (id.startsWith("gp:")) {
+    } else if (id.startsWith("track:")) selectTrack(id.slice(6));
+    else if (id.startsWith("gp:")) {
       m.grandPrix = id.slice(3);
       if (page !== "grand_prix_editor") go("gp_info");
     } else if (page === "gp_info" && id === "single-race") {
@@ -990,16 +995,16 @@
     } else if (page === "gp_info" && ["start", "continue"].includes(id)) {
       popup("confirm_dialog", tr("Grand Prix is currently a menu preview. Choose a single race to play.", "\u5927\u5956\u8D5B\u5F53\u524D\u4E3A\u83DC\u5355\u9884\u89C8\uFF0C\u8BF7\u9009\u62E9\u5355\u573A\u6BD4\u8D5B\u8FDB\u5165\u6E38\u620F\u3002"), "preview");
     } else if (id === "start" && page === "track_info") {
-      if (courseFor(m.track) && m.players === 1 && (m.raceMode === "time-trial" || m.raceMode === "normal" && m.number("ai-spinner", session2) <= 3)) {
-        session2.settings.trackId = m.track;
-        start();
-      } else {
-        popup("confirm_dialog", tr("This configuration is a menu preview. Playable tracks: Hacienda and Lighthouse; singleplayer with up to three AI karts.", "\u6B64\u914D\u7F6E\u76EE\u524D\u4EC5\u4F9B\u83DC\u5355\u9884\u89C8\uFF1B\u53EF\u73A9\u5E84\u56ED\u548C\u706F\u5854\u8D5B\u9053\uFF0C\u652F\u6301\u5355\u4EBA\u53CA\u6700\u591A\u4E09\u540D AI\u3002"), "preview");
+      if (courseFor(m.track)) {
+        if (m.players !== 1 || !["normal", "time-trial"].includes(m.raceMode)) popup("confirm_dialog", tr("Choose Singleplayer and select Normal Race or Time Trial.", "\u8BF7\u9009\u62E9\u5355\u4EBA\u6E38\u620F\uFF0C\u518D\u9009\u62E9\u6B63\u5E38\u6BD4\u8D5B\u6216\u7ADE\u901F\u6A21\u5F0F\u3002"), "preview");
+        else if (m.raceMode === "normal" && m.number("ai-spinner", session2) > 3) popup("confirm_dialog", tr("Set AI karts to three or fewer to start the race.", "\u8BF7\u5C06 AI \u8D5B\u8F66\u6570\u91CF\u8BBE\u4E3A 3 \u6216\u66F4\u5C11\uFF0C\u518D\u5F00\u59CB\u6BD4\u8D5B\u3002"), "preview");
+        else {
+          session2.settings.trackId = m.track;
+          start();
+        }
       }
-    } else if (id === "random_track") {
-      m.track = menuData.tracks.find((track) => !track.arena)?.id ?? "lighthouse";
-      go("track_info", "track-info");
-    } else if (id === "rand-gp") {
+    } else if (id === "random_track") selectTrack(courses[Math.floor(Math.random() * courses.length)].id);
+    else if (id === "rand-gp") {
       m.grandPrix = menuData.grandPrix[0].id;
       go("gp_info");
     } else if (id.startsWith("group:") || id.startsWith("filter:")) {
@@ -1266,6 +1271,9 @@
     const m = session2.menu, page = menuPageFor(session2);
     m.page = page;
     const mobile2 = !!layout2.mobile;
+    const playableTrack = page === "track_info" && !!courseFor(m.track);
+    const previewNote = tr("Preview only. This track has no race available.", "\u4EC5\u4F9B\u9884\u89C8\uFF0C\u5F53\u524D\u8D5B\u9053\u6682\u672A\u5F00\u653E\u6BD4\u8D5B\u3002");
+    const singleRaceLabel = tr(`Play ${defaultCourse.name} Single Race`, "\u73A9\u5E84\u56ED\u5355\u573A\u6BD4\u8D5B");
     const { rect: safeRect, scale } = menuGeometry(layout2);
     const counts = /* @__PURE__ */ new Map();
     const uid = (key) => {
@@ -1311,7 +1319,7 @@
           const index = courses.findIndex((course) => course.id === id2);
           return index < 0 ? courses.length : index;
         };
-        return menuData.tracks.filter((track) => track.id !== "overworld" && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => priority(a.id) - priority(b.id)).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name), image: track.image, selected: track.id === m.track }));
+        return menuData.tracks.filter((track) => track.id !== "overworld" && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => priority(a.id) - priority(b.id)).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name) + (currentPage === "tracks_and_gp" && !courseFor(track.id) ? tr(" \xB7 Preview", " \xB7 \u9884\u89C8") : ""), image: track.image, selected: track.id === m.track }));
       }
       if (id === "players") return m.profiles.map((name, index) => ({ id: `profile:${index}`, text: name === "Player" ? tr("Player", "\u73A9\u5BB6") : name, image: trackData.karts[index % trackData.karts.length].icon, selected: m.player === index }));
       if (id === "resolutions") return ["1280 \xD7 720", "1600 \xD7 900", "1920 \xD7 1080"].map((label2) => ({ id: `resolution:${label2}`, text: label2, selected: label2 === (m.values["resolution"] ?? "1280 \xD7 720") }));
@@ -1334,6 +1342,10 @@
       if (mobile2 && currentPage === "options_input" && id === "help1") return tr("Tap a device to view its controls.", "\u70B9\u51FB\u8BBE\u5907\u67E5\u770B\u64CD\u4F5C\u65B9\u5F0F\u3002");
       if (mobile2 && currentPage === "options_input" && id === "help2") return tr("Drag the virtual joystick to drive. Combine it with the action buttons using another finger.", "\u62D6\u52A8\u865A\u62DF\u6447\u6746\u9A7E\u9A76\uFF0C\u53E6\u4E00\u6839\u624B\u6307\u53EF\u540C\u65F6\u64CD\u4F5C\u6280\u80FD\u6309\u94AE\u3002");
       if (m.dialog && id === "title") return m.dialog.title;
+      if (id === "name" && currentPage === "gp_info") {
+        const name = menuData.grandPrix.find((gp) => gp.id === m.grandPrix)?.name;
+        return `${name ? sourceText(name) : tr("Grand Prix", "\u5927\u5956\u8D5B")}${tr(" \xB7 Preview", " \xB7 \u9884\u89C8")}`;
+      }
       if (id === "name" && currentPage === "track_info" || id === "selected_track") return sourceText(m.selectedTrack.name);
       if (id === "author") return m.selectedTrack.designer;
       if (id === "title" && currentPage === "options_device") return tr("Keyboard 0", "\u952E\u76D8 0");
@@ -1364,6 +1376,14 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
         const { node: node2, path } = box, a = node2.attributes, logical = a.id ?? `node-${path}`, r = box.rect;
         if (r.width < 1 || r.height < 1 || node2.tag === "spacer" || logical.startsWith("test_")) return;
         const id = uid(menuWidgetId(currentPage, logical));
+        if (currentPage === "track_info") {
+          if (!playableTrack && ["race-options-box", "buttons"].includes(logical)) return;
+          if (logical === "max-arena-players") {
+            if (playableTrack) host.resourceStatus(r);
+            else text(id, previewNote, r, Math.max(12, 15 * scale));
+            return;
+          }
+        }
         if (containerTags.has(node2.tag)) {
           if (node2.tag === "box") skinPicture(`${id}:box`, skin("glass_section"), r, scale);
           if (logical === "animated_area") {
@@ -1374,6 +1394,10 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
           return;
         }
         if (gridTags.has(node2.tag)) {
+          if (currentPage === "gp_info" && logical === "buttons") {
+            button2(menuWidgetId(currentPage, "single-race"), r, singleRaceLabel, action("single-race"));
+            return;
+          }
           let list = items(logical, currentPage);
           if (!list.length && node2.children.length) list = node2.children.map((child, index) => ({ id: child.attributes.id ?? `item-${index}`, text: sourceText(child.attributes.text ?? ""), image: child.attributes.icon, selected: selected(child.attributes.id ?? "", currentPage) }));
           if (currentPage === "race_setup" && logical === "difficulty") list = list.map((item, index) => ({ ...item, selected: session2.settings.difficulty === index }));
@@ -1583,10 +1607,14 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
         text("mobile-gp-tracks", tracks.map((track) => sourceText(track.name)).join(" \xB7 "), rect(0, r.height - 68, left, 60), 15);
         text("mobile-gp-note", tr("Grand Prix menu preview. Hacienda and Lighthouse single races are playable.", "\u5927\u5956\u8D5B\u83DC\u5355\u9884\u89C8\u3002\u5F53\u524D\u53EF\u73A9\u5E84\u56ED\u548C\u706F\u5854\u5355\u573A\u6BD4\u8D5B\u3002"), rect(right, 60, column, Math.max(70, r.height - 180)), 18, ink, "left");
         button2(menuWidgetId(page, "start"), rect(right, r.height - 112, column, 44), tr("Grand Prix Preview", "\u5927\u5956\u8D5B\u9884\u89C8"), action("start"));
-        button2(menuWidgetId(page, "single-race"), rect(right, r.height - 56, column, 48), tr(`Play ${defaultCourse.name} Single Race`, "\u73A9\u5E84\u56ED\u5355\u573A\u6BD4\u8D5B"), action("single-race"));
+        button2(menuWidgetId(page, "single-race"), rect(right, r.height - 56, column, 48), singleRaceLabel, action("single-race"));
       } else {
         const left = r.width * 0.43, right = left + 20, column = r.width - right;
         picture("mobile-track-preview", m.selectedTrack.image, rect(0, 56, left, Math.max(70, r.height - 110)));
+        if (!playableTrack) {
+          text("mobile-track-preview-note", previewNote, rect(right, 56, column, Math.max(70, r.height - 110)), 16);
+          return true;
+        }
         text("mobile-track-best", session2.best > 0 ? `${tr("Best time", "\u6700\u4F73\u6210\u7EE9")}  ${formatTime(session2.best)}` : tr("No high score yet", "\u6682\u65E0\u6700\u9AD8\u6210\u7EE9"), rect(0, r.height - 48, left, 40), 16);
         const spinner = (id, label2, y) => {
           text(`mobile-${id}-label`, label2, rect(right, y, column * 0.48, 44), 16, ink, "left");
@@ -1598,8 +1626,8 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
           session2.settings.reverse = !session2.settings.reverse;
           changed();
         });
+        host.resourceStatus(rect(right, r.height - 88, column, 32));
         button2(menuWidgetId(page, "start"), rect(right, r.height - 52, column, 48), tr("Start Race", "\u5F00\u59CB\u6BD4\u8D5B"), action("start"));
-        host.focus(menuWidgetId(page, "start"));
       }
       return true;
     }
@@ -1630,7 +1658,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       });
     }
     if (session2.screen !== "main" && !(mobile2 && drawMobilePage(safeRect))) drawPage(page, safeRect);
-    if (page === "track_info") host.focus(menuWidgetId(page, "start"));
+    if (playableTrack) host.focus(menuWidgetId(page, "start"));
     if (m.dialog) {
       spawn("menu-dialog-shade", "node", "root", { position: "absolute", left: 0, top: 0, width: "100%", height: "100%", background: [0, 0, 0, 0.55] });
       host.modal();
@@ -1840,13 +1868,21 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     menuChanged = changed;
     const screen = session2.screen;
     let preferredFocus = "";
-    const host = { register: (button2) => buttons.push(button2), modal: () => {
-      buttons.length = 0;
-      focus = 0;
-      preferredFocus = "";
-    }, focus: (id) => {
-      preferredFocus = id;
-    } };
+    const host = {
+      register: (button2) => buttons.push(button2),
+      modal: () => {
+        buttons.length = 0;
+        focus = 0;
+        preferredFocus = "";
+      },
+      focus: (id) => {
+        preferredFocus = id;
+      },
+      resourceStatus: ({ x, y, width, height }) => {
+        node("track-resource-status", "root", { position: "absolute", left: x, top: y, width, height, alignItems: "center", justifyContent: "center" });
+        label("resource-status", "track-resource-status", session2.resourceText, mobile2 ? 12 : 15, { maxWidth: "100%", background: [0, 0, 0, 0.6], borderRadius: 5, padding: 3 });
+      }
+    };
     const finish = () => {
       const wanted = focusedId ?? preferredFocus, index = buttons.findIndex((button2) => button2.id === wanted);
       if (index >= 0) focus = index;
@@ -2212,16 +2248,18 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
   var requiredResources = [];
   function raceResources() {
     const race = new Race(new Circuit(session.course.route), session.course.pickups, session.settings.laps, session.settings);
-    return [session.course.trackModel, session.course.skyModel, ...race.racers.flatMap((racer) => {
+    return [...courseModelPaths(session.course), ...race.racers.flatMap((racer) => {
       const kart = trackData.karts.find((kart2) => kart2.id === racer.kartId);
       return [kart.model, ...kart.wheels.map((wheel) => wheel.path)];
     })];
   }
   function resourceStatus() {
-    const status = resources.status(session.screen === "downloading" ? requiredResources : void 0);
+    const course = session.screen === "track-info" ? courseFor(session.menu.track) : void 0;
+    if (session.screen === "track-info" && !course) return;
+    const status = resources.status(course ? courseModelPaths(course) : session.screen === "downloading" ? requiredResources : void 0);
     session.resourceFailed = !!status.error;
     session.resourceText = status.error === "runtime_update_required" ? tr("Update the game runtime to download resources.", "\u8BF7\u66F4\u65B0\u6E38\u620F\u8FD0\u884C\u65F6\u4EE5\u4E0B\u8F7D\u8D44\u6E90\u3002") : status.error ? tr("Download failed. Retry when starting the race.", "\u8D44\u6E90\u4E0B\u8F7D\u5931\u8D25\uFF0C\u53EF\u5728\u5F00\u59CB\u6BD4\u8D5B\u65F6\u91CD\u8BD5\u3002") : status.ready ? tr("Resources ready", "\u8D44\u6E90\u5DF2\u5C31\u7EEA") : `${tr("Downloading resources", "\u6B63\u5728\u4E0B\u8F7D\u8D44\u6E90")} ${(status.received / 1048576).toFixed(1)} / ${(status.total / 1048576).toFixed(1)} MiB`;
-    if (session.screen === "main" || session.screen === "downloading") updateResourceStatus(session.resourceText);
+    if (session.screen === "main" || session.screen === "downloading" || course) updateResourceStatus(session.resourceText);
   }
   var zeroPose = () => ({ x: 0, y: 0, z: 0, heading: 0, pitch: 0 });
   function spawn2(id, path, pose, scale = 1) {
@@ -2246,9 +2284,13 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     }
     scene_set_3d_enabled(session.screen === "kart" || worldReady && (["race", "paused", "finished"].includes(session.screen) || ["options", "help"].includes(session.screen) && session.returnScreen === "paused"));
     if (session.screen === "track-info") {
-      const stored = storage_read(session.bestKey);
-      const value = stored.state === "ok" ? Number(stored.value) : 0;
-      session.best = Number.isFinite(value) && value > 0 ? value : 0;
+      const course = courseFor(session.menu.track);
+      if (course) {
+        resources.ensure(courseModelPaths(course), 90);
+        const stored = storage_read(session.bestKey);
+        const value = stored.state === "ok" ? Number(stored.value) : 0;
+        session.best = Number.isFinite(value) && value > 0 ? value : 0;
+      }
     }
     storage_write("pc-race-settings-v1", JSON.stringify(session.settings));
     mountHud(session, layout, refreshUi, startRace, mobile, (id) => {
@@ -2260,6 +2302,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
         }
       }
     });
+    if (session.screen === "track-info") resourceStatus();
     viewport = JSON.stringify(layout);
     mountedScreen = session.screen;
     updatePerformance(lastMetrics, showPerformance && session.screen !== "main");

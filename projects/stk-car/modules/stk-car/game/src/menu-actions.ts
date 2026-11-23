@@ -2,7 +2,7 @@ import { menuData } from "./menu-data.js";
 import { setUiLanguage, sourceText, tr } from "./localization.js";
 import { optionPages, optionTabs } from "./menu-state.js";
 import type { PcSession, Screen } from "./session.js";
-import { courseFor, defaultCourse } from "./courses.js";
+import { courseFor, courses, defaultCourse } from "./courses.js";
 
 export function menuPageFor(session: PcSession): string {
   const pages: Partial<Record<Screen, string>> = { kart: "karts", setup: "race_setup", tracks: "tracks_and_gp", "track-info": "track_info" };
@@ -12,6 +12,12 @@ export function menuAction(session: PcSession, id: string, changed: () => void, 
   const m = session.menu, page = m.activePage;
   const go = (target: string, screen: Screen = "menu") => session.openMenu(target, screen);
   const popup = (target: string, title: string, purpose = "") => m.popup(target, title, purpose);
+  const selectTrack = (trackId: string) => {
+    const course = courseFor(trackId);
+    m.track = trackId;
+    if (course && session.settings.trackId !== trackId) { session.settings.trackId = trackId; session.settings.laps = course.defaultLaps; }
+    if (page !== "edit_track") go("track_info", "track-info");
+  };
   if (id === "back" || id === "cancel" || id === "backbtn" || id === "back_to_device_list") {
     if (id === "back_to_device_list") m.show("options_input"); else session.back();
   } else if (id.startsWith("page") && /^page[1-7]$/.test(id)) m.show(`help${id.slice(4)}`);
@@ -29,11 +35,7 @@ export function menuAction(session: PcSession, id: string, changed: () => void, 
     m.raceMode = id.slice(5);
     if (m.raceMode === "normal" || m.raceMode === "time-trial") session.settings.mode = m.raceMode;
     go("tracks_and_gp", "tracks");
-  } else if (id.startsWith("track:")) {
-    const trackId = id.slice(6), course = courseFor(trackId); m.track = trackId;
-    if (course && session.settings.trackId !== trackId) { session.settings.trackId = trackId; session.settings.laps = course.defaultLaps; }
-    if (page !== "edit_track") go("track_info", "track-info");
-  }
+  } else if (id.startsWith("track:")) selectTrack(id.slice(6));
   else if (id.startsWith("gp:")) {
     m.grandPrix = id.slice(3);
     if (page !== "grand_prix_editor") go("gp_info");
@@ -43,9 +45,12 @@ export function menuAction(session: PcSession, id: string, changed: () => void, 
   } else if (page === "gp_info" && ["start", "continue"].includes(id)) {
     popup("confirm_dialog", tr("Grand Prix is currently a menu preview. Choose a single race to play.", "大奖赛当前为菜单预览，请选择单场比赛进入游戏。"), "preview");
   } else if (id === "start" && page === "track_info") {
-    if (courseFor(m.track) && m.players === 1 && (m.raceMode === "time-trial" || m.raceMode === "normal" && m.number("ai-spinner", session) <= 3)) { session.settings.trackId = m.track; start(); }
-    else { popup("confirm_dialog", tr("This configuration is a menu preview. Playable tracks: Hacienda and Lighthouse; singleplayer with up to three AI karts.", "此配置目前仅供菜单预览；可玩庄园和灯塔赛道，支持单人及最多三名 AI。"), "preview"); }
-  } else if (id === "random_track") { m.track = menuData.tracks.find((track) => !track.arena)?.id ?? "lighthouse"; go("track_info", "track-info"); }
+    if (courseFor(m.track)) {
+      if (m.players !== 1 || !["normal", "time-trial"].includes(m.raceMode)) popup("confirm_dialog", tr("Choose Singleplayer and select Normal Race or Time Trial.", "请选择单人游戏，再选择正常比赛或竞速模式。"), "preview");
+      else if (m.raceMode === "normal" && m.number("ai-spinner", session) > 3) popup("confirm_dialog", tr("Set AI karts to three or fewer to start the race.", "请将 AI 赛车数量设为 3 或更少，再开始比赛。"), "preview");
+      else { session.settings.trackId = m.track; start(); }
+    }
+  } else if (id === "random_track") selectTrack(courses[Math.floor(Math.random() * courses.length)].id);
   else if (id === "rand-gp") { m.grandPrix = menuData.grandPrix[0].id; go("gp_info"); }
   else if (id.startsWith("group:") || id.startsWith("filter:")) { m.values[m.key("group")] = id.split(":")[1]; m.listPages = {}; }
   else if (id.startsWith("score-mode:")) { m.scoreMode = id.slice(11); }
