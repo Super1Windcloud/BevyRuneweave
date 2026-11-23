@@ -13,6 +13,20 @@ use bevy_mod_scripting::prelude::ScriptValue;
 
 const MAX_RESPONSE_BYTES: u64 = 1024 * 1024;
 
+pub(super) fn http_client_builder() -> reqwest::Result<reqwest::blocking::ClientBuilder> {
+    let builder = reqwest::blocking::Client::builder();
+    #[cfg(target_os = "android")]
+    let builder = {
+        // Native hosts can use strict TLS without installing a JVM certificate verifier.
+        let roots = webpki_root_certs::TLS_SERVER_ROOT_CERTS
+            .iter()
+            .map(|cert| reqwest::Certificate::from_der(cert.as_ref()))
+            .collect::<reqwest::Result<Vec<_>>>()?;
+        builder.tls_certs_only(roots)
+    };
+    Ok(builder)
+}
+
 enum HttpRequestState {
     Pending,
     Complete { status: u16, body: String },
@@ -28,14 +42,17 @@ pub(super) struct ScriptNetwork {
 
 impl Default for ScriptNetwork {
     fn default() -> Self {
-        let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(30));
-        #[cfg(all(target_os = "android", debug_assertions))]
-        let client = client
-            .tls_danger_accept_invalid_certs(true)
-            .tls_danger_accept_invalid_hostnames(true);
+        let client = http_client_builder().and_then(|builder| {
+            let builder = builder.timeout(Duration::from_secs(30));
+            #[cfg(all(target_os = "android", debug_assertions))]
+            let builder = builder
+                .tls_danger_accept_invalid_certs(true)
+                .tls_danger_accept_invalid_hostnames(true);
+            builder.build()
+        });
 
         Self {
-            client: client.build().ok(),
+            client: client.ok(),
             requests: Arc::default(),
             next_id: Arc::new(AtomicU32::new(1)),
         }

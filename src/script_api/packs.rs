@@ -9,6 +9,7 @@ use std::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
+    thread::JoinHandle,
     time::Duration,
 };
 
@@ -109,6 +110,22 @@ enum State {
 struct Job {
     state: Arc<Mutex<State>>,
     cancel: Arc<AtomicBool>,
+    worker: Option<JoinHandle<()>>,
+}
+
+impl Job {
+    fn state(&self) -> State {
+        // If the worker already exited, any result it published is visible below.
+        let finished = self.worker.as_ref().is_some_and(JoinHandle::is_finished);
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if finished && matches!(*state, State::Pending(..)) {
+            return State::Error("unavailable".into());
+        }
+        state.clone()
+    }
 }
 
 /// The named Bevy asset source and the download workers share this project-independent root.
@@ -151,7 +168,7 @@ impl ScriptPacks {
         self.next = self.next.wrapping_add(1).max(1);
         let id = self.next;
         let state = Arc::new(Mutex::new(State::Pending(0, 0)));
-        let cancel = Arc::new(AtomicBool::new(false));
+        let job_cancel = Arc::new(AtomicBool::new(false));
         let descriptor = Descriptor::parse(json);
         let active = self
             .jobs
@@ -166,15 +183,9 @@ impl ScriptPacks {
             .entry(owner.clone())
             .or_insert_with(|| (self.project.clone(), self.assets.clone()))
             .clone();
-        self.jobs.insert(
-            (owner, id),
-            Job {
-                state: state.clone(),
-                cancel: cancel.clone(),
-            },
-        );
         let worker_state = state.clone();
-        let spawn = std::thread::Builder::new()
+        let cancel = job_cancel.clone();
+        let worker = std::thread::Builder::new()
             .name("resource-pack".into())
             .spawn(move || {
                 let outcome = (|| {
@@ -219,23 +230,27 @@ impl ScriptPacks {
                     Ok(root) => State::Ready(root),
                     Err(code) => State::Error(code),
                 };
-            });
-        if spawn.is_err() {
+            })
+            .ok();
+        if worker.is_none() {
             *state
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner) =
                 State::Error("unavailable".into());
         }
+        self.jobs.insert(
+            (owner, id),
+            Job {
+                state,
+                cancel: job_cancel,
+                worker,
+            },
+        );
         id
     }
     fn poll(&mut self, owner: ScriptAttachment, id: u32) -> ScriptValue {
         let key = (owner, id);
-        let state = self.jobs.get(&key).map(|j| {
-            j.state
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone()
-        });
+        let state = self.jobs.get(&key).map(Job::state);
         let mut fields = bevy::platform::collections::HashMap::default();
         let status = match &state {
             Some(State::Pending(received, total)) => {
@@ -289,7 +304,8 @@ fn download(
     state: &Mutex<State>,
     cancel: &AtomicBool,
 ) -> Result<(), String> {
-    let client = reqwest::blocking::Client::builder()
+    let client = super::network::http_client_builder()
+        .map_err(|_| "network")?
         .connect_timeout(Duration::from_secs(20))
         .timeout(Duration::from_secs(300))
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
@@ -552,6 +568,33 @@ mod tests {
         );
         assert!(!destination.path().join("models/kart.glb").exists());
     }
+    #[test]
+    fn a_worker_exit_without_a_result_returns_a_consumable_error() {
+        let worker = std::thread::spawn(|| {});
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        while !worker.is_finished() {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+        let owner = ScriptAttachment::StaticScript(Handle::<ScriptAsset>::default());
+        let mut packs = ScriptPacks::default();
+        packs.jobs.insert(
+            (owner.clone(), 1),
+            Job {
+                state: Arc::new(Mutex::new(State::Pending(0, 0))),
+                cancel: Arc::default(),
+                worker: Some(worker),
+            },
+        );
+        assert!(matches!(
+            packs.poll(owner.clone(), 1),
+            ScriptValue::Map(fields)
+                if fields.get("state") == Some(&ScriptValue::from("error"))
+                    && fields.get("error") == Some(&ScriptValue::from("unavailable"))
+        ));
+        assert!(!packs.jobs.contains_key(&(owner, 1)));
+    }
+
     #[test]
     fn bundled_resources_verify_offline_and_requests_are_attachment_scoped() {
         let root = tempfile::tempdir().unwrap();

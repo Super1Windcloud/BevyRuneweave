@@ -39,7 +39,8 @@ Both runtime and APK recipes default to debug. For release, run `just build-runt
 once before `just build-android-demo --release`. The APK build checks that every selected ABI exists
 and matches the requested profile. Android Debug builds accept invalid TLS certificate chains and
 hostnames in both the launcher downloader and script HTTP API. Release builds always use strict TLS
-validation.
+validation. In-game resource packs use strict TLS in every profile. The Rust runtime uses bundled
+Mozilla root certificates for strict TLS on Android.
 
 Runtime builds and APK packaging default to `arm64-v8a` only, including direct Gradle builds.
 Previously built x86_64 runtime outputs may remain on disk but are not copied into the default APK.
