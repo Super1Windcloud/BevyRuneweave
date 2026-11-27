@@ -2058,6 +2058,13 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       finish();
       return;
     }
+    if (screen === "scene-loading") {
+      node("scene-loading-cover", "root", { position: "absolute", width: "100%", height: "100%", background: [0.05, 0.09, 0.14, 1] });
+      heading(tr("Loading Track", "\u6B63\u5728\u52A0\u8F7D\u5730\u56FE"), "");
+      button("scene-loading-back", "root", tr("Back", "\u8FD4\u56DE"), back, { position: "absolute", left: layout2.left, bottom: layout2.bottom, width: 110, height: 48 });
+      finish();
+      return;
+    }
     if (screen === "scene-preview") {
       button("scene-back", "root", tr("Back", "\u8FD4\u56DE"), back, { position: "absolute", left: layout2.left, top: layout2.top, height: 48 });
       label("scene-name", "root", sourceText(session2.menu.selectedTrack.name), 20, { position: "absolute", top: layout2.top, right: layout2.right, padding: 8, borderRadius: 8, background: panel });
@@ -2066,6 +2073,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     }
     const racing = screen === "race" || screen === "paused" || screen === "finished" || (screen === "options" || screen === "help") && session2.returnScreen === "paused";
     if (!racing && screen !== "kart") {
+      if (screen === "track-info") node("track-detail-cover", "root", { position: "absolute", width: "100%", height: "100%", background: [0.05, 0.09, 0.14, 1] });
       image("menu-background", "root", "ui/background.jpg", { position: "absolute", width: "100%", height: "100%", imageMode: "stretch" });
     } else if (racing && (!mobile2 || screen === "race")) mountRaceHud(session2, layout2, mobile2, changed);
     if (screen === "race") {
@@ -2297,9 +2305,12 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     get bestKey() {
       return `pc-${this.course.id}-${this.settings.mode}-${this.settings.laps}-${this.settings.reverse ? "reverse" : "forward"}-${this.settings.difficulty}`;
     }
+    createRace(course) {
+      const route = this.settings.reverse ? [...course.route].reverse() : course.route;
+      return new Race(new Circuit(route), course.pickups, this.settings.laps, this.settings);
+    }
     start() {
-      const route = this.settings.reverse ? [...this.course.route].reverse() : this.course.route;
-      this.race = new Race(new Circuit(route), this.course.pickups, this.settings.laps, this.settings);
+      this.race = this.createRace(this.course);
       this.resultLapPage = 0;
       this.race.start();
       this.screen = "race";
@@ -2316,7 +2327,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
         return;
       }
       const previous = { kart: "main", setup: "kart", tracks: "setup", "track-info": "tracks", "scene-preview": "track-info", paused: "race", finished: "track-info", race: "paused" };
-      this.screen = this.screen === "options" || this.screen === "help" || this.screen === "notice" || this.screen === "downloading" ? this.returnScreen : previous[this.screen] ?? "main";
+      this.screen = ["options", "help", "notice", "downloading", "scene-loading"].includes(this.screen) ? this.returnScreen : previous[this.screen] ?? "main";
     }
     open(screen) {
       this.returnScreen = this.screen;
@@ -2418,8 +2429,12 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
   var camera = { ...session.race.player };
   var pendingLoad;
   var scenePreview;
-  function raceResources(course) {
-    const race = new Race(new Circuit(course.route), course.pickups, session.settings.laps, session.settings);
+  var preparedTrack;
+  var preparedRace;
+  var detailWarmup;
+  var warmup;
+  var canWaitForScene = typeof scene_models_state === "function" && typeof scene_render_ready_frame === "function";
+  function raceResources(course, race = session.createRace(course)) {
     return [...courseModelPaths(course), course.minimap.image, ...race.racers.flatMap((racer) => {
       const kart = trackData.karts.find((kart2) => kart2.id === racer.kartId);
       return [kart.model, ...kart.wheels.map((wheel) => wheel.path)];
@@ -2441,10 +2456,12 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
   }
   function refreshUi() {
     if (session.screen !== "downloading") pendingLoad = void 0;
-    if (scenePreview && session.screen !== "scene-preview") {
+    if (warmup && session.screen !== "scene-loading" || scenePreview && session.screen !== "scene-preview" && session.screen !== "scene-loading") {
+      warmup = void 0;
       scenePreview = void 0;
-      scene_clear();
+      clearScene();
     }
+    detailWarmup = void 0;
     layout = readLayout(mobile);
     layoutClock = 0;
     touch.reset();
@@ -2459,17 +2476,27 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       const [bx, by, bz, rx, ry, rz, scale] = kartBackdropTransform(layout, camera2);
       scene_set_transform_3d("preview-background", bx, by, bz, rx, ry, rz, scale);
     }
-    scene_set_3d_enabled(session.screen === "kart" || session.screen === "scene-preview" || worldReady && (["race", "paused", "finished"].includes(session.screen) || ["options", "help"].includes(session.screen) && session.returnScreen === "paused"));
     if (session.screen === "track-info") {
       const scene = sceneFor(session.menu.track);
       if (scene) resources.ensure(courseModelPaths(scene), 90);
       const course = courseFor(session.menu.track);
       if (course) {
+        if (courseModelPaths(course).every((path) => resources.ready(path))) {
+          prepareTrack(course);
+          if (canWaitForScene) {
+            const race = session.createRace(course);
+            if (resources.ensure(raceResources(course, race), 90)) {
+              detailWarmup = prepareRace(course, race).prewarm;
+              if (detailWarmup) followCamera(race.player, 0, false);
+            }
+          }
+        }
         const stored = storage_read(session.bestKey);
         const value = stored.state === "ok" ? Number(stored.value) : 0;
         session.best = Number.isFinite(value) && value > 0 ? value : 0;
       }
     }
+    scene_set_3d_enabled(!!detailWarmup || ["kart", "scene-preview", "scene-loading"].includes(session.screen) || worldReady && (["race", "paused", "finished"].includes(session.screen) || ["options", "help"].includes(session.screen) && session.returnScreen === "paused"));
     storage_write("pc-race-settings-v1", JSON.stringify(session.settings));
     mountHud(session, layout, refreshUi, startRace, viewScene, mobile, (id) => {
       if (!mobile && session.screen === "kart" && id.startsWith("gui:karts:choose-")) {
@@ -2485,11 +2512,16 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     mountedScreen = session.screen;
     updatePerformance(lastMetrics, showPerformance && session.screen !== "main");
   }
-  function preparePreview() {
-    if (previewId === session.settings.kartId) return;
+  function clearScene() {
     scene_clear();
     worldReady = false;
+    preparedTrack = void 0;
+    preparedRace = void 0;
     previewId = "";
+  }
+  function preparePreview() {
+    if (previewId === session.settings.kartId) return;
+    clearScene();
     previewAngle = 0;
     const kart = trackData.karts.find((kart2) => kart2.id === session.settings.kartId);
     scene_set_environment(JSON.stringify({ ambient: [1, 1, 1], brightness: 600, sun: [1, 0.95, 0.9], illuminance: 12e3, direction: [1, 3, 2], background: [0.2, 0.17, 0.12], fog: null }));
@@ -2510,15 +2542,46 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       scene_set_transform_3d(`preview-wheel-${i}`, wheel.position.x, wheel.position.y, wheel.position.z, ...wheel.rotation, 1);
     }
   }
-  function mountScene(scene) {
-    scene_clear();
-    worldReady = false;
-    previewId = "";
+  function prepareTrack(scene) {
+    if (preparedTrack?.id === scene.id && !worldReady) return preparedTrack.models;
+    clearScene();
+    const models = [];
+    const add = (id, path) => {
+      spawn2(id, path, zeroPose());
+      models.push(id);
+    };
+    add("track", scene.trackModel);
+    for (const [index, path] of (scene.trackModelParts ?? []).entries()) add(`track-part-${index}`, path);
+    if (scene.skyModel) add("sky", scene.skyModel);
+    preparedTrack = { id: scene.id, models };
+    return models;
+  }
+  function applyEnvironment(scene) {
     if (!scene_set_environment(JSON.stringify(scene.environment))) throw new Error(`Cannot set environment for ${scene.id}`);
-    scene_set_3d_enabled(true);
-    spawn2("track", scene.trackModel, zeroPose());
-    for (const [index, path] of (scene.trackModelParts ?? []).entries()) spawn2(`track-part-${index}`, path, zeroPose());
-    if (scene.skyModel) spawn2("sky", scene.skyModel, zeroPose());
+  }
+  function prepareRace(course, race) {
+    const track = prepareTrack(course);
+    const key = JSON.stringify([course.id, session.settings.reverse, race.options.mode, race.racers.map((racer) => racer.kartId)]);
+    if (preparedRace?.key === key) return preparedRace;
+    for (const id of preparedRace?.actors ?? []) scene_despawn(id);
+    applyEnvironment(course);
+    const actors = [];
+    const add = (id, path, pose) => {
+      spawn2(id, path, pose);
+      actors.push(id);
+    };
+    for (const racer of race.racers) {
+      const kart = trackData.karts.find((kart2) => kart2.id === racer.kartId);
+      add(racer.id, kart.model, racer);
+      for (let i = 0; i < kart.wheels.length; i++) add(`${racer.id}-wheel-${i}`, kart.wheels[i].path, racer);
+    }
+    for (let i = 0; i < race.pickups.length; i++) {
+      const pickup = race.pickups[i], [x, y, z] = pickup.position;
+      add(`pickup-${i}`, trackData.pickupModels[pickup.kind], { x, y, z, heading: 0, pitch: 0 });
+    }
+    const models = [...track, ...actors];
+    preparedRace = { key, actors, models, prewarm: { models, elapsed: 0, firstReadyFrame: 0 } };
+    return preparedRace;
   }
   function renderScenePreview(dt) {
     if (!scenePreview) return;
@@ -2544,12 +2607,13 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       refreshUi();
       return;
     }
+    const origin = session.screen === "downloading" ? session.returnScreen : session.screen;
     if (load2.kind === "preview") {
-      mountScene(load2.scene);
+      const models = prepareTrack(load2.scene);
+      applyEnvironment(load2.scene);
       scenePreview = { view: load2.view, angle: Math.PI / 4 };
-      session.screen = "scene-preview";
-      refreshUi();
       renderScenePreview(0);
+      presentScene("scene-preview", models, origin);
       return;
     }
     const { course } = load2;
@@ -2562,19 +2626,40 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     pickupVisible.clear();
     trapIds.clear();
     camera = { ...session.race.player };
-    mountScene(course);
-    for (const racer of session.race.racers) {
-      const kart = trackData.karts.find((kart2) => kart2.id === racer.kartId);
-      spawn2(racer.id, kart.model, racer);
-      for (let i = 0; i < kart.wheels.length; i++) spawn2(`${racer.id}-wheel-${i}`, kart.wheels[i].path, racer);
-    }
-    for (let i = 0; i < session.race.pickups.length; i++) {
-      const pickup = session.race.pickups[i], [x, y, z] = pickup.position;
-      spawn2(`pickup-${i}`, trackData.pickupModels[pickup.kind], { x, y, z, heading: 0, pitch: 0 });
-    }
+    const raceScene = prepareRace(course, session.race);
     worldReady = true;
+    render(1, 0);
+    presentScene("race", raceScene.models, origin);
+  }
+  function presentScene(target, models, origin) {
+    if (canWaitForScene) {
+      warmup = { target, models, elapsed: 0, firstReadyFrame: 0 };
+      session.returnScreen = origin === "paused" || origin === "finished" ? "track-info" : origin;
+      session.screen = "scene-loading";
+    } else session.screen = target;
     refreshUi();
-    render(1, 1);
+  }
+  function sceneWarmupStatus(preparation, dt) {
+    preparation.elapsed += dt;
+    const status = scene_models_state(preparation.models);
+    if (status === "failed" || preparation.elapsed >= 30) return "failed";
+    const frame = status === "ready" ? scene_render_ready_frame() : 0;
+    if (!frame || !preparation.firstReadyFrame) preparation.firstReadyFrame = frame;
+    else if (frame >= preparation.firstReadyFrame + 2) return "ready";
+    return "loading";
+  }
+  function tickSceneWarmup(dt) {
+    if (!warmup) return;
+    const status = sceneWarmupStatus(warmup, dt);
+    if (status === "failed") {
+      session.back();
+      session.notice(tr("Could not load the map", "\u65E0\u6CD5\u52A0\u8F7D\u5730\u56FE"), tr("Return to the map details and retry.", "\u8FD4\u56DE\u5730\u56FE\u8BE6\u60C5\u540E\u91CD\u8BD5\u3002"));
+      refreshUi();
+    } else if (status === "ready") {
+      session.screen = warmup.target;
+      warmup = void 0;
+      refreshUi();
+    }
   }
   function startRace() {
     if (pendingLoad) {
@@ -2615,16 +2700,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       camera.z = target.z + lagZ * 0.75 / lag;
     }
     camera.heading += angleDelta(target.heading - camera.heading) * response;
-    const distance = 3.8 + Math.abs(race.player.speed) * 8e-3, direction = lookBack ? -1 : 1;
-    if (!scene_set_camera_3d(
-      camera.x - Math.sin(camera.heading) * distance * direction,
-      camera.y + 1.9,
-      camera.z + Math.cos(camera.heading) * distance * direction,
-      camera.x + Math.sin(camera.heading) * 1.1 * direction,
-      camera.y + 0.65,
-      camera.z - Math.cos(camera.heading) * 1.1 * direction,
-      55
-    )) throw new Error("3D follow camera unavailable");
+    followCamera(camera, race.player.speed, lookBack);
     for (let i = 0; i < race.pickups.length; i++) {
       const pickup = race.pickups[i], visible = pickup.cooldown <= 0;
       if (pickupVisible.get(i) === visible) continue;
@@ -2646,6 +2722,18 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       trapIds.delete(id);
     }
   }
+  function followCamera(pose, speed, rear) {
+    const distance = 3.8 + Math.abs(speed) * 8e-3, direction = rear ? -1 : 1;
+    if (!scene_set_camera_3d(
+      pose.x - Math.sin(pose.heading) * distance * direction,
+      pose.y + 1.9,
+      pose.z + Math.cos(pose.heading) * distance * direction,
+      pose.x + Math.sin(pose.heading) * 1.1 * direction,
+      pose.y + 0.65,
+      pose.z - Math.cos(pose.heading) * 1.1 * direction,
+      55
+    )) throw new Error("3D follow camera unavailable");
+  }
   function load() {
     sound.reset();
     const stored = storage_read("pc-race-settings-v1");
@@ -2655,10 +2743,10 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     setUiLanguage(session.settings.language);
     session.menu.close();
     session.menuHistory = [];
-    scene_clear();
+    clearScene();
     scene_set_3d_enabled(false);
-    worldReady = false;
-    previewId = "";
+    scenePreview = void 0;
+    warmup = void 0;
     accumulator = 0;
     uiClock = 0;
     wheelAngles.clear();
@@ -2706,6 +2794,15 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       if (viewport !== JSON.stringify(readLayout(mobile))) refreshUi();
     }
     if (mountedScreen !== session.screen) refreshUi();
+    if (detailWarmup && preparedRace && sceneWarmupStatus(detailWarmup, dt) !== "loading") {
+      preparedRace.prewarm = void 0;
+      detailWarmup = void 0;
+      scene_set_3d_enabled(false);
+    }
+    if (session.screen === "scene-loading") {
+      tickSceneWarmup(dt);
+      return;
+    }
     if (session.screen === "kart") renderPreview(dt);
     if (session.screen === "scene-preview") renderScenePreview(dt);
     if (session.screen !== "race") {

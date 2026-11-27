@@ -1,7 +1,7 @@
 import { TouchControls, readControls, type Layout } from "./controls.js";
 import { mountHud, pollButtons, readLayout, updateHud, updateTouchControls, updatePerformance, updateResourceStatus } from "./hud.js";
 import { FrameProfiler, type FrameMetrics } from "./performance.js";
-import { angleDelta, Circuit, Race, fixedStep, interpolate, type Pose } from "./race.js";
+import { angleDelta, fixedStep, interpolate, type Pose, type Race } from "./race.js";
 import { PcSession, parseSettings } from "./session.js";
 import { trackData } from "./track-data.js";
 import { GameAudio } from "./sound.js";
@@ -33,8 +33,13 @@ let camera: Pose = { ...session.race.player };
 type SceneLoad = { kind: "race"; course: Course; paths: string[] } | { kind: "preview"; scene: MapScene; view: NonNullable<MapScene["view"]>; paths: string[] };
 let pendingLoad: SceneLoad | undefined;
 let scenePreview: { view: NonNullable<MapScene["view"]>; angle: number } | undefined;
-function raceResources(course: Course): string[] {
-  const race = new Race(new Circuit(course.route), course.pickups, session.settings.laps, session.settings);
+let preparedTrack: { id: string; models: string[] } | undefined;
+type SceneWarmup = { models: string[]; elapsed: number; firstReadyFrame: number };
+let preparedRace: { key: string; actors: string[]; models: string[]; prewarm: SceneWarmup | undefined } | undefined;
+let detailWarmup: SceneWarmup | undefined;
+let warmup: (SceneWarmup & { target: "race" | "scene-preview" }) | undefined;
+const canWaitForScene = typeof scene_models_state === "function" && typeof scene_render_ready_frame === "function";
+function raceResources(course: Course, race = session.createRace(course)): string[] {
   return [...courseModelPaths(course), course.minimap.image, ...race.racers.flatMap((racer) => {
     const kart = trackData.karts.find((kart) => kart.id === racer.kartId)!;
     return [kart.model, ...kart.wheels.map((wheel) => wheel.path)];
@@ -60,7 +65,11 @@ function spawn(id: string, path: string, pose: Pose, scale = 1): void {
 }
 function refreshUi(): void {
   if (session.screen !== "downloading") pendingLoad = undefined;
-  if (scenePreview && session.screen !== "scene-preview") { scenePreview = undefined; scene_clear(); }
+  if (warmup && session.screen !== "scene-loading" ||
+      scenePreview && session.screen !== "scene-preview" && session.screen !== "scene-loading") {
+    warmup = undefined; scenePreview = undefined; clearScene();
+  }
+  detailWarmup = undefined;
   layout = readLayout(mobile); layoutClock = 0;
   touch.reset(); accumulator = 0; pendingItem = false; pendingRescue = false; lookBack = false;
   if (session.screen === "kart") {
@@ -70,17 +79,27 @@ function refreshUi(): void {
     const [bx, by, bz, rx, ry, rz, scale] = kartBackdropTransform(layout, camera);
     scene_set_transform_3d("preview-background", bx, by, bz, rx, ry, rz, scale);
   }
-  scene_set_3d_enabled(session.screen === "kart" || session.screen === "scene-preview" || worldReady && (["race", "paused", "finished"].includes(session.screen) || ["options", "help"].includes(session.screen) && session.returnScreen === "paused"));
   if (session.screen === "track-info") {
     const scene = sceneFor(session.menu.track);
     if (scene) resources.ensure(courseModelPaths(scene), 90);
     const course = courseFor(session.menu.track);
     if (course) {
+      if (courseModelPaths(course).every((path) => resources.ready(path))) {
+        prepareTrack(course);
+        if (canWaitForScene) {
+          const race = session.createRace(course);
+          if (resources.ensure(raceResources(course, race), 90)) {
+            detailWarmup = prepareRace(course, race).prewarm;
+            if (detailWarmup) followCamera(race.player, 0, false);
+          }
+        }
+      }
       const stored = storage_read(session.bestKey);
       const value = stored.state === "ok" ? Number(stored.value) : 0;
       session.best = Number.isFinite(value) && value > 0 ? value : 0;
     }
   }
+  scene_set_3d_enabled(!!detailWarmup || ["kart", "scene-preview", "scene-loading"].includes(session.screen) || worldReady && (["race", "paused", "finished"].includes(session.screen) || ["options", "help"].includes(session.screen) && session.returnScreen === "paused"));
   storage_write("pc-race-settings-v1", JSON.stringify(session.settings));
   mountHud(session, layout, refreshUi, startRace, viewScene, mobile, (id) => {
     if (!mobile && session.screen === "kart" && id.startsWith("gui:karts:choose-")) {
@@ -92,9 +111,12 @@ function refreshUi(): void {
   viewport = JSON.stringify(layout); mountedScreen = session.screen;
   updatePerformance(lastMetrics, showPerformance && session.screen !== "main");
 }
+function clearScene(): void {
+  scene_clear(); worldReady = false; preparedTrack = undefined; preparedRace = undefined; previewId = "";
+}
 function preparePreview(): void {
   if (previewId === session.settings.kartId) return;
-  scene_clear(); worldReady = false; previewId = ""; previewAngle = 0;
+  clearScene(); previewAngle = 0;
   const kart = trackData.karts.find((kart) => kart.id === session.settings.kartId)!;
   scene_set_environment(JSON.stringify({ ambient: [1, 1, 1], brightness: 600, sun: [1, 0.95, 0.9], illuminance: 12000, direction: [1, 3, 2], background: [0.2, 0.17, 0.12], fog: null }));
   spawn("preview-background", trackData.menuSkyModel, zeroPose());
@@ -114,13 +136,40 @@ function renderPreview(dt: number): void {
     scene_set_transform_3d(`preview-wheel-${i}`, wheel.position.x, wheel.position.y, wheel.position.z, ...wheel.rotation, 1);
   }
 }
-function mountScene(scene: MapScene): void {
-  scene_clear(); worldReady = false; previewId = "";
+function prepareTrack(scene: MapScene): string[] {
+  if (preparedTrack?.id === scene.id && !worldReady) return preparedTrack.models;
+  clearScene();
+  const models: string[] = [];
+  const add = (id: string, path: string) => { spawn(id, path, zeroPose()); models.push(id); };
+  add("track", scene.trackModel);
+  for (const [index, path] of (scene.trackModelParts ?? []).entries()) add(`track-part-${index}`, path);
+  if (scene.skyModel) add("sky", scene.skyModel);
+  preparedTrack = { id: scene.id, models };
+  return models;
+}
+function applyEnvironment(scene: MapScene): void {
   if (!scene_set_environment(JSON.stringify(scene.environment))) throw new Error(`Cannot set environment for ${scene.id}`);
-  scene_set_3d_enabled(true);
-  spawn("track", scene.trackModel, zeroPose());
-  for (const [index, path] of (scene.trackModelParts ?? []).entries()) spawn(`track-part-${index}`, path, zeroPose());
-  if (scene.skyModel) spawn("sky", scene.skyModel, zeroPose());
+}
+function prepareRace(course: Course, race: Race): NonNullable<typeof preparedRace> {
+  const track = prepareTrack(course);
+  const key = JSON.stringify([course.id, session.settings.reverse, race.options.mode, race.racers.map((racer) => racer.kartId)]);
+  if (preparedRace?.key === key) return preparedRace;
+  for (const id of preparedRace?.actors ?? []) scene_despawn(id);
+  applyEnvironment(course);
+  const actors: string[] = [];
+  const add = (id: string, path: string, pose: Pose) => { spawn(id, path, pose); actors.push(id); };
+  for (const racer of race.racers) {
+    const kart = trackData.karts.find((kart) => kart.id === racer.kartId)!;
+    add(racer.id, kart.model, racer);
+    for (let i = 0; i < kart.wheels.length; i++) add(`${racer.id}-wheel-${i}`, kart.wheels[i].path, racer);
+  }
+  for (let i = 0; i < race.pickups.length; i++) {
+    const pickup = race.pickups[i], [x, y, z] = pickup.position;
+    add(`pickup-${i}`, trackData.pickupModels[pickup.kind as keyof typeof trackData.pickupModels], { x, y, z, heading: 0, pitch: 0 });
+  }
+  const models = [...track, ...actors];
+  preparedRace = { key, actors, models, prewarm: { models, elapsed: 0, firstReadyFrame: 0 } };
+  return preparedRace;
 }
 function renderScenePreview(dt: number): void {
   if (!scenePreview) return;
@@ -136,28 +185,53 @@ function loadScene(load: SceneLoad): void {
     if (session.screen !== "downloading") session.returnScreen = session.screen;
     session.screen = "downloading"; resourceStatus(); refreshUi(); return;
   }
+  const origin = session.screen === "downloading" ? session.returnScreen : session.screen;
   if (load.kind === "preview") {
-    mountScene(load.scene);
+    const models = prepareTrack(load.scene);
+    applyEnvironment(load.scene);
     scenePreview = { view: load.view, angle: Math.PI / 4 };
-    session.screen = "scene-preview";
-    refreshUi(); renderScenePreview(0); return;
+    renderScenePreview(0);
+    presentScene("scene-preview", models, origin);
+    return;
   }
   const { course } = load;
   session.settings.trackId = course.id;
   session.start(); accumulator = 0; uiClock = 0; lookBack = false;
   wheelAngles.clear(); pickupVisible.clear(); trapIds.clear();
   camera = { ...session.race.player };
-  mountScene(course);
-  for (const racer of session.race.racers) {
-    const kart = trackData.karts.find((kart) => kart.id === racer.kartId)!;
-    spawn(racer.id, kart.model, racer);
-    for (let i = 0; i < kart.wheels.length; i++) spawn(`${racer.id}-wheel-${i}`, kart.wheels[i].path, racer);
+  const raceScene = prepareRace(course, session.race);
+  worldReady = true; render(1, 0);
+  presentScene("race", raceScene.models, origin);
+}
+function presentScene(target: "race" | "scene-preview", models: string[], origin: PcSession["screen"]): void {
+  if (canWaitForScene) {
+    warmup = { target, models, elapsed: 0, firstReadyFrame: 0 };
+    session.returnScreen = origin === "paused" || origin === "finished" ? "track-info" : origin;
+    session.screen = "scene-loading";
+  } else session.screen = target;
+  refreshUi();
+}
+function sceneWarmupStatus(preparation: SceneWarmup, dt: number): "loading" | "ready" | "failed" {
+  preparation.elapsed += dt;
+  const status = scene_models_state(preparation.models);
+  if (status === "failed" || preparation.elapsed >= 30) return "failed";
+  const frame = status === "ready" ? scene_render_ready_frame() : 0;
+  if (!frame || !preparation.firstReadyFrame) preparation.firstReadyFrame = frame;
+  else if (frame >= preparation.firstReadyFrame + 2) return "ready";
+  return "loading";
+}
+function tickSceneWarmup(dt: number): void {
+  if (!warmup) return;
+  const status = sceneWarmupStatus(warmup, dt);
+  if (status === "failed") {
+    session.back();
+    session.notice(tr("Could not load the map", "无法加载地图"), tr("Return to the map details and retry.", "返回地图详情后重试。"));
+    refreshUi();
+  } else if (status === "ready") {
+    session.screen = warmup.target;
+    warmup = undefined;
+    refreshUi();
   }
-  for (let i = 0; i < session.race.pickups.length; i++) {
-    const pickup = session.race.pickups[i], [x, y, z] = pickup.position;
-    spawn(`pickup-${i}`, trackData.pickupModels[pickup.kind as keyof typeof trackData.pickupModels], { x, y, z, heading: 0, pitch: 0 });
-  }
-  worldReady = true; refreshUi(); render(1, 1);
 }
 function startRace(): void {
   if (pendingLoad) { loadScene(pendingLoad); return; }
@@ -190,10 +264,7 @@ function render(alpha: number, dt: number): void {
   const lagX = camera.x - target.x, lagZ = camera.z - target.z, lag = Math.hypot(lagX, lagZ);
   if (lag > 0.75) { camera.x = target.x + lagX * 0.75 / lag; camera.z = target.z + lagZ * 0.75 / lag; }
   camera.heading += angleDelta(target.heading - camera.heading) * response;
-  const distance = 3.8 + Math.abs(race.player.speed) * 0.008, direction = lookBack ? -1 : 1;
-  if (!scene_set_camera_3d(camera.x - Math.sin(camera.heading) * distance * direction, camera.y + 1.9,
-    camera.z + Math.cos(camera.heading) * distance * direction, camera.x + Math.sin(camera.heading) * 1.1 * direction, camera.y + 0.65,
-    camera.z - Math.cos(camera.heading) * 1.1 * direction, 55)) throw new Error("3D follow camera unavailable");
+  followCamera(camera, race.player.speed, lookBack);
   for (let i = 0; i < race.pickups.length; i++) {
     const pickup = race.pickups[i], visible = pickup.cooldown <= 0;
     if (pickupVisible.get(i) === visible) continue;
@@ -207,14 +278,20 @@ function render(alpha: number, dt: number): void {
   }
   for (const id of trapIds) if (!active.has(id)) { scene_despawn(id); trapIds.delete(id); }
 }
+function followCamera(pose: Pose, speed: number, rear: boolean): void {
+  const distance = 3.8 + Math.abs(speed) * 0.008, direction = rear ? -1 : 1;
+  if (!scene_set_camera_3d(pose.x - Math.sin(pose.heading) * distance * direction, pose.y + 1.9,
+    pose.z + Math.cos(pose.heading) * distance * direction, pose.x + Math.sin(pose.heading) * 1.1 * direction, pose.y + 0.65,
+    pose.z - Math.cos(pose.heading) * 1.1 * direction, 55)) throw new Error("3D follow camera unavailable");
+}
 function load(): void {
   sound.reset();
   const stored = storage_read("pc-race-settings-v1");
   session.settings = parseSettings(stored.state === "ok" ? stored.value : "{}"); session.screen = "main";
   session.menu.track = session.settings.trackId;
   setUiLanguage(session.settings.language); session.menu.close(); session.menuHistory = [];
-  scene_clear(); scene_set_3d_enabled(false); worldReady = false;
-  previewId = "";
+  clearScene(); scene_set_3d_enabled(false);
+  scenePreview = undefined; warmup = undefined;
   accumulator = 0; uiClock = 0; wheelAngles.clear(); pickupVisible.clear(); trapIds.clear(); refreshUi();
   resources.ensure(raceResources(session.course), 0); resources.tick(); resourceStatus();
   sound.update(session, 0);
@@ -239,6 +316,12 @@ function updateGame(frameDt: number): void {
     if (viewport !== JSON.stringify(readLayout(mobile))) refreshUi();
   }
   if (mountedScreen !== session.screen) refreshUi();
+  if (detailWarmup && preparedRace && sceneWarmupStatus(detailWarmup, dt) !== "loading") {
+    preparedRace.prewarm = undefined;
+    detailWarmup = undefined;
+    scene_set_3d_enabled(false);
+  }
+  if (session.screen === "scene-loading") { tickSceneWarmup(dt); return; }
   if (session.screen === "kart") renderPreview(dt);
   if (session.screen === "scene-preview") renderScenePreview(dt);
   if (session.screen !== "race") {

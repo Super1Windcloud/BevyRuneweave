@@ -4,7 +4,7 @@ import { createContext, Script } from "node:vm";
 import { buildSync } from "esbuild";
 
 const bundle = buildSync({ entryPoints: [resolve(import.meta.dirname, "../modules/stk-car/game/src/stk-car.ts")], bundle: true, write: false, format: "iife", target: "es2023" }).outputFiles[0].text;
-export function load(locale: string, platform = "macos", geometry = { width: 1280, height: 720, leftInset: 10, rightInset: 10 }, missingApis: string[] = [], downloads: { hold: boolean; error: string; root: string; received?: number } = { hold: false, error: "", root: "" }) {
+export function load(locale: string, platform = "macos", geometry = { width: 1280, height: 720, leftInset: 10, rightInset: 10 }, missingApis: string[] = [], downloads: { hold: boolean; error: string; root: string; received?: number } = { hold: false, error: "", root: "" }, sceneReadiness?: { models: "loading" | "ready" | "failed"; frame: number }) {
   const texts = new Map<string, string>(), images = new Map<string, string>(), nodes = new Set<string>();
   const transforms = new Map<string, number[]>(), held = new Set<string>(), pressed = new Set<string>();
   const models = new Map<string, string>();
@@ -27,6 +27,12 @@ export function load(locale: string, platform = "macos", geometry = { width: 128
     audio_stop: (id: string) => voices.delete(id), audio_clear: () => voices.clear(), audio_state: (id: string) => voices.has(id) ? "playing" : "missing",
     scene_clear: () => { transforms.clear(); models.clear(); }, scene_set_3d_enabled: () => true, scene_set_environment: () => true,
     scene_spawn: () => true, scene_set_model: (id: string, path: string) => { models.set(id, path); return true; }, scene_despawn: () => true,
+    scene_models_state: sceneReadiness && ((ids: string[]) => {
+      assert.ok(ids.includes("track") && ids.includes("sky"));
+      for (const id of ids) assert.ok(models.has(id), `Missing model ${id}`);
+      return sceneReadiness.models;
+    }),
+    scene_render_ready_frame: sceneReadiness && (() => sceneReadiness.frame),
     scene_set_transform_3d: (id: string, ...values: number[]) => { transforms.set(id, values); return true; },
     scene_set_camera_3d: (...values: number[]) => { assert.ok(values.every(Number.isFinite)); cameras.push(values); return true; },
     storage_read: (key: string) => saved.has(key) ? { state: "ok", value: saved.get(key) } : key === "pc-race-settings-v1" ? { state: "missing" } : { state: "ok", value: "120.4" }, storage_write: (key: string, value: string) => { saved.set(key, value); return { state: "ok" }; },

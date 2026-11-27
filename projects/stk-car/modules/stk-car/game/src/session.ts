@@ -2,9 +2,9 @@ import { Circuit, Race, clamp } from "./race.js";
 import { trackData } from "./track-data.js";
 import { MenuState } from "./menu-state.js";
 import type { UiLanguage } from "./localization.js";
-import { courseFor, defaultCourse } from "./courses.js";
+import { courseFor, defaultCourse, type Course } from "./courses.js";
 
-export type Screen = "main" | "kart" | "setup" | "tracks" | "track-info" | "scene-preview" | "options" | "help" | "notice" | "menu" | "race" | "paused" | "finished" | "downloading";
+export type Screen = "main" | "kart" | "setup" | "tracks" | "track-info" | "scene-preview" | "options" | "help" | "notice" | "menu" | "race" | "paused" | "finished" | "downloading" | "scene-loading";
 export interface Settings { trackId: string; kartId: string; difficulty: number; mode: "normal" | "time-trial"; laps: number; aiCount: number; reverse: boolean; wasd: boolean; steeringAssist: boolean; musicVolume: number; sfxVolume: number; language: UiLanguage; }
 export const defaultSettings = (): Settings => ({ trackId: defaultCourse.id, kartId: "tux", difficulty: 1, mode: "normal", laps: defaultCourse.defaultLaps, aiCount: 3, reverse: false, wasd: false, steeringAssist: false, musicVolume: 0.6, sfxVolume: 0.7, language: "system" });
 export function parseSettings(value: string): Settings {
@@ -40,9 +40,12 @@ export class PcSession {
   menuHistory: { screen: Screen; page: string }[] = [];
   get course() { return courseFor(this.settings.trackId) ?? defaultCourse; }
   get bestKey(): string { return `pc-${this.course.id}-${this.settings.mode}-${this.settings.laps}-${this.settings.reverse ? "reverse" : "forward"}-${this.settings.difficulty}`; }
+  createRace(course: Course): Race {
+    const route = this.settings.reverse ? [...course.route].reverse() : course.route;
+    return new Race(new Circuit(route), course.pickups, this.settings.laps, this.settings);
+  }
   start(): void {
-    const route = this.settings.reverse ? [...this.course.route].reverse() : this.course.route;
-    this.race = new Race(new Circuit(route), this.course.pickups, this.settings.laps, this.settings);
+    this.race = this.createRace(this.course);
     this.resultLapPage = 0;
     this.race.start(); this.screen = "race";
   }
@@ -52,7 +55,7 @@ export class PcSession {
       const previous = this.menuHistory.pop()!; this.screen = previous.screen; this.menu.show(previous.page); return;
     }
     const previous: Partial<Record<Screen, Screen>> = { kart: "main", setup: "kart", tracks: "setup", "track-info": "tracks", "scene-preview": "track-info", paused: "race", finished: "track-info", race: "paused" };
-    this.screen = this.screen === "options" || this.screen === "help" || this.screen === "notice" || this.screen === "downloading" ? this.returnScreen : previous[this.screen] ?? "main";
+    this.screen = ["options", "help", "notice", "downloading", "scene-loading"].includes(this.screen) ? this.returnScreen : previous[this.screen] ?? "main";
   }
   open(screen: "options" | "help"): void { this.returnScreen = this.screen; this.openMenu(screen === "options" ? "options_audio" : "help1", screen); }
   chooseNewRace(): void {

@@ -12,12 +12,21 @@ mod perf_baseline;
 pub(crate) mod storage;
 mod ui;
 
-use std::path::{Component as PathComponent, Path};
+use std::{
+    path::{Component as PathComponent, Path},
+    sync::{
+        Arc,
+        atomic::{AtomicU32, Ordering},
+    },
+};
 
 use bevy::{
+    asset::{LoadState, RecursiveDependencyLoadState},
     ecs::{component::Mutable, query::QueryState},
     prelude::*,
+    render::{Render, RenderApp, RenderSystems, render_resource::PipelineCache},
     sprite::Anchor,
+    world_serialization::{WorldInstance, WorldInstanceSpawner},
 };
 use bevy_mod_scripting::{
     bindings::{
@@ -81,6 +90,24 @@ struct PendingScriptAnimation {
     graph: Handle<AnimationGraph>,
     node: AnimationNodeIndex,
     repeat: bool,
+}
+
+// A render-world signal for the latest submitted frame whose pipeline queue was drained.
+#[derive(Resource, Default, Clone)]
+struct RenderReadyFrame(Arc<AtomicU32>);
+
+fn publish_render_ready_frame(
+    cache: Res<PipelineCache>,
+    ready: Res<RenderReadyFrame>,
+    mut frame: Local<u32>,
+) {
+    *frame = frame.saturating_add(1);
+    let value = if cache.waiting_pipelines().next().is_none() {
+        *frame
+    } else {
+        0
+    };
+    ready.0.store(value, Ordering::Relaxed);
 }
 
 fn valid_entity_id(id: &str) -> bool {
@@ -267,6 +294,47 @@ fn scene_set_model(
             .remove::<Sprite>()
             .insert(WorldAssetRoot(scene));
         true
+    })
+}
+
+fn scene_models_state(
+    context: FunctionCallContext,
+    ids: Vec<String>,
+) -> Result<String, InteropError> {
+    let (world, owner) = current_script(&context)?;
+    world.with_world_mut(|world| {
+        let mut ready = true;
+        for id in ids {
+            let Some(entity) = find_owned_entity(world, &owner, &id) else {
+                return "failed".into();
+            };
+            let Some(root) = world.get::<WorldAssetRoot>(entity) else {
+                return "failed".into();
+            };
+            let Some(assets) = world.get_resource::<AssetServer>() else {
+                return "failed".into();
+            };
+            match assets.get_load_states(root.id()) {
+                Some((LoadState::Failed(_), ..))
+                | Some((_, _, RecursiveDependencyLoadState::Failed(_))) => return "failed".into(),
+                Some((LoadState::Loaded, _, RecursiveDependencyLoadState::Loaded)) => {
+                    ready &= world
+                        .get::<WorldInstance>(entity)
+                        .zip(world.get_resource::<WorldInstanceSpawner>())
+                        .is_some_and(|(instance, spawner)| spawner.instance_is_ready(**instance));
+                }
+                _ => ready = false,
+            }
+        }
+        if ready { "ready" } else { "loading" }.into()
+    })
+}
+
+fn scene_render_ready_frame(context: FunctionCallContext) -> Result<u32, InteropError> {
+    context.world()?.with_world(|world| {
+        world
+            .get_resource::<RenderReadyFrame>()
+            .map_or(0, |frame| frame.0.load(Ordering::Relaxed))
     })
 }
 
@@ -714,6 +782,14 @@ pub(crate) struct RuneweaveScriptApiPlugin;
 
 impl Plugin for RuneweaveScriptApiPlugin {
     fn build(&self, app: &mut App) {
+        let render_ready = RenderReadyFrame::default();
+        if let Some(renderer) = app.get_sub_app_mut(RenderApp) {
+            renderer.insert_resource(render_ready.clone()).add_systems(
+                Render,
+                publish_render_ready_frame.after(RenderSystems::Render),
+            );
+        }
+        app.insert_resource(render_ready);
         app.register_type::<ScriptEntityId>()
             .register_type::<audio::ScriptAudio>()
             .register_type::<ScriptActor>()
@@ -763,6 +839,8 @@ impl Plugin for RuneweaveScriptApiPlugin {
             .register("scene_set_sprite", scene_set_sprite)
             .register("scene_set_sprite_offset", scene_set_sprite_offset)
             .register("scene_set_model", scene_set_model)
+            .register("scene_models_state", scene_models_state)
+            .register("scene_render_ready_frame", scene_render_ready_frame)
             .register("scene_set_transform_3d", scene_set_transform_3d)
             .register("scene_play_animation", scene_play_animation)
             .register("scene_set_3d_enabled", scene_set_3d_enabled)
@@ -1327,7 +1405,12 @@ mod tests {
             #[cfg(feature = "typescript")]
             let source = include_bytes!("../../projects/ts/modules/shooter/game/assets/shooter.js")
                 .as_slice();
-            let mut context = quickjs_context_load(&attachment, source, world_id)?;
+            let source = [
+                source,
+                b"\nif (scene_models_state(['missing']) !== 'failed' || scene_render_ready_frame() !== 0) throw Error('Unexpected model readiness');",
+            ]
+            .concat();
+            let mut context = quickjs_context_load(&attachment, &source, world_id)?;
             quickjs_handler(
                 Vec::new(),
                 &attachment,
@@ -1390,11 +1473,13 @@ mod tests {
             CurrentScriptAttachment(Some(attachment.clone())),
         );
         WorldGuard::with_static_guard(app.world_mut(), cache, |_guard| {
-            let mut context = lua_context_load(
-                &attachment,
-                include_bytes!("../../projects/lua/modules/shooter/game/assets/shooter.lua"),
-                world_id,
-            )?;
+            let source = [
+                include_bytes!("../../projects/lua/modules/shooter/game/assets/shooter.lua")
+                    .as_slice(),
+                b"\nassert(scene_models_state({'missing'}) == 'failed' and scene_render_ready_frame() == 0)",
+            ]
+            .concat();
+            let mut context = lua_context_load(&attachment, &source, world_id)?;
             lua_handler(
                 Vec::new(),
                 &attachment,

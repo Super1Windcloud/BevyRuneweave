@@ -227,6 +227,12 @@ export function mountHud(session: PcSession, layout: Layout, changed: () => void
     button("download-back", "download-panel", tr("Back", "返回"), back, { height: 48 });
     finish(); return;
   }
+  if (screen === "scene-loading") {
+    node("scene-loading-cover", "root", { position: "absolute", width: "100%", height: "100%", background: [0.05, 0.09, 0.14, 1] });
+    heading(tr("Loading Track", "正在加载地图"), "");
+    button("scene-loading-back", "root", tr("Back", "返回"), back, { position: "absolute", left: layout.left, bottom: layout.bottom, width: 110, height: 48 });
+    finish(); return;
+  }
   if (screen === "scene-preview") {
     button("scene-back", "root", tr("Back", "返回"), back, { position: "absolute", left: layout.left, top: layout.top, height: 48 });
     label("scene-name", "root", sourceText(session.menu.selectedTrack.name), 20, { position: "absolute", top: layout.top, right: layout.right, padding: 8, borderRadius: 8, background: panel });
@@ -234,6 +240,7 @@ export function mountHud(session: PcSession, layout: Layout, changed: () => void
   }
   const racing = screen === "race" || screen === "paused" || screen === "finished" || (screen === "options" || screen === "help") && session.returnScreen === "paused";
   if (!racing && screen !== "kart") {
+    if (screen === "track-info") node("track-detail-cover", "root", { position: "absolute", width: "100%", height: "100%", background: [0.05, 0.09, 0.14, 1] });
     image("menu-background", "root", "ui/background.jpg", { position: "absolute", width: "100%", height: "100%", imageMode: "stretch" });
   } else if (racing && (!mobile || screen === "race")) mountRaceHud(session, layout, mobile, changed);
   if (screen === "race") { performanceLabel(); updateHud(session); return; }
