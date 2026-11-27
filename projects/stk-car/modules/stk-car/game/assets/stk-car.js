@@ -985,13 +985,7 @@
       m.grandPrix = id.slice(3);
       if (page !== "grand_prix_editor") go("gp_info");
     } else if (page === "gp_info" && id === "single-race") {
-      m.track = defaultCourse.id;
-      session2.settings.trackId = defaultCourse.id;
-      session2.settings.laps = defaultCourse.defaultLaps;
-      m.raceMode = "normal";
-      m.players = 1;
-      session2.settings.mode = "normal";
-      go("track_info", "track-info");
+      session2.back();
     } else if (page === "gp_info" && ["start", "continue"].includes(id)) {
       popup("confirm_dialog", tr("Grand Prix is currently a menu preview. Choose a single race to play.", "\u5927\u5956\u8D5B\u5F53\u524D\u4E3A\u83DC\u5355\u9884\u89C8\uFF0C\u8BF7\u9009\u62E9\u5355\u573A\u6BD4\u8D5B\u8FDB\u5165\u6E38\u620F\u3002"), "preview");
     } else if (id === "start" && page === "track_info") {
@@ -1273,7 +1267,7 @@
     const mobile2 = !!layout2.mobile;
     const playableTrack = page === "track_info" && !!courseFor(m.track);
     const previewNote = tr("Preview only. This track has no race available.", "\u4EC5\u4F9B\u9884\u89C8\uFF0C\u5F53\u524D\u8D5B\u9053\u6682\u672A\u5F00\u653E\u6BD4\u8D5B\u3002");
-    const singleRaceLabel = tr(`Play ${defaultCourse.name} Single Race`, "\u73A9\u5E84\u56ED\u5355\u573A\u6BD4\u8D5B");
+    const singleRaceLabel = tr("Choose a Single Race Track", "\u9009\u62E9\u5355\u573A\u6BD4\u8D5B\u8D5B\u9053");
     const { rect: safeRect, scale } = menuGeometry(layout2);
     const counts = /* @__PURE__ */ new Map();
     const uid = (key) => {
@@ -2245,10 +2239,10 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
   var previewId = "";
   var previewAngle = 0;
   var camera = { ...session.race.player };
-  var requiredResources = [];
-  function raceResources() {
-    const race = new Race(new Circuit(session.course.route), session.course.pickups, session.settings.laps, session.settings);
-    return [...courseModelPaths(session.course), ...race.racers.flatMap((racer) => {
+  var pendingRace;
+  function raceResources(course) {
+    const race = new Race(new Circuit(course.route), course.pickups, session.settings.laps, session.settings);
+    return [...courseModelPaths(course), ...race.racers.flatMap((racer) => {
       const kart = trackData.karts.find((kart2) => kart2.id === racer.kartId);
       return [kart.model, ...kart.wheels.map((wheel) => wheel.path)];
     })];
@@ -2256,7 +2250,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
   function resourceStatus() {
     const course = session.screen === "track-info" ? courseFor(session.menu.track) : void 0;
     if (session.screen === "track-info" && !course) return;
-    const status = resources.status(course ? courseModelPaths(course) : session.screen === "downloading" ? requiredResources : void 0);
+    const status = resources.status(course ? courseModelPaths(course) : pendingRace?.paths);
     session.resourceFailed = !!status.error;
     session.resourceText = status.error === "runtime_update_required" ? tr("Update the game runtime to download resources.", "\u8BF7\u66F4\u65B0\u6E38\u620F\u8FD0\u884C\u65F6\u4EE5\u4E0B\u8F7D\u8D44\u6E90\u3002") : status.error ? tr("Download failed. Retry when starting the race.", "\u8D44\u6E90\u4E0B\u8F7D\u5931\u8D25\uFF0C\u53EF\u5728\u5F00\u59CB\u6BD4\u8D5B\u65F6\u91CD\u8BD5\u3002") : status.ready ? tr("Resources ready", "\u8D44\u6E90\u5DF2\u5C31\u7EEA") : `${tr("Downloading resources", "\u6B63\u5728\u4E0B\u8F7D\u8D44\u6E90")} ${(status.received / 1048576).toFixed(1)} / ${(status.total / 1048576).toFixed(1)} MiB`;
     if (session.screen === "main" || session.screen === "downloading" || course) updateResourceStatus(session.resourceText);
@@ -2268,6 +2262,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     scene_set_transform_3d(id, pose.x, pose.y, pose.z, pose.pitch, -pose.heading, 0, scale);
   }
   function refreshUi() {
+    if (session.screen !== "downloading") pendingRace = void 0;
     layout = readLayout(mobile);
     layoutClock = 0;
     touch.reset();
@@ -2333,14 +2328,20 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     }
   }
   function startRace() {
-    requiredResources = raceResources();
-    if (!resources.ensure(requiredResources, 100, true)) {
+    if (!pendingRace) {
+      const course2 = courseFor(session.settings.trackId);
+      if (!course2) return;
+      pendingRace = { course: course2, paths: raceResources(course2) };
+    }
+    const { course, paths } = pendingRace;
+    if (!resources.ensure(paths, 100, true)) {
       if (session.screen !== "downloading") session.returnScreen = session.screen;
       session.screen = "downloading";
       resourceStatus();
       refreshUi();
       return;
     }
+    session.settings.trackId = course.id;
     session.start();
     accumulator = 0;
     uiClock = 0;
@@ -2350,10 +2351,10 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     trapIds.clear();
     camera = { ...session.race.player };
     scene_clear();
-    if (!scene_set_environment(JSON.stringify(session.course.environment))) throw new Error("STK scene environment requires the current native runtime");
+    if (!scene_set_environment(JSON.stringify(course.environment))) throw new Error("STK scene environment requires the current native runtime");
     scene_set_3d_enabled(true);
-    spawn2("track", session.course.trackModel, zeroPose());
-    spawn2("sky", session.course.skyModel, zeroPose());
+    spawn2("track", course.trackModel, zeroPose());
+    spawn2("sky", course.skyModel, zeroPose());
     for (const racer of session.race.racers) {
       const kart = trackData.karts.find((kart2) => kart2.id === racer.kartId);
       spawn2(racer.id, kart.model, racer);
@@ -2445,7 +2446,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     pickupVisible.clear();
     trapIds.clear();
     refreshUi();
-    resources.ensure(raceResources(), 0);
+    resources.ensure(raceResources(session.course), 0);
     resources.tick();
     resourceStatus();
     sound.update(session, 0);
@@ -2474,7 +2475,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     pollButtons();
     const resourcesChanged = resources.tick();
     resourceStatus();
-    if (session.screen === "downloading" && requiredResources.every((path) => resources.ready(path))) {
+    if (session.screen === "downloading" && pendingRace?.paths.every((path) => resources.ready(path))) {
       startRace();
       return;
     }

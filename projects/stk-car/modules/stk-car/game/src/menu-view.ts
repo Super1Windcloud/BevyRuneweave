@@ -9,7 +9,7 @@ import { isChinese, sourceText, tr } from "./localization.js";
 import { formatTime } from "./race.js";
 import type { PcSession } from "./session.js";
 import { trackData } from "./track-data.js";
-import { courseFor, courses, defaultCourse } from "./courses.js";
+import { courseFor, courses } from "./courses.js";
 import { kartMenuSource, menuGeometry, playerKartRects } from "./kart-layout.js";
 
 export interface MenuButton {
@@ -74,7 +74,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   const mobile = !!layout.mobile;
   const playableTrack = page === "track_info" && !!courseFor(m.track);
   const previewNote = tr("Preview only. This track has no race available.", "仅供预览，当前赛道暂未开放比赛。");
-  const singleRaceLabel = tr(`Play ${defaultCourse.name} Single Race`, "玩庄园单场比赛");
+  const singleRaceLabel = tr("Choose a Single Race Track", "选择单场比赛赛道");
   const { rect: safeRect, scale } = menuGeometry(layout);
   const counts = new Map<string, number>();
   const uid = (key: string) => { const count = counts.get(key) ?? 0; counts.set(key, count + 1); return count ? `${key}:${count}` : key; };

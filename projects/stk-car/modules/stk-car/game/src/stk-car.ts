@@ -9,7 +9,7 @@ import { advanceWheelSpin, kartFrame, wheelTransform } from "./kart-transform.js
 import { setUiLanguage, tr } from "./localization.js";
 import { resources } from "./resources.js";
 import { kartBackdropTransform, kartPreviewCamera } from "./kart-layout.js";
-import { courseFor, courseModelPaths } from "./courses.js";
+import { type Course, courseFor, courseModelPaths } from "./courses.js";
 
 const callbacks = globalThis as unknown as RuneweaveCallbacks;
 const session = new PcSession();
@@ -30,10 +30,10 @@ let pendingRescue = false, pendingItem = false, lookBack = false;
 let worldReady = false;
 let previewId = "", previewAngle = 0;
 let camera: Pose = { ...session.race.player };
-let requiredResources: string[] = [];
-function raceResources(): string[] {
-  const race = new Race(new Circuit(session.course.route), session.course.pickups, session.settings.laps, session.settings);
-  return [...courseModelPaths(session.course), ...race.racers.flatMap((racer) => {
+let pendingRace: { course: Course; paths: string[] } | undefined;
+function raceResources(course: Course): string[] {
+  const race = new Race(new Circuit(course.route), course.pickups, session.settings.laps, session.settings);
+  return [...courseModelPaths(course), ...race.racers.flatMap((racer) => {
     const kart = trackData.karts.find((kart) => kart.id === racer.kartId)!;
     return [kart.model, ...kart.wheels.map((wheel) => wheel.path)];
   })];
@@ -41,7 +41,7 @@ function raceResources(): string[] {
 function resourceStatus(): void {
   const course = session.screen === "track-info" ? courseFor(session.menu.track) : undefined;
   if (session.screen === "track-info" && !course) return;
-  const status = resources.status(course ? courseModelPaths(course) : session.screen === "downloading" ? requiredResources : undefined);
+  const status = resources.status(course ? courseModelPaths(course) : pendingRace?.paths);
   session.resourceFailed = !!status.error;
   session.resourceText = status.error === "runtime_update_required" ? tr("Update the game runtime to download resources.", "请更新游戏运行时以下载资源。")
     : status.error ? tr("Download failed. Retry when starting the race.", "资源下载失败，可在开始比赛时重试。")
@@ -57,6 +57,7 @@ function spawn(id: string, path: string, pose: Pose, scale = 1): void {
   scene_set_transform_3d(id, pose.x, pose.y, pose.z, pose.pitch, -pose.heading, 0, scale);
 }
 function refreshUi(): void {
+  if (session.screen !== "downloading") pendingRace = undefined;
   layout = readLayout(mobile); layoutClock = 0;
   touch.reset(); accumulator = 0; pendingItem = false; pendingRescue = false; lookBack = false;
   if (session.screen === "kart") {
@@ -110,19 +111,25 @@ function renderPreview(dt: number): void {
   }
 }
 function startRace(): void {
-  requiredResources = raceResources();
-  if (!resources.ensure(requiredResources, 100, true)) {
+  if (!pendingRace) {
+    const course = courseFor(session.settings.trackId);
+    if (!course) return;
+    pendingRace = { course, paths: raceResources(course) };
+  }
+  const { course, paths } = pendingRace;
+  if (!resources.ensure(paths, 100, true)) {
     if (session.screen !== "downloading") session.returnScreen = session.screen;
     session.screen = "downloading"; resourceStatus(); refreshUi(); return;
   }
+  session.settings.trackId = course.id;
   session.start(); accumulator = 0; uiClock = 0; lookBack = false;
   wheelAngles.clear(); pickupVisible.clear(); trapIds.clear();
   camera = { ...session.race.player };
   scene_clear();
-  if (!scene_set_environment(JSON.stringify(session.course.environment))) throw new Error("STK scene environment requires the current native runtime");
+  if (!scene_set_environment(JSON.stringify(course.environment))) throw new Error("STK scene environment requires the current native runtime");
   scene_set_3d_enabled(true);
-  spawn("track", session.course.trackModel, zeroPose());
-  spawn("sky", session.course.skyModel, zeroPose());
+  spawn("track", course.trackModel, zeroPose());
+  spawn("sky", course.skyModel, zeroPose());
   for (const racer of session.race.racers) {
     const kart = trackData.karts.find((kart) => kart.id === racer.kartId)!;
     spawn(racer.id, kart.model, racer);
@@ -183,7 +190,7 @@ function load(): void {
   scene_clear(); scene_set_3d_enabled(false); worldReady = false;
   previewId = "";
   accumulator = 0; uiClock = 0; wheelAngles.clear(); pickupVisible.clear(); trapIds.clear(); refreshUi();
-  resources.ensure(raceResources(), 0); resources.tick(); resourceStatus();
+  resources.ensure(raceResources(session.course), 0); resources.tick(); resourceStatus();
   sound.update(session, 0);
 }
 callbacks.on_script_loaded = load;
@@ -197,7 +204,7 @@ function updateGame(frameDt: number): void {
   pollButtons();
   // Honor Back/selection input before a completed download can replace the current menu.
   const resourcesChanged = resources.tick(); resourceStatus();
-  if (session.screen === "downloading" && requiredResources.every((path) => resources.ready(path))) { startRace(); return; }
+  if (session.screen === "downloading" && pendingRace?.paths.every((path) => resources.ready(path))) { startRace(); return; }
   if (resourcesChanged && session.screen !== "race" && session.screen !== "paused") refreshUi();
   const dt = Math.min(frameDt, 0.1);
   layoutClock += dt;

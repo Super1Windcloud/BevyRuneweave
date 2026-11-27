@@ -223,7 +223,7 @@ test("iOS home entries construct menus using the native layout enum contract", (
     game.press("Escape"); assert.ok(game.nodes.has("singleplayer"));
   }
 });
-test("mobile Grand Prix details expose a playable single-race action inside the safe area", () => {
+test("mobile Grand Prix details let players choose a single-race track inside the safe area", () => {
   for (const platform of ["android", "ios"]) {
     const game = load("zh-CN", platform, { width: 852, height: 393, leftInset: 112, rightInset: 0 });
     game.click("singleplayer"); game.click("gui:karts:continue"); game.click("gui:race_setup:mode-normal");
@@ -233,6 +233,8 @@ test("mobile Grand Prix details expose a playable single-race action inside the 
       assert.ok(Number(r.left) >= 0 && Number(r.top) >= 0 && Number(r.top) + Number(r.height) <= 393);
     }
     game.click("gui:gp_info:start"); assert.ok(game.nodes.has("menu-dialog-frame")); game.press("Escape");
-    game.click("gui:gp_info:single-race"); game.click("gui:track_info:start"); assert.ok(game.nodes.has("right"));
+    game.click("gui:gp_info:single-race"); game.click("gui:tracks_and_gp:track:lighthouse");
+    game.click("gui:track_info:start"); assert.ok(game.nodes.has("right"));
+    assert.equal(game.images.get("map"), "ui/minimap.png");
   }
 });

@@ -81,7 +81,7 @@ test("preview-only track details have no start action or race model requests", (
     assert.ok(newFiles.every(({ path }) => !path.endsWith(".glb")));
   }
 });
-test("desktop Grand Prix previews offer a playable single race instead of a Grand Prix start", () => {
+test("desktop Grand Prix previews return to the track picker without selecting Hacienda", () => {
   const game = load("zh-CN", "windows");
   game.click("singleplayer"); game.press("Enter"); game.click("gui:race_setup:mode-normal");
   game.click(`gui:tracks_and_gp:gp:${menuData.grandPrix[0].id}`);
@@ -89,9 +89,28 @@ test("desktop Grand Prix previews offer a playable single race instead of a Gran
   assert.ok(!game.nodes.has("gui:gp_info:start"));
   assert.ok(!game.nodes.has("gui:gp_info:continue"));
   game.click("gui:gp_info:single-race");
-  assert.equal(game.texts.get("resource-status"), "资源已就绪");
+  assert.ok(!game.nodes.has("gui:track_info:start"));
+  game.click("gui:tracks_and_gp:track:lighthouse");
   game.click("gui:track_info:start");
-  assert.equal(game.models.get("track"), courseFor("hacienda")!.trackModel);
+  assert.equal(game.models.get("track"), courseFor("lighthouse")!.trackModel);
+});
+test("a new track selection replaces the cancelled race while both courses are downloading", () => {
+  const root = "cache://stk-car/test/";
+  const game = load("en-US", "android", undefined, [], { hold: true, error: "", root });
+  game.click("singleplayer"); game.click("gui:karts:continue"); game.click("gui:race_setup:mode-normal");
+  game.click("gui:tracks_and_gp:track:hacienda"); game.click("gui:track_info:start");
+  game.click("download-back"); game.press("Escape");
+  game.click("gui:tracks_and_gp:track:lighthouse"); game.click("gui:track_info:start");
+  assert.ok(!game.models.has("track"));
+
+  game.downloads.hold = false; game.settle();
+  const course = courseFor("lighthouse")!;
+  assert.equal(game.models.get("track"), root + course.trackModel);
+  assert.equal(game.models.get("sky"), root + course.skyModel);
+  assert.equal(game.images.get("map"), course.minimap.image);
+  assert.equal(game.voices.get("music")?.path, root + course.music);
+  game.click("pause"); game.click("restart-race");
+  assert.equal(game.models.get("track"), root + course.trackModel);
 });
 test("starting a race waits for scene and AI vehicles; leaving the download page cannot auto-start later", () => {
   const game = load("en-US", "android", undefined, [], { hold: true, error: "", root: "" });

@@ -2,7 +2,7 @@ import { menuData } from "./menu-data.js";
 import { setUiLanguage, sourceText, tr } from "./localization.js";
 import { optionPages, optionTabs } from "./menu-state.js";
 import type { PcSession, Screen } from "./session.js";
-import { courseFor, courses, defaultCourse } from "./courses.js";
+import { courseFor, courses } from "./courses.js";
 
 export function menuPageFor(session: PcSession): string {
   const pages: Partial<Record<Screen, string>> = { kart: "karts", setup: "race_setup", tracks: "tracks_and_gp", "track-info": "track_info" };
@@ -40,8 +40,7 @@ export function menuAction(session: PcSession, id: string, changed: () => void, 
     m.grandPrix = id.slice(3);
     if (page !== "grand_prix_editor") go("gp_info");
   } else if (page === "gp_info" && id === "single-race") {
-    m.track = defaultCourse.id; session.settings.trackId = defaultCourse.id; session.settings.laps = defaultCourse.defaultLaps;
-    m.raceMode = "normal"; m.players = 1; session.settings.mode = "normal"; go("track_info", "track-info");
+    session.back();
   } else if (page === "gp_info" && ["start", "continue"].includes(id)) {
     popup("confirm_dialog", tr("Grand Prix is currently a menu preview. Choose a single race to play.", "大奖赛当前为菜单预览，请选择单场比赛进入游戏。"), "preview");
   } else if (id === "start" && page === "track_info") {
