@@ -112,7 +112,10 @@ function highlight(): void {
       const active = i === focus || button.face.selected;
       if (button.face.slices) for (const slice of button.face.slices) ui_set_image(slice.id, active ? slice.focused : slice.normal);
       else ui_set_image(button.face.id, active ? button.face.focused || button.face.normal : button.face.normal);
-      if (button.caption) { const c = button.caption; ui_set_text(c.id, c.text, c.size, active ? 1 : 0, active ? 1 : 0, active ? 1 : 0, 1); }
+      if (button.caption) {
+        const c = button.caption, channel = active && !dimensions.mobile ? 1 : 0;
+        ui_set_text(c.id, c.text, c.size, channel, channel, channel, 1);
+      }
     } else if (button.icon) ui_set_image(`${button.id}-icon`, i === focus ? button.focusIcon ?? button.icon : button.icon);
     else style(button.id, { background: i === focus ? [0.52, 0.3, 0.045, 0.95] : button.base });
   }
@@ -184,7 +187,7 @@ export function mountHud(session: PcSession, layout: Layout, changed: () => void
   const racing = screen === "race" || screen === "paused" || screen === "finished" || (screen === "options" || screen === "help") && session.returnScreen === "paused";
   if (!racing && screen !== "kart") {
     image("menu-background", "root", "ui/background.jpg", { position: "absolute", width: "100%", height: "100%", imageMode: "stretch" });
-  } else if (racing) mountRaceHud(session, layout, mobile, changed);
+  } else if (racing && (!mobile || screen === "race")) mountRaceHud(session, layout, mobile, changed);
   if (screen === "race") { performanceLabel(); updateHud(session); return; }
   if (racing) node("shade", "root", { position: "absolute", width: "100%", height: "100%", background: [0, 0.01, 0.02, 0.65] });
   if (screen !== "main" && mountSourceMenu(session, layout, host, changed, start)) { finish(); return; }
@@ -196,7 +199,7 @@ export function mountHud(session: PcSession, layout: Layout, changed: () => void
     centeredPanel("pause-panel", { flexDirection: "row", alignItems: "center", height: "50%", top: "30%", justifyContent: "space-between" });
     button("resume", "pause-panel", tr("Resume Race", "继续比赛"), act(() => { session.screen = "race"; }), { width: "24%" }, "ui/back.png");
     button("restart-race", "pause-panel", tr("Restart Race", "重新比赛"), start, { width: "24%" }, "ui/restart.png");
-    button("new-race", "pause-panel", tr("New Race", "新的比赛"), act(() => { session.screen = "kart"; }), { width: "24%" }, "ui/menu_race.png");
+    button("new-race", "pause-panel", tr("New Race", "新的比赛"), act(() => session.chooseNewRace()), { width: "24%" }, "ui/menu_race.png");
     button("leave-race", "pause-panel", tr("Exit to Menu", "返回主菜单"), act(() => { session.screen = "main"; }), { width: "24%" }, "ui/main_quit.png");
   } else if (screen === "finished") {
     heading(tr("Race Results", "比赛结果"), tr("Position · Kart · Time", "名次 · 赛车 · 时间"));
@@ -208,7 +211,7 @@ export function mountHud(session: PcSession, layout: Layout, changed: () => void
     label("lap-splits", "results-panel", session.race.lapTimes.map((time, index) => `${tr("Lap", "圈")} ${index + 1}: ${formatTime(time)}`).join("    "), 18);
     node("result-actions", "results-panel", { flexDirection: "row", gap: 20 });
     button("race-again", "result-actions", tr("Race Again", "再来一局"), start, { height: 54 });
-    button("choose-new-race", "result-actions", tr("New Race", "新的比赛"), act(() => { session.screen = "kart"; }), { height: 54 });
+    button("choose-new-race", "result-actions", tr("New Race", "新的比赛"), act(() => session.chooseNewRace()), { height: 54 });
     button("result-menu", "result-actions", tr("Main Menu", "主菜单"), act(() => { session.screen = "main"; }), { height: 54 });
   } else if (screen === "notice") {
     heading(session.noticeTitle, ""); centeredPanel("notice-panel");

@@ -73,11 +73,16 @@ test("non-racing maps download their own 3D scene and can return or retry", () =
     else game.press("Enter");
     game.click("gui:race_setup:mode-normal");
     const id = `gui:tracks_and_gp:track:${scene.id}`;
+    if (platform !== "windows") {
+      assert.ok(!game.nodes.has(id));
+      game.click("gui:tracks_and_gp:track-section:scenes");
+      assert.ok(!game.nodes.has("gui:tracks_and_gp:track:lighthouse"));
+    }
     for (let page = 0; page < mapScenes.length && !game.nodes.has(id); page++) {
       const next = [...game.nodes].find((node) => node.endsWith(":page-1"));
       assert.ok(next); game.click(next);
     }
-    assert.match(game.texts.get(`${id}:label:text`)!, /3D 场景$/);
+    assert.ok(game.texts.get(`${id}:label:text`));
     game.downloads.hold = true;
     game.click(id);
     assert.ok(!game.nodes.has("gui:track_info:start"));

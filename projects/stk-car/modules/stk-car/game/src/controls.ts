@@ -63,12 +63,13 @@ export class TouchControls {
       if (action === "item" && contact.justPressed) input.useItem = true;
       if (action === "rescue" && contact.justPressed) input.rescue = true;
     }
-    if (this.active.has("left") || this.active.has("right")) input.steer = Number(this.active.has("right")) - Number(this.active.has("left"));
-    else if (!input.steer && driving) input.steer = assistedSteer;
+    const manualTouch = this.active.has("left") || this.active.has("right");
+    if (manualTouch) input.steer = Number(this.active.has("right")) - Number(this.active.has("left"));
     if (this.active.has("drift")) {
       if (Math.abs(input.steer) > 0.12) input.drift = true;
       else input.brake = true;
     }
+    if (!manualTouch && !input.steer && driving) input.steer = assistedSteer;
     input.throttle = driving && !input.brake ? 1 : 0;
     this.braking = input.brake; this.drifting = input.drift;
   }

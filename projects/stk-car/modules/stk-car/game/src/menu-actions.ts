@@ -1,6 +1,6 @@
 import { menuData } from "./menu-data.js";
 import { setUiLanguage, sourceText, tr } from "./localization.js";
-import { optionPages, optionTabs } from "./menu-state.js";
+import { optionPages, optionTabs, trackSections } from "./menu-state.js";
 import type { PcSession, Screen } from "./session.js";
 import { courseFor, courses } from "./courses.js";
 
@@ -8,7 +8,7 @@ export function menuPageFor(session: PcSession): string {
   const pages: Partial<Record<Screen, string>> = { kart: "karts", setup: "race_setup", tracks: "tracks_and_gp", "track-info": "track_info" };
   return pages[session.screen] ?? session.menu.page;
 }
-export function menuAction(session: PcSession, id: string, changed: () => void, start: () => void): void {
+export function menuAction(session: PcSession, id: string, changed: () => void, start: () => void, mobile = false): void {
   const m = session.menu, page = m.activePage;
   const go = (target: string, screen: Screen = "menu") => session.openMenu(target, screen);
   const popup = (target: string, title: string, purpose = "") => m.popup(target, title, purpose);
@@ -27,19 +27,30 @@ export function menuAction(session: PcSession, id: string, changed: () => void, 
   else if (id === "tab_settings") m.show("profile_settings");
   else if (id.startsWith("choose-")) {
     const kart = id.slice(7);
-    if (session.settings.kartId === kart) go("race_setup", "setup");
+    if (!mobile && session.settings.kartId === kart) go("race_setup", "setup");
     else session.settings.kartId = kart;
   } else if (page === "karts" && id === "continue") go("race_setup", "setup");
   else if (["novice", "intermediate", "expert", "best", "supertux"].includes(id)) session.settings.difficulty = Math.min(3, ["novice", "intermediate", "expert", "best", "supertux"].indexOf(id));
   else if (id.startsWith("mode-")) {
-    m.raceMode = id.slice(5);
-    if (m.raceMode === "normal" || m.raceMode === "time-trial") session.settings.mode = m.raceMode;
-    go("tracks_and_gp", "tracks");
+    const mode = id.slice(5);
+    const playable = mode === "normal" || mode === "time-trial";
+    if (mobile && !playable) {
+      popup("confirm_dialog", tr("This mode is a preview. Normal Race and Time Trial are available.", "此模式暂供预览。可选择正常比赛或竞速模式。"), "preview");
+    } else {
+      m.raceMode = mode;
+      if (playable) session.settings.mode = mode;
+      m.trackSection = "races";
+      go("tracks_and_gp", "tracks");
+    }
+  } else if (page === "tracks_and_gp" && id.startsWith("track-section:")) {
+    const section = trackSections.find((section) => section === id.slice(14));
+    if (section) m.trackSection = section;
   } else if (id.startsWith("track:")) selectTrack(id.slice(6));
   else if (id.startsWith("gp:")) {
     m.grandPrix = id.slice(3);
     if (page !== "grand_prix_editor") go("gp_info");
   } else if (page === "gp_info" && id === "single-race") {
+    m.trackSection = "races";
     session.back();
   } else if (page === "gp_info" && ["start", "continue"].includes(id)) {
     popup("confirm_dialog", tr("Grand Prix is currently a menu preview. Choose a single race to play.", "大奖赛当前为菜单预览，请选择单场比赛进入游戏。"), "preview");

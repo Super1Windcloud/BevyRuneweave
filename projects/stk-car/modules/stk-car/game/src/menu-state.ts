@@ -11,6 +11,7 @@ export const modeChoices = [
   ["normal", "Normal Race", "mode_normal"], ["time-trial", "Time Trial", "mode_tt"], ["follow", "Follow the Leader", "mode_ftl"],
   ["battle", "Battle", "mode_weapons"], ["soccer", "Soccer", "mode_soccer"], ["eggs", "Egg Hunt", "mode_easter"], ["ghost", "Ghost Replay", "mode_ghost"], ["lap", "Lap Trial", "mode_laptrial"],
 ] as const;
+export const trackSections = ["races", "scenes", "grand-prix"] as const;
 
 export class MenuState {
   page = "";
@@ -22,6 +23,7 @@ export class MenuState {
   track = defaultCourse.id;
   grandPrix = menuData.grandPrix[0]?.id ?? "";
   raceMode = "normal";
+  trackSection: typeof trackSections[number] = "races";
   scoreMode = "normal";
   profiles = ["Player"];
   player = 0;
@@ -78,7 +80,7 @@ export class MenuState {
       this.values[this.key(id)] = choices[(index + direction + choices.length) % choices.length].value; return;
     }
     if (id === "target-value-spinner" || id === "laps") { min = 1; max = 20; }
-    if (id === "ai-spinner") { min = 0; max = 20; }
+    if (id === "ai-spinner") min = 0;
     const step = id === "scale_rtts" || id === "font_size" ? 10 : 1;
     const value = Math.max(min, Math.min(max, this.number(id, session) + direction * step));
     if (id === "music_volume") session.settings.musicVolume = value / 10;

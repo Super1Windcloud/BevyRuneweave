@@ -81,6 +81,14 @@ test("opposing arrows cancel and explicit steering overrides the optional assist
   const manual = emptyControls(); touch.apply(manual, [center(rects.left, "a")], layout, true, 0.65); assert.equal(manual.steer, -1);
   const opposite = emptyControls(); touch.apply(opposite, [{ ...center(rects.left, "a"), justPressed: false }, center(rects.right, "b")], layout, true, 0.65); assert.equal(opposite.steer, 0);
 });
+test("steering assistance leaves the brake in braking mode until a steering arrow is pressed", () => {
+  const layout = makeLayout(914, 411, { left: 0, right: 0, top: 0, bottom: 0 }, true);
+  const touch = new TouchControls(), rects = touchControlRects(layout), brake = center(rects.drift, "brake");
+  const assisted = emptyControls(); touch.apply(assisted, [brake], layout, true, 0.7);
+  assert.equal(assisted.brake, true); assert.equal(assisted.drift, false); assert.equal(assisted.throttle, 0);
+  const manual = emptyControls(); touch.apply(manual, [{ ...brake, justPressed: false }, center(rects.left, "steer")], layout, true, 0.7);
+  assert.equal(manual.drift, true); assert.equal(manual.brake, false); assert.equal(manual.steer, -1);
+});
 test("resuming with old fingers down suppresses new actions until they release", () => {
   const layout = makeLayout(914, 411, { left: 0, right: 0, top: 0, bottom: 0 }, true), rects = touchControlRects(layout), touch = new TouchControls();
   touch.reset();
@@ -166,6 +174,7 @@ test("Android touch menus reach normal and time-trial races in English, Chinese 
     assert.notDeepEqual(game.transforms.get("tux"), initial);
     assert.equal(game.transforms.has("comet"), mode === "normal");
     game.click("pause"); const paused = [...game.transforms.get("tux")!];
+    assert.ok(!game.nodes.has("positions")); assert.ok(!game.nodes.has("map"));
     for (let i = 0; i < 30; i++) game.frame(); assert.deepEqual(game.transforms.get("tux"), paused);
     game.click("resume"); game.contacts.length = 0; game.frame();
     game.callbacks.on_suspend?.(); game.frame(); assert.equal(game.texts.get("title"), locale === "zh-CN" ? "已暂停" : "Paused");
@@ -183,17 +192,46 @@ test("mobile settings and help tabs remain navigable and language changes persis
   game.click("help"); game.click("gui:help1:page2"); assert.ok(game.nodes.has("gui:help2:page7"));
   game.press("Escape"); assert.ok(game.nodes.has("singleplayer"));
 });
-test("mobile kart preview stays selectable and time trial ignores a preview-only AI count", () => {
+test("mobile kart selection requires Continue and racing setup clamps AI to the supported range", () => {
   const game = load("en-US", "android", { width: 914, height: 411, leftInset: 50, rightInset: 0 });
   game.click("singleplayer"); game.click("gui:karts:choose-wilber");
+  game.click("gui:karts:choose-wilber");
   assert.ok(game.nodes.has("gui:karts:continue")); assert.ok(game.transforms.has("preview-body"));
   game.click("gui:karts:continue"); game.click("gui:race_setup:mode-normal"); game.click("gui:tracks_and_gp:track:lighthouse");
-  game.click("gui:track_info:ai-spinner:up"); game.click("gui:track_info:start"); assert.ok(game.nodes.has("menu-dialog-frame"));
-  game.press("Escape"); game.press("Escape"); game.press("Escape");
+  game.click("gui:track_info:ai-spinner:up");
+  assert.equal(game.texts.get("gui:track_info:ai-spinner:value:text"), "3");
+  game.click("gui:track_info:option"); assert.match(game.texts.get("gui:track_info:option:label:text")!, /On$/);
+  game.press("Escape"); game.press("Escape");
   game.click("gui:race_setup:mode-time-trial"); game.click("gui:tracks_and_gp:track:lighthouse");
   assert.equal(game.nodes.has("gui:track_info:ai-spinner:up"), false);
   game.click("gui:track_info:start"); assert.ok(game.nodes.has("right"));
   assert.ok(game.transforms.has("tux")); assert.equal(game.transforms.has("comet"), false);
+});
+test("preview-only modes stay in setup and new race clears the previous navigation stack", () => {
+  const game = load("zh-CN", "android");
+  game.click("singleplayer"); game.click("gui:karts:continue");
+  assert.match(game.texts.get("gui:race_setup:mode-battle:label:text")!, /预览$/);
+  game.click("gui:race_setup:mode-battle"); assert.ok(game.nodes.has("menu-dialog-frame"));
+  assert.ok(!game.nodes.has("gui:tracks_and_gp:track:lighthouse"));
+  game.press("Escape"); game.click("gui:race_setup:mode-normal");
+  game.click("gui:tracks_and_gp:track:lighthouse"); game.click("gui:track_info:start");
+  game.click("pause"); game.click("new-race"); assert.ok(game.nodes.has("gui:karts:continue"));
+  game.click("gui:karts:back"); assert.ok(game.nodes.has("singleplayer"));
+});
+test("compact landscape keeps map pagination and race actions inside the safe area", () => {
+  const game = load("en-US", "android", { width: 680, height: 300, leftInset: 42, rightInset: 0 });
+  game.click("singleplayer"); game.click("gui:karts:continue"); game.click("gui:race_setup:mode-normal");
+  const race = "gui:tracks_and_gp:track:lighthouse", next = "mobile-tracks:races:page-1";
+  const bounds = (id: string) => {
+    const { left, top, width, height } = game.styles.get(id)!;
+    return { x: Number(left), y: Number(top), width: Number(width), height: Number(height) };
+  };
+  assert.equal(bounds(next).width, 44);
+  assert.equal(overlap(bounds(next), bounds(race)), false);
+  game.click(race);
+  const reverse = bounds("gui:track_info:option"), start = bounds("gui:track_info:start"), status = bounds("track-resource-status");
+  assert.equal(overlap(reverse, start), false); assert.equal(overlap(reverse, status), false);
+  assert.ok(start.y + start.height <= 300);
 });
 test("touch keyboard edits local fields, masks passwords and keeps credentials out of saved settings", () => {
   const game = load("en-US", "android", { width: 914, height: 411, leftInset: 50, rightInset: 0 });
@@ -227,6 +265,7 @@ test("mobile Grand Prix details let players choose a single-race track inside th
   for (const platform of ["android", "ios"]) {
     const game = load("zh-CN", platform, { width: 852, height: 393, leftInset: 112, rightInset: 0 });
     game.click("singleplayer"); game.click("gui:karts:continue"); game.click("gui:race_setup:mode-normal");
+    game.click("gui:tracks_and_gp:track-section:grand-prix");
     game.click(`gui:tracks_and_gp:gp:${menuData.grandPrix[0].id}`);
     for (const id of ["start", "single-race"]) {
       const r = game.styles.get(`gui:gp_info:${id}`)!;

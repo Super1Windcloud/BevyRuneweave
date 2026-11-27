@@ -447,12 +447,13 @@
         if (action === "item" && contact.justPressed) input.useItem = true;
         if (action === "rescue" && contact.justPressed) input.rescue = true;
       }
-      if (this.active.has("left") || this.active.has("right")) input.steer = Number(this.active.has("right")) - Number(this.active.has("left"));
-      else if (!input.steer && driving) input.steer = assistedSteer;
+      const manualTouch = this.active.has("left") || this.active.has("right");
+      if (manualTouch) input.steer = Number(this.active.has("right")) - Number(this.active.has("left"));
       if (this.active.has("drift")) {
         if (Math.abs(input.steer) > 0.12) input.drift = true;
         else input.brake = true;
       }
+      if (!manualTouch && !input.steer && driving) input.steer = assistedSteer;
       input.throttle = driving && !input.brake ? 1 : 0;
       this.braking = input.brake;
       this.drifting = input.drift;
@@ -819,6 +820,7 @@
     ["ghost", "Ghost Replay", "mode_ghost"],
     ["lap", "Lap Trial", "mode_laptrial"]
   ];
+  var trackSections = ["races", "scenes", "grand-prix"];
   var MenuState = class {
     page = "";
     dialog = null;
@@ -829,6 +831,7 @@
     track = defaultCourse.id;
     grandPrix = menuData.grandPrix[0]?.id ?? "";
     raceMode = "normal";
+    trackSection = "races";
     scoreMode = "normal";
     profiles = ["Player"];
     player = 0;
@@ -925,10 +928,7 @@
         min = 1;
         max = 20;
       }
-      if (id === "ai-spinner") {
-        min = 0;
-        max = 20;
-      }
+      if (id === "ai-spinner") min = 0;
       const step = id === "scale_rtts" || id === "font_size" ? 10 : 1;
       const value = Math.max(min, Math.min(max, this.number(id, session2) + direction * step));
       if (id === "music_volume") session2.settings.musicVolume = value / 10;
@@ -957,7 +957,7 @@
     const pages = { kart: "karts", setup: "race_setup", tracks: "tracks_and_gp", "track-info": "track_info" };
     return pages[session2.screen] ?? session2.menu.page;
   }
-  function menuAction(session2, id, changed, start) {
+  function menuAction(session2, id, changed, start, mobile2 = false) {
     const m = session2.menu, page = m.activePage;
     const go = (target, screen = "menu") => session2.openMenu(target, screen);
     const popup = (target, title, purpose = "") => m.popup(target, title, purpose);
@@ -980,19 +980,30 @@
     else if (id === "tab_settings") m.show("profile_settings");
     else if (id.startsWith("choose-")) {
       const kart = id.slice(7);
-      if (session2.settings.kartId === kart) go("race_setup", "setup");
+      if (!mobile2 && session2.settings.kartId === kart) go("race_setup", "setup");
       else session2.settings.kartId = kart;
     } else if (page === "karts" && id === "continue") go("race_setup", "setup");
     else if (["novice", "intermediate", "expert", "best", "supertux"].includes(id)) session2.settings.difficulty = Math.min(3, ["novice", "intermediate", "expert", "best", "supertux"].indexOf(id));
     else if (id.startsWith("mode-")) {
-      m.raceMode = id.slice(5);
-      if (m.raceMode === "normal" || m.raceMode === "time-trial") session2.settings.mode = m.raceMode;
-      go("tracks_and_gp", "tracks");
+      const mode = id.slice(5);
+      const playable = mode === "normal" || mode === "time-trial";
+      if (mobile2 && !playable) {
+        popup("confirm_dialog", tr("This mode is a preview. Normal Race and Time Trial are available.", "\u6B64\u6A21\u5F0F\u6682\u4F9B\u9884\u89C8\u3002\u53EF\u9009\u62E9\u6B63\u5E38\u6BD4\u8D5B\u6216\u7ADE\u901F\u6A21\u5F0F\u3002"), "preview");
+      } else {
+        m.raceMode = mode;
+        if (playable) session2.settings.mode = mode;
+        m.trackSection = "races";
+        go("tracks_and_gp", "tracks");
+      }
+    } else if (page === "tracks_and_gp" && id.startsWith("track-section:")) {
+      const section = trackSections.find((section2) => section2 === id.slice(14));
+      if (section) m.trackSection = section;
     } else if (id.startsWith("track:")) selectTrack(id.slice(6));
     else if (id.startsWith("gp:")) {
       m.grandPrix = id.slice(3);
       if (page !== "grand_prix_editor") go("gp_info");
     } else if (page === "gp_info" && id === "single-race") {
+      m.trackSection = "races";
       session2.back();
     } else if (page === "gp_info" && ["start", "continue"].includes(id)) {
       popup("confirm_dialog", tr("Grand Prix is currently a menu preview. Choose a single race to play.", "\u5927\u5956\u8D5B\u5F53\u524D\u4E3A\u83DC\u5355\u9884\u89C8\uFF0C\u8BF7\u9009\u62E9\u5355\u573A\u6BD4\u8D5B\u8FDB\u5165\u6E38\u620F\u3002"), "preview");
@@ -1219,6 +1230,10 @@
   var transparent = [0, 0, 0, 0];
   var ink = [0, 0, 0, 1];
   var blue = [0, 0, 0.7, 1];
+  var mobileText = [0.96, 0.96, 0.92, 1];
+  var mobileSurface = [0.06, 0.09, 0.13, 0.97];
+  var mobileCard = [0.11, 0.16, 0.22, 0.95];
+  var mobileSelection = [0.19, 0.33, 0.4, 0.98];
   var textFieldColors = { border: [138 / 255, 138 / 255, 138 / 255, 1], focus: [243 / 255, 164 / 255, 80 / 255, 1], background: [200 / 255, 200 / 255, 200 / 255, 1], editing: [236 / 255, 226 / 255, 201 / 255, 1] };
   var containerTags = /* @__PURE__ */ new Set(["stkgui", "div", "box", "bottombar"]);
   var gridTags = /* @__PURE__ */ new Set(["ribbon_grid", "scrollable_ribbon", "scrollable_toolbar", "ribbon", "buttonbar", "tabs", "vertical-tabs"]);
@@ -1287,20 +1302,20 @@
     };
     const action = (id) => () => {
       m.editing = "";
-      menuAction(session2, id, changed, start);
+      menuAction(session2, id, changed, start, mobile2);
     };
     function button2(id, rect, label2, click, options = {}) {
       spawn(id, "button", "root", { ...position(rect), background: transparent });
       const normal = options.normal ?? skin("glassbutton"), focused2 = options.focused ?? skin("glassbutton_focused");
       if (normal) skinPicture(`${id}:face`, normal, { x: 0, y: 0, width: rect.width, height: rect.height }, scale, id);
-      const captionHeight = label2 ? Math.min(rect.height * (options.image && !options.horizontal ? 0.31 : 1), 42 * scale) : 0;
+      const captionHeight = label2 ? options.background && options.image ? Math.min(rect.height * 0.44, Math.max(32, 42 * scale)) : Math.min(rect.height * (options.image && !options.horizontal ? 0.31 : 1), 42 * scale) : 0;
       if (options.image) {
         const imageRect = options.horizontal ? { x: 6 * scale, y: 3 * scale, width: Math.min(rect.height - 6 * scale, rect.width * 0.28), height: rect.height - 6 * scale } : { x: 4 * scale, y: 2 * scale, width: rect.width - 8 * scale, height: rect.height - captionHeight - 4 * scale };
         picture(`${id}:icon`, options.image, imageRect, false, id);
       }
-      if (label2) text(`${id}:label`, label2, options.horizontal && options.image ? { x: rect.width * 0.25, y: 0, width: rect.width * 0.74, height: rect.height } : { x: 4 * scale, y: rect.height - captionHeight, width: rect.width - 8 * scale, height: captionHeight }, Math.max(13, 18 * scale), ink, "center", id);
-      const base = options.selected && !normal ? [0, 0.65, 0.7, 0.32] : transparent;
-      if (!normal && options.selected) ui_set_style(id, JSON.stringify({ background: base }));
+      if (label2) text(`${id}:label`, label2, options.horizontal && options.image ? { x: rect.width * 0.25, y: 0, width: rect.width * 0.74, height: rect.height } : { x: 4 * scale, y: options.image ? rect.height - captionHeight : (rect.height - captionHeight) / 2, width: rect.width - 8 * scale, height: captionHeight }, Math.max(13, 18 * scale), options.textColor ?? ink, "center", id);
+      const base = options.background ?? (options.selected && !normal ? [0, 0.65, 0.7, 0.32] : transparent);
+      if (!normal && (options.background || options.selected)) ui_set_style(id, JSON.stringify({ background: base, ...options.background ? { borderRadius: 6 } : {} }));
       const slices = menuData.images[normal]?.slices?.flatMap((path, index) => path ? [{ id: `${id}:face:slice-${index}`, normal: path, focused: menuData.images[focused2]?.slices?.[index] || path }] : []);
       host.register({
         id,
@@ -1323,7 +1338,7 @@
           const index = courses.findIndex((course) => course.id === id2);
           return index < 0 ? courses.length : index;
         };
-        return menuData.tracks.filter((track) => (currentPage === "tracks_and_gp" ? sceneFor(track.id) : !track.internal && track.id !== "overworld") && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => priority(a.id) - priority(b.id)).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name) + (currentPage === "tracks_and_gp" && !courseFor(track.id) ? tr(" \xB7 3D Scene", " \xB7 3D \u573A\u666F") : ""), image: track.image, selected: track.id === m.track }));
+        return menuData.tracks.filter((track) => (currentPage === "tracks_and_gp" ? sceneFor(track.id) : !track.internal && track.id !== "overworld") && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => priority(a.id) - priority(b.id)).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name) + (!mobile2 && currentPage === "tracks_and_gp" && !courseFor(track.id) ? tr(" \xB7 3D Scene", " \xB7 3D \u573A\u666F") : ""), image: track.image, selected: track.id === m.track }));
       }
       if (id === "players") return m.profiles.map((name, index) => ({ id: `profile:${index}`, text: name === "Player" ? tr("Player", "\u73A9\u5BB6") : name, image: trackData.karts[index % trackData.karts.length].icon, selected: m.player === index }));
       if (id === "resolutions") return ["1280 \xD7 720", "1600 \xD7 900", "1920 \xD7 1080"].map((label2) => ({ id: `resolution:${label2}`, text: label2, selected: label2 === (m.values["resolution"] ?? "1280 \xD7 720") }));
@@ -1331,7 +1346,7 @@
     }
     function rows(id, currentPage) {
       if (id === "language") return [{ id: "language:system", text: tr("System Language (default)", "\u7CFB\u7EDF\u8BED\u8A00\uFF08\u9ED8\u8BA4\uFF09"), selected: session2.settings.language === "system" }, { id: "language:en-US", text: "English", selected: session2.settings.language === "en-US" }, { id: "language:zh-CN", text: "\u7B80\u4F53\u4E2D\u6587", selected: session2.settings.language === "zh-CN" }];
-      if (id === "devices") return [...mobile2 ? [{ id: "device:touch", text: tr("Touchscreen \xB7 Virtual joystick", "\u89E6\u6478\u5C4F \xB7 \u865A\u62DF\u6447\u6746"), image: "gui/icons/options_input.png" }] : [], { id: "device:keyboard", text: tr("Keyboard 0", "\u952E\u76D8 0"), image: "gui/icons/options_input.png" }];
+      if (id === "devices") return [...mobile2 ? [{ id: "device:touch", text: tr("Touchscreen \xB7 Driving controls", "\u89E6\u6478\u5C4F \xB7 \u9A7E\u9A76\u63A7\u5236"), image: "gui/icons/options_input.png" }] : [], { id: "device:keyboard", text: tr("Keyboard 0", "\u952E\u76D8 0"), image: "gui/icons/options_input.png" }];
       if (id === "actions") return [["Accelerate", "\u2191"], ["Brake", "\u2193"], ["Steer Left", "\u2190"], ["Steer Right", "\u2192"], ["Fire", "Space"], ["Nitro", "N"], ["Drift", "V"], ["Rescue", "Backspace"], ["Look Back", "B"]].map(([name, key]) => ({ id: `binding:${name}`, text: `${sourceText(name)}                         ${key}` }));
       if (id === "achievements_list") return menuData.achievements.map((item, index) => ({ id: `achievement:${index}`, text: `${sourceText(item.name)}                           0%` }));
       if (id === "tracks" && currentPage === "edit_gp") return m.draftTracks.map((id2, index) => ({ id: `draft-row:${index}`, text: `${index + 1}.  ${sourceText(menuData.tracks.find((track) => track.id === id2)?.name ?? id2)}`, selected: m.selectedRow === index }));
@@ -1344,7 +1359,7 @@
     }
     function labelValue(id, fallback, currentPage) {
       if (mobile2 && currentPage === "options_input" && id === "help1") return tr("Tap a device to view its controls.", "\u70B9\u51FB\u8BBE\u5907\u67E5\u770B\u64CD\u4F5C\u65B9\u5F0F\u3002");
-      if (mobile2 && currentPage === "options_input" && id === "help2") return tr("Drag the virtual joystick to drive. Combine it with the action buttons using another finger.", "\u62D6\u52A8\u865A\u62DF\u6447\u6746\u9A7E\u9A76\uFF0C\u53E6\u4E00\u6839\u624B\u6307\u53EF\u540C\u65F6\u64CD\u4F5C\u6280\u80FD\u6309\u94AE\u3002");
+      if (mobile2 && currentPage === "options_input" && id === "help2") return tr("Hold either arrow to steer. Use another finger for the action buttons.", "\u6309\u4F4F\u5DE6\u53F3\u65B9\u5411\u952E\u8F6C\u5411\uFF0C\u53E6\u4E00\u6839\u624B\u6307\u53EF\u540C\u65F6\u64CD\u4F5C\u6280\u80FD\u6309\u94AE\u3002");
       if (m.dialog && id === "title") return m.dialog.title;
       if (id === "name" && currentPage === "gp_info") {
         const name = menuData.grandPrix.find((gp) => gp.id === m.grandPrix)?.name;
@@ -1537,7 +1552,17 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       if (list.length > capacity) pagination(id, r, Math.ceil(list.length / capacity));
     }
     function pagination(id, r, total) {
-      const pageNumber = m.listPages[id] ?? 0, side = 26 * scale, y = r.y + r.height - side;
+      const touchPager = id.startsWith("mobile-tracks:");
+      const pageNumber = m.listPages[id] ?? 0, side = touchPager ? 44 : 26 * scale, y = r.y + r.height - side;
+      if (touchPager) {
+        const x = r.x + r.width - side;
+        for (const direction of [-1, 1]) button2(`${id}:page-${direction}`, { x: x - (direction < 0 ? 100 : 0), y, width: side, height: side }, direction < 0 ? "\u2039" : "\u203A", () => {
+          m.listPages[id] = (pageNumber + direction + total) % total;
+          changed();
+        });
+        text(`${id}:page-number`, `${pageNumber + 1}/${total}`, { x: x - 56, y, width: 56, height: side }, 14, mobileText);
+        return;
+      }
       for (const direction of [-1, 1]) button2(`${id}:page-${direction}`, { x: r.x + r.width - (direction < 0 ? 110 : 30) * scale, y, width: side, height: side }, direction < 0 ? "\u2039" : "\u203A", () => {
         m.listPages[id] = (pageNumber + direction + total) % total;
         changed();
@@ -1564,15 +1589,20 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       const rect = (x, y, width, height) => ({ x: r.x + x, y: r.y + y, width, height });
       const gp = menuData.grandPrix.find((entry) => entry.id === m.grandPrix);
       const title = page === "gp_info" ? sourceText(gp?.name ?? "Grand Prix") : page === "touch_controls" ? tr("Touch Controls", "\u89E6\u63A7\u64CD\u4F5C") : page === "karts" ? tr("Choose a Kart", "\u9009\u62E9\u8D5B\u8F66") : page === "race_setup" ? sourceText("Race Setup") : page === "tracks_and_gp" ? tr("Choose a Track", "\u9009\u62E9\u8D5B\u9053") : sourceText(m.selectedTrack.name);
-      text("mobile-page-title", title, rect(56, 0, r.width - 112, 42), 24, blue);
-      button2(menuWidgetId(page, "back"), rect(0, 0, 48, 44), "", action("back"), { image: "gui/icons/back.png", normal: "" });
-      const card = (item, bounds) => button2(menuWidgetId(page, item.id), bounds, item.text, action(item.id), { image: item.image, selected: item.selected, normal: "" });
+      spawn("mobile-page-surface", "node", "root", { ...position(rect(0, 0, r.width, page === "karts" ? 48 : r.height)), background: mobileSurface, borderRadius: 10 });
+      text("mobile-page-title", title, rect(56, 0, r.width - 112, 42), 24, mobileText);
+      button2(menuWidgetId(page, "back"), rect(0, 0, 48, 44), "", action("back"), { image: "gui/icons/back.png", normal: "", background: mobileCard });
+      const card = (item, bounds) => button2(menuWidgetId(page, item.id), bounds, item.text, action(item.id), {
+        image: item.image,
+        normal: "",
+        background: item.selected ? mobileSelection : mobileCard,
+        textColor: mobileText
+      });
       if (page === "touch_controls") {
-        skinPicture("touch-controls-panel", skin("glass_section"), rect(0, 52, r.width, r.height - 52), scale);
         button2(menuWidgetId(page, "steering-assist"), rect(18, 60, Math.min(360, r.width - 36), 44), session2.settings.steeringAssist ? tr("Steering assist: On", "\u8F85\u52A9\u8F6C\u5411\uFF1A\u5F00\u542F") : tr("Steering assist: Off", "\u8F85\u52A9\u8F6C\u5411\uFF1A\u5173\u95ED"), action("steering-assist"), { selected: session2.settings.steeringAssist });
         const rules = [tr("Automatic acceleration. Hold an arrow to steer, or slide between arrows.", "\u81EA\u52A8\u52A0\u901F\uFF1B\u6309\u4F4F\u5DE6\u53F3\u952E\u8F6C\u5411\uFF0C\u53EF\u5728\u4E24\u952E\u95F4\u6ED1\u52A8\u3002"), tr("Hold Drift while turning; press it on a straight to brake without reversing.", "\u8F6C\u5F2F\u65F6\u6309\u4F4F\u6F02\u79FB\uFF1B\u76F4\u7EBF\u65F6\u6309\u4E0B\u5239\u8F66\uFF0C\u505C\u8F66\u540E\u4E0D\u4F1A\u5012\u8F66\u3002"), tr("Release a charged drift for a boost. Hold Nitro to accelerate further.", "\u677E\u5F00\u5DF2\u84C4\u529B\u7684\u6F02\u79FB\u53EF\u52A0\u901F\uFF1B\u6309\u4F4F\u6C2E\u6C14\u6301\u7EED\u52A0\u901F\u3002"), tr("Tap Fire or Rescue once; hold Rear. Manual steering overrides assist.", "\u70B9\u51FB\u9053\u5177\u6216\u6551\u63F4\u89E6\u53D1\u4E00\u6B21\uFF0C\u6309\u4F4F\u56DE\u770B\uFF1B\u624B\u52A8\u8F6C\u5411\u4F18\u5148\u4E8E\u8F85\u52A9\u3002"), tr("Pause stops the race. Release your fingers before resuming.", "\u6682\u505C\u4F1A\u505C\u6B62\u6BD4\u8D5B\uFF0C\u6062\u590D\u524D\u8BF7\u5148\u677E\u5F00\u624B\u6307\u3002")];
         rules.forEach((rule, index) => {
-          text(`touch-control-rule-${index}`, rule, rect(18, 112 + index * (r.height - 120) / rules.length, r.width - 36, (r.height - 120) / rules.length), 17, ink, "left");
+          text(`touch-control-rule-${index}`, rule, rect(18, 112 + index * (r.height - 120) / rules.length, r.width - 36, (r.height - 120) / rules.length), 17, mobileText, "left");
         });
       } else if (page === "karts") {
         const height = Math.min(112, r.height * 0.33), width = Math.min(150, r.width / 5);
@@ -1580,7 +1610,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
           card(item, rect((r.width - width * 4) / 2 + index * width, r.height - height, width - 8, height));
         });
         button2(menuWidgetId(page, "continue"), rect(r.width - 110, 0, 110, 44), tr("Continue", "\u7EE7\u7EED"), action("continue"));
-        host.focus(menuWidgetId(page, `choose-${session2.settings.kartId}`));
+        host.focus(menuWidgetId(page, "continue"));
       } else if (page === "race_setup") {
         const names = ["Novice", "Intermediate", "Expert", "SuperTux"], ids = ["novice", "intermediate", "expert", "best"], icons = ["easy", "medium", "hard", "best"];
         const difficultyHeight = Math.min(92, r.height * 0.27);
@@ -1589,55 +1619,67 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
         });
         const y = 52 + difficultyHeight, height = (r.height - y) / 2;
         items("gamemode", page).forEach((item, index) => {
-          card(item, rect(r.width / 4 * (index % 4) + 4, y + Math.floor(index / 4) * height, r.width / 4 - 8, height - 4));
+          const mode = modeChoices[index][0];
+          const name = mode === "follow" ? tr("Follow the Leader", "\u8DDF\u968F\u9886\u8DD1\u8005") : mode === "ghost" ? tr("Ghost Replay", "\u5E7D\u7075\u56DE\u653E") : item.text;
+          const label2 = mode === "normal" || mode === "time-trial" ? name : name + tr(" \xB7 Preview", " \xB7 \u9884\u89C8");
+          card({ ...item, text: label2 }, rect(r.width / 4 * (index % 4) + 4, y + Math.floor(index / 4) * height, r.width / 4 - 8, height - 4));
         });
         host.focus(menuWidgetId(page, `mode-${session2.settings.mode}`));
       } else if (page === "tracks_and_gp") {
-        const gpHeight = Math.min(84, r.height * 0.24);
-        text("mobile-gp-heading", tr("Grand Prix \xB7 Preview", "\u5927\u5956\u8D5B \xB7 \u9884\u89C8"), rect(4, 44, r.width - 8, 20), 15, ink, "left");
-        items("gps", page).forEach((item, index) => {
-          card(item, rect(index * r.width / 4 + 4, 66, r.width / 4 - 8, gpHeight));
+        const labels2 = [tr("Race Tracks", "\u6BD4\u8D5B\u8D5B\u9053"), tr("3D Scenes", "3D \u573A\u666F"), tr("Grand Prix \xB7 Preview", "\u5927\u5956\u8D5B \xB7 \u9884\u89C8")];
+        const sectionWidth = Math.min(190, (r.width - 24) / 3), sectionLeft = (r.width - sectionWidth * 3) / 2;
+        trackSections.forEach((section, index) => {
+          button2(menuWidgetId(page, `track-section:${section}`), rect(sectionLeft + index * sectionWidth + 4, 49, sectionWidth - 8, 44), labels2[index], action(`track-section:${section}`), {
+            normal: "",
+            background: m.trackSection === section ? mobileSelection : mobileCard,
+            textColor: mobileText
+          });
         });
-        const list = items("tracks", page), columns = Math.max(3, Math.min(5, Math.floor(r.width / 160))), capacity = columns * 2, key = "mobile-tracks";
+        const isGp = m.trackSection === "grand-prix";
+        const list = isGp ? items("gps", page) : items("tracks", page).filter((item) => !!courseFor(item.id.slice(6)) === (m.trackSection === "races"));
+        const columns = isGp ? 4 : Math.max(3, Math.min(5, Math.floor(r.width / 154)));
+        const rows2 = isGp || r.height < 248 ? 1 : 2, capacity = columns * rows2;
+        const key = `mobile-tracks:${m.trackSection}`;
         const total = Math.max(1, Math.ceil(list.length / capacity)), number = Math.min(m.listPages[key] ?? 0, total - 1);
         m.listPages[key] = number;
-        text("mobile-track-heading", tr("Tracks & 3D Scenes", "\u8D5B\u9053\u4E0E 3D \u573A\u666F"), rect(4, gpHeight + 68, r.width - 8, 20), 15, ink, "left");
-        const y = gpHeight + 90, height = Math.max(44, (r.height - y - 30) / 2);
-        list.slice(number * capacity, (number + 1) * capacity).forEach((item, index) => {
-          card(item, rect(index % columns * r.width / columns + 4, y + Math.floor(index / columns) * height, r.width / columns - 8, height - 4));
+        const y = 101, height = Math.max(49, (r.height - y - (total > 1 ? 49 : 4)) / rows2);
+        const visible = list.slice(number * capacity, (number + 1) * capacity);
+        visible.forEach((item, index) => {
+          card(item, rect(index % columns * r.width / columns + 4, y + Math.floor(index / columns) * height, r.width / columns - 8, height - 5));
         });
-        pagination(key, r, total);
-        host.focus(menuWidgetId(page, `track:${m.track}`));
+        if (total > 1) pagination(key, r, total);
+        host.focus(menuWidgetId(page, visible.find((item) => item.selected)?.id ?? visible[0]?.id ?? `track-section:${m.trackSection}`));
       } else if (page === "gp_info") {
         const tracks = (gp?.tracks ?? []).map((id) => menuData.tracks.find((track) => track.id === id)).filter((track) => !!track);
         const left = r.width * 0.5, right = left + 20, column = r.width - right;
         if (tracks[0]) picture("mobile-gp-preview", tracks[0].image, rect(0, 56, left, Math.max(80, r.height - 130)));
-        text("mobile-gp-tracks", tracks.map((track) => sourceText(track.name)).join(" \xB7 "), rect(0, r.height - 68, left, 60), 15);
-        text("mobile-gp-note", tr("Grand Prix menu preview. Choose a track to play a single race.", "\u5927\u5956\u8D5B\u83DC\u5355\u9884\u89C8\u3002\u53EF\u9009\u8D5B\u9053\u5F00\u59CB\u5355\u573A\u6BD4\u8D5B\u3002"), rect(right, 60, column, Math.max(70, r.height - 180)), 18, ink, "left");
+        text("mobile-gp-tracks", tracks.map((track) => sourceText(track.name)).join(" \xB7 "), rect(0, r.height - 68, left, 60), 15, mobileText);
+        text("mobile-gp-note", tr("Grand Prix menu preview. Choose a track to play a single race.", "\u5927\u5956\u8D5B\u83DC\u5355\u9884\u89C8\u3002\u53EF\u9009\u8D5B\u9053\u5F00\u59CB\u5355\u573A\u6BD4\u8D5B\u3002"), rect(right, 60, column, Math.max(70, r.height - 180)), 18, mobileText, "left");
         button2(menuWidgetId(page, "start"), rect(right, r.height - 112, column, 44), tr("Grand Prix Preview", "\u5927\u5956\u8D5B\u9884\u89C8"), action("start"));
         button2(menuWidgetId(page, "single-race"), rect(right, r.height - 56, column, 48), singleRaceLabel, action("single-race"));
       } else {
         const left = r.width * 0.43, right = left + 20, column = r.width - right;
-        picture("mobile-track-preview", m.selectedTrack.image, rect(0, 56, left, Math.max(70, r.height - 110)));
+        const compact = playableTrack && r.height < 294, rowPitch = compact ? 46 : 52;
+        picture("mobile-track-preview", m.selectedTrack.image, rect(0, 56, left, Math.max(70, r.height - (compact ? 138 : 110))));
         if (!playableTrack) {
           if (viewableScene) {
             host.resourceStatus(rect(right, r.height - 88, column, 32));
             button2(menuWidgetId(page, "view-scene"), rect(right, r.height - 52, column, 48), viewSceneLabel, host.viewScene);
-          } else text("mobile-track-preview-note", previewNote, rect(right, 56, column, Math.max(70, r.height - 110)), 16);
+          } else text("mobile-track-preview-note", previewNote, rect(right, 56, column, Math.max(70, r.height - 110)), 16, mobileText);
           return true;
         }
-        text("mobile-track-best", session2.best > 0 ? `${tr("Best time", "\u6700\u4F73\u6210\u7EE9")}  ${formatTime(session2.best)}` : tr("No high score yet", "\u6682\u65E0\u6700\u9AD8\u6210\u7EE9"), rect(0, r.height - 48, left, 40), 16);
+        text("mobile-track-best", session2.best > 0 ? `${tr("Best time", "\u6700\u4F73\u6210\u7EE9")}  ${formatTime(session2.best)}` : tr("No high score yet", "\u6682\u65E0\u6700\u9AD8\u6210\u7EE9"), rect(0, r.height - (compact ? 78 : 48), left, 40), 16, mobileText);
         const spinner = (id, label2, y) => {
-          text(`mobile-${id}-label`, label2, rect(right, y, column * 0.48, 44), 16, ink, "left");
-          drawSpinner(menuWidgetId(page, id), id, { tag: "spinner", attributes: { min_value: "0", max_value: "20" }, children: [] }, rect(right + column * 0.48, y, column * 0.52, 44));
+          text(`mobile-${id}-label`, label2, rect(right, y, column * 0.48, 44), 16, mobileText, "left");
+          drawSpinner(menuWidgetId(page, id), id, { tag: "spinner", attributes: { min_value: "0", max_value: id === "ai-spinner" ? "3" : "20" }, children: [] }, rect(right + column * 0.48, y, column * 0.52, 44));
         };
-        spinner("target-value-spinner", tr("Number of laps", "\u5708\u6570"), 56);
-        if (m.raceMode !== "time-trial") spinner("ai-spinner", tr("AI karts", "AI \u8D5B\u8F66"), 108);
-        button2(menuWidgetId(page, "option"), rect(right, 162, column, 44), `${session2.settings.reverse ? "\u2611" : "\u2610"} ${tr("Reverse track", "\u53CD\u5411\u8D5B\u9053")}`, () => {
+        spinner("target-value-spinner", tr("Number of laps", "\u5708\u6570"), 54);
+        if (m.raceMode !== "time-trial") spinner("ai-spinner", tr("AI karts", "AI \u8D5B\u8F66"), 54 + rowPitch);
+        button2(menuWidgetId(page, "option"), rect(right, 54 + rowPitch * (m.raceMode === "time-trial" ? 1 : 2), column, 44), session2.settings.reverse ? tr("Reverse track \xB7 On", "\u53CD\u5411\u8D5B\u9053 \xB7 \u5F00") : tr("Reverse track \xB7 Off", "\u53CD\u5411\u8D5B\u9053 \xB7 \u5173"), () => {
           session2.settings.reverse = !session2.settings.reverse;
           changed();
         });
-        host.resourceStatus(rect(right, r.height - 88, column, 32));
+        host.resourceStatus(compact ? rect(0, r.height - 37, left, 32) : rect(right, r.height - 88, column, 32));
         button2(menuWidgetId(page, "start"), rect(right, r.height - 52, column, 48), tr("Start Race", "\u5F00\u59CB\u6BD4\u8D5B"), action("start"));
       }
       return true;
@@ -1674,6 +1716,16 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     if (m.dialog) {
       spawn("menu-dialog-shade", "node", "root", { position: "absolute", left: 0, top: 0, width: "100%", height: "100%", background: [0, 0, 0, 0.55] });
       host.modal();
+      if (mobile2 && m.dialog.purpose === "preview") {
+        const width = Math.min(420, safeRect.width - 24), height = 150;
+        const x = safeRect.x + (safeRect.width - width) / 2, y = safeRect.y + (safeRect.height - height) / 2;
+        spawn("menu-dialog-frame", "node", "root", { ...position({ x, y, width, height }), background: mobileSurface, borderRadius: 12 });
+        text("menu-dialog-message", m.dialog.title, { x: x + 16, y: y + 12, width: width - 32, height: 74 }, 18, mobileText);
+        const id = menuWidgetId(m.dialog.page, "ok");
+        button2(id, { x: x + width / 2 - 76, y: y + 92, width: 152, height: 44 }, tr("OK", "\u77E5\u9053\u4E86"), action("ok"));
+        host.focus(id);
+        return true;
+      }
       const large = ["custom_video_settings", "custom_camera_settings", "select_challenge"].includes(m.dialog.page);
       const marginX = mobile2 ? 0.03 : large ? 0.1 : 0.2, marginY = mobile2 ? 0.03 : large ? 0.1 : 0.18;
       const r = { x: safeRect.x + safeRect.width * marginX, y: safeRect.y + safeRect.height * marginY, width: safeRect.width * (1 - marginX * 2), height: safeRect.height * (1 - marginY * 2) };
@@ -1812,8 +1864,8 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
         if (button2.face.slices) for (const slice of button2.face.slices) ui_set_image(slice.id, active ? slice.focused : slice.normal);
         else ui_set_image(button2.face.id, active ? button2.face.focused || button2.face.normal : button2.face.normal);
         if (button2.caption) {
-          const c = button2.caption;
-          ui_set_text(c.id, c.text, c.size, active ? 1 : 0, active ? 1 : 0, active ? 1 : 0, 1);
+          const c = button2.caption, channel = active && !dimensions.mobile ? 1 : 0;
+          ui_set_text(c.id, c.text, c.size, channel, channel, channel, 1);
         }
       } else if (button2.icon) ui_set_image(`${button2.id}-icon`, i === focus ? button2.focusIcon ?? button2.icon : button2.icon);
       else style(button2.id, { background: i === focus ? [0.52, 0.3, 0.045, 0.95] : button2.base });
@@ -1928,7 +1980,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     const racing = screen === "race" || screen === "paused" || screen === "finished" || (screen === "options" || screen === "help") && session2.returnScreen === "paused";
     if (!racing && screen !== "kart") {
       image("menu-background", "root", "ui/background.jpg", { position: "absolute", width: "100%", height: "100%", imageMode: "stretch" });
-    } else if (racing) mountRaceHud(session2, layout2, mobile2, changed);
+    } else if (racing && (!mobile2 || screen === "race")) mountRaceHud(session2, layout2, mobile2, changed);
     if (screen === "race") {
       performanceLabel();
       updateHud(session2);
@@ -1949,9 +2001,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
         session2.screen = "race";
       }), { width: "24%" }, "ui/back.png");
       button("restart-race", "pause-panel", tr("Restart Race", "\u91CD\u65B0\u6BD4\u8D5B"), start, { width: "24%" }, "ui/restart.png");
-      button("new-race", "pause-panel", tr("New Race", "\u65B0\u7684\u6BD4\u8D5B"), act(() => {
-        session2.screen = "kart";
-      }), { width: "24%" }, "ui/menu_race.png");
+      button("new-race", "pause-panel", tr("New Race", "\u65B0\u7684\u6BD4\u8D5B"), act(() => session2.chooseNewRace()), { width: "24%" }, "ui/menu_race.png");
       button("leave-race", "pause-panel", tr("Exit to Menu", "\u8FD4\u56DE\u4E3B\u83DC\u5355"), act(() => {
         session2.screen = "main";
       }), { width: "24%" }, "ui/main_quit.png");
@@ -1965,9 +2015,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       label("lap-splits", "results-panel", session2.race.lapTimes.map((time, index) => `${tr("Lap", "\u5708")} ${index + 1}: ${formatTime(time)}`).join("    "), 18);
       node("result-actions", "results-panel", { flexDirection: "row", gap: 20 });
       button("race-again", "result-actions", tr("Race Again", "\u518D\u6765\u4E00\u5C40"), start, { height: 54 });
-      button("choose-new-race", "result-actions", tr("New Race", "\u65B0\u7684\u6BD4\u8D5B"), act(() => {
-        session2.screen = "kart";
-      }), { height: 54 });
+      button("choose-new-race", "result-actions", tr("New Race", "\u65B0\u7684\u6BD4\u8D5B"), act(() => session2.chooseNewRace()), { height: 54 });
       button("result-menu", "result-actions", tr("Main Menu", "\u4E3B\u83DC\u5355"), act(() => {
         session2.screen = "main";
       }), { height: 54 });
@@ -2181,6 +2229,11 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     open(screen) {
       this.returnScreen = this.screen;
       this.openMenu(screen === "options" ? "options_audio" : "help1", screen);
+    }
+    chooseNewRace() {
+      this.screen = "main";
+      this.menu.show("");
+      this.openMenu("karts", "kart");
     }
     openMenu(page, screen = "menu") {
       if (this.screen === "main") this.menuHistory = [];

@@ -53,6 +53,10 @@ export class PcSession {
     this.screen = this.screen === "options" || this.screen === "help" || this.screen === "notice" || this.screen === "downloading" ? this.returnScreen : previous[this.screen] ?? "main";
   }
   open(screen: "options" | "help"): void { this.returnScreen = this.screen; this.openMenu(screen === "options" ? "options_audio" : "help1", screen); }
+  chooseNewRace(): void {
+    this.screen = "main"; this.menu.show("");
+    this.openMenu("karts", "kart");
+  }
   openMenu(page: string, screen: Screen = "menu"): void {
     if (this.screen === "main") this.menuHistory = [];
     this.menuHistory.push({ screen: this.screen, page: this.menu.page }); this.menu.close(); this.screen = screen; this.menu.show(page);

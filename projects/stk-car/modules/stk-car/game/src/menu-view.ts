@@ -4,7 +4,7 @@ import { resources } from "./resources.js";
 import { menuData } from "./menu-data.js";
 import type { GuiNode } from "./menu-data-types.js";
 import { menuAction, menuPageFor } from "./menu-actions.js";
-import { modeChoices, optionPages, optionTabs } from "./menu-state.js";
+import { modeChoices, optionPages, optionTabs, trackSections } from "./menu-state.js";
 import { isChinese, sourceText, tr } from "./localization.js";
 import { formatTime } from "./race.js";
 import type { PcSession } from "./session.js";
@@ -21,6 +21,8 @@ export interface MenuButton {
 export interface MenuHost { register(button: MenuButton): void; modal(): void; focus(id: string): void; resourceStatus(rect: Rect): void; viewScene(): void; }
 export const menuWidgetId = (page: string, id: string): string => `gui:${page}:${id}`;
 const transparent = [0, 0, 0, 0], ink = [0, 0, 0, 1], blue = [0, 0, 0.7, 1];
+const mobileText = [0.96, 0.96, 0.92, 1], mobileSurface = [0.06, 0.09, 0.13, 0.97];
+const mobileCard = [0.11, 0.16, 0.22, 0.95], mobileSelection = [0.19, 0.33, 0.40, 0.98];
 // Classic stkskin.xml text_field colors; STK edit boxes use solid fills, not button textures.
 export const textFieldColors = { border: [138 / 255, 138 / 255, 138 / 255, 1], focus: [243 / 255, 164 / 255, 80 / 255, 1], background: [200 / 255, 200 / 255, 200 / 255, 1], editing: [236 / 255, 226 / 255, 201 / 255, 1] };
 const containerTags = new Set(["stkgui", "div", "box", "bottombar"]);
@@ -80,22 +82,23 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   const { rect: safeRect, scale } = menuGeometry(layout);
   const counts = new Map<string, number>();
   const uid = (key: string) => { const count = counts.get(key) ?? 0; counts.set(key, count + 1); return count ? `${key}:${count}` : key; };
-  const action = (id: string) => () => { m.editing = ""; menuAction(session, id, changed, start); };
+  const action = (id: string) => () => { m.editing = ""; menuAction(session, id, changed, start, mobile); };
 
-  function button(id: string, rect: Rect, label: string, click: () => void, options: { image?: string; normal?: string; focused?: string; selected?: boolean; horizontal?: boolean } = {}): void {
+  function button(id: string, rect: Rect, label: string, click: () => void, options: { image?: string; normal?: string; focused?: string; selected?: boolean; horizontal?: boolean; background?: number[]; textColor?: number[] } = {}): void {
     spawn(id, "button", "root", { ...position(rect), background: transparent });
     const normal = options.normal ?? skin("glassbutton"), focused = options.focused ?? skin("glassbutton_focused");
     if (normal) skinPicture(`${id}:face`, normal, { x: 0, y: 0, width: rect.width, height: rect.height }, scale, id);
-    const captionHeight = label ? Math.min(rect.height * (options.image && !options.horizontal ? 0.31 : 1), 42 * scale) : 0;
+    const captionHeight = label ? options.background && options.image ? Math.min(rect.height * 0.44, Math.max(32, 42 * scale))
+      : Math.min(rect.height * (options.image && !options.horizontal ? 0.31 : 1), 42 * scale) : 0;
     if (options.image) {
       const imageRect = options.horizontal ? { x: 6 * scale, y: 3 * scale, width: Math.min(rect.height - 6 * scale, rect.width * 0.28), height: rect.height - 6 * scale }
         : { x: 4 * scale, y: 2 * scale, width: rect.width - 8 * scale, height: rect.height - captionHeight - 4 * scale };
       picture(`${id}:icon`, options.image, imageRect, false, id);
     }
     if (label) text(`${id}:label`, label, options.horizontal && options.image ? { x: rect.width * 0.25, y: 0, width: rect.width * 0.74, height: rect.height }
-      : { x: 4 * scale, y: rect.height - captionHeight, width: rect.width - 8 * scale, height: captionHeight }, Math.max(13, 18 * scale), ink, "center", id);
-    const base = options.selected && !normal ? [0, 0.65, 0.7, 0.32] : transparent;
-    if (!normal && options.selected) ui_set_style(id, JSON.stringify({ background: base }));
+      : { x: 4 * scale, y: options.image ? rect.height - captionHeight : (rect.height - captionHeight) / 2, width: rect.width - 8 * scale, height: captionHeight }, Math.max(13, 18 * scale), options.textColor ?? ink, "center", id);
+    const base = options.background ?? (options.selected && !normal ? [0, 0.65, 0.7, 0.32] : transparent);
+    if (!normal && (options.background || options.selected)) ui_set_style(id, JSON.stringify({ background: base, ...(options.background ? { borderRadius: 6 } : {}) }));
     const slices = menuData.images[normal]?.slices?.flatMap((path, index) => path ? [{ id: `${id}:face:slice-${index}`, normal: path, focused: menuData.images[focused]?.slices?.[index] || path }] : []);
     host.register({ id, action: click, base, face: normal ? { id: `${id}:face`, normal: sourceImage(normal), focused: sourceImage(focused), selected: !!options.selected, slices } : undefined,
       caption: label ? { id: `${id}:label:text`, text: label, size: Math.max(13, 18 * scale) } : undefined });
@@ -110,7 +113,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       const gp = currentPage === "grand_prix_editor" || currentPage === "gp_info" ? menuData.grandPrix.find((gp) => gp.id === m.grandPrix) : undefined;
       const query = m.fields[`${currentPage}:search`]?.toLocaleLowerCase() ?? "";
       const priority = (id: string) => { const index = courses.findIndex((course) => course.id === id); return index < 0 ? courses.length : index; };
-      return menuData.tracks.filter((track) => (currentPage === "tracks_and_gp" ? sceneFor(track.id) : !track.internal && track.id !== "overworld") && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => priority(a.id) - priority(b.id)).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name) + (currentPage === "tracks_and_gp" && !courseFor(track.id) ? tr(" · 3D Scene", " · 3D 场景") : ""), image: track.image, selected: track.id === m.track }));
+      return menuData.tracks.filter((track) => (currentPage === "tracks_and_gp" ? sceneFor(track.id) : !track.internal && track.id !== "overworld") && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => priority(a.id) - priority(b.id)).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name) + (!mobile && currentPage === "tracks_and_gp" && !courseFor(track.id) ? tr(" · 3D Scene", " · 3D 场景") : ""), image: track.image, selected: track.id === m.track }));
     }
     if (id === "players") return m.profiles.map((name, index) => ({ id: `profile:${index}`, text: name === "Player" ? tr("Player", "玩家") : name, image: trackData.karts[index % trackData.karts.length].icon, selected: m.player === index }));
     if (id === "resolutions") return ["1280 × 720", "1600 × 900", "1920 × 1080"].map((label) => ({ id: `resolution:${label}`, text: label, selected: label === (m.values["resolution"] ?? "1280 × 720") }));
@@ -118,7 +121,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   }
   function rows(id: string, currentPage: string): Item[] {
     if (id === "language") return [{ id: "language:system", text: tr("System Language (default)", "系统语言（默认）"), selected: session.settings.language === "system" }, { id: "language:en-US", text: "English", selected: session.settings.language === "en-US" }, { id: "language:zh-CN", text: "简体中文", selected: session.settings.language === "zh-CN" }];
-    if (id === "devices") return [...(mobile ? [{ id: "device:touch", text: tr("Touchscreen · Virtual joystick", "触摸屏 · 虚拟摇杆"), image: "gui/icons/options_input.png" }] : []), { id: "device:keyboard", text: tr("Keyboard 0", "键盘 0"), image: "gui/icons/options_input.png" }];
+    if (id === "devices") return [...(mobile ? [{ id: "device:touch", text: tr("Touchscreen · Driving controls", "触摸屏 · 驾驶控制"), image: "gui/icons/options_input.png" }] : []), { id: "device:keyboard", text: tr("Keyboard 0", "键盘 0"), image: "gui/icons/options_input.png" }];
     if (id === "actions") return [["Accelerate", "↑"], ["Brake", "↓"], ["Steer Left", "←"], ["Steer Right", "→"], ["Fire", "Space"], ["Nitro", "N"], ["Drift", "V"], ["Rescue", "Backspace"], ["Look Back", "B"]].map(([name, key]) => ({ id: `binding:${name}`, text: `${sourceText(name)}                         ${key}` }));
     if (id === "achievements_list") return menuData.achievements.map((item, index) => ({ id: `achievement:${index}`, text: `${sourceText(item.name)}                           0%` }));
     if (id === "tracks" && currentPage === "edit_gp") return m.draftTracks.map((id, index) => ({ id: `draft-row:${index}`, text: `${index + 1}.  ${sourceText(menuData.tracks.find((track) => track.id === id)?.name ?? id)}`, selected: m.selectedRow === index }));
@@ -131,7 +134,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   }
   function labelValue(id: string, fallback: string, currentPage: string): string {
     if (mobile && currentPage === "options_input" && id === "help1") return tr("Tap a device to view its controls.", "点击设备查看操作方式。");
-    if (mobile && currentPage === "options_input" && id === "help2") return tr("Drag the virtual joystick to drive. Combine it with the action buttons using another finger.", "拖动虚拟摇杆驾驶，另一根手指可同时操作技能按钮。");
+    if (mobile && currentPage === "options_input" && id === "help2") return tr("Hold either arrow to steer. Use another finger for the action buttons.", "按住左右方向键转向，另一根手指可同时操作技能按钮。");
     if (m.dialog && id === "title") return m.dialog.title;
     if (id === "name" && currentPage === "gp_info") {
       const name = menuData.grandPrix.find((gp) => gp.id === m.grandPrix)?.name;
@@ -280,7 +283,14 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     if (list.length > capacity) pagination(id, r, Math.ceil(list.length / capacity));
   }
   function pagination(id: string, r: Rect, total: number): void {
-    const pageNumber = m.listPages[id] ?? 0, side = 26 * scale, y = r.y + r.height - side;
+    const touchPager = id.startsWith("mobile-tracks:");
+    const pageNumber = m.listPages[id] ?? 0, side = touchPager ? 44 : 26 * scale, y = r.y + r.height - side;
+    if (touchPager) {
+      const x = r.x + r.width - side;
+      for (const direction of [-1, 1]) button(`${id}:page-${direction}`, { x: x - (direction < 0 ? 100 : 0), y, width: side, height: side }, direction < 0 ? "‹" : "›", () => { m.listPages[id] = (pageNumber + direction + total) % total; changed(); });
+      text(`${id}:page-number`, `${pageNumber + 1}/${total}`, { x: x - 56, y, width: 56, height: side }, 14, mobileText);
+      return;
+    }
     for (const direction of [-1, 1]) button(`${id}:page-${direction}`, { x: r.x + r.width - (direction < 0 ? 110 : 30) * scale, y, width: side, height: side }, direction < 0 ? "‹" : "›", () => { m.listPages[id] = (pageNumber + direction + total) % total; changed(); });
     text(`${id}:page-number`, `${pageNumber + 1}/${total}`, { x: r.x + r.width - 82 * scale, y, width: 50 * scale, height: side }, 14 * scale);
   }
@@ -303,65 +313,81 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
     const rect = (x: number, y: number, width: number, height: number): Rect => ({ x: r.x + x, y: r.y + y, width, height });
     const gp = menuData.grandPrix.find((entry) => entry.id === m.grandPrix);
     const title = page === "gp_info" ? sourceText(gp?.name ?? "Grand Prix") : page === "touch_controls" ? tr("Touch Controls", "触控操作") : page === "karts" ? tr("Choose a Kart", "选择赛车") : page === "race_setup" ? sourceText("Race Setup") : page === "tracks_and_gp" ? tr("Choose a Track", "选择赛道") : sourceText(m.selectedTrack.name);
-    text("mobile-page-title", title, rect(56, 0, r.width - 112, 42), 24, blue);
-    button(menuWidgetId(page, "back"), rect(0, 0, 48, 44), "", action("back"), { image: "gui/icons/back.png", normal: "" });
-    const card = (item: Item, bounds: Rect) => button(menuWidgetId(page, item.id), bounds, item.text, action(item.id), { image: item.image, selected: item.selected, normal: "" });
+    spawn("mobile-page-surface", "node", "root", { ...position(rect(0, 0, r.width, page === "karts" ? 48 : r.height)), background: mobileSurface, borderRadius: 10 });
+    text("mobile-page-title", title, rect(56, 0, r.width - 112, 42), 24, mobileText);
+    button(menuWidgetId(page, "back"), rect(0, 0, 48, 44), "", action("back"), { image: "gui/icons/back.png", normal: "", background: mobileCard });
+    const card = (item: Item, bounds: Rect) => button(menuWidgetId(page, item.id), bounds, item.text, action(item.id), {
+      image: item.image, normal: "", background: item.selected ? mobileSelection : mobileCard, textColor: mobileText,
+    });
     if (page === "touch_controls") {
-      skinPicture("touch-controls-panel", skin("glass_section"), rect(0, 52, r.width, r.height - 52), scale);
       button(menuWidgetId(page, "steering-assist"), rect(18, 60, Math.min(360, r.width - 36), 44), session.settings.steeringAssist ? tr("Steering assist: On", "辅助转向：开启") : tr("Steering assist: Off", "辅助转向：关闭"), action("steering-assist"), { selected: session.settings.steeringAssist });
       const rules = [tr("Automatic acceleration. Hold an arrow to steer, or slide between arrows.", "自动加速；按住左右键转向，可在两键间滑动。"), tr("Hold Drift while turning; press it on a straight to brake without reversing.", "转弯时按住漂移；直线时按下刹车，停车后不会倒车。"), tr("Release a charged drift for a boost. Hold Nitro to accelerate further.", "松开已蓄力的漂移可加速；按住氮气持续加速。"), tr("Tap Fire or Rescue once; hold Rear. Manual steering overrides assist.", "点击道具或救援触发一次，按住回看；手动转向优先于辅助。"), tr("Pause stops the race. Release your fingers before resuming.", "暂停会停止比赛，恢复前请先松开手指。")];
-      rules.forEach((rule, index) => { text(`touch-control-rule-${index}`, rule, rect(18, 112 + index * (r.height - 120) / rules.length, r.width - 36, (r.height - 120) / rules.length), 17, ink, "left"); });
+      rules.forEach((rule, index) => { text(`touch-control-rule-${index}`, rule, rect(18, 112 + index * (r.height - 120) / rules.length, r.width - 36, (r.height - 120) / rules.length), 17, mobileText, "left"); });
     } else if (page === "karts") {
       const height = Math.min(112, r.height * 0.33), width = Math.min(150, r.width / 5);
       items("karts", page).forEach((item, index) => { card(item, rect((r.width - width * 4) / 2 + index * width, r.height - height, width - 8, height)); });
       button(menuWidgetId(page, "continue"), rect(r.width - 110, 0, 110, 44), tr("Continue", "继续"), action("continue"));
-      host.focus(menuWidgetId(page, `choose-${session.settings.kartId}`));
+      host.focus(menuWidgetId(page, "continue"));
     } else if (page === "race_setup") {
       const names = ["Novice", "Intermediate", "Expert", "SuperTux"], ids = ["novice", "intermediate", "expert", "best"], icons = ["easy", "medium", "hard", "best"];
       const difficultyHeight = Math.min(92, r.height * 0.27);
       names.forEach((name, index) => { card({ id: ids[index], text: sourceText(name), image: `gui/icons/difficulty_${icons[index]}.png`, selected: session.settings.difficulty === index }, rect(r.width / 4 * index + 4, 46, r.width / 4 - 8, difficultyHeight)); });
       const y = 52 + difficultyHeight, height = (r.height - y) / 2;
-      items("gamemode", page).forEach((item, index) => { card(item, rect(r.width / 4 * (index % 4) + 4, y + Math.floor(index / 4) * height, r.width / 4 - 8, height - 4)); });
+      items("gamemode", page).forEach((item, index) => {
+        const mode = modeChoices[index][0];
+        const name = mode === "follow" ? tr("Follow the Leader", "跟随领跑者") : mode === "ghost" ? tr("Ghost Replay", "幽灵回放") : item.text;
+        const label = mode === "normal" || mode === "time-trial" ? name : name + tr(" · Preview", " · 预览");
+        card({ ...item, text: label }, rect(r.width / 4 * (index % 4) + 4, y + Math.floor(index / 4) * height, r.width / 4 - 8, height - 4));
+      });
       host.focus(menuWidgetId(page, `mode-${session.settings.mode}`));
     } else if (page === "tracks_and_gp") {
-      const gpHeight = Math.min(84, r.height * 0.24);
-      text("mobile-gp-heading", tr("Grand Prix · Preview", "大奖赛 · 预览"), rect(4, 44, r.width - 8, 20), 15, ink, "left");
-      items("gps", page).forEach((item, index) => { card(item, rect(index * r.width / 4 + 4, 66, r.width / 4 - 8, gpHeight)); });
-      const list = items("tracks", page), columns = Math.max(3, Math.min(5, Math.floor(r.width / 160))), capacity = columns * 2, key = "mobile-tracks";
+      const labels = [tr("Race Tracks", "比赛赛道"), tr("3D Scenes", "3D 场景"), tr("Grand Prix · Preview", "大奖赛 · 预览")];
+      const sectionWidth = Math.min(190, (r.width - 24) / 3), sectionLeft = (r.width - sectionWidth * 3) / 2;
+      trackSections.forEach((section, index) => {
+        button(menuWidgetId(page, `track-section:${section}`), rect(sectionLeft + index * sectionWidth + 4, 49, sectionWidth - 8, 44), labels[index], action(`track-section:${section}`), {
+          normal: "", background: m.trackSection === section ? mobileSelection : mobileCard, textColor: mobileText,
+        });
+      });
+      const isGp = m.trackSection === "grand-prix";
+      const list = isGp ? items("gps", page) : items("tracks", page).filter((item) => !!courseFor(item.id.slice(6)) === (m.trackSection === "races"));
+      const columns = isGp ? 4 : Math.max(3, Math.min(5, Math.floor(r.width / 154)));
+      const rows = isGp || r.height < 248 ? 1 : 2, capacity = columns * rows;
+      const key = `mobile-tracks:${m.trackSection}`;
       const total = Math.max(1, Math.ceil(list.length / capacity)), number = Math.min(m.listPages[key] ?? 0, total - 1);
       m.listPages[key] = number;
-      text("mobile-track-heading", tr("Tracks & 3D Scenes", "赛道与 3D 场景"), rect(4, gpHeight + 68, r.width - 8, 20), 15, ink, "left");
-      const y = gpHeight + 90, height = Math.max(44, (r.height - y - 30) / 2);
-      list.slice(number * capacity, (number + 1) * capacity).forEach((item, index) => { card(item, rect(index % columns * r.width / columns + 4, y + Math.floor(index / columns) * height, r.width / columns - 8, height - 4)); });
-      pagination(key, r, total);
-      host.focus(menuWidgetId(page, `track:${m.track}`));
+      const y = 101, height = Math.max(49, (r.height - y - (total > 1 ? 49 : 4)) / rows);
+      const visible = list.slice(number * capacity, (number + 1) * capacity);
+      visible.forEach((item, index) => { card(item, rect(index % columns * r.width / columns + 4, y + Math.floor(index / columns) * height, r.width / columns - 8, height - 5)); });
+      if (total > 1) pagination(key, r, total);
+      host.focus(menuWidgetId(page, visible.find((item) => item.selected)?.id ?? visible[0]?.id ?? `track-section:${m.trackSection}`));
     } else if (page === "gp_info") {
       const tracks = (gp?.tracks ?? []).map((id) => menuData.tracks.find((track) => track.id === id)).filter((track) => !!track);
       const left = r.width * 0.5, right = left + 20, column = r.width - right;
       if (tracks[0]) picture("mobile-gp-preview", tracks[0].image, rect(0, 56, left, Math.max(80, r.height - 130)));
-      text("mobile-gp-tracks", tracks.map((track) => sourceText(track.name)).join(" · "), rect(0, r.height - 68, left, 60), 15);
-      text("mobile-gp-note", tr("Grand Prix menu preview. Choose a track to play a single race.", "大奖赛菜单预览。可选赛道开始单场比赛。"), rect(right, 60, column, Math.max(70, r.height - 180)), 18, ink, "left");
+      text("mobile-gp-tracks", tracks.map((track) => sourceText(track.name)).join(" · "), rect(0, r.height - 68, left, 60), 15, mobileText);
+      text("mobile-gp-note", tr("Grand Prix menu preview. Choose a track to play a single race.", "大奖赛菜单预览。可选赛道开始单场比赛。"), rect(right, 60, column, Math.max(70, r.height - 180)), 18, mobileText, "left");
       button(menuWidgetId(page, "start"), rect(right, r.height - 112, column, 44), tr("Grand Prix Preview", "大奖赛预览"), action("start"));
       button(menuWidgetId(page, "single-race"), rect(right, r.height - 56, column, 48), singleRaceLabel, action("single-race"));
     } else {
       const left = r.width * 0.43, right = left + 20, column = r.width - right;
-      picture("mobile-track-preview", m.selectedTrack.image, rect(0, 56, left, Math.max(70, r.height - 110)));
+      const compact = playableTrack && r.height < 294, rowPitch = compact ? 46 : 52;
+      picture("mobile-track-preview", m.selectedTrack.image, rect(0, 56, left, Math.max(70, r.height - (compact ? 138 : 110))));
       if (!playableTrack) {
         if (viewableScene) {
           host.resourceStatus(rect(right, r.height - 88, column, 32));
           button(menuWidgetId(page, "view-scene"), rect(right, r.height - 52, column, 48), viewSceneLabel, host.viewScene);
-        } else text("mobile-track-preview-note", previewNote, rect(right, 56, column, Math.max(70, r.height - 110)), 16);
+        } else text("mobile-track-preview-note", previewNote, rect(right, 56, column, Math.max(70, r.height - 110)), 16, mobileText);
         return true;
       }
-      text("mobile-track-best", session.best > 0 ? `${tr("Best time", "最佳成绩")}  ${formatTime(session.best)}` : tr("No high score yet", "暂无最高成绩"), rect(0, r.height - 48, left, 40), 16);
+      text("mobile-track-best", session.best > 0 ? `${tr("Best time", "最佳成绩")}  ${formatTime(session.best)}` : tr("No high score yet", "暂无最高成绩"), rect(0, r.height - (compact ? 78 : 48), left, 40), 16, mobileText);
       const spinner = (id: string, label: string, y: number) => {
-        text(`mobile-${id}-label`, label, rect(right, y, column * 0.48, 44), 16, ink, "left");
-        drawSpinner(menuWidgetId(page, id), id, { tag: "spinner", attributes: { min_value: "0", max_value: "20" }, children: [] }, rect(right + column * 0.48, y, column * 0.52, 44));
+        text(`mobile-${id}-label`, label, rect(right, y, column * 0.48, 44), 16, mobileText, "left");
+        drawSpinner(menuWidgetId(page, id), id, { tag: "spinner", attributes: { min_value: "0", max_value: id === "ai-spinner" ? "3" : "20" }, children: [] }, rect(right + column * 0.48, y, column * 0.52, 44));
       };
-      spinner("target-value-spinner", tr("Number of laps", "圈数"), 56);
-      if (m.raceMode !== "time-trial") spinner("ai-spinner", tr("AI karts", "AI 赛车"), 108);
-      button(menuWidgetId(page, "option"), rect(right, 162, column, 44), `${session.settings.reverse ? "☑" : "☐"} ${tr("Reverse track", "反向赛道")}`, () => { session.settings.reverse = !session.settings.reverse; changed(); });
-      host.resourceStatus(rect(right, r.height - 88, column, 32));
+      spinner("target-value-spinner", tr("Number of laps", "圈数"), 54);
+      if (m.raceMode !== "time-trial") spinner("ai-spinner", tr("AI karts", "AI 赛车"), 54 + rowPitch);
+      button(menuWidgetId(page, "option"), rect(right, 54 + rowPitch * (m.raceMode === "time-trial" ? 1 : 2), column, 44), session.settings.reverse ? tr("Reverse track · On", "反向赛道 · 开") : tr("Reverse track · Off", "反向赛道 · 关"), () => { session.settings.reverse = !session.settings.reverse; changed(); });
+      host.resourceStatus(compact ? rect(0, r.height - 37, left, 32) : rect(right, r.height - 88, column, 32));
       button(menuWidgetId(page, "start"), rect(right, r.height - 52, column, 48), tr("Start Race", "开始比赛"), action("start"));
     }
     return true;
@@ -393,6 +419,16 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   if (m.dialog) {
     spawn("menu-dialog-shade", "node", "root", { position: "absolute", left: 0, top: 0, width: "100%", height: "100%", background: [0, 0, 0, 0.55] });
     host.modal();
+    if (mobile && m.dialog.purpose === "preview") {
+      const width = Math.min(420, safeRect.width - 24), height = 150;
+      const x = safeRect.x + (safeRect.width - width) / 2, y = safeRect.y + (safeRect.height - height) / 2;
+      spawn("menu-dialog-frame", "node", "root", { ...position({ x, y, width, height }), background: mobileSurface, borderRadius: 12 });
+      text("menu-dialog-message", m.dialog.title, { x: x + 16, y: y + 12, width: width - 32, height: 74 }, 18, mobileText);
+      const id = menuWidgetId(m.dialog.page, "ok");
+      button(id, { x: x + width / 2 - 76, y: y + 92, width: 152, height: 44 }, tr("OK", "知道了"), action("ok"));
+      host.focus(id);
+      return true;
+    }
     const large = ["custom_video_settings", "custom_camera_settings", "select_challenge"].includes(m.dialog.page);
     const marginX = mobile ? 0.03 : large ? 0.1 : 0.2, marginY = mobile ? 0.03 : large ? 0.1 : 0.18;
     const r = { x: safeRect.x + safeRect.width * marginX, y: safeRect.y + safeRect.height * marginY, width: safeRect.width * (1 - marginX * 2), height: safeRect.height * (1 - marginY * 2) };
