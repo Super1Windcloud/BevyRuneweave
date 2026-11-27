@@ -337,6 +337,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     private var remoteButtons: [HostActionButton] = []
     private let remoteAssetsStack = UIStackView()
     private let remoteAssetsStatus = UILabel()
+    private let refreshRemoteAssetsButton = HostActionButton(type: .custom)
     private let urlField = UITextField()
     private let downloadButton = HostActionButton(type: .custom)
     private let launchButton = HostActionButton(type: .custom)
@@ -350,6 +351,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     private let statusRow = UIStackView()
     private let scroll = UIScrollView()
     private var busy = false
+    private var remoteAssetsLoading = false
 
     init(store: PackageStore) {
         self.store = store
@@ -418,7 +420,14 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         installed.addArrangedSubview(clearResourcesButton)
         add(HostStyle.card(installed), to: content, spacing: 28)
 
-        add(section(hostText("Discover")), to: content, spacing: 6)
+        let discoverTitle = section(hostText("Discover"))
+        discoverTitle.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        configureButton(refreshRemoteAssetsButton, title: hostText("Refresh"), symbol: "arrow.clockwise",
+                        action: #selector(reloadRemoteAssets))
+        let discoverHeader = UIStackView(arrangedSubviews: [discoverTitle, refreshRemoteAssetsButton])
+        discoverHeader.alignment = .center
+        discoverHeader.spacing = 12
+        add(discoverHeader, to: content, spacing: 6)
         remoteAssetsStatus.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 13))
         remoteAssetsStatus.adjustsFontForContentSizeCategory = true
         remoteAssetsStatus.textColor = HostStyle.secondary
@@ -513,6 +522,9 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     }
 
     @objc private func reloadRemoteAssets() {
+        guard !busy, !remoteAssetsLoading else { return }
+        remoteAssetsLoading = true
+        refreshRemoteAssetsButton.isEnabled = false
         remoteAssetsStatus.text = hostText("Finding the latest release…")
         remoteAssetsStack.arrangedSubviews.forEach {
             remoteAssetsStack.removeArrangedSubview($0)
@@ -525,6 +537,8 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     }
 
     private func showRemoteAssets(_ result: Result<RemoteRelease, Error>) {
+        remoteAssetsLoading = false
+        refreshRemoteAssetsButton.isEnabled = !busy
         switch result {
         case let .success(release):
             remoteAssets = release.assets
@@ -556,6 +570,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         urlField.isEnabled = !busy
         downloadButton.isEnabled = !busy
         clearResourcesButton.isEnabled = !busy
+        refreshRemoteAssetsButton.isEnabled = !busy && !remoteAssetsLoading
         launchButton.isEnabled = !busy && (try? store.installedConfig()) != nil
         remoteButtons.forEach { $0.isEnabled = !busy }
         busy ? spinner.startAnimating() : spinner.stopAnimating()

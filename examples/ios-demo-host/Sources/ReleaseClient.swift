@@ -84,7 +84,7 @@ final class ReleaseClient {
 
     private func request<Value: Decodable & Sendable>(_ url: URL, as type: Value.Type,
                                            completion: @escaping (Result<Value, Error>) -> Void) {
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("BevyRuneweave-iOS-Demo/0.1", forHTTPHeaderField: "User-Agent")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")

@@ -76,6 +76,7 @@ class MainActivity : Activity() {
     private val remoteAssetButtons = mutableListOf<Button>()
     private lateinit var remoteAssetsContainer: LinearLayout
     private lateinit var remoteAssetsStatus: TextView
+    private lateinit var refreshRemoteAssetsButton: Button
     private lateinit var progress: ProgressBar
     private lateinit var downloadBar: ProgressBar
     private lateinit var status: TextView
@@ -93,6 +94,7 @@ class MainActivity : Activity() {
     private var selectedPage = Page.HOME
     private var statusIsError = false
     private var busy = false
+    private var remoteAssetsLoading = false
 
     private val backgroundColor get() = Color.parseColor(if (darkMode) "#101C1B" else "#F3F5F1")
     private val surfaceColor get() = Color.parseColor(if (darkMode) "#1B2B29" else "#FFFFFF")
@@ -292,7 +294,18 @@ class MainActivity : Activity() {
             addView(clearResourcesButton, matchWrap())
         }, spaced(28))
 
-        addView(sectionHeading(getString(R.string.host_discover)), spaced(6))
+        addView(LinearLayout(context).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(sectionHeading(getString(R.string.host_discover)), LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f,
+            ).apply { marginEnd = dp(12) })
+            refreshRemoteAssetsButton = themedButton(getString(R.string.host_refresh), R.drawable.ic_refresh).apply {
+                setOnClickListener { loadRemoteAssets() }
+            }
+            addView(refreshRemoteAssetsButton, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            ))
+        }, spaced(6))
         remoteAssetsStatus = label(getString(R.string.host_finding_release), 13f, secondary = true).apply {
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
@@ -490,6 +503,7 @@ class MainActivity : Activity() {
     }
 
     private fun refreshButtons() {
+        refreshRemoteAssetsButton.isEnabled = !busy && !remoteAssetsLoading
         themedButtons.forEach { styleButton(it, it === downloadButton) }
     }
 
@@ -503,14 +517,19 @@ class MainActivity : Activity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     private fun loadRemoteAssets() {
+        if (busy || remoteAssetsLoading) return
+        remoteAssetsLoading = true
         remoteAssetsStatus.text = getString(R.string.host_finding_release)
         remoteAssetsContainer.removeAllViews()
         themedButtons.removeAll(remoteAssetButtons.toSet())
         remoteAssetButtons.clear()
+        refreshButtons()
         executor.execute {
             val result = runCatching { fetchRemoteAssets() }
                 .recover { fallbackRemoteRelease() }
             runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                remoteAssetsLoading = false
                 result.onSuccess(::showRemoteAssets).onFailure { error ->
                     remoteAssetsStatus.text = error.message ?: getString(R.string.host_release_failed)
                     val retry = themedButton(getString(R.string.host_retry), R.drawable.ic_download).apply {
@@ -574,6 +593,7 @@ class MainActivity : Activity() {
 
     private fun readRemoteMetadata(url: URL): String {
         val connection = openDownloadConnection(url).apply {
+            useCaches = false
             connectTimeout = 15_000
             readTimeout = 30_000
             setRequestProperty("Accept", "application/vnd.github+json")
