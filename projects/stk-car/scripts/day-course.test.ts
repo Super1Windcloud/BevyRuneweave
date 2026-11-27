@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { courseFor, defaultCourse } from "../modules/stk-car/game/src/courses.ts";
+import { courseFor, courses, defaultCourse } from "../modules/stk-car/game/src/courses.ts";
 import { Circuit, Race, angleDelta, clamp, emptyControls, fixedStep } from "../modules/stk-car/game/src/race.ts";
 import { PcSession } from "../modules/stk-car/game/src/session.ts";
 import { load } from "./game-fixture.ts";
@@ -39,5 +39,22 @@ test("PC and mobile start the daylight map with its own model, music and minimap
     assert.equal(game.images.get("map"), defaultCourse.minimap.image);
     assert.equal(game.voices.get("music")?.path, defaultCourse.music);
     assert.equal(game.texts.get("lap"), "1 / 3");
+  }
+});
+test("all 21 race courses support a complete lap in both directions", () => {
+  assert.equal(courses.length, 21);
+  for (const course of courses) for (const reverse of [false, true]) {
+    const circuit = new Circuit(reverse ? [...course.route].reverse() : course.route);
+    const race = new Race(circuit, [], 1, { difficulty: 1, aiCount: 0, mode: "time-trial", kartId: "tux" });
+    race.start();
+    for (let tick = 0; tick < 90_000 && race.phase !== "finished"; tick++) {
+      const player = race.player;
+      const target = circuit.sample(player.routeDistance + Math.max(4.5, player.speed * 0.4));
+      const error = angleDelta(Math.atan2(target.x - player.x, -(target.z - player.z)) - player.heading);
+      race.step(fixedStep, { ...emptyControls(), throttle: race.phase === "countdown" || player.speed > 8 ? 0 : 0.8,
+        steer: clamp(error * 3.4, -1, 1), brake: player.speed > 9 || Math.abs(error) > 0.65 && player.speed > 5 });
+    }
+    assert.equal(race.phase, "finished", `${course.id}, reverse=${reverse}`);
+    assert.equal(race.lapTimes.length, 1);
   }
 });

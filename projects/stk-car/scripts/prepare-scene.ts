@@ -117,8 +117,10 @@ export function prepareScene(source: string, track: string, record: (path: strin
   const starts = scene.children.filter((node) => node.tag === "start");
   // Use spawn locations where available so distant background terrain cannot frame the preview.
   if (starts.length) {
-    for (const { attributes } of starts) xyz(attributes.xyz ?? `${attributes.x} ${attributes.y} ${attributes.z}`).forEach((value, axis) => include(axis === 2 ? -value : value, axis));
-  } else for (const primitive of batched.primitives) primitive.positions.forEach((value, index) => include(value, index % 3));
+    for (const { attributes } of starts) {
+      xyz(attributes.xyz ?? `${attributes.x} ${attributes.y} ${attributes.z}`).forEach((value, axis) => { include(axis === 2 ? -value : value, axis); });
+    }
+  } else for (const primitive of batched.primitives) primitive.positions.forEach((value, index) => { include(value, index % 3); });
   const view = { center: min.map((value, axis) => (value + max[axis]) / 2), radius: Math.max(24, ...max.map((value, axis) => (value - min[axis]) / 2)) };
   return { trackModel: trackModels[0], trackModelParts: trackModels.slice(1), skyModel, metadata, instances, view,
     environment: { ambient: color(sun.ambient ?? "128 128 128"), brightness: daytime ? 1500 : 350, sun: color(sun["sun-diffuse"] ?? "255 255 255"), illuminance: daytime ? 50000 : 6000,
