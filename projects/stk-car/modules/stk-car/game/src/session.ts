@@ -35,6 +35,7 @@ export class PcSession {
   noticeText = "";
   resourceText = "";
   resourceFailed = false;
+  resultLapPage = 0;
   menu = new MenuState();
   menuHistory: { screen: Screen; page: string }[] = [];
   get course() { return courseFor(this.settings.trackId) ?? defaultCourse; }
@@ -42,6 +43,7 @@ export class PcSession {
   start(): void {
     const route = this.settings.reverse ? [...this.course.route].reverse() : this.course.route;
     this.race = new Race(new Circuit(route), this.course.pickups, this.settings.laps, this.settings);
+    this.resultLapPage = 0;
     this.race.start(); this.screen = "race";
   }
   back(): void {
@@ -56,6 +58,13 @@ export class PcSession {
   chooseNewRace(): void {
     this.screen = "main"; this.menu.show("");
     this.openMenu("karts", "kart");
+  }
+  chooseRaceTrack(): void {
+    this.chooseNewRace();
+    this.menu.raceMode = this.settings.mode;
+    this.menu.trackSection = "races";
+    this.openMenu("race_setup", "setup");
+    this.openMenu("tracks_and_gp", "tracks");
   }
   openMenu(page: string, screen: Screen = "menu"): void {
     if (this.screen === "main") this.menuHistory = [];

@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { makeLayout, touchControlRects, TouchControls, assistedSteering, type Contact, type ControlRect } from "../modules/stk-car/game/src/controls.ts";
+import { makeLayout, touchControlRects, TouchControls, steeringAssist, type Contact, type ControlRect } from "../modules/stk-car/game/src/controls.ts";
 import { raceHudLayout } from "../modules/stk-car/game/src/hud-layout.ts";
 import { Circuit, Race, emptyControls, fixedStep } from "../modules/stk-car/game/src/race.ts";
 import { parseSettings } from "../modules/stk-car/game/src/session.ts";
 import { load } from "./game-fixture.ts";
 import { menuData } from "../modules/stk-car/game/src/menu-data.ts";
+import { courses, courseFor } from "../modules/stk-car/game/src/courses.ts";
 
 const center = (r: ControlRect, id = "finger"): Contact => ({ id, justPressed: true, x: r.x + r.width / 2, y: r.y + r.height / 2 });
 const overlap = (a: ControlRect, b: ControlRect) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
@@ -77,16 +78,24 @@ test("steering can slide between arrows but cannot slide onto nitro or fire", ()
 });
 test("opposing arrows cancel and explicit steering overrides the optional assistance", () => {
   const layout = makeLayout(914, 411, { left: 0, right: 0, top: 0, bottom: 0 }, true), rects = touchControlRects(layout), touch = new TouchControls();
-  const assisted = emptyControls(); touch.apply(assisted, [], layout, true, 0.65); assert.equal(assisted.steer, 0.65);
-  const manual = emptyControls(); touch.apply(manual, [center(rects.left, "a")], layout, true, 0.65); assert.equal(manual.steer, -1);
-  const opposite = emptyControls(); touch.apply(opposite, [{ ...center(rects.left, "a"), justPressed: false }, center(rects.right, "b")], layout, true, 0.65); assert.equal(opposite.steer, 0);
+  const assist = { steer: 0.65, speed: 20, speedLimit: 10 };
+  const assisted = emptyControls(); touch.apply(assisted, [], layout, true, assist);
+  assert.equal(assisted.steer, 0.65); assert.equal(assisted.throttle, 0); assert.equal(assisted.brake, true);
+  const manual = emptyControls(); touch.apply(manual, [center(rects.left, "a")], layout, true, assist);
+  assert.equal(manual.steer, -1); assert.equal(manual.throttle, 1); assert.equal(manual.brake, false);
+  const opposite = emptyControls(); touch.apply(opposite, [{ ...center(rects.left, "a"), justPressed: false }, center(rects.right, "b")], layout, true, assist);
+  assert.equal(opposite.steer, 0); assert.equal(opposite.brake, false);
+  touch.apply(emptyControls(), [], layout);
+  const nitro = emptyControls(); touch.apply(nitro, [center(rects.boost)], layout, true, assist);
+  assert.equal(nitro.throttle, 1); assert.equal(nitro.brake, false);
 });
 test("steering assistance leaves the brake in braking mode until a steering arrow is pressed", () => {
   const layout = makeLayout(914, 411, { left: 0, right: 0, top: 0, bottom: 0 }, true);
   const touch = new TouchControls(), rects = touchControlRects(layout), brake = center(rects.drift, "brake");
-  const assisted = emptyControls(); touch.apply(assisted, [brake], layout, true, 0.7);
+  const assist = { steer: 0.7, speed: 15, speedLimit: 11 };
+  const assisted = emptyControls(); touch.apply(assisted, [brake], layout, true, assist);
   assert.equal(assisted.brake, true); assert.equal(assisted.drift, false); assert.equal(assisted.throttle, 0);
-  const manual = emptyControls(); touch.apply(manual, [{ ...brake, justPressed: false }, center(rects.left, "steer")], layout, true, 0.7);
+  const manual = emptyControls(); touch.apply(manual, [{ ...brake, justPressed: false }, center(rects.left, "steer")], layout, true, assist);
   assert.equal(manual.drift, true); assert.equal(manual.brake, false); assert.equal(manual.steer, -1);
 });
 test("resuming with old fingers down suppresses new actions until they release", () => {
@@ -120,11 +129,73 @@ test("assistance corrects an edge departure and its setting validates saved type
   const circuit = new Circuit([{ center: [0, 0, 0], width: 10 }, { center: [0, 0, -100], width: 10 }, { center: [100, 0, -100], width: 10 }]);
   const race = new Race(circuit, []);
   Object.assign(race.player, circuit.sample(30, 4), { routeDistance: 30, speed: 15 });
-  assert.ok(assistedSteering(race) < 0);
-  Object.assign(race.player, circuit.sample(30, -4)); assert.ok(assistedSteering(race) > 0);
+  assert.ok(steeringAssist(race).steer < 0);
+  Object.assign(race.player, circuit.sample(30, -4)); assert.ok(steeringAssist(race).steer > 0);
   assert.equal(parseSettings("{}").steeringAssist, false);
   assert.equal(parseSettings('{"steeringAssist":true}').steeringAssist, true);
   assert.equal(parseSettings('{"steeringAssist":"true"}').steeringAssist, false);
+});
+test("the mobile steering assist completes all courses in both directions at each difficulty", () => {
+  const layout = makeLayout(914, 411, { left: 0, right: 0, top: 0, bottom: 0 }, true);
+  for (const course of courses) for (const reverse of [false, true]) for (const difficulty of [0, 1, 2, 3]) {
+    const race = new Race(new Circuit(reverse ? [...course.route].reverse() : course.route), course.pickups, 1,
+      { difficulty, aiCount: 0, mode: "time-trial", kartId: "tux" });
+    const touch = new TouchControls();
+    race.start();
+    for (let frame = 0; frame < 60 * 300 && race.phase !== "finished"; frame++) {
+      const input = emptyControls(), racing = race.phase === "racing";
+      touch.apply(input, [], layout, racing, racing ? steeringAssist(race) : undefined);
+      race.step(fixedStep, input);
+      race.step(fixedStep, input);
+    }
+    assert.equal(race.phase, "finished", `${course.id}, reverse=${reverse}, difficulty=${difficulty}`);
+  }
+});
+test("the Android random track shortcut only selects playable maps and returns to the picker", () => {
+  const game = load("en-US", "android", { width: 680, height: 306, leftInset: 36, rightInset: 0 });
+  game.click("singleplayer");
+  game.click("gui:karts:continue");
+  game.click("gui:race_setup:mode-time-trial");
+  game.click("gui:tracks_and_gp:random_track");
+  const settings = JSON.parse(game.saved.get("pc-race-settings-v1")!);
+  assert.ok(courseFor(settings.trackId));
+  assert.equal(settings.mode, "time-trial");
+  assert.ok(game.nodes.has("gui:track_info:start"));
+  game.click("gui:track_info:back");
+  game.click("gui:tracks_and_gp:track-section:scenes");
+  assert.equal(game.nodes.has("gui:tracks_and_gp:random_track"), false);
+});
+test("compact Android results paginate lap times and retain the kart and mode when changing tracks", () => {
+  const game = load("zh-CN", "android", { width: 670, height: 290, leftInset: 32, rightInset: 0 });
+  game.saved.set("pc-race-settings-v1", JSON.stringify({ steeringAssist: true }));
+  game.callbacks.on_script_reloaded();
+  game.click("singleplayer");
+  game.click("gui:karts:choose-suzanne");
+  game.click("gui:karts:continue");
+  game.click("gui:race_setup:mode-time-trial");
+  game.click("gui:tracks_and_gp:track:lighthouse");
+  game.click("gui:track_info:target-value-spinner:down");
+  game.click("gui:track_info:start");
+  for (let frame = 0; frame < 60 * 360 && !game.nodes.has("results-panel"); frame++) game.frame();
+  assert.ok(game.nodes.has("results-panel"));
+  assert.equal(game.texts.get("title"), "比赛结果");
+  assert.match(game.texts.get("result-0")!, /Suzanne/);
+  for (const id of ["result-standings", "result-laps"]) assert.equal(game.styles.get(id)?.flexDirection, "column");
+  assert.equal(game.texts.get("result-page"), "1/2");
+  game.click("result-laps-next");
+  assert.equal(game.texts.get("result-lap-2-name"), "第 3 圈");
+  assert.equal(game.texts.get("result-page"), "2/2");
+  for (const id of ["race-again", "change-track", "choose-new-race", "result-menu"]) {
+    assert.equal(game.parents.get(id), "result-actions");
+    assert.equal(game.styles.get(id)?.height, 48);
+  }
+  game.click("change-track");
+  game.click("gui:tracks_and_gp:track:hacienda");
+  assert.equal(game.nodes.has("gui:track_info:ai-spinner"), false);
+  const settings = JSON.parse(game.saved.get("pc-race-settings-v1")!);
+  assert.equal(settings.mode, "time-trial");
+  assert.equal(settings.kartId, "suzanne");
+  assert.equal(settings.trackId, "hacienda");
 });
 test("Android and iOS auto accelerate only after countdown and keep the primary HUD separate from auxiliary controls", () => {
   for (const platform of ["android", "ios"]) {

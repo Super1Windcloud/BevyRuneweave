@@ -409,7 +409,7 @@
       this.capture.clear();
       this.rearm = true;
     }
-    apply(input, contacts, layout2, driving = true, assistedSteer = 0) {
+    apply(input, contacts, layout2, driving = true, assist) {
       this.active.clear();
       this.braking = false;
       this.drifting = false;
@@ -453,17 +453,33 @@
         if (Math.abs(input.steer) > 0.12) input.drift = true;
         else input.brake = true;
       }
-      if (!manualTouch && !input.steer && driving) input.steer = assistedSteer;
       input.throttle = driving && !input.brake ? 1 : 0;
       this.braking = input.brake;
       this.drifting = input.drift;
+      if (assist && driving && !manualTouch && !input.steer) {
+        input.steer = assist.steer;
+        if (!input.brake && !input.nitro && !input.useItem) {
+          if (assist.speed >= assist.speedLimit) input.throttle = 0;
+          if (assist.speed > assist.speedLimit + 0.8) input.brake = true;
+        }
+      }
     }
   };
-  function assistedSteering(race) {
-    const player = race.player, road = race.circuit.sample(player.routeDistance);
-    const lane = (player.x - road.x) * Math.cos(road.heading) + (player.z - road.z) * Math.sin(road.heading);
-    const target = race.circuit.sample(player.routeDistance + Math.max(5, Math.abs(player.speed) * 0.35), clamp(lane, -road.width * 0.25, road.width * 0.25));
-    return clamp(angleDelta(Math.atan2(target.x - player.x, -(target.z - player.z)) - player.heading) * 2.6, -0.9, 0.9);
+  function steeringAssist(race) {
+    const { player, circuit } = race, distance = player.routeDistance;
+    const target = circuit.sample(distance + Math.max(4.5, player.speed * 0.37));
+    const error = angleDelta(Math.atan2(target.x - player.x, -(target.z - player.z)) - player.heading);
+    const cruiseSpeed = 19, cornerSpeed = 7;
+    let speedLimit = clamp(cruiseSpeed - Math.abs(error) * 30, cornerSpeed, cruiseSpeed);
+    let heading2 = circuit.sample(distance + 3).heading;
+    for (const lookAhead of [7, 11, 15, 19, 24, 30]) {
+      const nextHeading = circuit.sample(distance + lookAhead).heading;
+      const turn = Math.abs(angleDelta(nextHeading - heading2));
+      const targetSpeed = clamp(cruiseSpeed - turn * 45, cornerSpeed, cruiseSpeed);
+      speedLimit = Math.min(speedLimit, Math.sqrt(targetSpeed ** 2 + 18 * Math.max(0, lookAhead - 9)));
+      heading2 = nextHeading;
+    }
+    return { steer: clamp(error * 3.4, -1, 1), speed: player.speed, speedLimit };
   }
   function keyboardControls(held, pressed, wasd = false) {
     const input = emptyControls();
@@ -489,7 +505,8 @@
       y: (0.5 - pointer.y / pointer.viewportHeight) * layout2.height
     });
     const active = driving ? driving.race.phase === "racing" : true;
-    touch2.apply(input, contacts, layout2, active, active && driving?.steeringAssist ? assistedSteering(driving.race) : 0);
+    const assist = active && driving?.steeringAssist ? steeringAssist(driving.race) : void 0;
+    touch2.apply(input, contacts, layout2, active, assist);
     return input;
   }
 
@@ -1642,11 +1659,13 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
         const key = `mobile-tracks:${m.trackSection}`;
         const total = Math.max(1, Math.ceil(list.length / capacity)), number = Math.min(m.listPages[key] ?? 0, total - 1);
         m.listPages[key] = number;
-        const y = 101, height = Math.max(49, (r.height - y - (total > 1 ? 49 : 4)) / rows2);
+        const showRandom = m.trackSection === "races";
+        const y = 101, height = Math.max(49, (r.height - y - (showRandom || total > 1 ? 49 : 4)) / rows2);
         const visible = list.slice(number * capacity, (number + 1) * capacity);
         visible.forEach((item, index) => {
           card(item, rect(index % columns * r.width / columns + 4, y + Math.floor(index / columns) * height, r.width / columns - 8, height - 5));
         });
+        if (showRandom) button2(menuWidgetId(page, "random_track"), rect(4, r.height - 44, 156, 44), tr("Random Track", "\u968F\u673A\u8D5B\u9053"), action("random_track"), { normal: "", background: mobileCard, textColor: mobileText });
         if (total > 1) pagination(key, r, total);
         host.focus(menuWidgetId(page, visible.find((item) => item.selected)?.id ?? visible[0]?.id ?? `track-section:${m.trackSection}`));
       } else if (page === "gp_info") {
@@ -1852,6 +1871,74 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
   function centeredPanel(id, spec = {}) {
     node(id, "root", { position: "absolute", left: "14%", top: "23%", width: "72%", height: "62%", padding: 22, gap: 16, background: panel, borderRadius: 18, flexDirection: "column", ...spec });
   }
+  function mountTouchResults(session2, layout2, changed, start) {
+    const { race } = session2, width = layout2.width - layout2.left - layout2.right, height = layout2.height - layout2.top - layout2.bottom;
+    const gap = 10, standingsWidth = Math.floor((width - gap) * 0.55), lapsWidth = width - gap - standingsWidth;
+    const bodyHeight = height - 108;
+    node("results-panel", "root", { position: "absolute", left: layout2.left, top: layout2.top, width, height });
+    const surface = [0.05, 0.09, 0.14, 0.94];
+    node("result-header", "results-panel", { width, height: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 10, background: surface, borderRadius: 10 });
+    label("title", "result-header", tr("Race Results", "\u6BD4\u8D5B\u7ED3\u679C"), 23);
+    label("result-track", "result-header", sourceText(session2.course.name), 17);
+    node("result-body", "results-panel", { position: "absolute", top: 52, width, height: bodyHeight, flexDirection: "row", gap });
+    const card = { height: bodyHeight, padding: 10, borderRadius: 10, background: surface, flexDirection: "column" };
+    node("result-standings", "result-body", { ...card, width: standingsWidth });
+    label("result-standings-title", "result-standings", tr("Standings", "\u6BD4\u8D5B\u6392\u540D"), 19, { margin: 2 });
+    const rowHeight = Math.min(32, Math.floor((bodyHeight - 48) / 4));
+    for (const [index, racer] of race.ranking.entries()) {
+      const kart = trackData.karts.find((kart2) => kart2.id === racer.kartId);
+      const id = `result-row-${index}`, player = racer === race.player;
+      node(id, "result-standings", {
+        width: "100%",
+        height: rowHeight,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: 2,
+        borderRadius: 5,
+        background: player ? [0.46, 0.28, 0.06, 0.9] : [0, 0, 0, 0]
+      });
+      label(`result-${index}`, id, `${index + 1}.  ${kart?.name ?? racer.kartId}${player ? tr(" (You)", "\uFF08\u4F60\uFF09") : ""}`, 16);
+      label(`result-time-${index}`, id, racer.finishedAt === null ? tr("Racing", "\u6BD4\u8D5B\u4E2D") : formatTime(racer.finishedAt), 16);
+    }
+    node("result-laps", "result-body", { ...card, width: lapsWidth });
+    label("result-laps-title", "result-laps", tr("Lap Times", "\u5206\u5708\u7528\u65F6"), 19, { margin: 2 });
+    const fastest = Math.min(...race.lapTimes), pageSize = Math.max(1, Math.floor((bodyHeight - 90) / 23));
+    const pages = Math.max(1, Math.ceil(race.lapTimes.length / pageSize));
+    const page = Math.min(session2.resultLapPage, pages - 1);
+    session2.resultLapPage = page;
+    race.lapTimes.slice(page * pageSize, (page + 1) * pageSize).forEach((time, row) => {
+      const index = page * pageSize + row, id = `result-lap-${index}`;
+      node(id, "result-laps", { width: "100%", height: 23, flexDirection: "row", alignItems: "center", justifyContent: "space-between" });
+      label(`${id}-name`, id, tr(`Lap ${index + 1}`, `\u7B2C ${index + 1} \u5708`), 16);
+      label(`${id}-time`, id, formatTime(time), 16, {}, time === fastest ? [1, 0.76, 0.26, 1] : cream);
+    });
+    if (pages > 1) {
+      node("result-lap-pages", "result-laps", { position: "absolute", right: 10, bottom: 6, flexDirection: "row", alignItems: "center", gap: 8 });
+      const turnPage = (direction) => () => {
+        session2.resultLapPage = (page + direction + pages) % pages;
+        changed();
+      };
+      button("result-laps-prev", "result-lap-pages", "\u2039", turnPage(-1), { width: 44, height: 44, padding: 0 });
+      label("result-page", "result-lap-pages", `${page + 1}/${pages}`, 15);
+      button("result-laps-next", "result-lap-pages", "\u203A", turnPage(1), { width: 44, height: 44, padding: 0 });
+    }
+    node("result-actions", "results-panel", { position: "absolute", bottom: 0, width, height: 48, flexDirection: "row", gap });
+    const actionStyle = { width: Math.floor((width - gap * 3) / 4), height: 48, padding: 4 };
+    button("race-again", "result-actions", tr("Race Again", "\u518D\u6765\u4E00\u5C40"), start, actionStyle);
+    button("change-track", "result-actions", tr("Change Track", "\u66F4\u6362\u8D5B\u9053"), () => {
+      session2.chooseRaceTrack();
+      changed();
+    }, actionStyle);
+    button("choose-new-race", "result-actions", tr("New Race", "\u65B0\u7684\u6BD4\u8D5B"), () => {
+      session2.chooseNewRace();
+      changed();
+    }, actionStyle);
+    button("result-menu", "result-actions", tr("Main Menu", "\u4E3B\u83DC\u5355"), () => {
+      session2.screen = "main";
+      changed();
+    }, actionStyle);
+  }
   function highlight() {
     for (let i = 0; i < buttons.length; i++) {
       const button2 = buttons[i];
@@ -2005,6 +2092,9 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       button("leave-race", "pause-panel", tr("Exit to Menu", "\u8FD4\u56DE\u4E3B\u83DC\u5355"), act(() => {
         session2.screen = "main";
       }), { width: "24%" }, "ui/main_quit.png");
+    } else if (screen === "finished" && mobile2) {
+      mountTouchResults(session2, layout2, changed, start);
+      preferredFocus = "race-again";
     } else if (screen === "finished") {
       heading(tr("Race Results", "\u6BD4\u8D5B\u7ED3\u679C"), tr("Position \xB7 Kart \xB7 Time", "\u540D\u6B21 \xB7 \u8D5B\u8F66 \xB7 \u65F6\u95F4"));
       centeredPanel("results-panel");
@@ -2198,6 +2288,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     noticeText = "";
     resourceText = "";
     resourceFailed = false;
+    resultLapPage = 0;
     menu = new MenuState();
     menuHistory = [];
     get course() {
@@ -2209,6 +2300,7 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
     start() {
       const route = this.settings.reverse ? [...this.course.route].reverse() : this.course.route;
       this.race = new Race(new Circuit(route), this.course.pickups, this.settings.laps, this.settings);
+      this.resultLapPage = 0;
       this.race.start();
       this.screen = "race";
     }
@@ -2234,6 +2326,13 @@ ${tr("Challenge progress is not connected in this preview.", "\u6B64\u9884\u89C8
       this.screen = "main";
       this.menu.show("");
       this.openMenu("karts", "kart");
+    }
+    chooseRaceTrack() {
+      this.chooseNewRace();
+      this.menu.raceMode = this.settings.mode;
+      this.menu.trackSection = "races";
+      this.openMenu("race_setup", "setup");
+      this.openMenu("tracks_and_gp", "tracks");
     }
     openMenu(page, screen = "menu") {
       if (this.screen === "main") this.menuHistory = [];

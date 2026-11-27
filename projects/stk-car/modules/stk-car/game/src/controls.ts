@@ -7,6 +7,7 @@ export interface Layout {
 }
 export interface Contact { id: string; justPressed: boolean; x: number; y: number; }
 export interface ControlRect { x: number; y: number; width: number; height: number; }
+interface SteeringAssist { steer: number; speed: number; speedLimit: number; }
 export type TouchAction = "left" | "right" | "boost" | "drift" | "item" | "rescue" | "look-back";
 export function touchControlRects(layout: Layout): Record<TouchAction, ControlRect> {
   const size = layout.controlSize, y = layout.height - layout.bottom - size, small = clamp(size * 0.68, 44, 60), steerWidth = size * 1.15;
@@ -34,7 +35,7 @@ export class TouchControls {
   private capture = new Map<string, TouchAction>();
   private rearm = false;
   reset(): void { this.braking = false; this.drifting = false; this.active.clear(); this.capture.clear(); this.rearm = true; }
-  apply(input: Controls, contacts: Contact[], layout: Layout, driving = true, assistedSteer = 0): void {
+  apply(input: Controls, contacts: Contact[], layout: Layout, driving = true, assist?: SteeringAssist): void {
     this.active.clear(); this.braking = false; this.drifting = false;
     input.allowReverse = false;
     contacts = contacts.filter((contact) => Number.isFinite(contact.x) && Number.isFinite(contact.y));
@@ -69,18 +70,34 @@ export class TouchControls {
       if (Math.abs(input.steer) > 0.12) input.drift = true;
       else input.brake = true;
     }
-    if (!manualTouch && !input.steer && driving) input.steer = assistedSteer;
     input.throttle = driving && !input.brake ? 1 : 0;
     this.braking = input.brake; this.drifting = input.drift;
+    if (assist && driving && !manualTouch && !input.steer) {
+      input.steer = assist.steer;
+      if (!input.brake && !input.nitro && !input.useItem) {
+        if (assist.speed >= assist.speedLimit) input.throttle = 0;
+        if (assist.speed > assist.speedLimit + 0.8) input.brake = true;
+      }
+    }
   }
 }
 
-/** Keep the current lane where possible, gently guiding back from the track edges. Manual input wins. */
-export function assistedSteering(race: Race): number {
-  const player = race.player, road = race.circuit.sample(player.routeDistance);
-  const lane = (player.x - road.x) * Math.cos(road.heading) + (player.z - road.z) * Math.sin(road.heading);
-  const target = race.circuit.sample(player.routeDistance + Math.max(5, Math.abs(player.speed) * 0.35), clamp(lane, -road.width * 0.25, road.width * 0.25));
-  return clamp(angleDelta(Math.atan2(target.x - player.x, -(target.z - player.z)) - player.heading) * 2.6, -0.9, 0.9);
+export function steeringAssist(race: Race): SteeringAssist {
+  const { player, circuit } = race, distance = player.routeDistance;
+  const target = circuit.sample(distance + Math.max(4.5, player.speed * 0.37));
+  const error = angleDelta(Math.atan2(target.x - player.x, -(target.z - player.z)) - player.heading);
+  const cruiseSpeed = 19, cornerSpeed = 7;
+  let speedLimit = clamp(cruiseSpeed - Math.abs(error) * 30, cornerSpeed, cruiseSpeed);
+  let heading = circuit.sample(distance + 3).heading;
+  for (const lookAhead of [7, 11, 15, 19, 24, 30]) {
+    const nextHeading = circuit.sample(distance + lookAhead).heading;
+    const turn = Math.abs(angleDelta(nextHeading - heading));
+    const targetSpeed = clamp(cruiseSpeed - turn * 45, cornerSpeed, cruiseSpeed);
+    // Leave enough distance to brake before reaching the bend.
+    speedLimit = Math.min(speedLimit, Math.sqrt(targetSpeed ** 2 + 18 * Math.max(0, lookAhead - 9)));
+    heading = nextHeading;
+  }
+  return { steer: clamp(error * 3.4, -1, 1), speed: player.speed, speedLimit };
 }
 
 export function keyboardControls(held: (key: string) => boolean, pressed: (key: string) => boolean, wasd = false): Controls {
@@ -100,6 +117,7 @@ export function readControls(touch: TouchControls, layout: Layout, mobile = fals
   if (!contacts.length && pointer.pressed) contacts.push({ id: "mouse", justPressed: pointer.justPressed,
     x: (pointer.x / pointer.viewportWidth + 0.5) * layout.width, y: (0.5 - pointer.y / pointer.viewportHeight) * layout.height });
   const active = driving ? driving.race.phase === "racing" : true;
-  touch.apply(input, contacts, layout, active, active && driving?.steeringAssist ? assistedSteering(driving.race) : 0);
+  const assist = active && driving?.steeringAssist ? steeringAssist(driving.race) : undefined;
+  touch.apply(input, contacts, layout, active, assist);
   return input;
 }

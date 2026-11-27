@@ -101,6 +101,54 @@ function heading(title: string, subtitle: string): void {
 function centeredPanel(id: string, spec: Record<string, unknown> = {}): void {
   node(id, "root", { position: "absolute", left: "14%", top: "23%", width: "72%", height: "62%", padding: 22, gap: 16, background: panel, borderRadius: 18, flexDirection: "column", ...spec });
 }
+function mountTouchResults(session: PcSession, layout: Layout, changed: () => void, start: () => void): void {
+  const { race } = session, width = layout.width - layout.left - layout.right, height = layout.height - layout.top - layout.bottom;
+  const gap = 10, standingsWidth = Math.floor((width - gap) * 0.55), lapsWidth = width - gap - standingsWidth;
+  const bodyHeight = height - 108;
+  node("results-panel", "root", { position: "absolute", left: layout.left, top: layout.top, width, height });
+  const surface = [0.05, 0.09, 0.14, 0.94];
+  node("result-header", "results-panel", { width, height: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 10, background: surface, borderRadius: 10 });
+  label("title", "result-header", tr("Race Results", "比赛结果"), 23);
+  label("result-track", "result-header", sourceText(session.course.name), 17);
+  node("result-body", "results-panel", { position: "absolute", top: 52, width, height: bodyHeight, flexDirection: "row", gap });
+  const card = { height: bodyHeight, padding: 10, borderRadius: 10, background: surface, flexDirection: "column" };
+  node("result-standings", "result-body", { ...card, width: standingsWidth });
+  label("result-standings-title", "result-standings", tr("Standings", "比赛排名"), 19, { margin: 2 });
+  const rowHeight = Math.min(32, Math.floor((bodyHeight - 48) / 4));
+  for (const [index, racer] of race.ranking.entries()) {
+    const kart = trackData.karts.find((kart) => kart.id === racer.kartId);
+    const id = `result-row-${index}`, player = racer === race.player;
+    node(id, "result-standings", { width: "100%", height: rowHeight, flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+      padding: 2, borderRadius: 5, background: player ? [0.46, 0.28, 0.06, 0.9] : [0, 0, 0, 0] });
+    label(`result-${index}`, id, `${index + 1}.  ${kart?.name ?? racer.kartId}${player ? tr(" (You)", "（你）") : ""}`, 16);
+    label(`result-time-${index}`, id, racer.finishedAt === null ? tr("Racing", "比赛中") : formatTime(racer.finishedAt), 16);
+  }
+  node("result-laps", "result-body", { ...card, width: lapsWidth });
+  label("result-laps-title", "result-laps", tr("Lap Times", "分圈用时"), 19, { margin: 2 });
+  const fastest = Math.min(...race.lapTimes), pageSize = Math.max(1, Math.floor((bodyHeight - 90) / 23));
+  const pages = Math.max(1, Math.ceil(race.lapTimes.length / pageSize));
+  const page = Math.min(session.resultLapPage, pages - 1);
+  session.resultLapPage = page;
+  race.lapTimes.slice(page * pageSize, (page + 1) * pageSize).forEach((time, row) => {
+    const index = page * pageSize + row, id = `result-lap-${index}`;
+    node(id, "result-laps", { width: "100%", height: 23, flexDirection: "row", alignItems: "center", justifyContent: "space-between" });
+    label(`${id}-name`, id, tr(`Lap ${index + 1}`, `第 ${index + 1} 圈`), 16);
+    label(`${id}-time`, id, formatTime(time), 16, {}, time === fastest ? [1, 0.76, 0.26, 1] : cream);
+  });
+  if (pages > 1) {
+    node("result-lap-pages", "result-laps", { position: "absolute", right: 10, bottom: 6, flexDirection: "row", alignItems: "center", gap: 8 });
+    const turnPage = (direction: number) => () => { session.resultLapPage = (page + direction + pages) % pages; changed(); };
+    button("result-laps-prev", "result-lap-pages", "‹", turnPage(-1), { width: 44, height: 44, padding: 0 });
+    label("result-page", "result-lap-pages", `${page + 1}/${pages}`, 15);
+    button("result-laps-next", "result-lap-pages", "›", turnPage(1), { width: 44, height: 44, padding: 0 });
+  }
+  node("result-actions", "results-panel", { position: "absolute", bottom: 0, width, height: 48, flexDirection: "row", gap });
+  const actionStyle = { width: Math.floor((width - gap * 3) / 4), height: 48, padding: 4 };
+  button("race-again", "result-actions", tr("Race Again", "再来一局"), start, actionStyle);
+  button("change-track", "result-actions", tr("Change Track", "更换赛道"), () => { session.chooseRaceTrack(); changed(); }, actionStyle);
+  button("choose-new-race", "result-actions", tr("New Race", "新的比赛"), () => { session.chooseNewRace(); changed(); }, actionStyle);
+  button("result-menu", "result-actions", tr("Main Menu", "主菜单"), () => { session.screen = "main"; changed(); }, actionStyle);
+}
 function highlight(): void {
   for (let i = 0; i < buttons.length; i++) {
     const button = buttons[i];
@@ -201,6 +249,9 @@ export function mountHud(session: PcSession, layout: Layout, changed: () => void
     button("restart-race", "pause-panel", tr("Restart Race", "重新比赛"), start, { width: "24%" }, "ui/restart.png");
     button("new-race", "pause-panel", tr("New Race", "新的比赛"), act(() => session.chooseNewRace()), { width: "24%" }, "ui/menu_race.png");
     button("leave-race", "pause-panel", tr("Exit to Menu", "返回主菜单"), act(() => { session.screen = "main"; }), { width: "24%" }, "ui/main_quit.png");
+  } else if (screen === "finished" && mobile) {
+    mountTouchResults(session, layout, changed, start);
+    preferredFocus = "race-again";
   } else if (screen === "finished") {
     heading(tr("Race Results", "比赛结果"), tr("Position · Kart · Time", "名次 · 赛车 · 时间"));
     centeredPanel("results-panel");

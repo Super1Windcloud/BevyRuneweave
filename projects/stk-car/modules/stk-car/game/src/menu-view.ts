@@ -355,9 +355,11 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       const key = `mobile-tracks:${m.trackSection}`;
       const total = Math.max(1, Math.ceil(list.length / capacity)), number = Math.min(m.listPages[key] ?? 0, total - 1);
       m.listPages[key] = number;
-      const y = 101, height = Math.max(49, (r.height - y - (total > 1 ? 49 : 4)) / rows);
+      const showRandom = m.trackSection === "races";
+      const y = 101, height = Math.max(49, (r.height - y - (showRandom || total > 1 ? 49 : 4)) / rows);
       const visible = list.slice(number * capacity, (number + 1) * capacity);
       visible.forEach((item, index) => { card(item, rect(index % columns * r.width / columns + 4, y + Math.floor(index / columns) * height, r.width / columns - 8, height - 5)); });
+      if (showRandom) button(menuWidgetId(page, "random_track"), rect(4, r.height - 44, 156, 44), tr("Random Track", "随机赛道"), action("random_track"), { normal: "", background: mobileCard, textColor: mobileText });
       if (total > 1) pagination(key, r, total);
       host.focus(menuWidgetId(page, visible.find((item) => item.selected)?.id ?? visible[0]?.id ?? `track-section:${m.trackSection}`));
     } else if (page === "gp_info") {
