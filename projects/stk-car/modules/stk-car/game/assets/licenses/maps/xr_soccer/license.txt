@@ -1,0 +1,41 @@
+XR-4R3N4 by CrystalDaEevee, based on the track XR591
+License: CC-BY-SA 4.0
+
+Textures used that belong to the base game:
+acid_lake.jpg
+basicwall.png
+columngreen.png
+columnred.png
+glassWindows.png
+goal.png
+light.png
+metal_ground.jpg
+metal_ground.png
+red_dirt.jpg
+road_dirt_red.jpg
+sandred.jpg
+stkflag_mandaravaMotors_a.png
+stktex_tvVan_a.png
+
+Textures that author made or modified from base game:
+acid_glow.png
+arrows(blue / neutral / red).png
+ball.png
+ball_gloss.png
+barrier_grid.png
+grid_glow.png
+light_goal.png
+metal_gloss.png
+metal_transition_gloss.png
+satellite.png
+seating.png
+stk_blueFutureSquareLight_a.png
+stktex_tvVan_a_gloss.png
+
+All new textures are under CC-BY-SA 4.0, all modified ones under CC-BY-SA 3.0 or 4.0 according to the texture's original license
+
+.spm:
+barrier.spm
+field_lining.spm
+soccer_ball.spm
+xr_4r3n4_track.spm

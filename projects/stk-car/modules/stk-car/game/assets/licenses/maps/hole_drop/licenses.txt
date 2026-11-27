@@ -1,0 +1,43 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Hole drop for SuperTuxKart
+Upstream-Contact: Jean-Manual "samuncle" Clémençon <sam.un@protonmail.com>
+Source: https://supertuxkart.net
+License: CC-BY-SA 4.0
+
+
+Files:
+ background_fan.spm
+ barrier.spm
+ field_lining.spm
+ hole_drop_track.spm
+ holes.spm
+ puck.spm
+ pusher_blue.spm
+ pusher_red.spm
+ puck.png
+ puck_gloss.png
+ softLights.png
+ softLightsGloss.png
+Copyright: Copyright 2025 CrystalDaEevee
+License: CC-BY-SA 4.0
+
+
+Files:
+ factory.ogg
+Copyright: Copyright 2025 CrystalDaEevee and Dernis
+License: CC-BY-SA 4.0
+
+
+Files:
+ stk_genericMetal_a_dark.png
+ stk_genericMetal_a_glossy.png
+ stk_genericMetal_a_light.png
+Copyright: Copyright 2025 Sven Andreas Belting
+License: CC-BY-SA 4.0
+
+
+Files: *
+Copyright: Copyright 2022 CrystalDaEevee
+License: CC-BY-SA 4.0
+Comment: 0bottom.png
+ 0top.png, 1north.png, 2east.png, 3south.png, 4west.png by Greg Zaal and Jarod Guest releasded under CC0

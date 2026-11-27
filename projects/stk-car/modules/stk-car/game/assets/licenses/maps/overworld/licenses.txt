@@ -1,0 +1,44 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Overworld for SuperTuxKart
+Upstream-Contact: Jean-Manual "samuncle" Clémençon <sam.un@protonmail.com>
+Source: https://supertuxkart.net
+License: CC-BY-SA 3.0
+
+Files: sps_splatting.xml splatting.frag
+Copyright: Benau
+License: Public Domain
+Comment:
+ Custom splatting shader for SP
+
+ Files: house.png
+Copyright: DoggoOfSpeed
+License: CC0
+Comment:
+ https://forum.freegamedev.net/viewtopic.php?f=18&t=12528
+
+Files: skybox_bottom.jpg skybox_east.jpg skybox_north.jpg skybox_south.jpg skybox_top.jpg skybox_west.jpg
+Copyright: Ursula Belting
+License: CC-BY-SA 3.0
+
+Files: killer_whale.spm tex-subsea.jpg
+Copyright: Joey Fleischman
+License: CC0
+
+Files: lava_2k_diffuse.jpg lava_2k_glossy.jpg lava_2k_nm.jpg
+Copyright: Sven Andreas Belting
+License: CC0
+Comment: original from sharetextures.com modified by Sven Andreas Belting
+
+Files: grass2.jpg
+Copyright: Christoph Egger
+License: CC-BY-SA 3.0
+Comment: modified by Sven Andreas Belting
+
+Files: *
+Copyright: STK Team
+License: CC-BY-SA 3.0
+Comment: roadRoundBrick.jpg lighthouseRoof_diff.png lighthouseWall_diff.png lighthousWindows_diff.png are all from the lighthouse track
+
+Files: alpha_sea.png alpha_sea_b.png
+Copyright: Fabio Ponzi (aka Ponzino)
+License: CC-BY-SA 3.0

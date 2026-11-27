@@ -19,7 +19,10 @@ const catalog: ResourceCatalog = { schemaVersion: 1, packs: [], owners: {} };
 const publication: { name: string; path: string; sha256: string; bytes: number }[] = [];
 for (const [id, paths] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
   const files = readPackFiles(assets, [...new Set([...paths, "licenses/stk-assets.txt", "licenses/source-manifest.json"])]);
+  const maxBytes = 512 * 1024 ** 2;
+  if (files.length > 4096 || files.reduce((size, file) => size + file.data.length, 0) > maxBytes) throw new Error(`Pack exceeds runtime limits: ${id}`);
   const archive = zipFiles(files), hash = sha256(archive), name = `stk-${id}-${hash}.zip`;
+  if (archive.length > maxBytes) throw new Error(`Archive exceeds runtime limit: ${id}`);
   const destination = join(output, name); writeFileSync(destination, archive);
   catalog.packs.push({ id, url: `${baseUrl}/${name}`, bytes: archive.length, sha256: hash,
     files: files.map((file) => ({ path: file.path, bytes: file.data.length, sha256: sha256(file.data) })) });

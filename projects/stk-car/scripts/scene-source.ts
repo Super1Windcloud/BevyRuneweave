@@ -77,3 +77,25 @@ export function skyMesh(textures: string[]): SpmMesh {
     uvs: [0, 0, 1, 0, 1, 1, 0, 1], colors: new Array(16).fill(1), indices: [0, 1, 2, 0, 2, 3], material,
   })) };
 }
+
+export function skyDomeMesh(texture: string, attributes: Record<string, string>): SpmMesh {
+  const horizontal = Number(attributes.horizontal), vertical = Number(attributes.vertical);
+  const textureSpan = Number(attributes["texture-percent"]), sphereSpan = Number(attributes["sphere-percent"]);
+  if (![horizontal, vertical].every((value) => Number.isInteger(value) && value >= 3 && value <= 128)
+    || ![textureSpan, sphereSpan].every((value) => Number.isFinite(value) && value > 0 && value <= 2)) throw new Error("Invalid sky dome geometry");
+  const primitive: SpmPrimitive = { positions: [], normals: [], uvs: [], colors: [], indices: [], material: 0 };
+  const stride = horizontal + 1;
+  for (let row = 0; row <= vertical; row++) for (let column = 0; column <= horizontal; column++) {
+    const pitch = (1 - row / vertical * sphereSpan) * Math.PI / 2, yaw = column / horizontal * Math.PI * 2;
+    const unit = [Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw)];
+    primitive.positions.push(...unit.map((value) => value * 750));
+    primitive.normals.push(...unit.map((value) => -value));
+    primitive.uvs.push(column / horizontal, row / vertical * textureSpan);
+    primitive.colors.push(1, 1, 1, 1);
+    if (row < vertical && column < horizontal) {
+      const index = row * stride + column;
+      primitive.indices.push(index, index + 1, index + stride, index + 1, index + stride + 1, index + stride);
+    }
+  }
+  return { materials: [{ texture, secondary: "" }], primitives: [primitive] };
+}

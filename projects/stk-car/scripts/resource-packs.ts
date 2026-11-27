@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { crc32, deflateRawSync } from "node:zlib";
-import { courses } from "../modules/stk-car/game/src/courses.ts";
+import { courseModelPaths, mapScenes, sceneFor } from "../modules/stk-car/game/src/courses.ts";
 
 export type { ResourceCatalog, ResourcePack, PackFile } from "../modules/stk-car/game/src/resource-types.ts";
 export const sha256 = (data: Buffer): string => createHash("sha256").update(data).digest("hex");
@@ -12,8 +12,9 @@ export function safePath(path: string): boolean {
 export function packFor(path: string): string | null {
   if (path.startsWith("source/")) return "source-local";
   if (path.startsWith("models/karts/")) return `kart-${path.split("/")[2]}`;
-  const course = courses.find((course) => path === course.trackModel || path === course.skyModel);
-  if (course) return `track-${course.id}`;
+  const mapAsset = /^(?:licenses|ui)\/maps\/([^/]+)\//.exec(path)?.[1];
+  const scene = mapAsset ? sceneFor(mapAsset) : mapScenes.find((scene) => courseModelPaths(scene).includes(path));
+  if (scene) return `track-${scene.id}`;
   if (path.startsWith("audio/music/")) return `music-${path.split("/").at(-1)!.replace(/\.ogg$/, "")}`;
   if (path.startsWith("ui/catalog/")) return `preview-${path.split("/").at(-1)!.replace(/\.[^.]+$/, "")}`;
   return null;

@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 import { halfFloat, readSpm } from "./spm.ts";
 import { trackData } from "../modules/stk-car/game/src/track-data.ts";
-import { courses } from "../modules/stk-car/game/src/courses.ts";
+import { courseModelPaths, mapScenes } from "../modules/stk-car/game/src/courses.ts";
 
 const assets = resolve(import.meta.dirname, "../modules/stk-car/game/assets");
 test("original menu and race music and effect resources are included in the asset manifest", () => {
@@ -24,10 +24,11 @@ test("SPM decoding rejects unsupported headers and truncated buffers", () => {
 });
 
 test("all converted GLBs are self-contained with valid bounds, triangle indices and image signatures", () => {
-  const paths = [trackData.trackModel, ...courses.flatMap((course) => [course.trackModel, course.skyModel]), trackData.kartModel, ...trackData.wheels.map((wheel) => wheel.path),
-    trackData.skyModel, trackData.menuSkyModel, ...Object.values(trackData.pickupModels), ...trackData.karts.flatMap((kart) => [kart.model, ...kart.wheels.map((wheel) => wheel.path)])];
+  const paths = new Set([...mapScenes.flatMap(courseModelPaths), trackData.kartModel, ...trackData.wheels.map((wheel) => wheel.path),
+    trackData.menuSkyModel, ...Object.values(trackData.pickupModels), ...trackData.karts.flatMap((kart) => [kart.model, ...kart.wheels.map((wheel) => wheel.path)])]);
   for (const path of paths) {
     const data = readFileSync(join(assets, path));
+    assert.ok(data.length <= 90 * 1024 ** 2, path);
     assert.equal(data.readUInt32LE(), 0x46546c67);
     assert.equal(data.readUInt32LE(4), 2);
     assert.equal(data.readUInt32LE(8), data.length);

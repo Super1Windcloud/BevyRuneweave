@@ -97,12 +97,12 @@ export function prepareMenus(source: string, code: string, record: (path: string
     const directory = join(source, "tracks", entry.name), config = join(directory, "track.xml");
     if (!existsSync(config)) continue;
     const attrs = parseXml(record(config).toString("utf8")).attributes;
-    if (attrs.internal === "Y" && entry.name !== "overworld") continue;
-    const screenshot = [attrs.screenshot, "screenshot.jpg", "screenshot.png"].filter(Boolean).map((name) => join(directory, name)).find(existsSync);
+    const screenshot = attrs.internal === "Y" && entry.name !== "overworld" ? undefined
+      : [attrs.screenshot, "screenshot.jpg", "screenshot.png"].filter(Boolean).map((name) => join(directory, name)).find(existsSync);
     let path = "ui/branding/lighthouse.jpg";
     if (screenshot) { path = `ui/catalog/${entry.name}${extname(screenshot)}`; write(path, record(screenshot)); }
     else path = data.images["gui/icons/track_random.png"].path;
-    data.tracks.push({ id: entry.name, name: attrs.name ?? entry.name, designer: attrs.designer ?? "", image: path, laps: Number(attrs["default-number-of-laps"] ?? 3), arena: attrs.arena === "Y" || attrs.soccer === "Y", groups: attrs.groups ?? "standard" });
+    data.tracks.push({ id: entry.name, name: attrs.name ?? entry.name, designer: attrs.designer ?? "", image: path, laps: Number(attrs["default-number-of-laps"] ?? 3), arena: attrs.arena === "Y" || attrs.soccer === "Y", groups: attrs.groups ?? "standard", ...(attrs.internal === "Y" ? { internal: true } : {}) });
     texts.add(attrs.name ?? entry.name);
   }
   for (const name of readdirSync(join(code, "data/grandprix")).filter((name) => name.endsWith(".grandprix")).sort()) {

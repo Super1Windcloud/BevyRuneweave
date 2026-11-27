@@ -43,7 +43,7 @@ test("collision bounds match each packaged chassis and all four wheel mounts", (
   }
 });
 
-test("all starting grids are free of chassis overlap on both courses and in reverse", () => {
+test("all starting grids are free of chassis overlap on every course and in reverse", () => {
   for (const course of courses) for (const reverse of [false, true]) for (const kart of trackData.karts) {
     const game = new Race(new Circuit(reverse ? [...course.route].reverse() : course.route), [], 3, { difficulty: 1, aiCount: 3, mode: "normal", kartId: kart.id });
     separated(game.racers);

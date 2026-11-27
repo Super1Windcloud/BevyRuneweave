@@ -9,7 +9,7 @@ import { advanceWheelSpin, kartFrame, wheelTransform } from "./kart-transform.js
 import { setUiLanguage, tr } from "./localization.js";
 import { resources } from "./resources.js";
 import { kartBackdropTransform, kartPreviewCamera } from "./kart-layout.js";
-import { type Course, courseFor, courseModelPaths } from "./courses.js";
+import { type Course, type MapScene, courseFor, courseModelPaths, sceneFor } from "./courses.js";
 
 const callbacks = globalThis as unknown as RuneweaveCallbacks;
 const session = new PcSession();
@@ -30,24 +30,26 @@ let pendingRescue = false, pendingItem = false, lookBack = false;
 let worldReady = false;
 let previewId = "", previewAngle = 0;
 let camera: Pose = { ...session.race.player };
-let pendingRace: { course: Course; paths: string[] } | undefined;
+type SceneLoad = { kind: "race"; course: Course; paths: string[] } | { kind: "preview"; scene: MapScene; view: NonNullable<MapScene["view"]>; paths: string[] };
+let pendingLoad: SceneLoad | undefined;
+let scenePreview: { view: NonNullable<MapScene["view"]>; angle: number } | undefined;
 function raceResources(course: Course): string[] {
   const race = new Race(new Circuit(course.route), course.pickups, session.settings.laps, session.settings);
-  return [...courseModelPaths(course), ...race.racers.flatMap((racer) => {
+  return [...courseModelPaths(course), course.minimap.image, ...race.racers.flatMap((racer) => {
     const kart = trackData.karts.find((kart) => kart.id === racer.kartId)!;
     return [kart.model, ...kart.wheels.map((wheel) => wheel.path)];
   })];
 }
 function resourceStatus(): void {
-  const course = session.screen === "track-info" ? courseFor(session.menu.track) : undefined;
-  if (session.screen === "track-info" && !course) return;
-  const status = resources.status(course ? courseModelPaths(course) : pendingRace?.paths);
+  const scene = session.screen === "track-info" ? sceneFor(session.menu.track) : undefined;
+  if (session.screen === "track-info" && !scene) return;
+  const status = resources.status(scene ? courseModelPaths(scene) : pendingLoad?.paths);
   session.resourceFailed = !!status.error;
   session.resourceText = status.error === "runtime_update_required" ? tr("Update the game runtime to download resources.", "请更新游戏运行时以下载资源。")
-    : status.error ? tr("Download failed. Retry when starting the race.", "资源下载失败，可在开始比赛时重试。")
+    : status.error ? tr("Download failed. Please retry.", "资源下载失败，请重试。")
     : status.ready ? tr("Resources ready", "资源已就绪")
     : `${tr("Downloading resources", "正在下载资源")} ${(status.received / 1048576).toFixed(1)} / ${(status.total / 1048576).toFixed(1)} MiB`;
-  if (session.screen === "main" || session.screen === "downloading" || course) updateResourceStatus(session.resourceText);
+  if (session.screen === "main" || session.screen === "downloading" || scene) updateResourceStatus(session.resourceText);
 }
 const zeroPose = (): Pose => ({ x: 0, y: 0, z: 0, heading: 0, pitch: 0 });
 
@@ -57,7 +59,8 @@ function spawn(id: string, path: string, pose: Pose, scale = 1): void {
   scene_set_transform_3d(id, pose.x, pose.y, pose.z, pose.pitch, -pose.heading, 0, scale);
 }
 function refreshUi(): void {
-  if (session.screen !== "downloading") pendingRace = undefined;
+  if (session.screen !== "downloading") pendingLoad = undefined;
+  if (scenePreview && session.screen !== "scene-preview") { scenePreview = undefined; scene_clear(); }
   layout = readLayout(mobile); layoutClock = 0;
   touch.reset(); accumulator = 0; pendingItem = false; pendingRescue = false; lookBack = false;
   if (session.screen === "kart") {
@@ -67,18 +70,19 @@ function refreshUi(): void {
     const [bx, by, bz, rx, ry, rz, scale] = kartBackdropTransform(layout, camera);
     scene_set_transform_3d("preview-background", bx, by, bz, rx, ry, rz, scale);
   }
-  scene_set_3d_enabled(session.screen === "kart" || worldReady && (["race", "paused", "finished"].includes(session.screen) || ["options", "help"].includes(session.screen) && session.returnScreen === "paused"));
+  scene_set_3d_enabled(session.screen === "kart" || session.screen === "scene-preview" || worldReady && (["race", "paused", "finished"].includes(session.screen) || ["options", "help"].includes(session.screen) && session.returnScreen === "paused"));
   if (session.screen === "track-info") {
+    const scene = sceneFor(session.menu.track);
+    if (scene) resources.ensure(courseModelPaths(scene), 90);
     const course = courseFor(session.menu.track);
     if (course) {
-      resources.ensure(courseModelPaths(course), 90);
       const stored = storage_read(session.bestKey);
       const value = stored.state === "ok" ? Number(stored.value) : 0;
       session.best = Number.isFinite(value) && value > 0 ? value : 0;
     }
   }
   storage_write("pc-race-settings-v1", JSON.stringify(session.settings));
-  mountHud(session, layout, refreshUi, startRace, mobile, (id) => {
+  mountHud(session, layout, refreshUi, startRace, viewScene, mobile, (id) => {
     if (!mobile && session.screen === "kart" && id.startsWith("gui:karts:choose-")) {
       const kart = trackData.karts.find((kart) => `gui:karts:choose-${kart.id}` === id);
       if (kart && session.settings.kartId !== kart.id) { session.settings.kartId = kart.id; refreshUi(); }
@@ -110,26 +114,40 @@ function renderPreview(dt: number): void {
     scene_set_transform_3d(`preview-wheel-${i}`, wheel.position.x, wheel.position.y, wheel.position.z, ...wheel.rotation, 1);
   }
 }
-function startRace(): void {
-  if (!pendingRace) {
-    const course = courseFor(session.settings.trackId);
-    if (!course) return;
-    pendingRace = { course, paths: raceResources(course) };
-  }
-  const { course, paths } = pendingRace;
-  if (!resources.ensure(paths, 100, true)) {
+function mountScene(scene: MapScene): void {
+  scene_clear(); worldReady = false; previewId = "";
+  if (!scene_set_environment(JSON.stringify(scene.environment))) throw new Error(`Cannot set environment for ${scene.id}`);
+  scene_set_3d_enabled(true);
+  spawn("track", scene.trackModel, zeroPose());
+  for (const [index, path] of (scene.trackModelParts ?? []).entries()) spawn(`track-part-${index}`, path, zeroPose());
+  if (scene.skyModel) spawn("sky", scene.skyModel, zeroPose());
+}
+function renderScenePreview(dt: number): void {
+  if (!scenePreview) return;
+  const { center: [x, y, z], radius } = scenePreview.view;
+  scenePreview.angle = (scenePreview.angle + dt * 0.18) % (2 * Math.PI);
+  const distance = Math.max(8, Math.min(650, radius * 1.35));
+  scene_set_camera_3d(x + Math.cos(scenePreview.angle) * distance, y + distance * 0.75,
+    z + Math.sin(scenePreview.angle) * distance, x, y, z, 65);
+}
+function loadScene(load: SceneLoad): void {
+  pendingLoad = load;
+  if (!resources.ensure(load.paths, 100, true)) {
     if (session.screen !== "downloading") session.returnScreen = session.screen;
     session.screen = "downloading"; resourceStatus(); refreshUi(); return;
   }
+  if (load.kind === "preview") {
+    mountScene(load.scene);
+    scenePreview = { view: load.view, angle: Math.PI / 4 };
+    session.screen = "scene-preview";
+    refreshUi(); renderScenePreview(0); return;
+  }
+  const { course } = load;
   session.settings.trackId = course.id;
   session.start(); accumulator = 0; uiClock = 0; lookBack = false;
   wheelAngles.clear(); pickupVisible.clear(); trapIds.clear();
   camera = { ...session.race.player };
-  scene_clear();
-  if (!scene_set_environment(JSON.stringify(course.environment))) throw new Error("STK scene environment requires the current native runtime");
-  scene_set_3d_enabled(true);
-  spawn("track", course.trackModel, zeroPose());
-  spawn("sky", course.skyModel, zeroPose());
+  mountScene(course);
   for (const racer of session.race.racers) {
     const kart = trackData.karts.find((kart) => kart.id === racer.kartId)!;
     spawn(racer.id, kart.model, racer);
@@ -140,7 +158,15 @@ function startRace(): void {
     spawn(`pickup-${i}`, trackData.pickupModels[pickup.kind as keyof typeof trackData.pickupModels], { x, y, z, heading: 0, pitch: 0 });
   }
   worldReady = true; refreshUi(); render(1, 1);
-  previewId = "";
+}
+function startRace(): void {
+  if (pendingLoad) { loadScene(pendingLoad); return; }
+  const course = courseFor(session.settings.trackId);
+  if (course) loadScene({ kind: "race", course, paths: raceResources(course) });
+}
+function viewScene(): void {
+  const scene = sceneFor(session.menu.track);
+  if (scene?.view) loadScene({ kind: "preview", scene, view: scene.view, paths: courseModelPaths(scene) });
 }
 function render(alpha: number, dt: number): void {
   if (!worldReady) return;
@@ -204,7 +230,7 @@ function updateGame(frameDt: number): void {
   pollButtons();
   // Honor Back/selection input before a completed download can replace the current menu.
   const resourcesChanged = resources.tick(); resourceStatus();
-  if (session.screen === "downloading" && pendingRace?.paths.every((path) => resources.ready(path))) { startRace(); return; }
+  if (session.screen === "downloading" && pendingLoad?.paths.every((path) => resources.ready(path))) { loadScene(pendingLoad); return; }
   if (resourcesChanged && session.screen !== "race" && session.screen !== "paused") refreshUi();
   const dt = Math.min(frameDt, 0.1);
   layoutClock += dt;
@@ -214,6 +240,7 @@ function updateGame(frameDt: number): void {
   }
   if (mountedScreen !== session.screen) refreshUi();
   if (session.screen === "kart") renderPreview(dt);
+  if (session.screen === "scene-preview") renderScenePreview(dt);
   if (session.screen !== "race") {
     if (previousScreen === "race") { pendingItem = false; pendingRescue = false; }
     if (worldReady && ["paused", "finished"].includes(session.screen)) render(1, 0);

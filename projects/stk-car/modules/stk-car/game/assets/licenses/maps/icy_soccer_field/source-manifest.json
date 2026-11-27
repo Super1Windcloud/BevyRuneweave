@@ -1,0 +1,23 @@
+{
+  "textures/city_checker.png": "ed92dac1cae0b759f408bb340c09b87ac49ef2b3c5f4090915761cb63be512f6",
+  "textures/skybox/blue_sky_east.jpg": "484a3f46dbb8ab5e750999270a2fe20cfe7d9de6e793b0abf878880656d9b3f2",
+  "textures/skybox/blue_sky_north.jpg": "aa7a8de5cdf3177f150ed50e3df55120ac648df8e6272fc23a3f05eb22df00c9",
+  "textures/skybox/blue_sky_south.jpg": "c91aec080b714be0e26ae7e9e26764b12bae9c30886cefca32449c3daa2d2636",
+  "textures/skybox/blue_sky_top.jpg": "773dcef951e497289563429dfcb9dfaff60fb7f97ab3390420ec997e621441a3",
+  "textures/skybox/blue_sky_west.jpg": "89a0eb9ae09b99d412cec64ab97d2c5f1a9ce83e04ed3f2d9fd55fc36ed83639",
+  "textures/stk_generic_ice_a.png": "8295b0938b6c27882f3293c72a6c8d0f67d1cfffc53d3f3b091d8785f490fea6",
+  "textures/stk_generic_snow_a.png": "2e7ff23a0c597466913f9d3722b8e678701dc52ea21d702e5753874d07355f26",
+  "textures/stktex_frozenWaterFall_a.png": "8f7e378a964a72285974035543d3a6dddb62c2184c6ed0680fc3a57b5643ef52",
+  "textures/stktex_generic_cobbleStoneA.png": "3a179877dc9b3a1e1ba2202b9865d650607ea5e351fb18d81a1d1b0c910e3365",
+  "textures/stktex_snowRock_a.png": "0cec508201bc372c95d622bf3810a88d1856ebff3b56bd0cd6ba715889ec70a8",
+  "textures/stktex_stalactic_a.png": "ae75f7129beefec011729688ece2e4b61aa30710684b0e8fc5cbc70303b5e1ef",
+  "tracks/icy_soccer_field/field_lining.spm": "b935289757dc5b290a4c1e5c4ff211b044d90a94ec02ba7ca4f84119f7738133",
+  "tracks/icy_soccer_field/goal.png": "ba624038121aa5797e357d201efbb1b301d243de31d2124d9844d9dae94e0ba7",
+  "tracks/icy_soccer_field/icy_soccer_field_track.spm": "7d59acff3fef66e1bdf6ea00732b3cbaa0aa4adbaedc78eee3d46ec16e2cf72b",
+  "tracks/icy_soccer_field/licenses.txt": "0de3f656f84cd8b3e18a6affe350b246d1123b506ca69414fde5b7b0a4aef155",
+  "tracks/icy_soccer_field/materials.xml": "e802114e69124add285698b2d6684430f53b2ec87bcb442f37ca8d8ea61cd8cd",
+  "tracks/icy_soccer_field/puck.png": "62b234e0ef35ecfb94828530ec6075a2d3dcfea36dbba91be30553509ff21d4f",
+  "tracks/icy_soccer_field/puck.spm": "3c211697aaa991d41ded89a8809b45d14c01ae4b6383390638ebca887584f659",
+  "tracks/icy_soccer_field/scene.xml": "99446e4b3b1b5532f1aee27dbcb86a00ad82489011a3071aea7b032a491402ec",
+  "tracks/icy_soccer_field/track.xml": "15d161e5032b50df7b63506752ea0769b5e82044cb237abf9f19136d6306b4bd"
+}

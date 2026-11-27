@@ -3,6 +3,9 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { readSpm, writeGlb, wheelRadius, type SpmMesh } from "./spm.ts";
 import { prepareScene } from "./prepare-scene.ts";
+import { parseXml } from "./scene-source.ts";
+import type { Course, MapScene } from "../modules/stk-car/game/src/courses.js";
+import { Circuit } from "../modules/stk-car/game/src/race.js";
 import { minimap } from "./minimap.ts";
 import { kartPreviewBasis } from "../modules/stk-car/game/src/kart-layout.js";
 import { prepareMenus } from "./prepare-menus.ts";
@@ -42,7 +45,8 @@ function write(path: string, data: string | Buffer) {
   if (assetPath && !assetPath.startsWith("..") && !isAbsolute(assetPath)) generatedFiles.add(assetPath.replaceAll("\\", "/"));
 }
 function copy(path: string, target: string) { write(join(assets, target), record(path)); }
-function copyAudioMetadata(path: string, target: string) { write(join(assets, target), `${record(path).toString("utf8").replace(/[\t ]+$/gm, "").trimEnd()}\n`); }
+function textMetadata(bytes: Buffer): string { return `${bytes.toString("utf8").replace(/\r\n/g, "\n").replace(/[\t ]+$/gm, "").trimEnd()}\n`; }
+function copyTextMetadata(path: string, target: string) { write(join(assets, target), textMetadata(record(path))); }
 function xml(path: string): string { return record(path).toString("utf8"); }
 function attributes(value: string): Record<string, string> {
   return Object.fromEntries([...value.matchAll(/([\w-]+)\s*=\s*"([^"]*)"/g)].map((match) => [match[1], match[2]]));
@@ -120,9 +124,9 @@ const pickupModels = Object.fromEntries([
   ["item", "gift-box.spm"], ["banana", "banana.spm"],
   ["small-nitro", "nitrotank-small.spm"], ["big-nitro", "nitrotank-big-low.spm"],
 ].map(([kind, filename]) => [kind, convert(join(source, "models", filename), `models/${kind}.glb`)]));
-function driveline(directory: string) {
+function driveline(directory: string, readXml = xml) {
   const quads: number[][][] = [];
-  for (const quad of tags(xml(join(directory, "quads.xml")), "quad")) {
+  for (const quad of tags(readXml(join(directory, "quads.xml")), "quad")) {
     quads.push([0, 1, 2, 3].map((index) => {
       const value = quad[`p${index}`];
       if (!value.includes(":")) return vector(value);
@@ -131,7 +135,7 @@ function driveline(directory: string) {
       return [...quads[q][p]];
     }));
   }
-  const edge = tags(xml(join(directory, "graph.xml")), "edge-loop")[0];
+  const edge = tags(readXml(join(directory, "graph.xml")), "edge-loop")[0];
   return quads.slice(Number(edge.from), Number(edge.to) + 1).map((quad) => ({
     center: quad[0].map((value, axis) => (value + quad[1][axis]) / 2),
     width: Math.hypot(quad[0][0] - quad[1][0], quad[0][2] - quad[1][2]),
@@ -142,18 +146,18 @@ const pickups = ["small-nitro", "big-nitro", "banana", "item"].flatMap((tag) => 
   kind: tag, position: vector(`${item.x} ${item.y} ${item.z}`),
 })));
 const trackInfo = tags(xml(join(track, "track.xml")), "track")[0];
-function music(name: string): string {
-  const info = tags(xml(join(source, "music", name)), "music")[0];
+function music(name: string, readXml = xml): string {
+  const info = tags(readXml(join(source, "music", name)), "music")[0];
   const target = `audio/music/${info.file}`;
   copy(join(source, "music", info.file), target);
-  copyAudioMetadata(join(source, "music", name), `licenses/${name}`);
+  copyTextMetadata(join(source, "music", name), `licenses/${name}`);
   return target;
 }
 const audio = { menu: music("main_theme.music"), race: music(trackInfo.music), result: music("race_win_theme.music"), lose: music("lose_theme.music") };
 for (const name of ["plopp", "appear", "locked", "pre_start_race", "start_race", "engine_small", "nitro", "skid", "grab_collectable", "energy_bar_full", "race_finish", "crash", "wee"]) copy(join(source, "sfx", `${name}.ogg`), `audio/sfx/${name}.ogg`);
-copyAudioMetadata(join(source, "music/licenses.txt"), "licenses/music.txt");
-copyAudioMetadata(join(source, "sfx/sfx.xml"), "licenses/sfx.xml");
-copyAudioMetadata(join(source, "sfx/licenses.txt"), "licenses/sfx.txt");
+copyTextMetadata(join(source, "music/licenses.txt"), "licenses/music.txt");
+copyTextMetadata(join(source, "sfx/sfx.xml"), "licenses/sfx.xml");
+copyTextMetadata(join(source, "sfx/licenses.txt"), "licenses/sfx.txt");
 const map = minimap(route);
 write(join(assets, "ui/minimap.png"), map.image);
 const dayTrack = join(source, "tracks/hacienda");
@@ -209,14 +213,57 @@ for (const [path, target] of [
   [join(track, "licenses.txt"), "licenses/lighthouse.txt"],
   [join(kart, "licenses.txt"), "licenses/tux.txt"],
   [join(source, "models/licenses.txt"), "licenses/models.txt"],
-  [join(code, "data/ttf/LICENSE"), "licenses/fonts.txt"],
   [join(code, "data/ttf/SIL Open Font License.txt"), "licenses/OFL.txt"],
   [join(code, "COPYING"), "licenses/STK-COPYING.txt"],
 ] as const) copy(path, target);
+copyTextMetadata(join(code, "data/ttf/LICENSE"), "licenses/fonts.txt");
 write(join(assets, "licenses/source-manifest.json"), `${JSON.stringify({
   source: "https://github.com/supertuxkart/stk-assets-mobile/releases/tag/git",
   conversion: "SPM v1 to GLB; Z reflection; composed scene/library/LOD transforms baked including nonuniform scale; static opaque/masked material batching in 64m cells, transparent instances kept separate; original skybox; straight kart poses; base color only; secondary textures and skeletons omitted.",
   files: Object.fromEntries([...sourceFiles].sort(([a], [b]) => a.localeCompare(b))),
 }, null, 2)}\n`);
+
+const additionalCourses: Course[] = [], additionalScenes: MapScene[] = [];
+const trackRoot = join(source, "tracks");
+// Some scenes refer to textures shipped in another track's directory.
+indexTextures(trackRoot);
+for (const entry of readdirSync(trackRoot, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+  const id = entry.name;
+  if (!entry.isDirectory() || id === "hacienda" || id === "lighthouse") continue;
+  const directory = join(trackRoot, id), provenance = new Map<string, string>();
+  function read(path: string): Buffer {
+    const bytes = readFileSync(path);
+    provenance.set(relative(source, path).replaceAll("\\", "/"), createHash("sha256").update(bytes).digest("hex"));
+    return bytes;
+  }
+  const readXml = (path: string) => read(path).toString("utf8");
+  const info = parseXml(readXml(join(directory, "track.xml"))).attributes;
+  const converted = prepareScene(source, directory, read, textures, (path, data) => write(join(assets, path), data));
+  const { trackModel: model, trackModelParts, skyModel, environment, view } = converted;
+  const mapScene = { id, name: info.name ?? id, trackModel: model, trackModelParts, skyModel, environment, view };
+  for (const file of readdirSync(directory).filter((name) => /^licen[cs]e/i.test(name) && name.endsWith(".txt"))) {
+    write(join(assets, "licenses/maps", id, file), textMetadata(read(join(directory, file))));
+  }
+  for (const library of converted.metadata.libraries) {
+    const path = join(source, "library", library, "licenses.txt");
+    if (existsSync(path)) write(join(assets, "licenses/maps", id, `library-${library}.txt`), textMetadata(read(path)));
+  }
+  const competitive = !["arena", "soccer", "cutscene", "internal"].some((flag) => info[flag] === "Y") && id !== "overworld" && id !== "tutorial";
+  if (competitive) {
+    const courseRoute = driveline(directory, readXml);
+    new Circuit(courseRoute);
+    const courseMap = minimap(courseRoute), image = `ui/maps/${id}/minimap.png`;
+    write(join(assets, image), courseMap.image);
+    const courseXml = readXml(join(directory, "scene.xml"));
+    const coursePickups = ["small-nitro", "big-nitro", "banana", "item"].flatMap((kind) => tags(courseXml, kind).map((item) => ({
+      kind, position: vector(item.xyz ?? `${item.x} ${item.y} ${item.z}`),
+    })));
+    const courseMusic = info.music ? music(info.music, readXml) : audio.race;
+    additionalCourses.push({ ...mapScene, route: courseRoute, pickups: coursePickups, defaultLaps: Number(info["default-number-of-laps"] ?? 3), music: courseMusic, minimap: { ...courseMap.bounds, image } });
+  } else additionalScenes.push(mapScene);
+  write(join(assets, "licenses/maps", id, "source-manifest.json"), `${JSON.stringify(Object.fromEntries([...provenance].sort(([a], [b]) => a.localeCompare(b))), null, 2)}\n`);
+}
+write(join(project, "modules/stk-car/game/src/additional-map-data.ts"), `// Generated by npm run prepare:assets from the supplied STK assets.\nimport type { Course, MapScene } from "./courses.js";\nexport const additionalCourses: Course[] = ${JSON.stringify(additionalCourses)};\nexport const additionalScenes: MapScene[] = ${JSON.stringify(additionalScenes)};\n`);
 console.log(`Prepared Lighthouse (${fullScene.metadata.modelInstances} model instances, ${fullScene.metadata.libraryInstances} library instances, ${route.length} route nodes), ${karts.length} karts and ${pickups.length} pickups.`);
+console.log(`Prepared ${additionalCourses.length} additional race courses and ${additionalScenes.length} scene previews.`);
 write(join(assets, "asset-manifest.json"), `${JSON.stringify({ files: [...generatedFiles].sort() }, null, 2)}\n`);

@@ -1,0 +1,20 @@
+{
+  "textures/city_concrete.png": "7086750f0dfb0f42445819730260ec80092329fba0ad3f2432ccd9cf99e3b63f",
+  "textures/racetrack_asphalt.jpg": "5b0bf7309ccd3fd260b45c3d790f0c9c9ce8b5dbc9e289ebb9afdb92469123a3",
+  "textures/racetrack_grass.jpg": "949d9c02a512e9a5e7c92da588aa073b4c0f24489ccf4782590742dedb23501e",
+  "textures/skybox/genericskybox_bottom.jpg": "f504a45878ebe94484f739eea569fe831929c634effde310e6db0f06961b5223",
+  "textures/skybox/genericskybox_east.jpg": "44309ee8b26025127ccaf2319d652072c98880dd34b58664cfdb828738f168a0",
+  "textures/skybox/genericskybox_north.jpg": "b25dea3269df9ea9426355dc866d2f69adc4b364d7ecfb5a4d809ae28c0372ef",
+  "textures/skybox/genericskybox_south.jpg": "e70f8405b5f88cdbcd63854c50aa7ddc126815920f0be10ad2b3e32c21dfb8ca",
+  "textures/skybox/genericskybox_top.jpg": "7d2e50cdda3d45b3bc6b7c0818c848ded4d1b0da738f2b86574e5df3c997eb80",
+  "textures/skybox/genericskybox_west.jpg": "ccf9adf4afbf35b26d941df5e43aacbbca5f89029f1316cadf464478478a5463",
+  "tracks/stadium/city_metal.png": "6d05ed3013548bdda94b982f7bec3ff75a0cd8eaabb78c0b9fcf6d0af95b23ef",
+  "tracks/stadium/licenses.txt": "0c81bf2f15ad91651f23ce5944bda3c0284f30991c2a5ed58036b540d91d59b9",
+  "tracks/stadium/racetrack_curbs.jpg": "f54a74856df643069f9c301930d8e742bc41d5c29650b9252190f4bb8fbb5f78",
+  "tracks/stadium/racetrack_red.png": "55ed98faaf9da1237f1929685ee0d3057ab5e7711371759d9bcb6147e7219bd5",
+  "tracks/stadium/racetrack_roof.jpg": "ee7ee810826f55e9b38f4e476235ff88f8f27b550aeeddafbc4e4c4184bb8208",
+  "tracks/stadium/racetrack_stadium.jpg": "358dc9186c29c408631e87e5c81dfc875924681573aa5e53db00afb12c0e1408",
+  "tracks/stadium/scene.xml": "78555621e51c8f48b8859565a204c43966d92f706eec55b593b9711ed84a4d6c",
+  "tracks/stadium/stadium_track.spm": "52d84bba90f020dc069417342d1f521ca040be5976537fb679cd269a5a0df6f3",
+  "tracks/stadium/track.xml": "90e43974abfef4bfe106049bdf3e4f0f45517d09aa4ccde3bf2ebf39f2bc3c74"
+}

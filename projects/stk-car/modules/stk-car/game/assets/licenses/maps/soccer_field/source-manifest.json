@@ -1,0 +1,22 @@
+{
+  "textures/city_checker.png": "ed92dac1cae0b759f408bb340c09b87ac49ef2b3c5f4090915761cb63be512f6",
+  "textures/skybox/genericskybox_bottom.jpg": "f504a45878ebe94484f739eea569fe831929c634effde310e6db0f06961b5223",
+  "textures/skybox/genericskybox_east.jpg": "44309ee8b26025127ccaf2319d652072c98880dd34b58664cfdb828738f168a0",
+  "textures/skybox/genericskybox_north.jpg": "b25dea3269df9ea9426355dc866d2f69adc4b364d7ecfb5a4d809ae28c0372ef",
+  "textures/skybox/genericskybox_south.jpg": "e70f8405b5f88cdbcd63854c50aa7ddc126815920f0be10ad2b3e32c21dfb8ca",
+  "textures/skybox/genericskybox_top.jpg": "7d2e50cdda3d45b3bc6b7c0818c848ded4d1b0da738f2b86574e5df3c997eb80",
+  "textures/skybox/genericskybox_west.jpg": "ccf9adf4afbf35b26d941df5e43aacbbca5f89029f1316cadf464478478a5463",
+  "tracks/soccer_field/city_concrete.png": "023d967e5b691743dbf12b3d44086cb0e10d05abeeaef44f9d0746fe00a804d8",
+  "tracks/soccer_field/field_lining.spm": "cee20b4c2591a93f78d513dbfa88a4dae81d98eab33d38b86a6394fd2ef765fc",
+  "tracks/soccer_field/goal.png": "c0e7ad4d57a5815b89fddc040f0f964e407f8f66b4797eb9ec26cb7bd4d1ed4d",
+  "tracks/soccer_field/licenses.txt": "5bae66f1ff198fd2cd1a3e13e5da33f23036dfdde57d28f75e5b97e103dcb678",
+  "tracks/soccer_field/materials.xml": "bee62c66f8a64b7196c2ae1eb22e5cd3ca9cf4bac301ff49433bec942db9551e",
+  "tracks/soccer_field/racetrack_grass.jpg": "949d9c02a512e9a5e7c92da588aa073b4c0f24489ccf4782590742dedb23501e",
+  "tracks/soccer_field/racetrack_red.png": "55ed98faaf9da1237f1929685ee0d3057ab5e7711371759d9bcb6147e7219bd5",
+  "tracks/soccer_field/racetrack_stadium.jpg": "358dc9186c29c408631e87e5c81dfc875924681573aa5e53db00afb12c0e1408",
+  "tracks/soccer_field/scene.xml": "b697c3fa9d75d7356b1d4991f1e374459b3a6bcae8ce707be0560c0e2bde2c99",
+  "tracks/soccer_field/soccer_ball.png": "cbd539d83a97dc8087af63e1aeea4d5cbd18a5f92007b78aabe914f403ed69e8",
+  "tracks/soccer_field/soccer_ball.spm": "ca71e9b808a1d149fe95cc38f6e71670b047996b0aeb8e4021b4a5992be75371",
+  "tracks/soccer_field/soccer_field_track.spm": "cb5343677284562df9dc4654e6f55e0293358ffccbc71fbcc6e4381baced2af8",
+  "tracks/soccer_field/track.xml": "b10f28896f4042fa92af97999fd2972add5f71f1d88e8baed32d13e0c4be2cbb"
+}

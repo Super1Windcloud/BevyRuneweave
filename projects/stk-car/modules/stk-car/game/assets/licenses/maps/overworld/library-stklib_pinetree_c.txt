@@ -1,0 +1,21 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Pine Tree C model for SuperTuxKart
+Upstream-Contact:
+ Sven Andreas Belting: sven_andreas_belting@web.de
+Source: https://supertuxkart.net
+License: CC-BY-SA 4.0
+
+Files:
+ stktex_treebark_c.jpg
+ stktex_treebark_n_nm.jpg
+Copyright: Christian "Duion" Femmer Copyright 2018 Sven Andreas Belting
+License: CC-BY 3.0
+Comment: Duion is/was a user on FreeGameDev forums.
+
+Files: stklib_pintree_c_high.spm stklib_pintree_c_low.spm stklib_pintree_c_med.spm SomeModel.spm materials.xml node.xml
+Copyright: Sven Andreas Belting
+License: CC-BY-SA 4.0
+
+Files: stklib_pinetree_c.png stklib_pintree_low.png
+Copyright: STK Team
+License: CC-BY-SA 4.0

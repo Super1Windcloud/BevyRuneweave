@@ -14,9 +14,11 @@ versioned for repeatable conversion checks and builds.
 
 All 18 original karts, original music, all 44 scene directories and the complete
 public texture library are preserved as four `stk-source-*.zip` Release assets.
-These are production source archives, not executable packs: SPM meshes require
-conversion. Their publication does not make additional karts, arenas or cutscenes
-playable. The current playable set is still four karts and two courses.
+These production source archives contain the inputs for asset conversion. The
+runtime catalog contains an independent pack for each of the 44 converted
+scenes. The 21 standard race courses use their original drivelines and generated minimaps.
+The other 23 scenes, including arenas, soccer fields and internal scenes, can be
+downloaded and opened in the 3D viewer. Races use the four existing playable karts.
 
 ## Build and publish
 
@@ -45,12 +47,12 @@ libraries and remote payloads from its game ZIP.
 
 The homepage renders locally and queues the selected course and all its default
 race's karts, with at most two active requests. Opening a playable course's details
-prioritizes its scene and sky packs and shows their progress. Preview-only tracks
-are labeled in the course picker and have no race start action. Grand Prix previews
-offer a single-race entry. Starting checks the actual player and AI roster and shows
-a bilingual preparation screen until required packs are installed. Returning cancels the start
-intent; downloads may finish in the background. Errors allow retry. Music has lower
-priority and never prevents racing.
+prioritizes its map pack and shows its progress. For a viewer scene, the same
+map-pack flow leads to a 3D view with an orbiting camera. Grand Prix previews
+link back to the single-race track picker. Starting checks the map and actual
+player and AI roster and shows a bilingual preparation screen until the packs are
+installed. Returning cancels the start intent; downloads may finish in the
+background. Errors allow retry. Music has lower priority and never prevents racing.
 
 Workers stream downloads to temporary files outside the render thread. Installation
 checks archive size/SHA-256, an exact file allowlist, per-file size/SHA-256, safe

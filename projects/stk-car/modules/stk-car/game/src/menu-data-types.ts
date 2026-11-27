@@ -1,5 +1,5 @@
 export interface GuiNode { tag: string; attributes: Readonly<Record<string, string>>; children: readonly GuiNode[]; }
-export interface MenuTrack { id: string; name: string; designer: string; image: string; laps: number; arena: boolean; groups: string; }
+export interface MenuTrack { id: string; name: string; designer: string; image: string; laps: number; arena: boolean; groups: string; internal?: boolean; }
 export interface MenuGrandPrix { id: string; name: string; tracks: string[]; }
 export interface MenuData {
   pages: Record<string, GuiNode>;

@@ -1,0 +1,13 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: XR-4R3N4 for SuperTuxKart
+Upstream-Contact: Alayan <alayan.feh@gmail.com>
+Source: https://supertuxkart.net
+License: CC-BY-SA 4.0
+
+Files: barrier.spm field_lining.spm soccer_ball.spm xr-4r3n4_track.spm
+Copyright: Copyright 2024 CrystalDaEevee
+License: CC-BY-SA 4.0
+
+Files: *
+Copyright: STK team
+License: CC-BY-SA 4.0

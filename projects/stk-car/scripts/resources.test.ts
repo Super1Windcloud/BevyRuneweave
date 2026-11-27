@@ -6,7 +6,7 @@ import { ResourceDownloads } from "../modules/stk-car/game/src/resources.ts";
 import type { ResourceCatalog } from "../modules/stk-car/game/src/resource-types.ts";
 import { packFor, safePath, sha256, zipFiles } from "./resource-packs.ts";
 import { resourceCatalog } from "../modules/stk-car/game/src/resource-catalog.ts";
-import { courseFor, courseModelPaths } from "../modules/stk-car/game/src/courses.ts";
+import { courseFor, courseModelPaths, mapScenes, sceneFor } from "../modules/stk-car/game/src/courses.ts";
 import { menuData } from "../modules/stk-car/game/src/menu-data.ts";
 import { load } from "./game-fixture.ts";
 
@@ -62,24 +62,46 @@ test("selecting a playable course prefetches its models and shows progress befor
     assert.equal(game.models.get("track"), course.trackModel);
   }
 });
-test("preview-only track details have no start action or race model requests", () => {
-  const track = menuData.tracks.find(({ id }) => id !== "overworld" && !courseFor(id))!;
-  for (const platform of ["android", "windows"]) {
-    const game = load("zh-CN", platform);
+test("non-racing maps download their own 3D scene and can return or retry", () => {
+  const scene = sceneFor("alien_signal")!;
+  const root = "cache://stk-car/test/";
+  for (const platform of ["android", "ios", "windows"]) {
+    const game = load("zh-CN", platform, undefined, [], { hold: false, error: "", root });
     game.click("singleplayer");
-    if (platform === "android") game.click("gui:karts:continue");
+    if (platform !== "windows") game.click("gui:karts:continue");
     else game.press("Enter");
     game.click("gui:race_setup:mode-normal");
-    const id = `gui:tracks_and_gp:track:${track.id}`;
-    assert.match(game.texts.get(`${id}:label:text`)!, /预览$/);
-    const lastRequest = game.packRequests.size;
+    const id = `gui:tracks_and_gp:track:${scene.id}`;
+    for (let page = 0; page < mapScenes.length && !game.nodes.has(id); page++) {
+      const next = [...game.nodes].find((node) => node.endsWith(":page-1"));
+      assert.ok(next); game.click(next);
+    }
+    assert.match(game.texts.get(`${id}:label:text`)!, /3D 场景$/);
+    game.downloads.hold = true;
     game.click(id);
-    assert.ok([...game.texts.values()].some((value) => value.includes("仅供预览")));
     assert.ok(!game.nodes.has("gui:track_info:start"));
-    assert.ok(!game.nodes.has("resource-status"));
-    const newFiles = [...game.packRequests.values()].slice(lastRequest).flatMap((pack) => pack.files);
-    assert.ok(newFiles.every(({ path }) => !path.endsWith(".glb")));
+    game.click("gui:track_info:view-scene");
+    assert.ok(game.nodes.has("download-back"));
+    assert.ok(!game.models.has("track"));
+    game.downloads.error = "network"; game.frame();
+    assert.match(game.texts.get("resource-status")!, /下载失败/);
+    game.downloads.error = ""; game.downloads.hold = false;
+    game.click("download-retry"); game.settle();
+    assert.equal(game.models.get("track"), root + scene.trackModel);
+    assert.equal(game.models.get("sky"), root + scene.skyModel);
+    assert.ok(!game.models.has("tux"));
+    game.click("scene-back");
+    assert.ok(!game.models.has("track")); assert.ok(game.nodes.has("gui:track_info:view-scene"));
   }
+});
+test("an additional race uses the downloaded scene and minimap", () => {
+  const course = courseFor("abyss")!, root = "cache://stk-car/test/";
+  const game = load("en-US", "android", undefined, [], { hold: false, error: "", root });
+  game.click("singleplayer"); game.click("gui:karts:continue"); game.click("gui:race_setup:mode-normal");
+  game.click(`gui:tracks_and_gp:track:${course.id}`); game.click("gui:track_info:start");
+  assert.equal(game.models.get("track"), root + course.trackModel);
+  assert.equal(game.images.get("map"), root + course.minimap.image);
+  assert.equal(JSON.parse(game.saved.get("pc-race-settings-v1")!).trackId, course.id);
 });
 test("desktop Grand Prix previews return to the track picker without selecting Hacienda", () => {
   const game = load("zh-CN", "windows");
@@ -132,6 +154,19 @@ test("startup payload excludes production sources, scenes, extra vehicles and mu
   const root = resolve(import.meta.dirname, "../modules/stk-car/game/assets");
   const startup = JSON.parse(readFileSync(`${root}/startup-manifest.json`, "utf8")) as { files: string[] };
   assert.ok(startup.files.includes("models/tux.glb")); assert.ok(startup.files.includes("fonts/wqy-microhei.ttf"));
+  assert.equal(mapScenes.length, 44);
+  assert.deepEqual(mapScenes.map((scene) => scene.id).sort(), menuData.tracks.map((track) => track.id).sort());
+  for (const scene of mapScenes) {
+    const id = `track-${scene.id}`;
+    const pack = resourceCatalog.packs.find((pack) => pack.id === id);
+    assert.ok(pack, id);
+    assert.ok(pack.bytes <= 512 * 1024 ** 2 && pack.files.reduce((total, file) => total + file.bytes, 0) <= 512 * 1024 ** 2, id);
+    for (const path of courseModelPaths(scene)) assert.equal(resourceCatalog.owners[path], id);
+    const { ambient, sun, background, direction, fog } = scene.environment;
+    for (const color of [ambient, sun, background]) assert.ok(color.length === 3 && color.every((value) => value >= 0 && value <= 1), id);
+    assert.ok(direction.length === 3 && direction.every(Number.isFinite) && Math.hypot(...direction) > 0, id);
+    if (fog) assert.ok(fog.color.length === 4 && fog.color.every((value) => value >= 0 && value <= 1) && fog.start >= 0 && fog.end > fog.start, id);
+  }
   for (const path of startup.files) assert.equal(packFor(path), null, path);
   for (const [path, owner] of Object.entries(resourceCatalog.owners)) assert.ok(resourceCatalog.packs.some((pack) => pack.id === owner && pack.files.some((file) => file.path === path)));
   for (const pack of resourceCatalog.packs) {

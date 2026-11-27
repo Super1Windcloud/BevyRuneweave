@@ -4,10 +4,11 @@ import type { PcSession } from "./session.js";
 import { trackData } from "./track-data.js";
 import type { FrameMetrics } from "./performance.js";
 import { menuSound } from "./sound.js";
-import { isChinese, tr } from "./localization.js";
+import { isChinese, sourceText, tr } from "./localization.js";
 import { mountSourceMenu, textFieldColors, type MenuButton, type MenuHost } from "./menu-view.js";
 import { pollMenuText } from "./menu-actions.js";
 import { raceHudLayout } from "./hud-layout.js";
+import { resources } from "./resources.js";
 
 export { tr } from "./localization.js";
 const labels = new Map<string, string>();
@@ -141,7 +142,7 @@ export function readLayout(mobile = false): Layout {
   const factor = size.height / Math.max(1, pointer.viewportHeight);
   return makeLayout(size.width, size.height, { left: safe.leftInset * factor, right: safe.rightInset * factor, top: safe.topInset * factor, bottom: safe.bottomInset * factor }, mobile);
 }
-export function mountHud(session: PcSession, layout: Layout, changed: () => void, start: () => void, mobile = false, focusChanged: (id: string) => void = () => {}): void {
+export function mountHud(session: PcSession, layout: Layout, changed: () => void, start: () => void, viewScene: () => void, mobile = false, focusChanged: (id: string) => void = () => {}): void {
   const screenKey = `${session.screen}:${session.menu.page}:${session.menu.dialog?.page ?? ""}`;
   const focusedId = previousScreen === screenKey ? buttons[focus]?.id : undefined;
   ui_clear(); labels.clear(); buttons.length = 0; focus = 0; dimensions = layout; touchState = "";
@@ -153,6 +154,7 @@ export function mountHud(session: PcSession, layout: Layout, changed: () => void
     register: (button) => buttons.push(button),
     modal: () => { buttons.length = 0; focus = 0; preferredFocus = ""; },
     focus: (id) => { preferredFocus = id; },
+    viewScene,
     resourceStatus: ({ x, y, width, height }) => {
       node("track-resource-status", "root", { position: "absolute", left: x, top: y, width, height, alignItems: "center", justifyContent: "center" });
       label("resource-status", "track-resource-status", session.resourceText, mobile ? 12 : 15, { maxWidth: "100%", background: [0, 0, 0, 0.6], borderRadius: 5, padding: 3 });
@@ -168,10 +170,15 @@ export function mountHud(session: PcSession, layout: Layout, changed: () => void
   const back = act(() => session.back());
   if (screen === "downloading") {
     image("menu-background", "root", "ui/background.jpg", { position: "absolute", width: "100%", height: "100%", imageMode: "stretch" });
-    heading(tr("Preparing race", "准备比赛资源"), ""); centeredPanel("download-panel");
+    heading(tr("Preparing game resources", "正在准备游戏资源"), ""); centeredPanel("download-panel");
     label("resource-status", "download-panel", session.resourceText, 20);
     button("download-retry", "download-panel", tr("Retry", "重试"), start, { height: 48 });
     button("download-back", "download-panel", tr("Back", "返回"), back, { height: 48 });
+    finish(); return;
+  }
+  if (screen === "scene-preview") {
+    button("scene-back", "root", tr("Back", "返回"), back, { position: "absolute", left: layout.left, top: layout.top, height: 48 });
+    label("scene-name", "root", sourceText(session.menu.selectedTrack.name), 20, { position: "absolute", top: layout.top, right: layout.right, padding: 8, borderRadius: 8, background: panel });
     finish(); return;
   }
   const racing = screen === "race" || screen === "paused" || screen === "finished" || (screen === "options" || screen === "help") && session.returnScreen === "paused";
@@ -236,7 +243,7 @@ function mountRaceHud(session: PcSession, layout: Layout, mobile: boolean, chang
     image(`position-icon-${i}`, `position-${i}`, trackData.karts[0].icon, { width: mobile ? 26 : 36, height: mobile ? 26 : 36 });
     if (!mobile) label(`position-name-${i}`, `position-${i}`, "", 17);
   }
-  image("map", "root", session.course.minimap.image, { position: "absolute", left: layout.left, bottom: mapBottom, width: mapSize, height: mapSize });
+  image("map", "root", resources.path(session.course.minimap.image), { position: "absolute", left: layout.left, bottom: mapBottom, width: mapSize, height: mapSize });
   for (const racer of session.race.racers) image(`map-${racer.id}`, "root", trackData.karts.find((kart) => kart.id === racer.kartId)!.icon, { position: "absolute", width: racer === session.race.player ? 22 : 16, height: racer === session.race.player ? 22 : 16 });
   image("speed-meter", "root", "ui/speedback.png", { position: "absolute", right: layout.right + 28, bottom: speedBottom, width: 145 * unit, height: 145 * unit });
   label("speed", "root", "", 29, { position: "absolute", right: layout.right + 57 * unit, bottom: speedBottom + 52 * unit });

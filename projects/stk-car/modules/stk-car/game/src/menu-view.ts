@@ -9,7 +9,7 @@ import { isChinese, sourceText, tr } from "./localization.js";
 import { formatTime } from "./race.js";
 import type { PcSession } from "./session.js";
 import { trackData } from "./track-data.js";
-import { courseFor, courses } from "./courses.js";
+import { courseFor, courses, sceneFor } from "./courses.js";
 import { kartMenuSource, menuGeometry, playerKartRects } from "./kart-layout.js";
 
 export interface MenuButton {
@@ -18,7 +18,7 @@ export interface MenuButton {
   caption?: { id: string; text: string; size: number };
   field?: { inner: string; editing: boolean };
 }
-export interface MenuHost { register(button: MenuButton): void; modal(): void; focus(id: string): void; resourceStatus(rect: Rect): void; }
+export interface MenuHost { register(button: MenuButton): void; modal(): void; focus(id: string): void; resourceStatus(rect: Rect): void; viewScene(): void; }
 export const menuWidgetId = (page: string, id: string): string => `gui:${page}:${id}`;
 const transparent = [0, 0, 0, 0], ink = [0, 0, 0, 1], blue = [0, 0, 0.7, 1];
 // Classic stkskin.xml text_field colors; STK edit boxes use solid fills, not button textures.
@@ -73,7 +73,9 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
   m.page = page;
   const mobile = !!layout.mobile;
   const playableTrack = page === "track_info" && !!courseFor(m.track);
+  const viewableScene = page === "track_info" && !!sceneFor(m.track)?.view;
   const previewNote = tr("Preview only. This track has no race available.", "仅供预览，当前赛道暂未开放比赛。");
+  const viewSceneLabel = tr("View 3D Scene", "查看 3D 场景");
   const singleRaceLabel = tr("Choose a Single Race Track", "选择单场比赛赛道");
   const { rect: safeRect, scale } = menuGeometry(layout);
   const counts = new Map<string, number>();
@@ -108,7 +110,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       const gp = currentPage === "grand_prix_editor" || currentPage === "gp_info" ? menuData.grandPrix.find((gp) => gp.id === m.grandPrix) : undefined;
       const query = m.fields[`${currentPage}:search`]?.toLocaleLowerCase() ?? "";
       const priority = (id: string) => { const index = courses.findIndex((course) => course.id === id); return index < 0 ? courses.length : index; };
-      return menuData.tracks.filter((track) => track.id !== "overworld" && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => priority(a.id) - priority(b.id)).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name) + (currentPage === "tracks_and_gp" && !courseFor(track.id) ? tr(" · Preview", " · 预览") : ""), image: track.image, selected: track.id === m.track }));
+      return menuData.tracks.filter((track) => (currentPage === "tracks_and_gp" ? sceneFor(track.id) : !track.internal && track.id !== "overworld") && (gp ? gp.tracks.includes(track.id) : true) && (!query || `${track.name} ${sourceText(track.name)}`.toLocaleLowerCase().includes(query))).sort((a, b) => priority(a.id) - priority(b.id)).map((track) => ({ id: `track:${track.id}`, text: sourceText(track.name) + (currentPage === "tracks_and_gp" && !courseFor(track.id) ? tr(" · 3D Scene", " · 3D 场景") : ""), image: track.image, selected: track.id === m.track }));
     }
     if (id === "players") return m.profiles.map((name, index) => ({ id: `profile:${index}`, text: name === "Player" ? tr("Player", "玩家") : name, image: trackData.karts[index % trackData.karts.length].icon, selected: m.player === index }));
     if (id === "resolutions") return ["1280 × 720", "1600 × 900", "1920 × 1080"].map((label) => ({ id: `resolution:${label}`, text: label, selected: label === (m.values["resolution"] ?? "1280 × 720") }));
@@ -161,9 +163,13 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       if (r.width < 1 || r.height < 1 || node.tag === "spacer" || logical.startsWith("test_")) return;
       const id = uid(menuWidgetId(currentPage, logical));
       if (currentPage === "track_info") {
-        if (!playableTrack && ["race-options-box", "buttons"].includes(logical)) return;
+        if (!playableTrack && logical === "race-options-box") return;
+        if (!playableTrack && logical === "buttons") {
+          if (viewableScene) button(menuWidgetId(currentPage, "view-scene"), r, viewSceneLabel, host.viewScene);
+          return;
+        }
         if (logical === "max-arena-players") {
-          if (playableTrack) host.resourceStatus(r);
+          if (playableTrack || viewableScene) host.resourceStatus(r);
           else text(id, previewNote, r, Math.max(12, 15 * scale));
           return;
         }
@@ -324,7 +330,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       const list = items("tracks", page), columns = Math.max(3, Math.min(5, Math.floor(r.width / 160))), capacity = columns * 2, key = "mobile-tracks";
       const total = Math.max(1, Math.ceil(list.length / capacity)), number = Math.min(m.listPages[key] ?? 0, total - 1);
       m.listPages[key] = number;
-      text("mobile-track-heading", tr("Playable: Hacienda and Lighthouse", "可玩赛道：庄园、灯塔"), rect(4, gpHeight + 68, r.width - 8, 20), 15, ink, "left");
+      text("mobile-track-heading", tr("Tracks & 3D Scenes", "赛道与 3D 场景"), rect(4, gpHeight + 68, r.width - 8, 20), 15, ink, "left");
       const y = gpHeight + 90, height = Math.max(44, (r.height - y - 30) / 2);
       list.slice(number * capacity, (number + 1) * capacity).forEach((item, index) => { card(item, rect(index % columns * r.width / columns + 4, y + Math.floor(index / columns) * height, r.width / columns - 8, height - 4)); });
       pagination(key, r, total);
@@ -334,14 +340,17 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
       const left = r.width * 0.5, right = left + 20, column = r.width - right;
       if (tracks[0]) picture("mobile-gp-preview", tracks[0].image, rect(0, 56, left, Math.max(80, r.height - 130)));
       text("mobile-gp-tracks", tracks.map((track) => sourceText(track.name)).join(" · "), rect(0, r.height - 68, left, 60), 15);
-      text("mobile-gp-note", tr("Grand Prix menu preview. Hacienda and Lighthouse single races are playable.", "大奖赛菜单预览。当前可玩庄园和灯塔单场比赛。"), rect(right, 60, column, Math.max(70, r.height - 180)), 18, ink, "left");
+      text("mobile-gp-note", tr("Grand Prix menu preview. Choose a track to play a single race.", "大奖赛菜单预览。可选赛道开始单场比赛。"), rect(right, 60, column, Math.max(70, r.height - 180)), 18, ink, "left");
       button(menuWidgetId(page, "start"), rect(right, r.height - 112, column, 44), tr("Grand Prix Preview", "大奖赛预览"), action("start"));
       button(menuWidgetId(page, "single-race"), rect(right, r.height - 56, column, 48), singleRaceLabel, action("single-race"));
     } else {
       const left = r.width * 0.43, right = left + 20, column = r.width - right;
       picture("mobile-track-preview", m.selectedTrack.image, rect(0, 56, left, Math.max(70, r.height - 110)));
       if (!playableTrack) {
-        text("mobile-track-preview-note", previewNote, rect(right, 56, column, Math.max(70, r.height - 110)), 16);
+        if (viewableScene) {
+          host.resourceStatus(rect(right, r.height - 88, column, 32));
+          button(menuWidgetId(page, "view-scene"), rect(right, r.height - 52, column, 48), viewSceneLabel, host.viewScene);
+        } else text("mobile-track-preview-note", previewNote, rect(right, 56, column, Math.max(70, r.height - 110)), 16);
         return true;
       }
       text("mobile-track-best", session.best > 0 ? `${tr("Best time", "最佳成绩")}  ${formatTime(session.best)}` : tr("No high score yet", "暂无最高成绩"), rect(0, r.height - 48, left, 40), 16);
@@ -380,6 +389,7 @@ export function mountSourceMenu(session: PcSession, layout: Layout, host: MenuHo
 
   if (session.screen !== "main" && !(mobile && drawMobilePage(safeRect))) drawPage(page, safeRect);
   if (playableTrack) host.focus(menuWidgetId(page, "start"));
+  else if (viewableScene) host.focus(menuWidgetId(page, "view-scene"));
   if (m.dialog) {
     spawn("menu-dialog-shade", "node", "root", { position: "absolute", left: 0, top: 0, width: "100%", height: "100%", background: [0, 0, 0, 0.55] });
     host.modal();
