@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import test from "node:test";
 import { advanceWheelSpin, kartFrame, wheelTransform } from "../modules/stk-car/game/src/kart-transform.ts";
 import { trackData } from "../modules/stk-car/game/src/track-data.ts";
 import { wheelRadius } from "./spm.ts";
+import { readLocalAsset } from "./asset-fixture.ts";
 
 type Point = readonly number[];
 const rotateX = ([x, y, z]: Point, a: number) => [x, y * Math.cos(a) - z * Math.sin(a), y * Math.sin(a) + z * Math.cos(a)];
@@ -56,7 +55,9 @@ test("forward rolling cancels ground contact velocity; reverse, pause and per-wh
 
 test("prepared wheel radii match the actual GLB vertical bounds and reject empty or flat meshes", () => {
   for (const kart of trackData.karts) for (const wheel of kart.wheels) {
-    const data = readFileSync(resolve(import.meta.dirname, "../modules/stk-car/game/assets", wheel.path));
+    assert.ok(wheel.radius > 0.05 && wheel.radius < 0.3);
+    const data = readLocalAsset(wheel.path);
+    if (!data) continue;
     const gltf = JSON.parse(data.subarray(20, 20 + data.readUInt32LE(12)).toString()) as {
       meshes: { primitives: { attributes: { POSITION: number } }[] }[];
       accessors: { min: number[]; max: number[] }[];
@@ -64,7 +65,6 @@ test("prepared wheel radii match the actual GLB vertical bounds and reject empty
     const positions = gltf.meshes[0].primitives.map((primitive) => gltf.accessors[primitive.attributes.POSITION]);
     const expected = (Math.max(...positions.map((p) => p.max[1])) - Math.min(...positions.map((p) => p.min[1]))) / 2;
     assert.ok(Math.abs(wheel.radius - expected) < 1e-8, `${kart.id}: ${wheel.path}`);
-    assert.ok(wheel.radius > 0.05 && wheel.radius < 0.3);
   }
   assert.throws(() => wheelRadius({ materials: [], primitives: [] }), /Invalid wheel/);
   assert.throws(() => wheelRadius({ materials: [], primitives: [{ material: 0, positions: [0, 0, 0], normals: [], uvs: [], colors: [], indices: [] }] }), /Invalid wheel/);

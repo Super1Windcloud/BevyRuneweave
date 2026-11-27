@@ -5,12 +5,15 @@ import test from "node:test";
 import { halfFloat, readSpm } from "./spm.ts";
 import { trackData } from "../modules/stk-car/game/src/track-data.ts";
 import { courseModelPaths, mapScenes } from "../modules/stk-car/game/src/courses.ts";
+import { readLocalAsset } from "./asset-fixture.ts";
 
 const assets = resolve(import.meta.dirname, "../modules/stk-car/game/assets");
 test("original menu and race music and effect resources are included in the asset manifest", () => {
   const manifest = JSON.parse(readFileSync(join(assets, "asset-manifest.json"), "utf8")) as { files: string[] };
   for (const path of [...Object.values(trackData.audio), "audio/sfx/engine_small.ogg", "audio/sfx/nitro.ogg", "audio/sfx/start_race.ogg", "audio/sfx/skid.ogg"]) {
-    assert.ok(manifest.files.includes(path)); assert.equal(readFileSync(join(assets, path)).subarray(0, 4).toString(), "OggS");
+    assert.ok(manifest.files.includes(path));
+    const data = readLocalAsset(path);
+    if (data) assert.equal(data.subarray(0, 4).toString(), "OggS");
   }
   for (const path of ["licenses/music.txt", "licenses/sfx.txt", "ui/bottom_bar.png", "ui/menu_story.png", "ui/menu_multi.png"]) assert.ok(manifest.files.includes(path));
 });
@@ -27,7 +30,8 @@ test("all converted GLBs are self-contained with valid bounds, triangle indices 
   const paths = new Set([...mapScenes.flatMap(courseModelPaths), trackData.kartModel, ...trackData.wheels.map((wheel) => wheel.path),
     trackData.menuSkyModel, ...Object.values(trackData.pickupModels), ...trackData.karts.flatMap((kart) => [kart.model, ...kart.wheels.map((wheel) => wheel.path)])]);
   for (const path of paths) {
-    const data = readFileSync(join(assets, path));
+    const data = readLocalAsset(path);
+    if (!data) continue;
     assert.ok(data.length <= 90 * 1024 ** 2, path);
     assert.equal(data.readUInt32LE(), 0x46546c67);
     assert.equal(data.readUInt32LE(4), 2);

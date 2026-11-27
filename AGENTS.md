@@ -145,9 +145,11 @@ cannot be executed in the current environment must be called out explicitly as a
 
 Each game package must include `assets/engineConfig.json` with `schemaVersion`, `name`, `version`,
 and `script.language`/`script.entry`. Entry paths must remain relative to `assets` and must not use `..`.
-Version game assets under `projects/**/game/assets/`, including converted GLB models, textures,
-fonts, audio, manifests, licenses and generated script entries used by the runtime. Do not ignore
-these assets or require a separate local upstream asset checkout for ordinary game launches.
+Version the assets needed to start each game, along with its manifests, licenses, and generated
+script entries. Keep STK Car's Release-backed scene models, additional kart models, music,
+previews, and map images in the local assets directory. Track their immutable URLs and hashes in
+the resource catalog. A clean checkout must be able to package the startup bundle and launch the
+game with on-demand downloads.
 Regenerate JavaScript entries through their TypeScript build command; do not edit them by hand.
 Keep build/release output under `dist/`; never commit `.env`, tokens, native runtime binaries,
 installers or release archives.

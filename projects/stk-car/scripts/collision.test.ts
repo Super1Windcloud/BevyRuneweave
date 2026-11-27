@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import test from "node:test";
 import { kartBodies } from "../modules/stk-car/game/src/kart-bodies.ts";
 import { kartContact, resolveKartContacts } from "../modules/stk-car/game/src/kart-collision.ts";
 import { Circuit, Race, emptyControls, fixedStep, type Racer } from "../modules/stk-car/game/src/race.ts";
 import { trackData } from "../modules/stk-car/game/src/track-data.ts";
 import { courses } from "../modules/stk-car/game/src/courses.ts";
+import { readLocalAsset } from "./asset-fixture.ts";
 
 const circuit = new Circuit([{ center: [0, 0, 0], width: 30 }, { center: [0, 0, -200], width: 30 }, { center: [200, 0, -200], width: 30 }, { center: [200, 0, 0], width: 30 }]);
 function race(count = 2): Race {
@@ -28,8 +27,10 @@ const energy = (racers: Racer[]) => racers.reduce((sum, racer) => sum + racer.sp
 test("collision bounds match each packaged chassis and all four wheel mounts", () => {
   for (const kart of trackData.karts) {
     const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
-    for (const part of [{ path: kart.model, position: [0, 0, 0] }, ...kart.wheels]) {
-      const bytes = readFileSync(resolve(import.meta.dirname, "../modules/stk-car/game/assets", part.path));
+    const parts = [{ path: kart.model, position: [0, 0, 0] }, ...kart.wheels].map((part) => ({ ...part, data: readLocalAsset(part.path) }));
+    if (parts.some((part) => !part.data)) continue;
+    for (const part of parts) {
+      const bytes = part.data!;
       const gltf = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString()) as { meshes: { primitives: { attributes: { POSITION: number } }[] }[]; accessors: { min: number[]; max: number[] }[] };
       for (const primitive of gltf.meshes[0].primitives) for (let axis = 0; axis < 3; axis++) {
         const bounds = gltf.accessors[primitive.attributes.POSITION];

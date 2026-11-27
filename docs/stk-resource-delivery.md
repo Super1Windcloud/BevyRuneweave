@@ -9,8 +9,10 @@ other playable karts, music and large track previews are downloaded separately.
 `projects/stk-car/modules/stk-car/game/assets/source/` versions the complete local
 STK models/items, sound effects, scenery library, GUI, skins, fonts and replay inputs.
 Its `source-manifest.json` records SHA-256 provenance. These production inputs are
-excluded from both startup and full playable ZIPs. Existing converted GLBs remain
-versioned for repeatable conversion checks and builds.
+excluded from both startup and full playable ZIPs. Published runtime models,
+music, previews, and map images stay in the local asset directory after
+conversion. The repository tracks the startup files, build inputs, and the
+catalog with the immutable URLs, file sizes, and hashes of the published packs.
 
 All 18 original karts, original music, all 44 scene directories and the complete
 public texture library are preserved as four `stk-source-*.zip` Release assets.
@@ -25,6 +27,7 @@ downloaded and opened in the 3D viewer. Races use the four existing playable kar
 ```sh
 npm --prefix projects/stk-car run import:local-assets -- --source=/absolute/stk-assets --code=/absolute/stk-code
 npm exec --prefix projects/stk-car -- tsx projects/stk-car/scripts/prepare-source-packs.ts --source=/absolute/stk-assets
+npm --prefix projects/stk-car run prepare:packs
 npm --prefix projects/stk-car run package
 npm --prefix projects/stk-car run publish:packs
 ```
@@ -38,8 +41,9 @@ The content prerelease does not replace the launcher's current stable release.
 
 `prepare:packs` generates `resource-catalog.ts`, `startup-manifest.json` and
 `dist/stk-car/packs/publication.json`. URLs pin a release tag and full SHA-256 name.
-`package` writes `dist/stk-car/stk-car.zip`; `tsx scripts/package.ts --full` with the
-project workdir writes `stk-car-full.zip` for offline testing of existing gameplay.
+`package` writes `dist/stk-car/stk-car.zip` directly from the tracked startup
+manifest and catalog. `tsx scripts/package.ts --full` uses the local converted
+assets to write `stk-car-full.zip` for offline testing.
 The shared encrypted publisher also honors the startup manifest, excluding source
 libraries and remote payloads from its game ZIP.
 

@@ -9,6 +9,7 @@ import { resourceCatalog } from "../modules/stk-car/game/src/resource-catalog.ts
 import { courseFor, courseModelPaths, mapScenes, sceneFor } from "../modules/stk-car/game/src/courses.ts";
 import { menuData } from "../modules/stk-car/game/src/menu-data.ts";
 import { load } from "./game-fixture.ts";
+import { readLocalAsset } from "./asset-fixture.ts";
 
 const catalog: ResourceCatalog = { schemaVersion: 1, owners: { "a.glb": "a", "b.glb": "b", "c.ogg": "c" }, packs: ["a", "b", "c"].map((id) => ({ id, url: `https://example.com/${id}.zip`, bytes: 100, sha256: "a".repeat(64), files: [] })) };
 test("foreground dependencies outrank queued music and downloads stay bounded", () => {
@@ -170,8 +171,13 @@ test("startup payload excludes production sources, scenes, extra vehicles and mu
   for (const path of startup.files) assert.equal(packFor(path), null, path);
   for (const [path, owner] of Object.entries(resourceCatalog.owners)) assert.ok(resourceCatalog.packs.some((pack) => pack.id === owner && pack.files.some((file) => file.path === path)));
   for (const pack of resourceCatalog.packs) {
-    const files = pack.files.map((file) => ({ path: file.path, data: readFileSync(`${root}/${file.path}`) }));
-    for (let i = 0; i < files.length; i++) assert.equal(sha256(files[i].data), pack.files[i].sha256);
+    const files = pack.files.flatMap((file) => {
+      const data = readLocalAsset(file.path);
+      if (!data) return [];
+      assert.equal(sha256(data), file.sha256, file.path);
+      return [{ path: file.path, data }];
+    });
+    if (files.length !== pack.files.length) continue;
     const archive = zipFiles(files); assert.equal(sha256(archive), pack.sha256); assert.equal(archive.length, pack.bytes);
   }
   assert.deepEqual(zipFiles([{ path: "a.txt", data: Buffer.from("a") }]), zipFiles([{ path: "a.txt", data: Buffer.from("a") }]));

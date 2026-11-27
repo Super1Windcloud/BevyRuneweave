@@ -11,3 +11,14 @@ index.html
 temp
 .DS_Store
 /examples/app-debug
+
+# STK Car content packs are published to GitHub Release and retained locally.
+/projects/stk-car/modules/stk-car/game/assets/models/*-scene.glb
+/projects/stk-car/modules/stk-car/game/assets/models/*-scene-*.glb
+/projects/stk-car/modules/stk-car/game/assets/models/*-sky.glb
+/projects/stk-car/modules/stk-car/game/assets/models/lighthouse.glb
+/projects/stk-car/modules/stk-car/game/assets/models/scenery-*.glb
+/projects/stk-car/modules/stk-car/game/assets/models/karts/
+/projects/stk-car/modules/stk-car/game/assets/audio/music/
+/projects/stk-car/modules/stk-car/game/assets/ui/catalog/
+/projects/stk-car/modules/stk-car/game/assets/ui/maps/

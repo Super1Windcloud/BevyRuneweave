@@ -12,7 +12,7 @@
     "prepare:assets": "tsx scripts/prepare-assets.ts",
     "prepare:packs": "tsx scripts/prepare-packs.ts",
     "test": "tsx --test scripts/*.test.ts",
-    "package": "npm run prepare:packs && tsx scripts/package.ts",
+    "package": "tsx scripts/package.ts",
     "publish:packs": "tsx --env-file=../../.env scripts/publish-packs.ts",
     "import:local-assets": "tsx scripts/import-local-assets.ts"
   },
