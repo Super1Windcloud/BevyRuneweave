@@ -4,6 +4,7 @@ struct RemoteAsset: Decodable, Sendable {
     let name: String
     let url: URL
     let size: Int64
+    var presentation: GamePresentation? = nil
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -30,7 +31,14 @@ final class ReleaseClient {
         }
     }
 
+    private struct GameCatalog: Decodable, Sendable {
+        let schemaVersion: Int
+        let games: [String: GamePresentation]
+    }
+
     private let apiRoot = URL(string: "https://api.github.com/repos/Super1Windcloud/BevyRuneweave")!
+    private let directDownloads = URL(string: "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/")!
+    private let catalogName = "game-catalog.json"
     private let session: URLSession
 
     private init() {
@@ -42,21 +50,52 @@ final class ReleaseClient {
 
     func loadLatest(completion: @escaping (Result<RemoteRelease, Error>) -> Void) {
         #if !DEBUG
-        completion(.success(fallbackRelease()))
-        return
+        loadDirectRelease(completion: completion)
         #else
         request(apiRoot.appendingPathComponent("releases/latest"), as: LatestRelease.self) { result in
             switch result {
             case let .success(latest):
-                completion(.success(RemoteRelease(tag: latest.tag, assets: latest.assets.sorted {
+                let assets = latest.assets.filter { $0.name != self.catalogName }.sorted {
                     $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-                })))
+                }
+                let catalog = latest.assets.first { $0.name == self.catalogName }?.url
+                guard let catalog, catalog.absoluteString.hasPrefix(
+                    "https://github.com/Super1Windcloud/BevyRuneweave/releases/download/"
+                ) else {
+                    completion(.success(RemoteRelease(tag: latest.tag, assets: assets)))
+                    return
+                }
+                self.loadCatalog(catalog) { games in
+                    let decorated = assets.map { asset in
+                        var game = asset
+                        game.presentation = games[asset.name]
+                        return game
+                    }
+                    completion(.success(RemoteRelease(tag: latest.tag, assets: decorated)))
+                }
             case let .failure(error):
                 NSLog("GitHub release API unavailable, using direct downloads: %@", String(describing: error))
-                completion(.success(self.fallbackRelease()))
+                self.loadDirectRelease(completion: completion)
             }
         }
         #endif
+    }
+
+    private func loadCatalog(_ url: URL, completion: @escaping ([String: GamePresentation]) -> Void) {
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 5)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        session.dataTask(with: request) { data, response, error in
+            let result = self.validatedData(data: data, response: response, error: error, maximumBytes: 128 * 1024)
+            guard let data = try? result.get(),
+                  let catalog = try? JSONDecoder().decode(GameCatalog.self, from: data),
+                  catalog.schemaVersion == 1 else {
+                completion([:])
+                return
+            }
+            completion(catalog.games.filter { name, _ in
+                name.range(of: #"\A[A-Za-z0-9][A-Za-z0-9._-]{0,123}\.zip\z"#, options: .regularExpression) != nil
+            })
+        }.resume()
     }
 
     /// Reports received and expected bytes on the main queue; expected is zero when unknown.
@@ -122,17 +161,17 @@ final class ReleaseClient {
         return .success(data)
     }
 
-    private func fallbackRelease() -> RemoteRelease {
-        let root = URL(
-            string: "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download/"
-        )!
-        let names = [
-            "script-squadron-typescript.zip",
-            "script-squadron-js.zip",
-            "script-squadron-lua.zip",
-        ]
-        return RemoteRelease(tag: "direct downloads", assets: names.map {
-            RemoteAsset(name: $0, url: root.appendingPathComponent($0), size: 0)
-        })
+    private func loadDirectRelease(completion: @escaping (Result<RemoteRelease, Error>) -> Void) {
+        loadCatalog(directDownloads.appendingPathComponent(catalogName)) { games in
+            let names = games.isEmpty ? [
+                "script-squadron-typescript.zip",
+                "script-squadron-js.zip",
+                "script-squadron-lua.zip",
+            ] : games.keys.sorted()
+            completion(.success(RemoteRelease(tag: "direct downloads", assets: names.map {
+                RemoteAsset(name: $0, url: self.directDownloads.appendingPathComponent($0),
+                            size: 0, presentation: games[$0])
+            })))
+        }
     }
 }

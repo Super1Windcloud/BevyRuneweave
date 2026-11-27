@@ -347,6 +347,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
     private let downloadProgress = UIProgressView(progressViewStyle: .default)
     private let installedTitle = HostStyle.label(hostText("Your next adventure awaits"), size: 19,
                                                 color: HostStyle.primary, weight: .semibold)
+    private let installedDescription = HostStyle.label("", size: 14)
     private let installedDetail = HostStyle.label(hostText("Choose a release below to get started."), size: 14)
     private let statusRow = UIStackView()
     private let scroll = UIScrollView()
@@ -410,6 +411,7 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         add(section(hostText("Your space")), to: content, spacing: 12)
         let installed = HostStyle.stack(spacing: 6)
         installed.addArrangedSubview(installedTitle)
+        installed.addArrangedSubview(installedDescription)
         installed.addArrangedSubview(installedDetail)
         installed.setCustomSpacing(18, after: installedDetail)
         configureButton(launchButton, title: hostText("Start installed game"), symbol: "play",
@@ -548,7 +550,8 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
             for (index, asset) in release.assets.enumerated() {
                 let button = HostActionButton(type: .custom)
                 let detail = asset.size > 0 ? hostText("{size} · Download", formattedByteCount(asset.size)) : hostText("Download release asset")
-                configureButton(button, title: "\(asset.name)\n\(detail)",
+                let copy = GamePresentation.text(for: asset.presentation, fallback: asset.name)
+                configureButton(button, title: [copy.title, copy.description, detail].compactMap { $0 }.joined(separator: "\n"),
                                 action: #selector(downloadPreset(_:)))
                 button.isEnabled = !busy
                 button.tag = index
@@ -589,11 +592,15 @@ final class HostLauncherViewController: UIViewController, UITextFieldDelegate {
         guard let config = try? store.installedConfig() else {
             launchButton.isEnabled = false
             installedTitle.text = hostText("Your next adventure awaits")
+            installedDescription.isHidden = true
             installedDetail.text = hostText("Choose a release below to get started.")
             return
         }
         launchButton.isEnabled = !busy
-        installedTitle.text = config.name
+        let copy = GamePresentation.text(for: config.presentation, fallback: config.name)
+        installedTitle.text = copy.title
+        installedDescription.text = copy.description
+        installedDescription.isHidden = copy.description == nil
         installedDetail.text = hostText("Ready to play · v{version} · {language}", config.version, config.script.language)
     }
 

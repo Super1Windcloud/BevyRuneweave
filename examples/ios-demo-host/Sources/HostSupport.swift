@@ -2,8 +2,9 @@ import Foundation
 
 // Honor the system/app language; all Chinese variants use the Simplified Chinese
 // catalog and other languages fall back to English. Keep strings in native resources.
+private let hostUsesChinese = Locale.preferredLanguages.first?.lowercased().hasPrefix("zh") == true
 private let hostLanguageBundle: Bundle = {
-    let language = Locale.preferredLanguages.first?.lowercased().hasPrefix("zh") == true ? "zh-Hans" : "en"
+    let language = hostUsesChinese ? "zh-Hans" : "en"
     guard let path = Bundle.main.path(forResource: language, ofType: "lproj"),
           let bundle = Bundle(path: path) else { return .main }
     return bundle
@@ -33,6 +34,45 @@ struct HostFailure: LocalizedError {
     var errorDescription: String? { message }
 }
 
+struct GamePresentation: Decodable, Sendable {
+    private struct Copy: Decodable, Sendable {
+        let appName: String?
+        let description: String?
+
+        private enum CodingKeys: String, CodingKey { case appName, description }
+
+        init(from decoder: Decoder) throws {
+            let data = try decoder.container(keyedBy: CodingKeys.self)
+            func read(_ key: CodingKeys) -> String? {
+                guard let raw = try? data.decode(String.self, forKey: key) else { return nil }
+                let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                return text.isEmpty ? nil : text
+            }
+            appName = read(.appName)
+            description = read(.description)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey { case localizations }
+    private enum LocaleKey: String, CodingKey { case chinese = "zh-CN" }
+    private let english: Copy
+    private let chinese: Copy?
+
+    init(from decoder: Decoder) throws {
+        english = try Copy(from: decoder)
+        let data = try decoder.container(keyedBy: CodingKeys.self)
+        let localizations = try? data.nestedContainer(keyedBy: LocaleKey.self, forKey: .localizations)
+        chinese = try? localizations?.decode(Copy.self, forKey: .chinese)
+    }
+
+    static func text(for game: Self?, fallback: String, useChinese: Bool = hostUsesChinese)
+        -> (title: String, description: String?) {
+        let localized = useChinese ? game?.chinese : nil
+        return (localized?.appName ?? game?.english.appName ?? fallback,
+                localized?.description ?? game?.english.description)
+    }
+}
+
 struct EngineConfig: Decodable {
     struct Mobile: Decodable {
         let orientation: String?
@@ -48,6 +88,9 @@ struct EngineConfig: Decodable {
     let version: String
     let script: Script
     let mobile: Mobile?
+    var presentation: GamePresentation?
+
+    private enum CodingKeys: String, CodingKey { case schemaVersion, name, version, script, mobile }
 }
 
 func safeRelativePath(_ path: String, allowTrailingSlash: Bool = false) -> Bool {
@@ -62,7 +105,9 @@ func safeRelativePath(_ path: String, allowTrailingSlash: Bool = false) -> Bool 
 
 func validateAssets(at assets: URL) throws -> EngineConfig {
     let configURL = assets.appendingPathComponent("engineConfig.json")
-    let config = try JSONDecoder().decode(EngineConfig.self, from: Data(contentsOf: configURL))
+    let data = try Data(contentsOf: configURL)
+    let decoder = JSONDecoder()
+    var config = try decoder.decode(EngineConfig.self, from: data)
     guard config.schemaVersion == 1 else { throw HostFailure(hostText("Unsupported engineConfig schemaVersion")) }
     guard !config.name.isEmpty, !config.version.isEmpty else {
         throw HostFailure(hostText("engineConfig name and version must not be empty"))
@@ -87,6 +132,7 @@ func validateAssets(at assets: URL) throws -> EngineConfig {
     guard FileManager.default.fileExists(atPath: assets.appendingPathComponent(entry).path) else {
         throw HostFailure(hostText("Script entry does not exist: {entry}", entry))
     }
+    config.presentation = try? decoder.decode(GamePresentation.self, from: data)
     return config
 }
 

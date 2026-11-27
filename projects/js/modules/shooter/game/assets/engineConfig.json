@@ -2,6 +2,14 @@
   "schemaVersion": 1,
   "name": "script-squadron-js",
   "version": "0.1.0",
+  "appName": "Script Squadron · JavaScript",
+  "description": "Pilot a starfighter, dodge incoming ships, and score points by shooting down waves of enemies.",
+  "localizations": {
+    "zh-CN": {
+      "appName": "脚本飞行队 · JavaScript",
+      "description": "驾驶星际战机，躲避来袭飞船，击落一波波敌机得分。"
+    }
+  },
   "script": { "language": "js", "entry": "shooter.js" },
   "metadata": { "runtime": "quickjs" }
 }

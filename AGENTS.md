@@ -145,6 +145,10 @@ cannot be executed in the current environment must be called out explicitly as a
 
 Each game package must include `assets/engineConfig.json` with `schemaVersion`, `name`, `version`,
 and `script.language`/`script.entry`. Entry paths must remain relative to `assets` and must not use `..`.
+Use `appName` and `description` for English display copy and `localizations["zh-CN"]` for the
+Simplified Chinese values. Keep `name` stable as the package identifier. Release packaging
+generates `game-catalog.json` from these fields for the hosts' Discover lists. Hosts read
+installed game copy from the package and fetch Discover copy from the current release.
 Version the assets needed to start each game, along with its manifests, licenses, and generated
 script entries. Keep STK Car's Release-backed scene models, additional kart models, music,
 previews, and map images in the local assets directory. Track their immutable URLs and hashes in

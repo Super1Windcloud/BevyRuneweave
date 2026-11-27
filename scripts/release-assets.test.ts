@@ -4,11 +4,32 @@ import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
-import { listReleaseAssets, releaseAssetLabel, startupAssetFiles, syncReleaseAssets, type ReleaseAsset, type ReleaseCandidate } from "./release-assets.js";
+import { gameCatalog, listReleaseAssets, releaseAssetLabel, startupAssetFiles, syncReleaseAssets, type ReleaseAsset, type ReleaseCandidate } from "./release-assets.js";
 
 function asset(id: number, name: string, label: string | null, state = "uploaded"): ReleaseAsset {
   return { id, name, label, state };
 }
+
+test("the remote game catalog copies only localized display metadata from the package configuration", (t) => {
+  const parent = resolve(import.meta.dirname, "../target/release-assets-tests");
+  mkdirSync(parent, { recursive: true });
+  const assets = mkdtempSync(join(parent, "catalog-"));
+  t.after(() => rmSync(assets, { recursive: true, force: true }));
+  writeFileSync(join(assets, "engineConfig.json"), JSON.stringify({
+    name: "stable-game-id", version: "1.0", appName: "Star Flight", description: "Fly a ship.",
+    localizations: { "zh-CN": { appName: "星际飞行", description: "驾驶飞船。", extra: "Ignored" } },
+    script: { language: "typescript", entry: "game.js" },
+  }));
+  assert.deepEqual(JSON.parse(gameCatalog([{ packageName: "star-flight-ts", assets }])), {
+    schemaVersion: 1,
+    games: {
+      "star-flight-ts.zip": {
+        appName: "Star Flight", description: "Fly a ship.",
+        localizations: { "zh-CN": { appName: "星际飞行", description: "驾驶飞船。" } },
+      },
+    },
+  });
+});
 
 test("startup manifests isolate published payloads from production sources and reject traversal", (t) => {
   const parent = resolve(import.meta.dirname, "../target/release-assets-tests"); mkdirSync(parent, { recursive: true });
@@ -189,8 +210,16 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.hostname === "uploads.test" && method === "POST") {
     const name = url.searchParams.get("name");
     const label = url.searchParams.get("label");
-    if (!label?.startsWith("runeweave-v1:")) throw new Error("Missing fingerprint label");
-    if (!Buffer.isBuffer(init.body) || init.body.readUInt32LE(0) !== 0x04034b50) throw new Error("Expected ZIP body");
+    if (!Buffer.isBuffer(init.body)) throw new Error("Expected asset body");
+    if (name === "game-catalog.json") {
+      if (!label?.startsWith("runeweave-catalog-v1:")) throw new Error("Missing catalog fingerprint");
+      if (new Headers(init.headers).get("Content-Type") !== "application/json") throw new Error("Expected JSON media type");
+      const catalog = JSON.parse(init.body.toString("utf8"));
+      if (catalog.schemaVersion !== 1 || !catalog.games["stk-car-ts.zip"].localizations["zh-CN"].appName) throw new Error("Expected localized catalog");
+    } else {
+      if (!label?.startsWith("runeweave-v1:")) throw new Error("Missing fingerprint label");
+      if (init.body.readUInt32LE(0) !== 0x04034b50) throw new Error("Expected ZIP body");
+    }
     if (state.assets.some((asset) => asset.name === name)) throw new Error("Duplicate upload");
     const asset = { id: state.nextId++, name, label, state: "uploaded" };
     state.assets.push(asset);
@@ -209,9 +238,9 @@ globalThis.fetch = async (input, init = {}) => {
   const readState = () => JSON.parse(readFileSync(stateFile, "utf8")) as RemoteState;
   const save = (state: RemoteState) => writeFileSync(stateFile, JSON.stringify(state));
   save({ assets: [asset(1, "unrelated-runtime.zip", null)], events: [], nextId: 2 });
-  const run = () => execFileSync(process.execPath, [
+  const run = (...flags: string[]) => execFileSync(process.execPath, [
     "--import", "tsx", "--import", pathToFileURL(mock).href,
-    join(root, "scripts/publish-release.ts"), `--tag=${tag}`,
+    join(root, "scripts/publish-release.ts"), `--tag=${tag}`, ...flags,
   ], {
     cwd: root, encoding: "utf8", timeout: 90_000,
     env: { ...process.env, GITHUB_TOKEN: "release-test-token", GH_TOKEN: "release-test-token",
@@ -241,4 +270,10 @@ globalThis.fetch = async (input, init = {}) => {
   assert.deepEqual(state.events.filter((event) => event.method === "DELETE"), [{ method: "DELETE", id: changed.id }]);
   assert.deepEqual(state.events.filter((event) => event.method === "POST").map((event) => event.name).sort(), [changed.name, missing.name].sort());
   assert.deepEqual(state.assets.find((item) => item.name === "unrelated-runtime.zip"), asset(1, "unrelated-runtime.zip", null));
+
+  state.assets = state.assets.filter((item) => item.name !== "game-catalog.json");
+  state.events = [];
+  save(state);
+  run("--catalog-only");
+  assert.deepEqual(readState().events, [{ method: "POST", name: "game-catalog.json" }]);
 });

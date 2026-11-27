@@ -15,6 +15,24 @@ export interface ReleaseCandidate {
   prepare(): Promise<string>;
 }
 
+export const gameCatalogName = "game-catalog.json";
+
+/** Keep the public catalog keyed by actual archive names and expose only display fields. */
+export function gameCatalog(projects: { packageName: string; assets: string }[]): string {
+  type Copy = { appName?: string; description?: string };
+  const fields = (source?: Copy): Copy => ({
+    appName: typeof source?.appName === "string" ? source.appName.trim() || undefined : undefined,
+    description: typeof source?.description === "string" ? source.description.trim() || undefined : undefined,
+  });
+  const games = Object.fromEntries([...projects].sort((a, b) => a.packageName.localeCompare(b.packageName, "en")).map((project) => {
+    const config = JSON.parse(readFileSync(join(project.assets, "engineConfig.json"), "utf8")) as Copy & {
+      localizations?: Record<string, Copy>;
+    };
+    return [`${project.packageName}.zip`, { ...fields(config), localizations: { "zh-CN": fields(config.localizations?.["zh-CN"]) } }];
+  }));
+  return `${JSON.stringify({ schemaVersion: 1, games }, null, 2)}\n`;
+}
+
 /** Optional explicit startup payload; production source assets never enter this ZIP. */
 export function startupAssetFiles(assets: string): Set<string> | null {
   const path = join(assets, "startup-manifest.json");

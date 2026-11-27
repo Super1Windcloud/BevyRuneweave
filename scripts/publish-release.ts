@@ -1,11 +1,11 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { createCipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { deflateRawSync } from "node:zlib";
 import { build, transform } from "esbuild";
-import { listReleaseAssets, releaseAssetLabel, startupAssetFiles, syncReleaseAssets, type ReleaseCandidate } from "./release-assets.js";
+import { gameCatalog, gameCatalogName, listReleaseAssets, releaseAssetLabel, startupAssetFiles, syncReleaseAssets, type ReleaseCandidate } from "./release-assets.js";
 
 const require = createRequire(import.meta.url);
 const luamin = require("luamin") as { minify(source: string): string };
@@ -14,6 +14,7 @@ const { obfuscate } = require("javascript-obfuscator") as typeof import("javascr
 const root = resolve(import.meta.dirname, "..");
 const tag = process.argv.find((arg) => arg.startsWith("--tag="))?.slice(6) ?? "0.0.1";
 const upload = !process.argv.includes("--no-upload");
+const catalogOnly = process.argv.includes("--catalog-only");
 const language = process.argv.find((arg) => arg.startsWith("--language="))?.slice(11) ?? "all";
 const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
 const output = join(root, "dist", "releases", tag);
@@ -299,11 +300,11 @@ function compressLua(source: string) {
 async function main() {
   mkdirSync(output, { recursive: true });
   const projects = discoverProjects();
-  const selectedProjects = projects.filter((project) =>
+  const selectedProjects = catalogOnly ? [] : projects.filter((project) =>
     language === "all" || project.language === language ||
     (language === "typescript" && project.language === "ts"),
   );
-  if (selectedProjects.length === 0) throw new Error(`No projects match language: ${language}`);
+  if (!catalogOnly && selectedProjects.length === 0) throw new Error(`No projects match language: ${language}`);
   const candidates: ReleaseCandidate[] = [];
   for (const project of selectedProjects) {
     const bundled = await prepareScript(project);
@@ -326,6 +327,17 @@ async function main() {
       },
     });
   }
+  const catalog = gameCatalog(projects);
+  candidates.push({
+    name: gameCatalogName,
+    label: `runeweave-catalog-v1:${createHash("sha256").update(catalog).digest("hex")}`,
+    async prepare() {
+      const archive = join(output, gameCatalogName);
+      writeFileSync(archive, catalog);
+      console.log(`Prepared ${archive}`);
+      return archive;
+    },
+  });
   if (!upload) {
     for (const candidate of candidates) await candidate.prepare();
     return;
@@ -343,7 +355,8 @@ async function main() {
       const query = new URLSearchParams({ name: candidate.name, label: candidate.label });
       const uploadUrl = release.upload_url.replace(/\{.*$/, "") + `?${query}`;
       const body = readFileSync(archive);
-      const uploaded = await fetch(uploadUrl, { method: "POST", headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/zip" }, body });
+      const contentType = candidate.name === gameCatalogName ? "application/json" : "application/zip";
+      const uploaded = await fetch(uploadUrl, { method: "POST", headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28", "Content-Type": contentType }, body });
       if (!uploaded.ok) throw new Error(`Upload failed for ${candidate.name}: ${uploaded.status} ${await uploaded.text()}`);
     },
     log: console.log,

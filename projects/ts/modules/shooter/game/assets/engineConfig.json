@@ -2,7 +2,14 @@
   "schemaVersion": 1,
   "name": "script-squadron-typescript",
   "version": "0.1.0",
-  "appName": "Script Squadron",
+  "appName": "Script Squadron · TypeScript",
+  "description": "Pilot a starfighter, dodge incoming ships, and score points by shooting down waves of enemies.",
+  "localizations": {
+    "zh-CN": {
+      "appName": "脚本飞行队 · TypeScript",
+      "description": "驾驶星际战机，躲避来袭飞船，击落一波波敌机得分。"
+    }
+  },
   "icon": "https://raw.githubusercontent.com/Super1Windcloud/bevy-script-squadron-runtime/main/assets/branding/bevy_icon.png",
   "script": { "language": "typescript", "entry": "shooter.js" },
   "metadata": { "sourceLanguage": "typescript", "runtime": "quickjs" }

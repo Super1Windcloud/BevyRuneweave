@@ -30,6 +30,7 @@ import android.widget.Switch
 import android.widget.TextView
 import org.json.JSONObject
 import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FilterInputStream
 import java.io.InputStream
@@ -82,6 +83,7 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var statusRow: LinearLayout
     private lateinit var installedTitle: TextView
+    private lateinit var installedDescription: TextView
     private lateinit var installedDetail: TextView
     private lateinit var appearanceSwitch: Switch
     private lateinit var rootView: LinearLayout
@@ -281,8 +283,10 @@ class MainActivity : Activity() {
         addView(sectionHeading(getString(R.string.host_your_space)), spaced(12))
         addView(card().apply {
             installedTitle = label(getString(R.string.host_next_adventure), 19f)
+            installedDescription = label("", 14f, secondary = true).apply { visibility = View.GONE }
             installedDetail = label(getString(R.string.host_choose_release), 14f, secondary = true)
             addView(installedTitle, spaced(6))
+            addView(installedDescription, spaced(6))
             addView(installedDetail, spaced(18))
             launchButton = themedButton(getString(R.string.host_start_installed), R.drawable.ic_play).apply {
                 setOnClickListener { launchGame() }
@@ -549,7 +553,8 @@ class MainActivity : Activity() {
         remoteAssetsStatus.text = getString(R.string.host_latest_release, tag)
         release.assets.forEach { asset ->
             val detail = if (asset.size > 0) getString(R.string.host_download_size, formatSize(asset.size)) else getString(R.string.host_download_asset)
-            val button = themedButton("${asset.name}\n$detail", R.drawable.ic_download).apply {
+            val copy = gameText(asset.presentation, asset.name)
+            val button = themedButton(listOfNotNull(copy.title, copy.description, detail).joinToString("\n"), R.drawable.ic_download).apply {
                 isEnabled = !busy
                 textSize = 14f
                 setOnClickListener {
@@ -579,15 +584,52 @@ class MainActivity : Activity() {
                 ))
             }
         }
-        return RemoteRelease(tag, assets.sortedBy { it.name.lowercase() })
+        val catalog = assets.firstOrNull { it.name == GAME_CATALOG_NAME }
+            ?.url?.takeIf { it.startsWith("https://github.com/Super1Windcloud/BevyRuneweave/releases/download/") }
+            ?.let(::readGameCatalog).orEmpty()
+        return RemoteRelease(tag, assets.filterNot { it.name == GAME_CATALOG_NAME }
+            .map { it.copy(presentation = catalog[it.name]) }
+            .sortedBy { it.name.lowercase() })
     }
 
-    private fun fallbackRemoteRelease() = RemoteRelease(
-        "direct downloads",
-        FALLBACK_RELEASE_ASSETS.map { name ->
-            RemoteAsset(name, "$GITHUB_RELEASE_DOWNLOAD_ROOT/$name", 0)
-        },
-    )
+    private fun fallbackRemoteRelease(): RemoteRelease {
+        val catalog = readGameCatalog("$GITHUB_RELEASE_DOWNLOAD_ROOT/$GAME_CATALOG_NAME")
+        val names = catalog.keys.sorted().ifEmpty { FALLBACK_RELEASE_ASSETS }
+        return RemoteRelease("direct downloads", names.map { name ->
+            RemoteAsset(name, "$GITHUB_RELEASE_DOWNLOAD_ROOT/$name", 0, catalog[name])
+        })
+    }
+
+    private fun readGameCatalog(url: String): Map<String, JSONObject> = runCatching {
+        val connection = URL(url).openConnection() as HttpsURLConnection
+        connection.connectTimeout = 5_000
+        connection.readTimeout = 5_000
+        connection.useCaches = false
+        try {
+            check(connection.responseCode in 200..299)
+            val data = ByteArrayOutputStream()
+            connection.inputStream.use { input ->
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    check(data.size() + count <= MAX_GAME_CATALOG_BYTES)
+                    data.write(buffer, 0, count)
+                }
+            }
+            val catalog = JSONObject(data.toString(Charsets.UTF_8.name()))
+            check(catalog.optInt("schemaVersion") == 1)
+            val games = catalog.getJSONObject("games")
+            buildMap {
+                for (name in games.keys()) {
+                    if (!GAME_ARCHIVE_NAME.matches(name)) continue
+                    games.optJSONObject(name)?.let { put(name, it) }
+                }
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }.getOrDefault(emptyMap())
 
     private fun readJsonObject(url: URL) = JSONObject(readRemoteMetadata(url))
 
@@ -847,11 +889,25 @@ class MainActivity : Activity() {
             JSONObject(File(assets, "engineConfig.json").readText())
         }.getOrNull()
         launchButton.isEnabled = !busy && config != null
-        installedTitle.text = config?.getString("name") ?: getString(R.string.host_next_adventure)
+        val copy = gameText(config, config?.getString("name") ?: getString(R.string.host_next_adventure))
+        installedTitle.text = copy.title
+        installedDescription.text = copy.description
+        installedDescription.visibility = if (copy.description == null) View.GONE else View.VISIBLE
         installedDetail.text = if (config != null) {
             getString(R.string.host_ready, config.getString("version"), config.getJSONObject("script").getString("language"))
         } else getString(R.string.host_choose_release)
         refreshButtons()
+    }
+
+    private fun gameText(config: JSONObject?, fallback: String): GameText {
+        val localized = if (resources.configuration.locales.get(0)?.language == "zh") {
+            config?.optJSONObject("localizations")?.optJSONObject("zh-CN")
+        } else null
+        fun read(metadata: JSONObject?, key: String) = (metadata?.opt(key) as? String)?.trim()?.takeIf { it.isNotEmpty() }
+        return GameText(
+            read(localized, "appName") ?: read(config, "appName") ?: fallback,
+            read(localized, "description") ?: read(config, "description"),
+        )
     }
 
     private fun setBusy(busy: Boolean, message: String) {
@@ -897,6 +953,9 @@ class MainActivity : Activity() {
             "https://api.github.com/repos/Super1Windcloud/BevyRuneweave"
         private const val GITHUB_RELEASE_DOWNLOAD_ROOT =
             "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download"
+        private const val GAME_CATALOG_NAME = "game-catalog.json"
+        private const val MAX_GAME_CATALOG_BYTES = 128 * 1024
+        private val GAME_ARCHIVE_NAME = Regex("[a-zA-Z0-9][a-zA-Z0-9._-]{0,123}\\.zip")
         private val FALLBACK_RELEASE_ASSETS = listOf(
             "script-squadron-typescript.zip",
             "script-squadron-js.zip",
@@ -942,7 +1001,8 @@ class MainActivity : Activity() {
         }
     }
 
-    private data class RemoteAsset(val name: String, val url: String, val size: Long)
+    private data class RemoteAsset(val name: String, val url: String, val size: Long, val presentation: JSONObject? = null)
+    private data class GameText(val title: String, val description: String?)
     private data class RemoteRelease(val tag: String, val assets: List<RemoteAsset>)
 
     private enum class Page { HOME, SETTINGS }

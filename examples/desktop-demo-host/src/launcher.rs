@@ -378,7 +378,10 @@ impl Launcher {
                                             game.version
                                         ),
                                         cx,
-                                    )),
+                                    ))
+                                    .when_some(game.description.clone(), |view, description| {
+                                        view.child(secondary(description, cx))
+                                    }),
                             ),
                     )
                     .child(
@@ -502,7 +505,10 @@ impl Launcher {
                     .child(secondary(
                         format!("{}  /  v{}", game.language.label(), game.version),
                         cx,
-                    )),
+                    ))
+                    .when_some(game.description.clone(), |view, description| {
+                        view.child(secondary(description, cx))
+                    }),
             )
             .when(active && !compact, |view| {
                 view.child(pill(text("Last played"), cx))
@@ -621,6 +627,7 @@ impl Launcher {
         cx: &mut Context<Self>,
     ) -> gpui_kit::Div {
         let download = asset.clone();
+        let (name, description) = asset.display();
         let size = if asset.size == 0 {
             text("Release asset").to_owned()
         } else {
@@ -655,8 +662,11 @@ impl Launcher {
                         div()
                             .font_weight(FontWeight::MEDIUM)
                             .truncate()
-                            .child(asset.name.clone()),
+                            .child(name.to_owned()),
                     )
+                    .when_some(description, |view, description| {
+                        view.child(secondary(description.to_owned(), cx))
+                    })
                     .child(secondary(size, cx)),
             )
             .child(
@@ -1079,6 +1089,7 @@ mod tests {
         initial.installed_games.push(InstalledGame {
             project: "demo".to_owned(),
             name: "Demo".to_owned(),
+            description: None,
             version: "1.0".to_owned(),
             language: Language::TypeScript,
         });

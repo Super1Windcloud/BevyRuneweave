@@ -2,7 +2,14 @@
     "schemaVersion": 1,
     "name": "stk-car",
     "version": "0.1.0",
-    "appName": "STK Car",
+    "appName": "STK Kart Racing",
+    "description": "Drift and boost on 3D tracks, race AI rivals, or set your fastest time in Time Trial.",
+    "localizations": {
+        "zh-CN": {
+            "appName": "STK 卡丁车",
+            "description": "在 3D 赛道上漂移和加速，与 AI 赛车同场竞技，或在计时赛中刷新成绩。"
+        }
+    },
     "icon": "branding/tux.png",
     "window": { "width": 1280, "height": 720, "vsync": false },
     "render": { "msaaSamples": 1, "fxaa": true },

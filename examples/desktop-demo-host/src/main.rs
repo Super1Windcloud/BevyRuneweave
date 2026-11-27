@@ -15,6 +15,7 @@ use libloading::{Library, Symbol};
 use lzma_rust2::XzReader;
 use serde::Deserialize;
 use std::{
+    collections::BTreeMap,
     ffi::{CString, OsStr, c_char, c_int},
     fs::{self, File},
     io::{self, Cursor, Read, Write},
@@ -26,6 +27,7 @@ use std::{
         mpsc::{self, Receiver},
     },
     thread,
+    time::Duration,
 };
 
 const CONFIG_FILE: &str = "engineConfig.json";
@@ -34,6 +36,8 @@ const BUILD_TARGET: &str = env!("RUNEWEAVE_BUILD_TARGET");
 const GITHUB_API_ROOT: &str = "https://api.github.com/repos/Super1Windcloud/BevyRuneweave";
 const GITHUB_RELEASE_DOWNLOAD_ROOT: &str =
     "https://github.com/Super1Windcloud/BevyRuneweave/releases/latest/download";
+const GAME_CATALOG_NAME: &str = "game-catalog.json";
+const MAX_GAME_CATALOG_BYTES: usize = 128 * 1024;
 const FALLBACK_RELEASE_ASSETS: [&str; 3] = [
     "script-squadron-typescript.zip",
     "script-squadron-js.zip",
@@ -122,11 +126,73 @@ struct EngineConfig {
     schema_version: u32,
     name: String,
     version: String,
-    #[serde(default, rename = "appName")]
-    _app_name: Option<String>,
+    #[serde(flatten)]
+    presentation: GamePresentation,
     #[serde(default)]
     icon: Option<String>,
     script: ScriptConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+struct GamePresentation {
+    #[serde(default)]
+    app_name: serde_json::Value,
+    #[serde(default)]
+    description: serde_json::Value,
+    #[serde(default)]
+    localizations: serde_json::Value,
+}
+
+impl GamePresentation {
+    fn text<'a>(&'a self, fallback: &'a str, chinese: bool) -> (&'a str, Option<&'a str>) {
+        fn nonblank(value: &serde_json::Value) -> Option<&str> {
+            value
+                .as_str()
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+        }
+        let localized = if chinese {
+            &self.localizations["zh-CN"]
+        } else {
+            &serde_json::Value::Null
+        };
+        let name = nonblank(&localized["appName"])
+            .or_else(|| nonblank(&self.app_name))
+            .unwrap_or(fallback);
+        let description =
+            nonblank(&localized["description"]).or_else(|| nonblank(&self.description));
+        (name, description)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GameCatalog {
+    schema_version: u32,
+    games: BTreeMap<String, GamePresentation>,
+}
+
+fn parse_game_catalog(bytes: &[u8]) -> Option<BTreeMap<String, GamePresentation>> {
+    if bytes.len() > MAX_GAME_CATALOG_BYTES {
+        return None;
+    }
+    let mut catalog: GameCatalog = serde_json::from_slice(bytes).ok()?;
+    if catalog.schema_version != 1 {
+        return None;
+    }
+    catalog.games.retain(|name, _| {
+        name.len() <= 128
+            && name.ends_with(".zip")
+            && name
+                .as_bytes()
+                .first()
+                .is_some_and(u8::is_ascii_alphanumeric)
+            && name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte))
+    });
+    Some(catalog.games)
 }
 
 #[derive(Deserialize)]
@@ -140,6 +206,18 @@ struct ReleaseAsset {
     name: String,
     browser_download_url: String,
     size: u64,
+    #[serde(skip)]
+    presentation: Option<GamePresentation>,
+}
+
+impl ReleaseAsset {
+    fn display(&self) -> (&str, Option<&str>) {
+        self.presentation
+            .as_ref()
+            .map_or((self.name.as_str(), None), |game| {
+                game.text(&self.name, i18n::is_chinese())
+            })
+    }
 }
 
 #[derive(Deserialize)]
@@ -154,6 +232,7 @@ type RemoteAssetsResult = Result<(String, Vec<ReleaseAsset>), String>;
 struct InstalledGame {
     project: String,
     name: String,
+    description: Option<String>,
     version: String,
     language: Language,
 }
@@ -618,9 +697,11 @@ fn installed_games_at(
         let Ok(config) = load_config(&assets) else {
             continue;
         };
+        let (name, description) = config.presentation.text(&config.name, i18n::is_chinese());
         games.push(InstalledGame {
             project,
-            name: config.name,
+            name: name.to_owned(),
+            description: description.map(str::to_owned),
             version: config.version,
             language: config.script.language,
         });
@@ -979,17 +1060,43 @@ fn fetch_remote_assets() -> Receiver<RemoteAssetsResult> {
 }
 
 fn load_remote_assets() -> RemoteAssetsResult {
-    #[cfg(not(debug_assertions))]
-    {
-        Ok(("direct downloads".to_owned(), fallback_release_assets()))
-    }
     #[cfg(debug_assertions)]
-    {
-        load_remote_assets_from_api().or_else(|error| {
+    match load_remote_assets_from_api() {
+        Ok(release) => return Ok(release),
+        Err(error) => {
             eprintln!("GitHub release API unavailable, using direct downloads: {error}");
-            Ok(("direct downloads".to_owned(), fallback_release_assets()))
-        })
+        }
     }
+    let url = format!("{GITHUB_RELEASE_DOWNLOAD_ROOT}/{GAME_CATALOG_NAME}");
+    let assets = match load_game_catalog(&url) {
+        Some(games) if !games.is_empty() => games
+            .into_iter()
+            .map(|(name, presentation)| ReleaseAsset {
+                browser_download_url: format!("{GITHUB_RELEASE_DOWNLOAD_ROOT}/{name}"),
+                name,
+                size: 0,
+                presentation: Some(presentation),
+            })
+            .collect(),
+        _ => fallback_release_assets(),
+    };
+    Ok(("direct downloads".to_owned(), assets))
+}
+
+fn load_game_catalog(url: &str) -> Option<BTreeMap<String, GamePresentation>> {
+    let client = reqwest::blocking::Client::builder()
+        .https_only(true)
+        .timeout(Duration::from_secs(5))
+        .user_agent("BevyRuneweave-Desktop-Demo/0.1")
+        .build()
+        .ok()?;
+    let response = client.get(url).send().ok()?.error_for_status().ok()?;
+    let mut bytes = Vec::new();
+    response
+        .take((MAX_GAME_CATALOG_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    parse_game_catalog(&bytes)
 }
 
 #[cfg(debug_assertions)]
@@ -1013,6 +1120,20 @@ fn load_remote_assets_from_api() -> RemoteAssetsResult {
         .map_err(|error| error.to_string())?
         .json::<LatestRelease>()
         .map_err(|error| error.to_string())?;
+    if let Some(index) = latest
+        .assets
+        .iter()
+        .position(|asset| asset.name == GAME_CATALOG_NAME)
+    {
+        let url = latest.assets.remove(index).browser_download_url;
+        if url.starts_with("https://github.com/Super1Windcloud/BevyRuneweave/releases/download/")
+            && let Some(mut catalog) = load_game_catalog(&url)
+        {
+            for asset in &mut latest.assets {
+                asset.presentation = catalog.remove(&asset.name);
+            }
+        }
+    }
     latest.assets.sort_by(|left, right| {
         left.name
             .to_ascii_lowercase()
@@ -1028,6 +1149,7 @@ fn fallback_release_assets() -> Vec<ReleaseAsset> {
             name: name.to_owned(),
             browser_download_url: format!("{GITHUB_RELEASE_DOWNLOAD_ROOT}/{name}"),
             size: 0,
+            presentation: None,
         })
         .collect()
 }
@@ -1688,6 +1810,35 @@ mod tests {
         assert_eq!(assets[0].name, "script-squadron-typescript.zip");
         assert_eq!(format_size(assets[0].size), "1.0 MB");
         assert_eq!(format_size(assets[1].size), "512 B");
+    }
+
+    #[test]
+    fn game_catalog_localizes_copy_and_rejects_unsafe_download_names() {
+        let catalog = parse_game_catalog(
+            r#"{"schemaVersion":1,"games":{
+                "star-flight.zip":{"appName":"Star Flight","description":"Fly a ship.",
+                   "localizations":{"zh-CN":{"appName":"星际飞行","description":" "}}},
+                "old-game.zip":{"description":5},
+                "../download.zip":{"appName":"Ignored"},
+                "other.txt":{"appName":"Ignored"}
+            }}"#
+            .as_bytes(),
+        )
+        .unwrap();
+        assert_eq!(catalog.len(), 2);
+        assert_eq!(
+            catalog["star-flight.zip"].text("archive", true),
+            ("星际飞行", Some("Fly a ship."))
+        );
+        assert_eq!(
+            catalog["star-flight.zip"].text("archive", false),
+            ("Star Flight", Some("Fly a ship."))
+        );
+        assert_eq!(
+            catalog["old-game.zip"].text("Old game", false),
+            ("Old game", None)
+        );
+        assert!(parse_game_catalog(br#"{"schemaVersion":2,"games":{}}"#).is_none());
     }
 
     #[test]

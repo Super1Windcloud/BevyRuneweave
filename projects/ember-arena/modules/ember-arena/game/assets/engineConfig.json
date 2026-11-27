@@ -2,7 +2,14 @@
   "schemaVersion": 1,
   "name": "ember-arena",
   "version": "0.1.0",
-  "appName": "Shattered Pixel Dungeon",
+    "appName": "Ember Arena",
+    "description": "Explore five sewer depths, scavenge gear and supplies, and fight monsters in turn-based battles.",
+    "localizations": {
+        "zh-CN": {
+            "appName": "余烬地牢",
+            "description": "探索五层下水道，搜集装备和补给，在回合制战斗中对抗怪物。"
+        }
+    },
   "icon": "branding/shattered-pixel-dungeon.png",
   "window": {
     "width": 800,
